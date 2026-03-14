@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pintuotuo/backend/config"
+	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 )
 
@@ -38,7 +40,7 @@ type AuthResponse struct {
 func RegisterUser(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -51,7 +53,7 @@ func RegisterUser(c *gin.Context) {
 		req.Email,
 	).Scan(&existingUser.ID)
 	if err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+		middleware.RespondWithError(c, apperrors.ErrUserAlreadyExists)
 		return
 	}
 
@@ -66,7 +68,12 @@ func RegisterUser(c *gin.Context) {
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"USER_CREATION_FAILED",
+			"Failed to create user",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -76,7 +83,12 @@ func RegisterUser(c *gin.Context) {
 		user.ID, 0,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initialize token balance"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"TOKEN_INIT_FAILED",
+			"Failed to initialize token balance",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -93,7 +105,7 @@ func RegisterUser(c *gin.Context) {
 func LoginUser(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -108,13 +120,13 @@ func LoginUser(c *gin.Context) {
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &passwordHash, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidCredentials)
 		return
 	}
 
 	// Verify password
 	if !verifyPassword(req.Password, passwordHash) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidCredentials)
 		return
 	}
 
@@ -138,7 +150,7 @@ func LogoutUser(c *gin.Context) {
 func GetCurrentUser(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -151,7 +163,7 @@ func GetCurrentUser(c *gin.Context) {
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		middleware.RespondWithError(c, apperrors.ErrUserNotFound)
 		return
 	}
 
@@ -162,7 +174,7 @@ func GetCurrentUser(c *gin.Context) {
 func UpdateCurrentUser(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -170,7 +182,7 @@ func UpdateCurrentUser(c *gin.Context) {
 		Name string `json:"name"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -183,7 +195,12 @@ func UpdateCurrentUser(c *gin.Context) {
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"USER_UPDATE_FAILED",
+			"Failed to update user",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -203,7 +220,7 @@ func GetUserByID(c *gin.Context) {
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		middleware.RespondWithError(c, apperrors.ErrUserNotFound)
 		return
 	}
 
@@ -219,7 +236,7 @@ func UpdateUser(c *gin.Context) {
 		Role string `json:"role"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -232,7 +249,12 @@ func UpdateUser(c *gin.Context) {
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"USER_UPDATE_FAILED",
+			"Failed to update user",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/errors"
 )
 
 // CORSMiddleware handles CORS for API requests
@@ -32,13 +33,22 @@ func ErrorHandlingMiddleware() gin.HandlerFunc {
 			if err := recover(); err != nil {
 				log.Printf("Panic: %v", err)
 				c.JSON(500, gin.H{
-					"error": "internal server error",
+					"code":    "INTERNAL_SERVER_ERROR",
 					"message": "An unexpected error occurred",
 				})
 				c.Abort()
 			}
 		}()
 		c.Next()
+
+		// Check if there are errors in the context
+		if len(c.Errors) > 0 {
+			lastErr := c.Errors.Last()
+			if appErr, ok := lastErr.Err.(*errors.AppError); ok {
+				c.JSON(appErr.Status, appErr)
+				return
+			}
+		}
 	}
 }
 
@@ -111,6 +121,11 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// RespondWithError is a helper function to respond with an AppError
+func RespondWithError(c *gin.Context, appErr *errors.AppError) {
+	c.JSON(appErr.Status, appErr)
 }
 
 // RateLimitMiddleware limits request rate (to be implemented)
