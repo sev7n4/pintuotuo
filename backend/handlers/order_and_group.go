@@ -7,6 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/config"
+	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 )
 
@@ -14,7 +16,7 @@ import (
 func CreateOrder(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -25,7 +27,7 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -39,12 +41,12 @@ func CreateOrder(c *gin.Context) {
 	).Scan(&product.ID, &product.Price, &product.Stock)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
 	}
 
 	if product.Stock < req.Quantity {
-		c.JSON(http.StatusConflict, gin.H{"error": "Insufficient stock"})
+		middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
 		return
 	}
 
@@ -58,7 +60,12 @@ func CreateOrder(c *gin.Context) {
 	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"ORDER_CREATION_FAILED",
+			"Failed to create order",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -69,7 +76,7 @@ func CreateOrder(c *gin.Context) {
 func ListOrders(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -95,7 +102,7 @@ func ListOrders(c *gin.Context) {
 		userID, perPageNum, offset,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch orders"})
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 	defer rows.Close()
@@ -105,7 +112,7 @@ func ListOrders(c *gin.Context) {
 		var o models.Order
 		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan order"})
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 		orders = append(orders, o)
@@ -126,7 +133,7 @@ func ListOrders(c *gin.Context) {
 func GetOrderByID(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -141,7 +148,7 @@ func GetOrderByID(c *gin.Context) {
 	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
 	}
 
@@ -152,7 +159,7 @@ func GetOrderByID(c *gin.Context) {
 func CancelOrder(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -168,12 +175,12 @@ func CancelOrder(c *gin.Context) {
 	).Scan(&status)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
 	}
 
 	if status != "pending" {
-		c.JSON(http.StatusConflict, gin.H{"error": "Can only cancel pending orders"})
+		middleware.RespondWithError(c, apperrors.ErrCannotCancelOrder)
 		return
 	}
 
@@ -184,7 +191,12 @@ func CancelOrder(c *gin.Context) {
 	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"ORDER_CANCEL_FAILED",
+			"Failed to cancel order",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -195,7 +207,7 @@ func CancelOrder(c *gin.Context) {
 func CreateGroup(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -206,13 +218,13 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
 	// Validate deadline is in future
 	if req.Deadline.Before(time.Now()) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Deadline must be in the future"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidGroupData)
 		return
 	}
 
@@ -222,7 +234,7 @@ func CreateGroup(c *gin.Context) {
 	var productID int
 	err := db.QueryRow("SELECT id FROM products WHERE id = $1", req.ProductID).Scan(&productID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
 	}
 
@@ -233,7 +245,12 @@ func CreateGroup(c *gin.Context) {
 	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create group"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"GROUP_CREATION_FAILED",
+			"Failed to create group",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
