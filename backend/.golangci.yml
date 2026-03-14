@@ -1,0 +1,50 @@
+run:
+  timeout: 5m
+  tests: false
+  modules-download-mode: readonly
+
+output:
+  format: colored-line-number
+  sort-results: true
+
+linters:
+  disable-all: true
+  enable:
+    - deadcode
+    - errcheck
+    - gofmt
+    - govet
+    - goconst
+    - gosimple
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - misspell
+    - unparam
+    - varcheck
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  gofmt:
+    simplify: true
+  misspell:
+    locale: US
+  govet:
+    check-shadowing: true
+
+issues:
+  exclude-use-default: false
+  exclude:
+    - "should have a package comment"
+    - "comment should be of the form"
+  exclude-rules:
+    - path: "_test.go"
+      linters:
+        - unparam
+        - varcheck
+    - path: "migrations"
+      linters:
+        - deadcode

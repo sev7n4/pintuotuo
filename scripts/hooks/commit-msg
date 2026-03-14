@@ -1,0 +1,22 @@
+#!/bin/bash
+# Commit message hook for Pintuotuo project
+# Validates commit message follows conventional commits
+
+MESSAGE=$(cat "$1")
+COMMIT_REGEX='^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?!?: .{1,50}'
+ERROR_MSG="Commit message does not follow conventional commits format.
+
+Format: <type>(<scope>): <subject>
+
+Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build, revert
+Example: feat(auth): add user login endpoint
+
+For more info: https://www.conventionalcommits.org/"
+
+if ! [[ $MESSAGE =~ $COMMIT_REGEX ]]; then
+    echo "$ERROR_MSG"
+    exit 1
+fi
+
+echo "✓ Commit message follows conventional commits"
+exit 0
