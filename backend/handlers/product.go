@@ -1,11 +1,17 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
+	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
+	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 )
 
@@ -13,7 +19,7 @@ import (
 func ListProducts(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")
-	status := c.DefaultQuery("status", "")
+	status := c.DefaultQuery("status", "active")
 
 	pageNum, _ := strconv.Atoi(page)
 	perPageNum, _ := strconv.Atoi(perPage)
@@ -29,15 +35,23 @@ func ListProducts(c *gin.Context) {
 
 	db := config.GetDB()
 
-	// Build query
-	query := "SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3"
-	if status == "" {
-		query = "SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products WHERE status = 'active' ORDER BY created_at DESC LIMIT $2 OFFSET $3"
+	// Build query with proper parameter handling for PostgreSQL
+	var rows *sql.Rows
+	var err error
+	if status == "" || status == "all" {
+		rows, err = db.Query(
+			"SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+			perPageNum, offset,
+		)
+	} else {
+		rows, err = db.Query(
+			"SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+			status, perPageNum, offset,
+		)
 	}
 
-	rows, err := db.Query(query, status, perPageNum, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 	defer rows.Close()
@@ -47,7 +61,7 @@ func ListProducts(c *gin.Context) {
 		var p models.Product
 		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.Stock, &p.Status, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan product"})
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 		products = append(products, p)
@@ -55,11 +69,16 @@ func ListProducts(c *gin.Context) {
 
 	// Get total count
 	var total int
-	countQuery := "SELECT COUNT(*) FROM products WHERE status = $1"
-	if status == "" {
-		countQuery = "SELECT COUNT(*) FROM products WHERE status = 'active'"
+	var countErr error
+	if status == "" || status == "all" {
+		countErr = db.QueryRow("SELECT COUNT(*) FROM products").Scan(&total)
+	} else {
+		countErr = db.QueryRow("SELECT COUNT(*) FROM products WHERE status = $1", status).Scan(&total)
 	}
-	db.QueryRow(countQuery, status).Scan(&total)
+
+	if countErr != nil {
+		total = 0
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"total":    total,
@@ -69,12 +88,23 @@ func ListProducts(c *gin.Context) {
 	})
 }
 
-// GetProductByID retrieves a single product by ID
+// GetProductByID retrieves a single product by ID with caching
 func GetProductByID(c *gin.Context) {
 	id := c.Param("id")
+	ctx := context.Background()
 
+	// Try cache first
+	cacheKey := cache.ProductKey(idToInt(id))
+	if cachedProduct, err := cache.Get(ctx, cacheKey); err == nil {
+		var product models.Product
+		if err := json.Unmarshal([]byte(cachedProduct), &product); err == nil {
+			c.JSON(http.StatusOK, product)
+			return
+		}
+	}
+
+	// Query database
 	db := config.GetDB()
-
 	var product models.Product
 	err := db.QueryRow(
 		"SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products WHERE id = $1",
@@ -82,8 +112,13 @@ func GetProductByID(c *gin.Context) {
 	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
+	}
+
+	// Cache the result
+	if productJSON, err := json.Marshal(product); err == nil {
+		cache.Set(ctx, cacheKey, string(productJSON), cache.ProductCacheTTL)
 	}
 
 	c.JSON(http.StatusOK, product)
@@ -93,7 +128,7 @@ func GetProductByID(c *gin.Context) {
 func SearchProducts(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query required"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -121,7 +156,7 @@ func SearchProducts(c *gin.Context) {
 		searchQuery, perPageNum, offset,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search products"})
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 	defer rows.Close()
@@ -131,7 +166,7 @@ func SearchProducts(c *gin.Context) {
 		var p models.Product
 		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.Stock, &p.Status, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan product"})
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 		products = append(products, p)
@@ -156,7 +191,7 @@ func SearchProducts(c *gin.Context) {
 func CreateProduct(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -169,7 +204,7 @@ func CreateProduct(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidProductData)
 		return
 	}
 
@@ -179,7 +214,7 @@ func CreateProduct(c *gin.Context) {
 	var role string
 	err := db.QueryRow("SELECT role FROM users WHERE id = $1", userID).Scan(&role)
 	if err != nil || role != "merchant" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only merchants can create products"})
+		middleware.RespondWithError(c, apperrors.ErrMerchantOnly)
 		return
 	}
 
@@ -190,7 +225,12 @@ func CreateProduct(c *gin.Context) {
 	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"PRODUCT_CREATION_FAILED",
+			"Failed to create product",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -201,7 +241,7 @@ func CreateProduct(c *gin.Context) {
 func UpdateProduct(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -217,7 +257,7 @@ func UpdateProduct(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -226,8 +266,14 @@ func UpdateProduct(c *gin.Context) {
 	// Verify ownership
 	var merchantID int
 	err := db.QueryRow("SELECT merchant_id FROM products WHERE id = $1", id).Scan(&merchantID)
-	if err != nil || merchantID != userID.(int) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own products"})
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok || merchantID != userIDInt {
+		middleware.RespondWithError(c, apperrors.ErrForbidden)
 		return
 	}
 
@@ -238,9 +284,18 @@ func UpdateProduct(c *gin.Context) {
 	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"PRODUCT_UPDATE_FAILED",
+			"Failed to update product",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
+
+	// Invalidate cache
+	ctx := context.Background()
+	cache.Delete(ctx, cache.ProductKey(idToInt(id)))
 
 	c.JSON(http.StatusOK, product)
 }
@@ -249,7 +304,7 @@ func UpdateProduct(c *gin.Context) {
 func DeleteProduct(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -260,16 +315,37 @@ func DeleteProduct(c *gin.Context) {
 	// Verify ownership
 	var merchantID int
 	err := db.QueryRow("SELECT merchant_id FROM products WHERE id = $1", id).Scan(&merchantID)
-	if err != nil || merchantID != userID.(int) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own products"})
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok || merchantID != userIDInt {
+		middleware.RespondWithError(c, apperrors.ErrForbidden)
 		return
 	}
 
 	_, err = db.Exec("DELETE FROM products WHERE id = $1", id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete product"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"PRODUCT_DELETE_FAILED",
+			"Failed to delete product",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
+	// Invalidate cache
+	ctx := context.Background()
+	cache.Delete(ctx, cache.ProductKey(idToInt(id)))
+
 	c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully"})
+}
+
+// Helper function to convert string ID to int
+func idToInt(id string) int {
+	idInt, _ := strconv.Atoi(id)
+	return idInt
 }
