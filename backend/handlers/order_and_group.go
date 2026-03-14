@@ -282,7 +282,7 @@ func ListGroups(c *gin.Context) {
 		status, perPageNum, offset,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch groups"})
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 	defer rows.Close()
@@ -292,7 +292,7 @@ func ListGroups(c *gin.Context) {
 		var g models.Group
 		err := rows.Scan(&g.ID, &g.ProductID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan group"})
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 		groups = append(groups, g)
@@ -322,7 +322,7 @@ func GetGroupByID(c *gin.Context) {
 	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
+		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
 		return
 	}
 
@@ -333,7 +333,7 @@ func GetGroupByID(c *gin.Context) {
 func JoinGroup(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -349,22 +349,27 @@ func JoinGroup(c *gin.Context) {
 	).Scan(&group.ID, &group.ProductID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
+		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
 		return
 	}
 
 	if group.Status != "active" {
-		c.JSON(http.StatusConflict, gin.H{"error": "Group is not active"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"GROUP_INACTIVE",
+			"Group is not active",
+			http.StatusConflict,
+			nil,
+		))
 		return
 	}
 
 	if group.CurrentCount >= group.TargetCount {
-		c.JSON(http.StatusConflict, gin.H{"error": "Group is already full"})
+		middleware.RespondWithError(c, apperrors.ErrGroupFull)
 		return
 	}
 
 	if time.Now().After(group.Deadline) {
-		c.JSON(http.StatusConflict, gin.H{"error": "Group deadline has passed"})
+		middleware.RespondWithError(c, apperrors.ErrGroupExpired)
 		return
 	}
 
@@ -372,7 +377,7 @@ func JoinGroup(c *gin.Context) {
 	var product models.Product
 	err = db.QueryRow("SELECT price FROM products WHERE id = $1", group.ProductID).Scan(&product.Price)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get product"})
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
 	}
 
@@ -383,7 +388,12 @@ func JoinGroup(c *gin.Context) {
 	).Scan(&orderID)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"ORDER_CREATION_FAILED",
+			"Failed to create order",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -394,7 +404,7 @@ func JoinGroup(c *gin.Context) {
 	)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to join group"})
+		middleware.RespondWithError(c, apperrors.ErrAlreadyInGroup)
 		return
 	}
 
@@ -411,7 +421,12 @@ func JoinGroup(c *gin.Context) {
 	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update group"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"GROUP_UPDATE_FAILED",
+			"Failed to update group",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -422,7 +437,7 @@ func JoinGroup(c *gin.Context) {
 func CancelGroup(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -433,14 +448,25 @@ func CancelGroup(c *gin.Context) {
 	// Verify creator
 	var creatorID int
 	err := db.QueryRow("SELECT creator_id FROM groups WHERE id = $1", id).Scan(&creatorID)
-	if err != nil || creatorID != userID.(int) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only creator can cancel group"})
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok || creatorID != userIDInt {
+		middleware.RespondWithError(c, apperrors.ErrForbidden)
 		return
 	}
 
 	_, err = db.Exec("DELETE FROM groups WHERE id = $1", id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel group"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"GROUP_DELETE_FAILED",
+			"Failed to cancel group",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -460,7 +486,7 @@ func GetGroupProgress(c *gin.Context) {
 	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Group not found"})
+		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
 		return
 	}
 
