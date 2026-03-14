@@ -10,6 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/config"
+	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 )
 
@@ -17,7 +19,7 @@ import (
 func ListAPIKeys(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -28,7 +30,7 @@ func ListAPIKeys(c *gin.Context) {
 		userID,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch API keys"})
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 	defer rows.Close()
@@ -42,7 +44,7 @@ func ListAPIKeys(c *gin.Context) {
 
 		err := rows.Scan(&id, &userIDScanned, &name, &status, &lastUsedAt, &createdAt, &updatedAt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan API key"})
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 
@@ -64,7 +66,7 @@ func ListAPIKeys(c *gin.Context) {
 func CreateAPIKey(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -73,7 +75,7 @@ func CreateAPIKey(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -81,7 +83,12 @@ func CreateAPIKey(c *gin.Context) {
 	keyBytes := make([]byte, 32)
 	_, err := rand.Read(keyBytes)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate API key"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"KEY_GENERATION_FAILED",
+			"Failed to generate API key",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -97,7 +104,12 @@ func CreateAPIKey(c *gin.Context) {
 	).Scan(&id)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create API key"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_CREATION_FAILED",
+			"Failed to create API key",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -114,7 +126,7 @@ func CreateAPIKey(c *gin.Context) {
 func UpdateAPIKey(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -126,7 +138,7 @@ func UpdateAPIKey(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -135,16 +147,16 @@ func UpdateAPIKey(c *gin.Context) {
 	// Verify ownership
 	var ownerID int
 	err := db.QueryRow("SELECT user_id FROM api_keys WHERE id = $1", id).Scan(&ownerID)
-	if err != nil || ownerID != userID.(int) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only update your own API keys"})
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrAPIKeyNotFound)
 		return
 	}
 
-	var apiKey map[string]interface{}
-	err = db.QueryRow(
-		"UPDATE api_keys SET name = COALESCE(NULLIF($1, ''), name), status = COALESCE(NULLIF($2, ''), status) WHERE id = $3 RETURNING id, user_id, name, status, created_at, updated_at",
-		req.Name, req.Status, id,
-	).Scan(&apiKey, &apiKey, &apiKey, &apiKey, &apiKey, &apiKey)
+	userIDInt, ok := userID.(int)
+	if !ok || ownerID != userIDInt {
+		middleware.RespondWithError(c, apperrors.ErrForbidden)
+		return
+	}
 
 	// Actually, let's use proper scanning
 	var apiID, apiUserID int
@@ -157,7 +169,12 @@ func UpdateAPIKey(c *gin.Context) {
 	).Scan(&apiID, &apiUserID, &apiName, &apiStatus, &apiCreatedAt, &apiUpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update API key"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_UPDATE_FAILED",
+			"Failed to update API key",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -175,7 +192,7 @@ func UpdateAPIKey(c *gin.Context) {
 func DeleteAPIKey(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -186,14 +203,25 @@ func DeleteAPIKey(c *gin.Context) {
 	// Verify ownership
 	var ownerID int
 	err := db.QueryRow("SELECT user_id FROM api_keys WHERE id = $1", id).Scan(&ownerID)
-	if err != nil || ownerID != userID.(int) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only delete your own API keys"})
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrAPIKeyNotFound)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok || ownerID != userIDInt {
+		middleware.RespondWithError(c, apperrors.ErrForbidden)
 		return
 	}
 
 	_, err = db.Exec("DELETE FROM api_keys WHERE id = $1", id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete API key"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_DELETE_FAILED",
+			"Failed to delete API key",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 

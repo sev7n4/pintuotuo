@@ -5,6 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/config"
+	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 )
 
@@ -12,7 +14,7 @@ import (
 func InitiatePayment(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -22,7 +24,7 @@ func InitiatePayment(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -36,12 +38,12 @@ func InitiatePayment(c *gin.Context) {
 	).Scan(&order.ID, &order.UserID, &order.TotalPrice, &order.Status)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
 	}
 
 	if order.Status != "pending" {
-		c.JSON(http.StatusConflict, gin.H{"error": "Order is not in pending status"})
+		middleware.RespondWithError(c, apperrors.ErrOrderAlreadyPaid)
 		return
 	}
 
@@ -52,7 +54,12 @@ func InitiatePayment(c *gin.Context) {
 	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.CreatedAt, &payment.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"PAYMENT_CREATION_FAILED",
+			"Failed to create payment",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -63,7 +70,7 @@ func InitiatePayment(c *gin.Context) {
 func GetPaymentByID(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -78,7 +85,7 @@ func GetPaymentByID(c *gin.Context) {
 	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.CreatedAt, &payment.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Payment not found"})
+		middleware.RespondWithError(c, apperrors.ErrPaymentNotFound)
 		return
 	}
 
@@ -89,7 +96,7 @@ func GetPaymentByID(c *gin.Context) {
 func RefundPayment(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -105,12 +112,12 @@ func RefundPayment(c *gin.Context) {
 	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Payment not found"})
+		middleware.RespondWithError(c, apperrors.ErrPaymentNotFound)
 		return
 	}
 
 	if payment.Status != "success" {
-		c.JSON(http.StatusConflict, gin.H{"error": "Can only refund successful payments"})
+		middleware.RespondWithError(c, apperrors.ErrPaymentAlreadyProcessed)
 		return
 	}
 
@@ -121,7 +128,12 @@ func RefundPayment(c *gin.Context) {
 	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.CreatedAt, &payment.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to refund payment"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"REFUND_FAILED",
+			"Failed to process refund",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -138,7 +150,7 @@ func HandleAlipayCallback(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -148,7 +160,7 @@ func HandleAlipayCallback(c *gin.Context) {
 	var paymentStatus string
 	err := db.QueryRow("SELECT status FROM payments WHERE id = $1", req.PaymentID).Scan(&paymentStatus)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Payment not found"})
+		middleware.RespondWithError(c, apperrors.ErrPaymentNotFound)
 		return
 	}
 
@@ -160,7 +172,12 @@ func HandleAlipayCallback(c *gin.Context) {
 	).Scan(&method)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update payment"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"PAYMENT_UPDATE_FAILED",
+			"Failed to update payment",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -171,7 +188,12 @@ func HandleAlipayCallback(c *gin.Context) {
 			"paid", req.PaymentID,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order"})
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"ORDER_UPDATE_FAILED",
+				"Failed to update order",
+				http.StatusInternalServerError,
+				err,
+			))
 			return
 		}
 	}
@@ -189,7 +211,7 @@ func HandleWechatCallback(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -199,7 +221,7 @@ func HandleWechatCallback(c *gin.Context) {
 	var paymentStatus string
 	err := db.QueryRow("SELECT status FROM payments WHERE id = $1", req.PaymentID).Scan(&paymentStatus)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Payment not found"})
+		middleware.RespondWithError(c, apperrors.ErrPaymentNotFound)
 		return
 	}
 
@@ -211,7 +233,12 @@ func HandleWechatCallback(c *gin.Context) {
 	).Scan(&method)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update payment"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"PAYMENT_UPDATE_FAILED",
+			"Failed to update payment",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -222,7 +249,12 @@ func HandleWechatCallback(c *gin.Context) {
 			"paid", req.PaymentID,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order"})
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"ORDER_UPDATE_FAILED",
+				"Failed to update order",
+				http.StatusInternalServerError,
+				err,
+			))
 			return
 		}
 	}
@@ -234,7 +266,7 @@ func HandleWechatCallback(c *gin.Context) {
 func GetTokenBalance(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -247,7 +279,7 @@ func GetTokenBalance(c *gin.Context) {
 	).Scan(&token.ID, &token.UserID, &token.Balance, &token.CreatedAt, &token.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Token balance not found"})
+		middleware.RespondWithError(c, apperrors.ErrTokenNotFound)
 		return
 	}
 
@@ -258,7 +290,7 @@ func GetTokenBalance(c *gin.Context) {
 func GetTokenConsumption(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -269,7 +301,7 @@ func GetTokenConsumption(c *gin.Context) {
 		userID,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch transactions"})
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 	defer rows.Close()
@@ -283,7 +315,7 @@ func GetTokenConsumption(c *gin.Context) {
 
 		err := rows.Scan(&id, &txType, &amount, &reason, &createdAt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan transaction"})
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 
@@ -303,7 +335,7 @@ func GetTokenConsumption(c *gin.Context) {
 func TransferTokens(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
@@ -313,7 +345,7 @@ func TransferTokens(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
@@ -323,12 +355,12 @@ func TransferTokens(c *gin.Context) {
 	var senderBalance float64
 	err := db.QueryRow("SELECT balance FROM tokens WHERE user_id = $1", userID).Scan(&senderBalance)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Sender token balance not found"})
+		middleware.RespondWithError(c, apperrors.ErrTokenNotFound)
 		return
 	}
 
 	if senderBalance < req.Amount {
-		c.JSON(http.StatusConflict, gin.H{"error": "Insufficient balance"})
+		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
 		return
 	}
 
@@ -338,7 +370,12 @@ func TransferTokens(c *gin.Context) {
 		req.Amount, userID,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update sender balance"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"TOKEN_TRANSFER_FAILED",
+			"Failed to transfer tokens",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
@@ -347,7 +384,12 @@ func TransferTokens(c *gin.Context) {
 		req.Amount, req.RecipientID,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update recipient balance"})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"TOKEN_TRANSFER_FAILED",
+			"Failed to transfer tokens",
+			http.StatusInternalServerError,
+			err,
+		))
 		return
 	}
 
