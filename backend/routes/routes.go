@@ -1,21 +1,24 @@
 package routes
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/handlers"
+)
 
 // RegisterUserRoutes registers user-related routes
 func RegisterUserRoutes(router *gin.RouterGroup) {
 	users := router.Group("/users")
 	{
 		// Auth endpoints
-		users.POST("/register", registerUser)
-		users.POST("/login", loginUser)
-		users.POST("/logout", logoutUser)
+		users.POST("/register", handlers.RegisterUser)
+		users.POST("/login", handlers.LoginUser)
+		users.POST("/logout", handlers.LogoutUser)
 
 		// User management endpoints
-		users.GET("/me", getCurrentUser)
-		users.PUT("/me", updateCurrentUser)
-		users.GET("/:id", getUserByID)
-		users.PUT("/:id", updateUser)
+		users.GET("/me", handlers.GetCurrentUser)
+		users.PUT("/me", handlers.UpdateCurrentUser)
+		users.GET("/:id", handlers.GetUserByID)
+		users.PUT("/:id", handlers.UpdateUser)
 	}
 }
 
@@ -24,16 +27,16 @@ func RegisterProductRoutes(router *gin.RouterGroup) {
 	products := router.Group("/products")
 	{
 		// Read operations
-		products.GET("", listProducts)
-		products.GET("/:id", getProductByID)
-		products.GET("/search", searchProducts)
+		products.GET("", handlers.ListProducts)
+		products.GET("/:id", handlers.GetProductByID)
+		products.GET("/search", handlers.SearchProducts)
 
 		// Merchant operations
 		merchants := products.Group("/merchants")
 		{
-			merchants.POST("", createProduct)
-			merchants.PUT("/:id", updateProduct)
-			merchants.DELETE("/:id", deleteProduct)
+			merchants.POST("", handlers.CreateProduct)
+			merchants.PUT("/:id", handlers.UpdateProduct)
+			merchants.DELETE("/:id", handlers.DeleteProduct)
 		}
 	}
 }
@@ -98,63 +101,7 @@ func RegisterPaymentRoutes(router *gin.RouterGroup) {
 	}
 }
 
-// Handler functions (placeholder implementations)
-
-// User handlers
-func registerUser(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "register user - to be implemented"})
-}
-
-func loginUser(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "login user - to be implemented"})
-}
-
-func logoutUser(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "logout user - to be implemented"})
-}
-
-func getCurrentUser(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "get current user - to be implemented"})
-}
-
-func updateCurrentUser(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "update current user - to be implemented"})
-}
-
-func getUserByID(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "get user by id - to be implemented"})
-}
-
-func updateUser(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "update user - to be implemented"})
-}
-
-// Product handlers
-func listProducts(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "list products - to be implemented"})
-}
-
-func getProductByID(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "get product by id - to be implemented"})
-}
-
-func searchProducts(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "search products - to be implemented"})
-}
-
-func createProduct(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "create product - to be implemented"})
-}
-
-func updateProduct(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "update product - to be implemented"})
-}
-
-func deleteProduct(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "delete product - to be implemented"})
-}
-
-// Order handlers
+// Order handlers (placeholders - to be implemented in handlers/order.go)
 func createOrder(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "create order - to be implemented"})
 }
@@ -171,7 +118,7 @@ func cancelOrder(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "cancel order - to be implemented"})
 }
 
-// Group handlers
+// Group handlers (placeholders - to be implemented in handlers/group.go)
 func createGroup(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "create group - to be implemented"})
 }
@@ -196,7 +143,7 @@ func getGroupProgress(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "get group progress - to be implemented"})
 }
 
-// Token handlers
+// Token handlers (placeholders - to be implemented in handlers/token.go)
 func getTokenBalance(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "get token balance - to be implemented"})
 }
@@ -225,7 +172,7 @@ func deleteAPIKey(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "delete api key - to be implemented"})
 }
 
-// Payment handlers
+// Payment handlers (placeholders - to be implemented in handlers/payment.go)
 func initiatePayment(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "initiate payment - to be implemented"})
 }
