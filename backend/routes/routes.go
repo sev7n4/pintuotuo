@@ -76,10 +76,10 @@ func RegisterTokenRoutes(router *gin.RouterGroup) {
 		// API Key management
 		keys := tokens.Group("/keys")
 		{
-			keys.GET("", listAPIKeys)
-			keys.POST("", createAPIKey)
-			keys.PUT("/:id", updateAPIKey)
-			keys.DELETE("/:id", deleteAPIKey)
+			keys.GET("", handlers.ListAPIKeys)
+			keys.POST("", handlers.CreateAPIKey)
+			keys.PUT("/:id", handlers.UpdateAPIKey)
+			keys.DELETE("/:id", handlers.DeleteAPIKey)
 		}
 	}
 }
@@ -99,21 +99,4 @@ func RegisterPaymentRoutes(router *gin.RouterGroup) {
 			webhooks.POST("/wechat", handlers.HandleWechatCallback)
 		}
 	}
-}
-
-// API Key management placeholder handlers (to be implemented in handlers/apikey.go)
-func listAPIKeys(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "list api keys - to be implemented"})
-}
-
-func createAPIKey(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "create api key - to be implemented"})
-}
-
-func updateAPIKey(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "update api key - to be implemented"})
-}
-
-func deleteAPIKey(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "delete api key - to be implemented"})
 }
