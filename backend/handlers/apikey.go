@@ -5,14 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
-	"github.com/pintuotuo/backend/models"
 )
 
 // ListAPIKeys retrieves all API keys for current user
