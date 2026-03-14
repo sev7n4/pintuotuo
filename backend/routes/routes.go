@@ -45,10 +45,10 @@ func RegisterProductRoutes(router *gin.RouterGroup) {
 func RegisterOrderRoutes(router *gin.RouterGroup) {
 	orders := router.Group("/orders")
 	{
-		orders.POST("", createOrder)
-		orders.GET("", listOrders)
-		orders.GET("/:id", getOrderByID)
-		orders.PUT("/:id/cancel", cancelOrder)
+		orders.POST("", handlers.CreateOrder)
+		orders.GET("", handlers.ListOrders)
+		orders.GET("/:id", handlers.GetOrderByID)
+		orders.PUT("/:id/cancel", handlers.CancelOrder)
 	}
 }
 
@@ -56,12 +56,12 @@ func RegisterOrderRoutes(router *gin.RouterGroup) {
 func RegisterGroupRoutes(router *gin.RouterGroup) {
 	groups := router.Group("/groups")
 	{
-		groups.POST("", createGroup)
-		groups.GET("", listGroups)
-		groups.GET("/:id", getGroupByID)
-		groups.POST("/:id/join", joinGroup)
-		groups.DELETE("/:id", cancelGroup)
-		groups.GET("/:id/progress", getGroupProgress)
+		groups.POST("", handlers.CreateGroup)
+		groups.GET("", handlers.ListGroups)
+		groups.GET("/:id", handlers.GetGroupByID)
+		groups.POST("/:id/join", handlers.JoinGroup)
+		groups.DELETE("/:id", handlers.CancelGroup)
+		groups.GET("/:id/progress", handlers.GetGroupProgress)
 	}
 }
 
@@ -69,9 +69,9 @@ func RegisterGroupRoutes(router *gin.RouterGroup) {
 func RegisterTokenRoutes(router *gin.RouterGroup) {
 	tokens := router.Group("/tokens")
 	{
-		tokens.GET("/balance", getTokenBalance)
-		tokens.GET("/consumption", getTokenConsumption)
-		tokens.POST("/transfer", transferTokens)
+		tokens.GET("/balance", handlers.GetTokenBalance)
+		tokens.GET("/consumption", handlers.GetTokenConsumption)
+		tokens.POST("/transfer", handlers.TransferTokens)
 
 		// API Key management
 		keys := tokens.Group("/keys")
@@ -88,74 +88,20 @@ func RegisterTokenRoutes(router *gin.RouterGroup) {
 func RegisterPaymentRoutes(router *gin.RouterGroup) {
 	payments := router.Group("/payments")
 	{
-		payments.POST("", initiatePayment)
-		payments.GET("/:id", getPaymentByID)
-		payments.POST("/:id/refund", refundPayment)
+		payments.POST("", handlers.InitiatePayment)
+		payments.GET("/:id", handlers.GetPaymentByID)
+		payments.POST("/:id/refund", handlers.RefundPayment)
 
 		// Webhooks
 		webhooks := payments.Group("/webhooks")
 		{
-			webhooks.POST("/alipay", handleAlipayCallback)
-			webhooks.POST("/wechat", handleWechatCallback)
+			webhooks.POST("/alipay", handlers.HandleAlipayCallback)
+			webhooks.POST("/wechat", handlers.HandleWechatCallback)
 		}
 	}
 }
 
-// Order handlers (placeholders - to be implemented in handlers/order.go)
-func createOrder(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "create order - to be implemented"})
-}
-
-func listOrders(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "list orders - to be implemented"})
-}
-
-func getOrderByID(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "get order by id - to be implemented"})
-}
-
-func cancelOrder(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "cancel order - to be implemented"})
-}
-
-// Group handlers (placeholders - to be implemented in handlers/group.go)
-func createGroup(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "create group - to be implemented"})
-}
-
-func listGroups(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "list groups - to be implemented"})
-}
-
-func getGroupByID(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "get group by id - to be implemented"})
-}
-
-func joinGroup(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "join group - to be implemented"})
-}
-
-func cancelGroup(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "cancel group - to be implemented"})
-}
-
-func getGroupProgress(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "get group progress - to be implemented"})
-}
-
-// Token handlers (placeholders - to be implemented in handlers/token.go)
-func getTokenBalance(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "get token balance - to be implemented"})
-}
-
-func getTokenConsumption(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "get token consumption - to be implemented"})
-}
-
-func transferTokens(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "transfer tokens - to be implemented"})
-}
-
+// API Key management placeholder handlers (to be implemented in handlers/apikey.go)
 func listAPIKeys(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "list api keys - to be implemented"})
 }
@@ -170,25 +116,4 @@ func updateAPIKey(c *gin.Context) {
 
 func deleteAPIKey(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "delete api key - to be implemented"})
-}
-
-// Payment handlers (placeholders - to be implemented in handlers/payment.go)
-func initiatePayment(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "initiate payment - to be implemented"})
-}
-
-func getPaymentByID(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "get payment by id - to be implemented"})
-}
-
-func refundPayment(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "refund payment - to be implemented"})
-}
-
-func handleAlipayCallback(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "handle alipay callback - to be implemented"})
-}
-
-func handleWechatCallback(c *gin.Context) {
-	c.JSON(200, gin.H{"message": "handle wechat callback - to be implemented"})
 }
