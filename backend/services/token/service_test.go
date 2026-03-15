@@ -3,14 +3,35 @@ package token
 import (
   "context"
   "database/sql"
+  "fmt"
+  "math/rand"
+  "os"
   "testing"
+  "time"
 
   "github.com/pintuotuo/backend/cache"
+  _ "github.com/lib/pq"
   "github.com/stretchr/testify/assert"
   "github.com/stretchr/testify/require"
 )
 
 var testDB *sql.DB
+var cacheInitialized bool
+
+func init() {
+  // Initialize cache for all tests (runs once)
+  os.Setenv("REDIS_URL", "redis://localhost:6380")
+  err := cache.Init()
+  if err == nil {
+    cacheInitialized = true
+  }
+  rand.Seed(time.Now().UnixNano())
+}
+
+// generateTestEmail creates a unique email for test isolation
+func generateTestEmail() string {
+  return fmt.Sprintf("test_%d_%d@example.com", time.Now().UnixNano(), rand.Intn(100000))
+}
 
 // setupTestDB initializes test database
 func setupTestDB(t *testing.T) *sql.DB {
@@ -20,7 +41,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 
   // For testing, we use a real database connection
   // In production CI/CD, use a test database
-  connStr := "postgres://pintuotuo:dev_password_123@localhost:5432/pintuotuo_db?sslmode=disable"
+  connStr := "postgres://pintuotuo:dev_password_123@localhost:5433/pintuotuo_db?sslmode=disable"
   db, err := sql.Open("postgres", connStr)
   require.NoError(t, err, "Failed to connect to test database")
 
@@ -42,7 +63,7 @@ func TestGetBalance(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_balance@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -82,7 +103,7 @@ func TestGetTotalBalance(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_total_balance@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -105,7 +126,7 @@ func TestRechargeTokens(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_recharge@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -152,7 +173,7 @@ func TestRechargeTokens(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_recharge_log@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -184,7 +205,7 @@ func TestConsumeTokens(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_consume@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -215,7 +236,7 @@ func TestConsumeTokens(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_consume_insufficient@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -247,7 +268,7 @@ func TestTransferTokens(t *testing.T) {
     var senderID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "sender_transfer@example.com", "Sender", "hash", "user", "active").Scan(&senderID)
+      generateTestEmail(), "Sender", "hash", "user", "active").Scan(&senderID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", senderID)
 
@@ -255,7 +276,7 @@ func TestTransferTokens(t *testing.T) {
     var recipientID int
     err = db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "recipient_transfer@example.com", "Recipient", "hash", "user", "active").Scan(&recipientID)
+      generateTestEmail(), "Recipient", "hash", "user", "active").Scan(&recipientID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", recipientID)
 
@@ -305,14 +326,14 @@ func TestTransferTokens(t *testing.T) {
     var senderID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "sender_insufficient@example.com", "Sender", "hash", "user", "active").Scan(&senderID)
+      generateTestEmail(), "Sender", "hash", "user", "active").Scan(&senderID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", senderID)
 
     var recipientID int
     err = db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "recipient_insufficient@example.com", "Recipient", "hash", "user", "active").Scan(&recipientID)
+      generateTestEmail(), "Recipient", "hash", "user", "active").Scan(&recipientID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", recipientID)
 
@@ -340,7 +361,7 @@ func TestGetConsumption(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_consumption@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -376,7 +397,7 @@ func TestInitializeUserTokens(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_init@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -400,7 +421,7 @@ func TestAdjustBalance(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_adjust@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -417,7 +438,7 @@ func TestAdjustBalance(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_adjust_neg@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -444,7 +465,7 @@ func TestIsBalanceSufficient(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_sufficient@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -466,7 +487,7 @@ func TestIsBalanceSufficient(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_insufficient@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -489,7 +510,7 @@ func TestCaching(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_cache@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -517,7 +538,7 @@ func TestCaching(t *testing.T) {
     var userID int
     err := db.QueryRowContext(ctx,
       "INSERT INTO users (email, name, password_hash, role, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id",
-      "test_cache_invalidate@example.com", "Test User", "hash", "user", "active").Scan(&userID)
+      generateTestEmail(), "Test User", "hash", "user", "active").Scan(&userID)
     require.NoError(t, err)
     defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 
