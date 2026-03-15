@@ -77,8 +77,10 @@ CREATE TABLE IF NOT EXISTS payments (
 -- Create tokens table (for user token balances)
 CREATE TABLE IF NOT EXISTS tokens (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id),
+    user_id INT NOT NULL UNIQUE REFERENCES users(id),
     balance DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    total_used DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    total_earned DECIMAL(10, 2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -93,3 +95,30 @@ CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
 CREATE INDEX IF NOT EXISTS idx_groups_product_id ON groups(product_id);
 CREATE INDEX IF NOT EXISTS idx_group_members_group_id ON group_members(group_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id);
+
+-- Create token_transactions table (for audit trail)
+CREATE TABLE IF NOT EXISTS token_transactions (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id),
+    type VARCHAR(50) NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    reason VARCHAR(255),
+    order_id INT REFERENCES orders(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create api_keys table
+CREATE TABLE IF NOT EXISTS api_keys (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id),
+    key_hash VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    status VARCHAR(50) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create additional indexes
+CREATE INDEX IF NOT EXISTS idx_token_transactions_user_id ON token_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_token_transactions_created_at ON token_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);

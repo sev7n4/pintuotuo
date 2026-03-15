@@ -2,6 +2,8 @@ package integration
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,8 +24,9 @@ func TestUserTokenIntegration(t *testing.T) {
 
 	t.Run("User registration initializes token balance", func(t *testing.T) {
 		// Register new user
+		userId := GenerateUniqueID()
 		req := &user.RegisterRequest{
-			Email:    "tokentest@example.com",
+			Email:    fmt.Sprintf("tokentest%d@example.com", userId),
 			Password: "TestPass123!",
 			Name:     "Token Test User",
 		}
@@ -44,7 +47,7 @@ func TestUserTokenIntegration(t *testing.T) {
 		// Create user
 		userId := GenerateUniqueID()
 		newUser, err := ts.UserService.RegisterUser(ctx, &user.RegisterRequest{
-			Email:    "payment@example.com",
+			Email:    fmt.Sprintf("payment%d@example.com", userId),
 			Password: "TestPass123!",
 			Name:     "Payment Test User",
 		})
@@ -77,7 +80,7 @@ func TestUserTokenIntegration(t *testing.T) {
 
 		// Simulate successful Alipay callback
 		alipayCallback := &payment.AlipayCallback{
-			OutTradeNo:  string(rune(paymentRecord.ID)),
+			OutTradeNo:  strconv.Itoa(paymentRecord.ID),
 			TradeNo:     "2024031500001234567",
 			TotalAmount: paymentRecord.Amount,
 			TradeStatus: "TRADE_SUCCESS",
@@ -106,15 +109,17 @@ func TestUserTokenIntegration(t *testing.T) {
 
 	t.Run("Token transfer between users", func(t *testing.T) {
 		// Create two users
+		userId1 := GenerateUniqueID()
+		userId2 := GenerateUniqueID()
 		user1, err := ts.UserService.RegisterUser(ctx, &user.RegisterRequest{
-			Email:    "transfer1@example.com",
+			Email:    fmt.Sprintf("transfer%d@example.com", userId1),
 			Password: "TestPass123!",
 			Name:     "Transfer User 1",
 		})
 		require.NoError(t, err)
 
 		user2, err := ts.UserService.RegisterUser(ctx, &user.RegisterRequest{
-			Email:    "transfer2@example.com",
+			Email:    fmt.Sprintf("transfer%d@example.com", userId2),
 			Password: "TestPass123!",
 			Name:     "Transfer User 2",
 		})

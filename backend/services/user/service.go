@@ -109,16 +109,16 @@ func (s *service) RegisterUser(ctx context.Context, req *RegisterRequest) (*User
 		return nil, wrapError("RegisterUser", "insertUser", err)
 	}
 
-	// Initialize token balance via token service
+	// Commit transaction first
+	if err := tx.Commit(); err != nil {
+		return nil, wrapError("RegisterUser", "commitTx", err)
+	}
+
+	// Initialize token balance AFTER user is committed
 	_, err = s.tokenService.InitializeUserTokens(ctx, user.ID)
 	if err != nil {
 		s.log.Printf("Warning: failed to initialize tokens for user %d: %v", user.ID, err)
 		// Log but don't fail - user registration is more critical
-	}
-
-	// Commit transaction
-	if err := tx.Commit(); err != nil {
-		return nil, wrapError("RegisterUser", "commitTx", err)
 	}
 
 	s.log.Printf("User registered: id=%d, email=%s", user.ID, user.Email)
