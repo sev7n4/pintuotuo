@@ -1,0 +1,85 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [ develop ]
+  workflow_run:
+    workflows: [ "Integration Tests" ]
+    types: [ completed ]
+    branches: [ develop ]
+
+jobs:
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Build Linux binary
+      working-directory: ./backend
+      run: |
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o backend-linux main.go
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        file: ./backend/Dockerfile.alpine
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/pintuotuo-backend:staging
+          ${{ secrets.DOCKER_USERNAME }}/pintuotuo-backend:staging-${{ github.sha }}
+
+    - name: Deploy to staging environment
+      env:
+        STAGING_SERVER: ${{ secrets.STAGING_SERVER }}
+        STAGING_USER: ${{ secrets.STAGING_USER }}
+        STAGING_KEY: ${{ secrets.STAGING_SSH_KEY }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$STAGING_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $STAGING_SERVER >> ~/.ssh/known_hosts
+
+        ssh $STAGING_USER@$STAGING_SERVER << 'DEPLOY'
+          cd /app
+          docker-compose pull
+          docker-compose down
+          docker-compose up -d
+          docker-compose logs backend
+        DEPLOY
+
+    - name: Run smoke tests
+      env:
+        STAGING_URL: ${{ secrets.STAGING_URL }}
+      run: |
+        echo "Testing health endpoint..."
+        curl -f -s "$STAGING_URL/health" || exit 1
+        echo "Staging deployment successful!"
+
+    - name: Notify deployment
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '✅ Deployed to staging environment'
+          })
