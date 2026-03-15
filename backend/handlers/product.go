@@ -31,6 +31,23 @@ func ListProducts(c *gin.Context) {
 		perPageNum = 20
 	}
 
+	ctx := context.Background()
+	cacheKey := cache.ProductListKey(pageNum, perPageNum, status)
+
+	// Try cache first
+	if cachedList, err := cache.Get(ctx, cacheKey); err == nil {
+		var cachedData struct {
+			Total   int                `json:"total"`
+			Page    int                `json:"page"`
+			PerPage int                `json:"per_page"`
+			Data    []models.Product   `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(cachedList), &cachedData); err == nil {
+			c.JSON(http.StatusOK, cachedData)
+			return
+		}
+	}
+
 	offset := (pageNum - 1) * perPageNum
 
 	db := config.GetDB()
@@ -80,12 +97,19 @@ func ListProducts(c *gin.Context) {
 		total = 0
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	result := gin.H{
 		"total":    total,
 		"page":     pageNum,
 		"per_page": perPageNum,
 		"data":     products,
-	})
+	}
+
+	// Cache the result
+	if resultJSON, err := json.Marshal(result); err == nil {
+		cache.Set(ctx, cacheKey, string(resultJSON), cache.ProductListTTL)
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // GetProductByID retrieves a single product by ID with caching
@@ -145,6 +169,23 @@ func SearchProducts(c *gin.Context) {
 		perPageNum = 20
 	}
 
+	ctx := context.Background()
+	cacheKey := cache.ProductSearchKey(query, pageNum, perPageNum)
+
+	// Try cache first
+	if cachedResults, err := cache.Get(ctx, cacheKey); err == nil {
+		var cachedData struct {
+			Total   int                `json:"total"`
+			Page    int                `json:"page"`
+			PerPage int                `json:"per_page"`
+			Data    []models.Product   `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(cachedResults), &cachedData); err == nil {
+			c.JSON(http.StatusOK, cachedData)
+			return
+		}
+	}
+
 	offset := (pageNum - 1) * perPageNum
 
 	db := config.GetDB()
@@ -179,12 +220,19 @@ func SearchProducts(c *gin.Context) {
 		searchQuery,
 	).Scan(&total)
 
-	c.JSON(http.StatusOK, gin.H{
+	result := gin.H{
 		"total":    total,
 		"page":     pageNum,
 		"per_page": perPageNum,
 		"data":     products,
-	})
+	}
+
+	// Cache the result
+	if resultJSON, err := json.Marshal(result); err == nil {
+		cache.Set(ctx, cacheKey, string(resultJSON), cache.SearchResultsTTL)
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // CreateProduct creates a new product (merchant only)
@@ -296,6 +344,8 @@ func UpdateProduct(c *gin.Context) {
 	// Invalidate cache
 	ctx := context.Background()
 	cache.Delete(ctx, cache.ProductKey(idToInt(id)))
+	cache.InvalidatePatterns(ctx, "products:list:*")
+	cache.InvalidatePatterns(ctx, "products:search:*")
 
 	c.JSON(http.StatusOK, product)
 }
@@ -340,6 +390,8 @@ func DeleteProduct(c *gin.Context) {
 	// Invalidate cache
 	ctx := context.Background()
 	cache.Delete(ctx, cache.ProductKey(idToInt(id)))
+	cache.InvalidatePatterns(ctx, "products:list:*")
+	cache.InvalidatePatterns(ctx, "products:search:*")
 
 	c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully"})
 }
