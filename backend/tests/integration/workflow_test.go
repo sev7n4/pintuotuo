@@ -19,10 +19,12 @@ func TestCompleteGroupPurchaseWithPayment(t *testing.T) {
 	ts := SetupPaymentTest(t)
 	defer TeardownPaymentTest(t, ts)
 
-	// Setup users and products
-	userAID := SeedTestUser(t, ts.DB, 20)
-	userBID := SeedTestUser(t, ts.DB, 21)
-	productID := SeedTestProduct(t, ts.DB, 20)
+	// Setup users and products with unique IDs for parallel test isolation
+	uniqueIDA := GenerateUniqueID()
+	uniqueIDB := GenerateUniqueID()
+	userAID := SeedTestUser(t, ts.DB, uniqueIDA)
+	userBID := SeedTestUser(t, ts.DB, uniqueIDB)
+	productID := SeedTestProduct(t, ts.DB, uniqueIDA)
 
 	defer CleanupTestData(t, ts.DB, userAID)
 	defer CleanupTestData(t, ts.DB, userBID)
@@ -103,8 +105,9 @@ func TestMultiplePaymentsForDifferentOrders(t *testing.T) {
 	ts := SetupPaymentTest(t)
 	defer TeardownPaymentTest(t, ts)
 
-	userID := SeedTestUser(t, ts.DB, 22)
-	productID := SeedTestProduct(t, ts.DB, 22)
+	uniqueID := GenerateUniqueID()
+	userID := SeedTestUser(t, ts.DB, uniqueID)
+	productID := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Create 3 orders
@@ -216,16 +219,17 @@ func TestConcurrentPaymentsForDifferentUsers(t *testing.T) {
 	ts := SetupPaymentTest(t)
 	defer TeardownPaymentTest(t, ts)
 
-	// Setup 3 users with orders
+	// Setup 3 users with orders - use unique IDs for parallel test isolation
 	const numUsers = 3
 	users := make([]int, numUsers)
 	orders := make([]int, numUsers)
 	payments := make([]int, numUsers)
 
-	productID := SeedTestProduct(t, ts.DB, 30)
+	baseID := GenerateUniqueID()
+	productID := SeedTestProduct(t, ts.DB, baseID)
 
 	for i := 0; i < numUsers; i++ {
-		users[i] = SeedTestUser(t, ts.DB, 30+i)
+		users[i] = SeedTestUser(t, ts.DB, baseID+i)
 		defer CleanupTestData(t, ts.DB, users[i])
 
 		req := &order.CreateOrderRequest{
@@ -321,15 +325,16 @@ func TestConcurrentRefunds(t *testing.T) {
 	ts := SetupPaymentTest(t)
 	defer TeardownPaymentTest(t, ts)
 
-	// Setup 5 users with completed payments
+	// Setup 5 users with completed payments - use unique IDs for parallel test isolation
 	const numPayments = 5
 	users := make([]int, numPayments)
 	payments := make([]int, numPayments)
 
-	productID := SeedTestProduct(t, ts.DB, 40)
+	baseID := GenerateUniqueID()
+	productID := SeedTestProduct(t, ts.DB, baseID)
 
 	for i := 0; i < numPayments; i++ {
-		users[i] = SeedTestUser(t, ts.DB, 40+i)
+		users[i] = SeedTestUser(t, ts.DB, baseID+i)
 		defer CleanupTestData(t, ts.DB, users[i])
 
 		req := &order.CreateOrderRequest{

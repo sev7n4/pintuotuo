@@ -25,8 +25,9 @@ func TestHighConcurrencyPaymentInitiation(t *testing.T) {
 	defer TeardownPaymentTest(t, ts)
 
 	const numConcurrent = 100
-	userID := SeedTestUser(t, ts.DB, 50)
-	productID := SeedTestProduct(t, ts.DB, 50)
+	uniqueID := GenerateUniqueID()
+	userID := SeedTestUser(t, ts.DB, uniqueID)
+	productID := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Prepare 100 orders
@@ -98,8 +99,9 @@ func TestHighConcurrencyWebhookCallbacks(t *testing.T) {
 	defer TeardownPaymentTest(t, ts)
 
 	const numPayments = 50
-	userID := SeedTestUser(t, ts.DB, 51)
-	productID := SeedTestProduct(t, ts.DB, 51)
+	uniqueID := GenerateUniqueID()
+	userID := SeedTestUser(t, ts.DB, uniqueID)
+	productID := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Create 50 pending payments
@@ -188,8 +190,9 @@ func TestCacheUnderLoad(t *testing.T) {
 	ts := SetupPaymentTest(t)
 	defer TeardownPaymentTest(t, ts)
 
-	userID := SeedTestUser(t, ts.DB, 52)
-	productID := SeedTestProduct(t, ts.DB, 52)
+	uniqueID := GenerateUniqueID()
+	userID := SeedTestUser(t, ts.DB, uniqueID)
+	productID := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Create 10 payments
@@ -270,8 +273,9 @@ func TestDatabaseConnectionPoolUnderLoad(t *testing.T) {
 	ts := SetupPaymentTest(t)
 	defer TeardownPaymentTest(t, ts)
 
-	userID := SeedTestUser(t, ts.DB, 53)
-	productID := SeedTestProduct(t, ts.DB, 53)
+	uniqueID := GenerateUniqueID()
+	userID := SeedTestUser(t, ts.DB, uniqueID)
+	productID := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Perform 500 concurrent operations
@@ -357,8 +361,9 @@ func TestRaceConditionDetection(t *testing.T) {
 	ts := SetupPaymentTest(t)
 	defer TeardownPaymentTest(t, ts)
 
-	userID := SeedTestUser(t, ts.DB, 54)
-	productID := SeedTestProduct(t, ts.DB, 54)
+	uniqueID := GenerateUniqueID()
+	userID := SeedTestUser(t, ts.DB, uniqueID)
+	productID := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Create order

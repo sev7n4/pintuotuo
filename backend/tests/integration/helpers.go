@@ -29,6 +29,11 @@ const (
 	TestProductPrice = 99.99
 )
 
+// GenerateUniqueID generates a unique ID for test isolation in parallel tests
+func GenerateUniqueID() int {
+	return int(time.Now().UnixNano()%100000) + rand.Intn(100000)
+}
+
 // TestServices holds all service instances for testing
 type TestServices struct {
 	DB             *sql.DB
