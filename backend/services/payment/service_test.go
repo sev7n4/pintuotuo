@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -250,7 +251,7 @@ func TestHandleAlipayCallbackValid(t *testing.T) {
 
 	// Handle callback
 	callback := &AlipayCallback{
-		OutTradeNo:  "1",
+		OutTradeNo:  strconv.Itoa(createdPayment.ID),
 		TradeNo:     "alipay_trade_123456",
 		TotalAmount: float64(createdPayment.Amount),
 		TradeStatus: "TRADE_SUCCESS",
@@ -263,7 +264,8 @@ func TestHandleAlipayCallbackValid(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, payment)
 	assert.Equal(t, "success", payment.Status)
-	assert.Equal(t, "alipay_trade_123456", payment.TransactionID)
+	assert.NotNil(t, payment.TransactionID)
+	assert.Equal(t, "alipay_trade_123456", *payment.TransactionID)
 }
 
 // TestHandleAlipayCallbackInvalidSignature tests Alipay callback with invalid signature
@@ -306,7 +308,7 @@ func TestHandleAlipayCallbackIdempotency(t *testing.T) {
 	require.NoError(t, err)
 
 	callback := &AlipayCallback{
-		OutTradeNo:  "1",
+		OutTradeNo:  strconv.Itoa(createdPayment.ID),
 		TradeNo:     "alipay_trade_789",
 		TotalAmount: float64(createdPayment.Amount),
 		TradeStatus: "TRADE_SUCCESS",
@@ -349,7 +351,7 @@ func TestHandleWechatCallbackValid(t *testing.T) {
 
 	// Handle callback
 	callback := &WechatCallback{
-		OutTradeNo:    "1",
+		OutTradeNo:    strconv.Itoa(createdPayment.ID),
 		TransactionID: "wechat_trans_456789",
 		TotalFee:      int(createdPayment.Amount * 100), // in cents
 		ResultCode:    "SUCCESS",
@@ -361,7 +363,8 @@ func TestHandleWechatCallbackValid(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, payment)
 	assert.Equal(t, "success", payment.Status)
-	assert.Equal(t, "wechat_trans_456789", payment.TransactionID)
+	assert.NotNil(t, payment.TransactionID)
+	assert.Equal(t, "wechat_trans_456789", *payment.TransactionID)
 }
 
 // TestHandleWechatCallbackInvalidSignature tests WeChat callback with invalid signature
@@ -403,7 +406,7 @@ func TestHandleWechatCallbackIdempotency(t *testing.T) {
 	require.NoError(t, err)
 
 	callback := &WechatCallback{
-		OutTradeNo:    "1",
+		OutTradeNo:    strconv.Itoa(createdPayment.ID),
 		TransactionID: "wechat_trans_999",
 		TotalFee:      int(createdPayment.Amount * 100),
 		ResultCode:    "SUCCESS",
@@ -446,7 +449,7 @@ func TestRefundPaymentValid(t *testing.T) {
 
 	// Simulate successful payment
 	callback := &AlipayCallback{
-		OutTradeNo:  "1",
+		OutTradeNo:  strconv.Itoa(createdPayment.ID),
 		TradeNo:     "alipay_refund_test",
 		TotalAmount: float64(createdPayment.Amount),
 		TradeStatus: "TRADE_SUCCESS",
