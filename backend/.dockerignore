@@ -1,0 +1,9 @@
+.git
+.gitignore
+.env.development
+.env.test
+*.md
+tests/
+vendor/
+.claude/
+*.log
