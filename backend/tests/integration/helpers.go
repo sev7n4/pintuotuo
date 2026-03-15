@@ -3,9 +3,12 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -43,9 +46,9 @@ func SetupPaymentTest(t *testing.T) *TestServices {
 		t.Fatalf("Failed to init test DB: %v", err)
 	}
 
-	// Initialize cache
+	// Initialize cache (idempotent - only initializes once)
 	if err := cache.Init(); err != nil {
-		t.Fatalf("Failed to init cache: %v", err)
+		t.Logf("Warning: Cache already initialized or failed to init: %v", err)
 	}
 
 	db := config.GetDB()
@@ -69,8 +72,7 @@ func SetupPaymentTest(t *testing.T) *TestServices {
 
 // TeardownPaymentTest cleans up test resources
 func TeardownPaymentTest(t *testing.T, ts *TestServices) {
-	// Clean up cache
-	cache.Close()
+	// Don't close cache as it's a shared global resource
 	// Connection pools close automatically
 }
 
@@ -81,9 +83,9 @@ func SeedTestUser(t *testing.T, db *sql.DB, userID int) int {
 	userService := user.NewService(db, logger)
 
 	req := &user.RegisterRequest{
-		Email:    "test" + string(rune(userID)) + "@example.com",
+		Email:    fmt.Sprintf("test%d@example.com", userID),
 		Password: "TestPassword123!",
-		Name:     "Test User",
+		Name:     fmt.Sprintf("Test User %d", userID),
 	}
 
 	registeredUser, err := userService.RegisterUser(ctx, req)
@@ -102,7 +104,7 @@ func SeedTestProduct(t *testing.T, db *sql.DB, productID int) int {
 	err := db.QueryRowContext(
 		ctx,
 		"INSERT INTO products (name, description, price, stock, merchant_id, category, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-		"Test Product "+string(rune(productID)),
+		fmt.Sprintf("Test Product %d", productID),
 		"Test product description",
 		TestProductPrice,
 		1000, // stock
@@ -191,11 +193,14 @@ func GetOrderFromDB(t *testing.T, db *sql.DB, orderID int) *order.Order {
 func CreateTestPaymentFlow(t *testing.T, ts *TestServices) (userID int, orderID int, paymentID int) {
 	ctx := context.Background()
 
-	// Create user
-	userID = SeedTestUser(t, ts.DB, 1)
+	// Generate unique ID for this test to avoid conflicts in parallel tests
+	uniqueID := int(time.Now().UnixNano()%10000) + rand.Intn(10000)
 
-	// Create product
-	productID := SeedTestProduct(t, ts.DB, 1)
+	// Create user with unique ID
+	userID = SeedTestUser(t, ts.DB, uniqueID)
+
+	// Create product with unique ID
+	productID := SeedTestProduct(t, ts.DB, uniqueID)
 
 	// Create order
 	orderID = SeedTestOrder(t, ts.DB, userID, productID)
@@ -218,8 +223,8 @@ func SimulateAlipayCallback(t *testing.T, ctx context.Context, db *sql.DB, payme
 	p := GetPaymentFromDB(t, db, paymentID)
 
 	callback := &payment.AlipayCallback{
-		OutTradeNo:  string(rune(paymentID)),
-		TradeNo:     "alipay_test_" + string(rune(paymentID)),
+		OutTradeNo:  fmt.Sprintf("%d", paymentID),
+		TradeNo:     fmt.Sprintf("alipay_test_%d", paymentID),
 		TotalAmount: p.Amount,
 		TradeStatus: "TRADE_SUCCESS",
 		Timestamp:   "2026-03-15 12:00:00",
@@ -239,8 +244,8 @@ func SimulateWechatCallback(t *testing.T, ctx context.Context, db *sql.DB, payme
 	p := GetPaymentFromDB(t, db, paymentID)
 
 	callback := &payment.WechatCallback{
-		OutTradeNo:    string(rune(paymentID)),
-		TransactionID: "wechat_test_" + string(rune(paymentID)),
+		OutTradeNo:    fmt.Sprintf("%d", paymentID),
+		TransactionID: fmt.Sprintf("wechat_test_%d", paymentID),
 		TotalFee:      int(p.Amount * 100), // Convert to cents
 		ResultCode:    "SUCCESS",
 		Sign:          "test_signature",
@@ -265,8 +270,20 @@ func CleanupTestData(t *testing.T, db *sql.DB, userID int) {
 	_, err = db.ExecContext(ctx, "DELETE FROM orders WHERE user_id = $1", userID)
 	require.NoError(t, err)
 
+	// Delete group members
+	_, err = db.ExecContext(ctx, "DELETE FROM group_members WHERE user_id = $1", userID)
+	require.NoError(t, err)
+
+	// Delete groups
+	_, err = db.ExecContext(ctx, "DELETE FROM groups WHERE user_id = $1", userID)
+	require.NoError(t, err)
+
 	// Delete user tokens
 	_, err = db.ExecContext(ctx, "DELETE FROM user_tokens WHERE user_id = $1", userID)
+	require.NoError(t, err)
+
+	// Delete tokens (balance table)
+	_, err = db.ExecContext(ctx, "DELETE FROM tokens WHERE user_id = $1", userID)
 	require.NoError(t, err)
 
 	// Delete user

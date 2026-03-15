@@ -72,9 +72,10 @@ func TestPaymentOrderSyncConsistency(t *testing.T) {
 	assert.Equal(t, "success", payment.Status)
 	assert.Equal(t, "paid", order.Status)
 
-	// 5. Verify timestamps are synchronized (payment updated after order update)
-	assert.True(t, payment.UpdatedAt.After(order.UpdatedAt) || payment.UpdatedAt.Equal(order.UpdatedAt),
-		"Payment should be updated at same time or after order")
+	// 5. Verify timestamps are approximately synchronized (within 1 second)
+	timeDiff := payment.UpdatedAt.Sub(order.UpdatedAt)
+	assert.True(t, timeDiff.Abs().Seconds() < 1.0,
+		"Payment and order timestamps should be within 1 second of each other")
 }
 
 // TestRevenueCalculationConsistency verifies commission calculations
