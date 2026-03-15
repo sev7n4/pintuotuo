@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
@@ -154,17 +157,39 @@ func GetCurrentUser(c *gin.Context) {
 		return
 	}
 
+	ctx := context.Background()
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	// Try cache first
+	cacheKey := cache.UserKey(userIDInt)
+	if cachedUser, err := cache.Get(ctx, cacheKey); err == nil {
+		var user models.User
+		if err := json.Unmarshal([]byte(cachedUser), &user); err == nil {
+			c.JSON(http.StatusOK, user)
+			return
+		}
+	}
+
 	db := config.GetDB()
 
 	var user models.User
 	err := db.QueryRow(
 		"SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1",
-		userID,
+		userIDInt,
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrUserNotFound)
 		return
+	}
+
+	// Cache the result
+	if userJSON, err := json.Marshal(user); err == nil {
+		cache.Set(ctx, cacheKey, string(userJSON), cache.UserCacheTTL)
 	}
 
 	c.JSON(http.StatusOK, user)
@@ -204,12 +229,30 @@ func UpdateCurrentUser(c *gin.Context) {
 		return
 	}
 
+	// Invalidate user cache
+	ctx := context.Background()
+	userIDInt, _ := userID.(int)
+	cache.Delete(ctx, cache.UserKey(userIDInt))
+
 	c.JSON(http.StatusOK, user)
 }
 
 // GetUserByID retrieves user by ID
 func GetUserByID(c *gin.Context) {
 	id := c.Param("id")
+
+	ctx := context.Background()
+	idInt := idToInt(id)
+
+	// Try cache first
+	cacheKey := cache.UserKey(idInt)
+	if cachedUser, err := cache.Get(ctx, cacheKey); err == nil {
+		var user models.User
+		if err := json.Unmarshal([]byte(cachedUser), &user); err == nil {
+			c.JSON(http.StatusOK, user)
+			return
+		}
+	}
 
 	db := config.GetDB()
 
@@ -222,6 +265,11 @@ func GetUserByID(c *gin.Context) {
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrUserNotFound)
 		return
+	}
+
+	// Cache the result
+	if userJSON, err := json.Marshal(user); err == nil {
+		cache.Set(ctx, cacheKey, string(userJSON), cache.UserCacheTTL)
 	}
 
 	c.JSON(http.StatusOK, user)
@@ -257,6 +305,10 @@ func UpdateUser(c *gin.Context) {
 		))
 		return
 	}
+
+	// Invalidate user cache
+	ctx := context.Background()
+	cache.Delete(ctx, cache.UserKey(idToInt(id)))
 
 	c.JSON(http.StatusOK, user)
 }

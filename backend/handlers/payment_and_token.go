@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
@@ -270,17 +273,39 @@ func GetTokenBalance(c *gin.Context) {
 		return
 	}
 
+	ctx := context.Background()
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	// Try cache first
+	cacheKey := cache.TokenBalanceKey(userIDInt)
+	if cachedToken, err := cache.Get(ctx, cacheKey); err == nil {
+		var token models.Token
+		if err := json.Unmarshal([]byte(cachedToken), &token); err == nil {
+			c.JSON(http.StatusOK, token)
+			return
+		}
+	}
+
 	db := config.GetDB()
 
 	var token models.Token
 	err := db.QueryRow(
 		"SELECT id, user_id, balance, created_at, updated_at FROM tokens WHERE user_id = $1",
-		userID,
+		userIDInt,
 	).Scan(&token.ID, &token.UserID, &token.Balance, &token.CreatedAt, &token.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrTokenNotFound)
 		return
+	}
+
+	// Cache the result
+	if tokenJSON, err := json.Marshal(token); err == nil {
+		cache.Set(ctx, cacheKey, string(tokenJSON), cache.TokenBalanceTTL)
 	}
 
 	c.JSON(http.StatusOK, token)
@@ -403,6 +428,12 @@ func TransferTokens(c *gin.Context) {
 		"INSERT INTO token_transactions (user_id, type, amount, reason) VALUES ($1, $2, $3, $4)",
 		req.RecipientID, "transfer", req.Amount, "Transfer from user",
 	)
+
+	// Invalidate token balance caches for both users
+	ctx := context.Background()
+	senderIDInt, _ := userID.(int)
+	cache.Delete(ctx, cache.TokenBalanceKey(senderIDInt))
+	cache.Delete(ctx, cache.TokenBalanceKey(req.RecipientID))
 
 	c.JSON(http.StatusOK, gin.H{"message": "Transfer successful"})
 }
