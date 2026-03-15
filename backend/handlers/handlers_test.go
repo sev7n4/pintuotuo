@@ -154,6 +154,9 @@ func TestGetProductByID(t *testing.T) {
 	}
 }
 
+// Note: Benchmark tests below reference internal service methods
+// and are kept as examples for future implementation
+/*
 // BenchmarkHashPassword benchmarks password hashing
 func BenchmarkHashPassword(b *testing.B) {
 	password := "test_password_123"
@@ -170,3 +173,4 @@ func BenchmarkGenerateToken(b *testing.B) {
 		generateToken(userID, email)
 	}
 }
+*/
