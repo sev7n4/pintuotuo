@@ -62,6 +62,9 @@ func main() {
 
 		// Payment routes (includes payments, webhooks, and merchants)
 		routes.RegisterPaymentRoutes(v1)
+
+		// Analytics routes
+		routes.RegisterAnalyticsRoutes(v1)
 	}
 
 	// Start server

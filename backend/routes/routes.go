@@ -111,3 +111,16 @@ func RegisterPaymentRoutes(router *gin.RouterGroup) {
 		merchants.GET("/:merchant_id/revenue", handlers.GetMerchantRevenue)
 	}
 }
+
+// RegisterAnalyticsRoutes registers analytics routes
+func RegisterAnalyticsRoutes(router *gin.RouterGroup) {
+	analytics := router.Group("/analytics")
+	{
+		analytics.GET("/consumption", handlers.GetUserConsumption)
+		analytics.GET("/spending-pattern", handlers.GetUserSpendingPattern)
+		analytics.GET("/consumption-history", handlers.GetConsumptionHistory)
+		analytics.GET("/revenue", handlers.GetRevenueAnalytics)
+		analytics.GET("/top-spenders", handlers.GetTopSpenders)
+		analytics.GET("/metrics", handlers.GetPlatformMetrics)
+	}
+}
