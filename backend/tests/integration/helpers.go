@@ -279,7 +279,7 @@ func CleanupTestData(t *testing.T, db *sql.DB, userID int) {
 	require.NoError(t, err)
 
 	// Delete user tokens
-	_, err = db.ExecContext(ctx, "DELETE FROM user_tokens WHERE user_id = $1", userID)
+	_, err = db.ExecContext(ctx, "DELETE FROM tokens WHERE user_id = $1", userID)
 	require.NoError(t, err)
 
 	// Delete tokens (balance table)
