@@ -121,19 +121,20 @@ func TestRevenueCalculationConsistency(t *testing.T) {
 	// 2. Manually calculate expected values
 	expectedMerchantEarnings := totalAmount - expectedCommission
 
-	// 3. Verify calculations
-	assert.Equal(t, totalAmount*commissionRate, expectedCommission)
-	assert.Equal(t, totalAmount*(1.0-commissionRate), expectedMerchantEarnings)
+	// 3. Verify calculations with floating point tolerance (0.01 = 1 cent)
+	const tolerance = 0.01
+	assert.InDelta(t, totalAmount*commissionRate, expectedCommission, tolerance)
+	assert.InDelta(t, totalAmount*(1.0-commissionRate), expectedMerchantEarnings, tolerance)
 
 	// 4. Query merchant revenue
 	period := "2026-03"
 	revenue, err := ts.PaymentService.GetMerchantRevenue(ctx, merchantID, period)
 	require.NoError(t, err)
 
-	// 5. Verify revenue calculations match
+	// 5. Verify revenue calculations match with tolerance
 	assert.GreaterOrEqual(t, revenue.TotalSales, totalAmount*0.99) // Allow small variance
-	assert.Greater(t, revenue.PlatformCommission, 0)
-	assert.Greater(t, revenue.MerchantEarnings, 0)
+	assert.Greater(t, revenue.PlatformCommission, 0.0)
+	assert.Greater(t, revenue.MerchantEarnings, 0.0)
 }
 
 // TestCacheConsistencyAfterFailure verifies cache handles failures gracefully
@@ -296,8 +297,25 @@ func TestPaymentListConsistency(t *testing.T) {
 		listPaymentIDs[p.ID] = true
 	}
 
+	// Debug: Log what we got
+	if len(result.Data) == 0 {
+		// Check if payments actually exist in database
+		var dbCount int
+		err := ts.DB.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM payments WHERE user_id = $1",
+			userID).Scan(&dbCount)
+		if err == nil {
+			t.Logf("ERROR: ListPayments returned 0 results but database has %d payments for user %d. Created: %v",
+				dbCount, userID, createdPaymentIDs)
+		}
+	} else {
+		t.Logf("ListPayments returned %d results (total=%d) for user %d",
+			len(result.Data), result.Total, userID)
+	}
+
 	for _, id := range createdPaymentIDs {
-		assert.True(t, listPaymentIDs[id], "Payment %d should be in list", id)
+		assert.True(t, listPaymentIDs[id], "Payment %d should be in list (got %d items: %v)",
+			id, len(result.Data), result.Data)
 	}
 
 	// 3. Verify list count is consistent

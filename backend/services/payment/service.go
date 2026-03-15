@@ -72,6 +72,23 @@ func (s *service) InitiatePayment(ctx context.Context, userID int, req *Initiate
 		return nil, ErrOrderCancelled
 	}
 
+	// Check if there's already a pending payment for this order
+	var existingPaymentStatus string
+	err = s.db.QueryRowContext(
+		ctx,
+		"SELECT status FROM payments WHERE order_id = $1 AND status = 'pending' LIMIT 1",
+		req.OrderID,
+	).Scan(&existingPaymentStatus)
+
+	if err == nil {
+		// Found an existing pending payment
+		return nil, ErrPaymentAlreadyPending
+	} else if err != sql.ErrNoRows {
+		s.log.Printf("Failed to check existing payments: %v", err)
+		return nil, wrapError("InitiatePayment", "check_existing", err)
+	}
+	// sql.ErrNoRows is expected, meaning no pending payment exists
+
 	// Create payment record
 	var payment Payment
 	err = s.db.QueryRowContext(
@@ -198,8 +215,8 @@ func (s *service) ListPayments(ctx context.Context, userID int, params *ListPaym
 		return nil, wrapError("ListPayments", "count", err)
 	}
 
-	// Get paginated data
-	args = append(args, offset, params.PerPage)
+	// Get paginated data (note: PostgreSQL syntax is LIMIT count OFFSET offset)
+	args = append(args, params.PerPage, offset)
 	query := "SELECT id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at FROM payments WHERE " + whereClause + " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(argIndex) + " OFFSET $" + strconv.Itoa(argIndex+1)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)

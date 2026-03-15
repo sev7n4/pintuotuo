@@ -67,6 +67,12 @@ var (
 		Message: "Cannot refund a payment that is still pending",
 		Status:  http.StatusConflict,
 	}
+
+	ErrPaymentAlreadyPending = &apperrors.AppError{
+		Code:    "PAYMENT_ALREADY_PENDING",
+		Message: "An order cannot have multiple pending payments",
+		Status:  http.StatusConflict,
+	}
 )
 
 // wrapError wraps service errors as AppErrors

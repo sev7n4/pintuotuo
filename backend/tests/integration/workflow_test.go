@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -58,7 +59,7 @@ func TestCompleteGroupPurchaseWithPayment(t *testing.T) {
 
 	// Simulate webhook callback for User A's payment
 	callbackA := &payment.AlipayCallback{
-		OutTradeNo:  string(rune(paymentA.ID)),
+		OutTradeNo:  strconv.Itoa(paymentA.ID),
 		TradeNo:     "alipay_user_a_123456",
 		TotalAmount: paymentA.Amount,
 		TradeStatus: "TRADE_SUCCESS",
@@ -83,7 +84,7 @@ func TestCompleteGroupPurchaseWithPayment(t *testing.T) {
 
 	// Simulate webhook for User B
 	callbackB := &payment.WechatCallback{
-		OutTradeNo:    string(rune(paymentB.ID)),
+		OutTradeNo:    strconv.Itoa(paymentB.ID),
 		TransactionID: "wechat_user_b_123456",
 		TotalFee:      int(paymentB.Amount * 100),
 		ResultCode:    "SUCCESS",
@@ -138,8 +139,8 @@ func TestMultiplePaymentsForDifferentOrders(t *testing.T) {
 		p := GetPaymentFromDB(t, ts.DB, paymentIDs[i])
 
 		callback := &payment.AlipayCallback{
-			OutTradeNo:  string(rune(paymentIDs[i])),
-			TradeNo:     "alipay_test_" + string(rune(i)),
+			OutTradeNo:  strconv.Itoa(paymentIDs[i]),
+			TradeNo:     "alipay_test_" + strconv.Itoa(i),
 			TotalAmount: p.Amount,
 			TradeStatus: "TRADE_SUCCESS",
 			Timestamp:   "2026-03-15 12:00:00",
@@ -193,7 +194,7 @@ func TestPaymentWithOrderCancellation(t *testing.T) {
 	p := GetPaymentFromDB(t, ts.DB, paymentID)
 
 	callback := &payment.AlipayCallback{
-		OutTradeNo:  string(rune(paymentID)),
+		OutTradeNo:  strconv.Itoa(paymentID),
 		TradeNo:     "alipay_test_123456",
 		TotalAmount: p.Amount,
 		TradeStatus: "TRADE_SUCCESS",
@@ -259,8 +260,8 @@ func TestConcurrentPaymentsForDifferentUsers(t *testing.T) {
 			p := GetPaymentFromDB(t, ts.DB, payments[idx])
 
 			callback := &payment.AlipayCallback{
-				OutTradeNo:  string(rune(payments[idx])),
-				TradeNo:     "alipay_concurrent_" + string(rune(idx)),
+				OutTradeNo:  strconv.Itoa(payments[idx]),
+				TradeNo:     "alipay_concurrent_" + strconv.Itoa(idx),
 				TotalAmount: p.Amount,
 				TradeStatus: "TRADE_SUCCESS",
 				Timestamp:   "2026-03-15 12:00:00",
@@ -295,7 +296,7 @@ func TestConcurrentPaymentsForSameOrder(t *testing.T) {
 	p := GetPaymentFromDB(t, ts.DB, firstPaymentID)
 
 	callback := &payment.AlipayCallback{
-		OutTradeNo:  string(rune(firstPaymentID)),
+		OutTradeNo:  strconv.Itoa(firstPaymentID),
 		TradeNo:     "alipay_first",
 		TotalAmount: p.Amount,
 		TradeStatus: "TRADE_SUCCESS",
@@ -422,7 +423,7 @@ func TestWebhookDelayedDelivery(t *testing.T) {
 		p := GetPaymentFromDB(t, ts.DB, paymentID)
 
 		callback := &payment.AlipayCallback{
-			OutTradeNo:  string(rune(paymentID)),
+			OutTradeNo:  strconv.Itoa(paymentID),
 			TradeNo:     "alipay_delayed",
 			TotalAmount: p.Amount,
 			TradeStatus: "TRADE_SUCCESS",
