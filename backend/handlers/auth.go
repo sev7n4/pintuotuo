@@ -13,6 +13,7 @@ import (
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/services/token"
 	"github.com/pintuotuo/backend/services/user"
 )
 
@@ -23,7 +24,8 @@ var userService user.Service
 
 func init() {
 	logger := log.New(os.Stderr, "[AuthHandler] ", log.LstdFlags)
-	userService = user.NewService(config.GetDB(), logger)
+	tokenSvc := token.NewService(config.GetDB(), logger)
+	userService = user.NewService(config.GetDB(), logger, tokenSvc)
 }
 
 // AuthResponse represents authentication response

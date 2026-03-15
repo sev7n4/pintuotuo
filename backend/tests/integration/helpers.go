@@ -17,6 +17,7 @@ import (
 	"github.com/pintuotuo/backend/services/order"
 	"github.com/pintuotuo/backend/services/payment"
 	"github.com/pintuotuo/backend/services/product"
+	"github.com/pintuotuo/backend/services/token"
 	"github.com/pintuotuo/backend/services/user"
 )
 
@@ -41,6 +42,7 @@ type TestServices struct {
 	ProductService product.Service
 	OrderService   order.Service
 	PaymentService payment.Service
+	TokenService   token.Service
 	Logger         *log.Logger
 }
 
@@ -60,10 +62,11 @@ func SetupPaymentTest(t *testing.T) *TestServices {
 	logger := log.New(os.Stderr, "[TestIntegration] ", log.LstdFlags)
 
 	// Initialize services
-	userSvc := user.NewService(db, logger)
+	tokenSvc := token.NewService(db, logger)
+	userSvc := user.NewService(db, logger, tokenSvc)
 	productSvc := product.NewService(db, logger)
 	orderSvc := order.NewService(db, logger)
-	paymentSvc := payment.NewService(db, orderSvc, logger)
+	paymentSvc := payment.NewService(db, orderSvc, logger, tokenSvc)
 
 	return &TestServices{
 		DB:             db,
@@ -71,6 +74,7 @@ func SetupPaymentTest(t *testing.T) *TestServices {
 		ProductService: productSvc,
 		OrderService:   orderSvc,
 		PaymentService: paymentSvc,
+		TokenService:   tokenSvc,
 		Logger:         logger,
 	}
 }
@@ -85,7 +89,8 @@ func TeardownPaymentTest(t *testing.T, ts *TestServices) {
 func SeedTestUser(t *testing.T, db *sql.DB, userID int) int {
 	ctx := context.Background()
 	logger := log.New(os.Stderr, "[SeedUser] ", log.LstdFlags)
-	userService := user.NewService(db, logger)
+	tokenSvc := token.NewService(db, logger)
+	userService := user.NewService(db, logger, tokenSvc)
 
 	req := &user.RegisterRequest{
 		Email:    fmt.Sprintf("test%d@example.com", userID),

@@ -12,6 +12,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pintuotuo/backend/cache"
+	"github.com/pintuotuo/backend/services/token"
 )
 
 // Service defines the user service interface
@@ -37,23 +38,29 @@ type Service interface {
 
 // service implements the Service interface
 type service struct {
-	db        *sql.DB
-	log       *log.Logger
-	jwtSecret []byte
+	db           *sql.DB
+	log          *log.Logger
+	jwtSecret    []byte
+	tokenService token.Service
 }
 
 // NewService creates a new user service
-func NewService(db *sql.DB, logger *log.Logger) Service {
+func NewService(db *sql.DB, logger *log.Logger, tokenService token.Service) Service {
 	if logger == nil {
 		logger = log.New(os.Stderr, "[UserService] ", log.LstdFlags)
+	}
+
+	if tokenService == nil {
+		tokenService = token.NewService(db, logger)
 	}
 
 	jwtSecret := []byte(getEnv("JWT_SECRET", "pintuotuo-secret-key-dev"))
 
 	return &service{
-		db:        db,
-		log:       logger,
-		jwtSecret: jwtSecret,
+		db:           db,
+		log:          logger,
+		jwtSecret:    jwtSecret,
+		tokenService: tokenService,
 	}
 }
 
@@ -102,14 +109,11 @@ func (s *service) RegisterUser(ctx context.Context, req *RegisterRequest) (*User
 		return nil, wrapError("RegisterUser", "insertUser", err)
 	}
 
-	// Initialize token balance
-	_, err = tx.ExecContext(
-		ctx,
-		"INSERT INTO tokens (user_id, balance) VALUES ($1, $2)",
-		user.ID, 0,
-	)
+	// Initialize token balance via token service
+	_, err = s.tokenService.InitializeUserTokens(ctx, user.ID)
 	if err != nil {
-		return nil, wrapError("RegisterUser", "initToken", err)
+		s.log.Printf("Warning: failed to initialize tokens for user %d: %v", user.ID, err)
+		// Log but don't fail - user registration is more critical
 	}
 
 	// Commit transaction
