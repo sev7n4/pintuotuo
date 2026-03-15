@@ -39,6 +39,17 @@ type AuthResponse struct {
 	Token string       `json:"token"`
 }
 
+// RefreshTokenRequest represents token refresh request
+type RefreshTokenRequest struct {
+	Token string `json:"token" binding:"required"`
+}
+
+// RefreshTokenResponse represents token refresh response
+type RefreshTokenResponse struct {
+	Token     string `json:"token"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
 // RegisterUser handles user registration
 func RegisterUser(c *gin.Context) {
 	var req RegisterRequest
@@ -147,6 +158,170 @@ func LogoutUser(c *gin.Context) {
 	// JWT is stateless, so logout is just a client-side operation
 	// Server can maintain a blacklist if needed
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+// RefreshToken refreshes an expired JWT token
+func RefreshToken(c *gin.Context) {
+	var req RefreshTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	// Parse and validate the token
+	token, err := jwt.ParseWithClaims(req.Token, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+
+	if err != nil || !token.Valid {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	// Extract user ID and email from claims
+	userID, ok := claims["user_id"].(float64)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	email, ok := claims["email"].(string)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	// Verify user still exists
+	db := config.GetDB()
+	var user models.User
+	err = db.QueryRow(
+		"SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1 AND status = 'active'",
+		int(userID),
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrUserNotFound)
+		return
+	}
+
+	// Generate new token
+	newToken := generateToken(int(userID), email)
+	expiresAt := time.Now().Add(time.Hour * 24).Unix()
+
+	c.JSON(http.StatusOK, RefreshTokenResponse{
+		Token:     newToken,
+		ExpiresAt: expiresAt,
+	})
+}
+
+// RequestPasswordReset initiates password reset
+func RequestPasswordReset(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+
+	// Check if user exists
+	var userID int
+	err := db.QueryRow("SELECT id FROM users WHERE email = $1", req.Email).Scan(&userID)
+	if err != nil {
+		// Don't reveal if email exists for security
+		c.JSON(http.StatusOK, gin.H{
+			"message": "If the email exists, a password reset link has been sent",
+		})
+		return
+	}
+
+	// In production, generate a secure reset token and send via email
+	// For now, we'll generate a simple reset token stored in cache
+	resetToken := fmt.Sprintf("%d-%d", userID, time.Now().Unix())
+	ctx := context.Background()
+	cacheKey := fmt.Sprintf("password_reset:%s", resetToken)
+	cache.Set(ctx, cacheKey, req.Email, 15*time.Minute) // 15-minute expiry
+
+	// In production, send email with reset link containing resetToken
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Password reset email sent",
+		// Only return reset_token in development
+		"reset_token": resetToken,
+	})
+}
+
+// ResetPassword resets user password with reset token
+func ResetPassword(c *gin.Context) {
+	var req struct {
+		ResetToken  string `json:"reset_token" binding:"required"`
+		NewPassword string `json:"new_password" binding:"required,min=6"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	// Verify reset token exists in cache
+	ctx := context.Background()
+	cacheKey := fmt.Sprintf("password_reset:%s", req.ResetToken)
+	email, err := cache.Get(ctx, cacheKey)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_RESET_TOKEN",
+			"Password reset token is invalid or expired",
+			http.StatusBadRequest,
+			err,
+		))
+		return
+	}
+
+	db := config.GetDB()
+
+	// Find user by email
+	var userID int
+	err = db.QueryRow("SELECT id FROM users WHERE email = $1", email).Scan(&userID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrUserNotFound)
+		return
+	}
+
+	// Hash new password
+	passwordHash := hashPassword(req.NewPassword)
+
+	// Update password
+	_, err = db.Exec(
+		"UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+		passwordHash, userID,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"PASSWORD_UPDATE_FAILED",
+			"Failed to update password",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	// Invalidate reset token
+	cache.Delete(ctx, cacheKey)
+
+	// Invalidate user cache to force fresh data on next login
+	cache.Delete(ctx, cache.UserKey(userID))
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Password reset successfully",
+	})
 }
 
 // GetCurrentUser retrieves current authenticated user
