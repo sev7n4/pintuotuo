@@ -9,6 +9,7 @@ import (
 
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/services/order"
+	"github.com/pintuotuo/backend/services/token"
 )
 
 // Service defines the payment service interface
@@ -36,18 +37,24 @@ type service struct {
 	db           *sql.DB
 	log          *log.Logger
 	orderService order.Service
+	tokenService token.Service
 }
 
 // NewService creates a new payment service
-func NewService(db *sql.DB, orderService order.Service, logger *log.Logger) Service {
+func NewService(db *sql.DB, orderService order.Service, logger *log.Logger, tokenService token.Service) Service {
 	if logger == nil {
 		logger = log.New(os.Stderr, "[PaymentService] ", log.LstdFlags)
+	}
+
+	if tokenService == nil {
+		tokenService = token.NewService(db, logger)
 	}
 
 	return &service{
 		db:           db,
 		log:          logger,
 		orderService: orderService,
+		tokenService: tokenService,
 	}
 }
 
@@ -308,13 +315,28 @@ func (s *service) HandleAlipayCallback(ctx context.Context, payload *AlipayCallb
 		return nil, wrapError("HandleAlipayCallback", "update", err)
 	}
 
-	// If payment successful, update order status
+	// If payment successful, update order status and recharge tokens
 	if newStatus == "success" {
 		// Get order ID to update
 		_, err := s.orderService.UpdateOrderStatus(ctx, payment.UserID, payment.OrderID, "paid")
 		if err != nil {
 			s.log.Printf("Failed to update order status: %v", err)
 			// Log but don't fail - payment was already recorded
+		}
+
+		// Recharge tokens for user based on payment amount
+		if s.tokenService != nil {
+			tokenReq := &token.RechargeTokensRequest{
+				UserID: payment.UserID,
+				Amount: payment.Amount,
+				Reason: "Payment successful - Order " + strconv.Itoa(payment.OrderID),
+			}
+
+			_, err := s.tokenService.RechargeTokens(ctx, tokenReq)
+			if err != nil {
+				s.log.Printf("Failed to recharge tokens after payment: %v", err)
+				// Log but don't fail - payment was already recorded
+			}
 		}
 	}
 
@@ -384,12 +406,27 @@ func (s *service) HandleWechatCallback(ctx context.Context, payload *WechatCallb
 		return nil, wrapError("HandleWechatCallback", "update", err)
 	}
 
-	// If payment successful, update order status
+	// If payment successful, update order status and recharge tokens
 	if newStatus == "success" {
 		_, err := s.orderService.UpdateOrderStatus(ctx, payment.UserID, payment.OrderID, "paid")
 		if err != nil {
 			s.log.Printf("Failed to update order status: %v", err)
 			// Log but don't fail - payment was already recorded
+		}
+
+		// Recharge tokens for user based on payment amount
+		if s.tokenService != nil {
+			tokenReq := &token.RechargeTokensRequest{
+				UserID: payment.UserID,
+				Amount: payment.Amount,
+				Reason: "Payment successful - Order " + strconv.Itoa(payment.OrderID),
+			}
+
+			_, err := s.tokenService.RechargeTokens(ctx, tokenReq)
+			if err != nil {
+				s.log.Printf("Failed to recharge tokens after payment: %v", err)
+				// Log but don't fail - payment was already recorded
+			}
 		}
 	}
 

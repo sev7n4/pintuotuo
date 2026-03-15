@@ -67,21 +67,25 @@ func RegisterGroupRoutes(router *gin.RouterGroup) {
 
 // RegisterTokenRoutes registers token management routes
 func RegisterTokenRoutes(router *gin.RouterGroup) {
-	tokens := router.Group("/tokens")
-	{
-		tokens.GET("/balance", handlers.GetTokenBalance)
-		tokens.GET("/consumption", handlers.GetTokenConsumption)
-		tokens.POST("/transfer", handlers.TransferTokens)
+  tokens := router.Group("/tokens")
+  {
+    tokens.GET("/balance", handlers.GetBalance)
+    tokens.GET("/consumption", handlers.GetConsumption)
+    tokens.GET("/total-balance", handlers.GetTotalBalance)
+    tokens.GET("/transactions", handlers.ListTransactions)
+    tokens.POST("/transfer", handlers.TransferTokens)
+    tokens.POST("/recharge", handlers.RechargeTokens)
+    tokens.POST("/consume", handlers.ConsumeTokens)
 
-		// API Key management
-		keys := tokens.Group("/keys")
-		{
-			keys.GET("", handlers.ListAPIKeys)
-			keys.POST("", handlers.CreateAPIKey)
-			keys.PUT("/:id", handlers.UpdateAPIKey)
-			keys.DELETE("/:id", handlers.DeleteAPIKey)
-		}
-	}
+    // API Key management
+    keys := tokens.Group("/keys")
+    {
+      keys.GET("", handlers.ListAPIKeys)
+      keys.POST("", handlers.CreateAPIKey)
+      keys.PUT("/:id", handlers.UpdateAPIKey)
+      keys.DELETE("/:id", handlers.DeleteAPIKey)
+    }
+  }
 }
 
 // RegisterPaymentRoutes registers payment routes

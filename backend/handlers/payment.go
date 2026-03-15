@@ -13,6 +13,7 @@ import (
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/services/order"
 	"github.com/pintuotuo/backend/services/payment"
+	"github.com/pintuotuo/backend/services/token"
 )
 
 // Initialize payment service
@@ -22,7 +23,8 @@ func initPaymentService() {
 	if paymentService == nil {
 		logger := log.New(os.Stderr, "[PaymentHandler] ", log.LstdFlags)
 		orderSvc := order.NewService(config.GetDB(), logger)
-		paymentService = payment.NewService(config.GetDB(), orderSvc, logger)
+		tokenSvc := token.NewService(config.GetDB(), logger)
+		paymentService = payment.NewService(config.GetDB(), orderSvc, logger, tokenSvc)
 	}
 }
 
