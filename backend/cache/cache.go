@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -19,6 +20,7 @@ const (
 	OrderCacheTTL      = 10 * time.Minute
 	TokenBalanceTTL    = 5 * time.Minute
 	SearchResultsTTL   = 10 * time.Minute
+	PaymentTTL         = 15 * time.Minute
 )
 
 // Init initializes the Redis client
@@ -145,6 +147,14 @@ func SessionKey(userID int) string {
 	return fmt.Sprintf("session:%d", userID)
 }
 
+func PaymentKey(id int) string {
+	return fmt.Sprintf("payment:%d", id)
+}
+
+func PaymentListKey(userID, page, perPage int) string {
+	return fmt.Sprintf("payments:user:%d:page:%d:limit:%d", userID, page, perPage)
+}
+
 // InvalidatePatterns invalidates cache keys matching a pattern
 func InvalidatePatterns(ctx context.Context, pattern string) error {
 	iter := client.Scan(ctx, 0, pattern, 100).Iterator()
@@ -163,4 +173,18 @@ func InvalidatePatterns(ctx context.Context, pattern string) error {
 	}
 
 	return nil
+}
+
+// MarshalCachedValue serializes a value to JSON string for caching
+func MarshalCachedValue(v interface{}) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+// UnmarshalCachedValue deserializes a JSON string from cache
+func UnmarshalCachedValue(data string, v interface{}) error {
+	return json.Unmarshal([]byte(data), v)
 }

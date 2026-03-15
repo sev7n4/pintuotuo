@@ -89,14 +89,21 @@ func RegisterPaymentRoutes(router *gin.RouterGroup) {
 	payments := router.Group("/payments")
 	{
 		payments.POST("", handlers.InitiatePayment)
+		payments.GET("", handlers.ListPayments)
 		payments.GET("/:id", handlers.GetPaymentByID)
 		payments.POST("/:id/refund", handlers.RefundPayment)
+	}
 
-		// Webhooks
-		webhooks := payments.Group("/webhooks")
-		{
-			webhooks.POST("/alipay", handlers.HandleAlipayCallback)
-			webhooks.POST("/wechat", handlers.HandleWechatCallback)
-		}
+	// Webhook routes (without authentication)
+	webhooks := router.Group("/webhooks")
+	{
+		webhooks.POST("/alipay", handlers.HandleAlipayCallback)
+		webhooks.POST("/wechat", handlers.HandleWechatCallback)
+	}
+
+	// Merchant routes
+	merchants := router.Group("/merchants")
+	{
+		merchants.GET("/:merchant_id/revenue", handlers.GetMerchantRevenue)
 	}
 }

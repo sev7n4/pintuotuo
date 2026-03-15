@@ -63,13 +63,15 @@ type Token struct {
 
 // Payment represents a payment transaction
 type Payment struct {
-	ID        int       `json:"id"`
-	OrderID   int       `json:"order_id"`
-	Amount    float64   `json:"amount"`
-	Method    string    `json:"method"`       // alipay, wechat
-	Status    string    `json:"status"`       // pending, success, failed
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID            int       `json:"id"`
+	UserID        int       `json:"user_id"`
+	OrderID       int       `json:"order_id"`
+	Amount        float64   `json:"amount"`
+	Method        string    `json:"method"`       // alipay, wechat
+	Status        string    `json:"status"`       // pending, success, failed, refunded
+	TransactionID string    `json:"transaction_id,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // APIKey represents an API key for B2B users

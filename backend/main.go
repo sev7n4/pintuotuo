@@ -60,7 +60,7 @@ func main() {
 		// Token routes
 		routes.RegisterTokenRoutes(v1)
 
-		// Payment routes
+		// Payment routes (includes payments, webhooks, and merchants)
 		routes.RegisterPaymentRoutes(v1)
 	}
 
