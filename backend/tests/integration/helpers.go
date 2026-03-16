@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,9 +30,16 @@ const (
 	TestProductPrice = 99.99
 )
 
+// Atomic counter for generating unique IDs (thread-safe, no race condition)
+var uniqueIDCounter int64
+
 // GenerateUniqueID generates a unique ID for test isolation in parallel tests
+// Uses atomic operations to be thread-safe without requiring mutexes
 func GenerateUniqueID() int {
-	return int(time.Now().UnixNano()%100000) + rand.Intn(100000)
+	// Use atomic increment to generate unique IDs safely across parallel tests
+	counter := atomic.AddInt64(&uniqueIDCounter, 1)
+	// Combine timestamp and counter for uniqueness and reasonable spacing
+	return int(counter%1000000) + int(time.Now().Unix()%1000)*1000
 }
 
 // TestServices holds all service instances for testing
@@ -204,7 +211,8 @@ func CreateTestPaymentFlow(t *testing.T, ts *TestServices) (userID int, orderID 
 	ctx := context.Background()
 
 	// Generate unique ID for this test to avoid conflicts in parallel tests
-	uniqueID := int(time.Now().UnixNano()%10000) + rand.Intn(10000)
+	// Use GenerateUniqueID() which is thread-safe with atomic operations
+	uniqueID := GenerateUniqueID()
 
 	// Create user with unique ID
 	userID = SeedTestUser(t, ts.DB, uniqueID)
