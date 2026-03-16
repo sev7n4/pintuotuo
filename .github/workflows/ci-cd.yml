@@ -42,6 +42,15 @@ jobs:
         working-directory: ./backend
         run: go mod download
 
+      - name: Install PostgreSQL Client
+        run: apt-get update && apt-get install -y postgresql-client
+
+      - name: Initialize database schema
+        run: |
+          psql -h localhost -U pintuotuo -d pintuotuo_test -f backend/scripts/db/full_schema.sql
+        env:
+          PGPASSWORD: test_password
+
       - name: Run go fmt
         working-directory: ./backend
         run: |
@@ -58,8 +67,8 @@ jobs:
       - name: Run tests
         working-directory: ./backend
         env:
-          DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
-          GIN_MODE: test
+          DATABASE_URL: postgresql://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
+          GIN_MODE: release
         run: go test -v -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage to Codecov

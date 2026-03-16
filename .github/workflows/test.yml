@@ -45,6 +45,9 @@ jobs:
         go-version: '1.21'
         cache: 'go'
 
+    - name: Install PostgreSQL Client
+      run: apt-get update && apt-get install -y postgresql-client
+
     - name: Initialize database schema
       working-directory: ./backend
       env:

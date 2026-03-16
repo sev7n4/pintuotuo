@@ -22,8 +22,8 @@ jobs:
         image: postgres:15-alpine
         env:
           POSTGRES_USER: pintuotuo
-          POSTGRES_PASSWORD: dev_password_123
-          POSTGRES_DB: pintuotuo_db
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: pintuotuo_test
           POSTGRES_INITDB_ARGS: "-E UTF8"
         options: >-
           --health-cmd pg_isready
@@ -33,7 +33,7 @@ jobs:
         ports:
           - 5432:5432
         volumes:
-          - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+          - ./scripts/db/full_schema.sql:/docker-entrypoint-initdb.d/init.sql
 
       redis:
         image: redis:7-alpine
@@ -76,11 +76,11 @@ jobs:
         done
 
         # Run initialization script
-        PGPASSWORD=dev_password_123 psql \
+        PGPASSWORD=test_password psql \
           -h localhost \
           -U pintuotuo \
-          -d pintuotuo_db \
-          -f scripts/db/init.sql || true
+          -d pintuotuo_test \
+          -f scripts/db/full_schema.sql || true
       working-directory: ./backend
 
     - name: Run Integration Tests
@@ -153,8 +153,8 @@ jobs:
         image: postgres:15-alpine
         env:
           POSTGRES_USER: pintuotuo
-          POSTGRES_PASSWORD: dev_password_123
-          POSTGRES_DB: pintuotuo_db
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: pintuotuo_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
