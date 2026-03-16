@@ -39,7 +39,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./backend
-        run: go mod download
+        run: |
+          go mod download
+          go mod tidy
+          go mod verify
 
       - name: Install PostgreSQL Client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
