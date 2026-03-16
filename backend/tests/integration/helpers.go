@@ -38,8 +38,11 @@ var uniqueIDCounter int64
 func GenerateUniqueID() int {
 	// Use atomic increment to generate unique IDs safely across parallel tests
 	counter := atomic.AddInt64(&uniqueIDCounter, 1)
-	// Combine timestamp and counter for uniqueness and reasonable spacing
-	return int(counter%1000000) + int(time.Now().Unix()%1000)*1000
+	// Create large, well-distributed unique ID:
+	// - Use counter with large multiplier to create spacing between IDs
+	// - Add timestamp component for additional uniqueness
+	// - Ensures different emails like test100000@, test100001@, test100002@, etc.
+	return int(counter)*100000 + int(time.Now().Unix()%100000)
 }
 
 // TestServices holds all service instances for testing
