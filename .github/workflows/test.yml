@@ -46,6 +46,12 @@ jobs:
         cache: true
         cache-dependency-path: 'backend/go.sum'
 
+    - name: Download Go dependencies
+      run: |
+        go mod download
+        go mod verify
+      working-directory: ./backend
+
     - name: Install PostgreSQL Client
       run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
