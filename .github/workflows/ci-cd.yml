@@ -153,7 +153,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-        if: secrets.DOCKER_USERNAME != ''
+        if: ${{secrets.DOCKER_USERNAME != ''}}
 
       - name: Build and push backend
         uses: docker/build-push-action@v4
