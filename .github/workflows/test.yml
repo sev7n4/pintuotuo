@@ -67,7 +67,10 @@ jobs:
       env:
         DATABASE_URL: "postgresql://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable"
         REDIS_URL: "redis://localhost:6379"
+        GO111MODULE: "on"
       run: |
+        go mod download
+        go mod verify
         go test -v ./tests/integration -timeout 120s
 
     - name: Run race detector
