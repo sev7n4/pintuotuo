@@ -178,7 +178,7 @@ func TestInitiatePaymentEndpoint(t *testing.T) {
 	router := SetupPaymentRouter(t, ts)
 
 	userID := integration.SeedTestUser(t, ts.DB, 10)
-	productID := integration.SeedTestProduct(t, ts.DB, 10)
+	productID, _ := integration.SeedTestProduct(t, ts.DB, 10)
 	orderID := integration.SeedTestOrder(t, ts.DB, userID, productID)
 
 	defer integration.CleanupTestData(t, ts.DB, userID)
@@ -249,7 +249,7 @@ func TestListPaymentsEndpoint(t *testing.T) {
 	router := SetupPaymentRouter(t, ts)
 
 	userID := integration.SeedTestUser(t, ts.DB, 11)
-	productID := integration.SeedTestProduct(t, ts.DB, 11)
+	productID, _ := integration.SeedTestProduct(t, ts.DB, 11)
 	defer integration.CleanupTestData(t, ts.DB, userID)
 
 	// Create 5 test payments
@@ -465,7 +465,7 @@ func TestInvalidPaymentMethodError(t *testing.T) {
 	router := SetupPaymentRouter(t, ts)
 
 	userID := integration.SeedTestUser(t, ts.DB, 12)
-	productID := integration.SeedTestProduct(t, ts.DB, 12)
+	productID, _ := integration.SeedTestProduct(t, ts.DB, 12)
 	orderID := integration.SeedTestOrder(t, ts.DB, userID, productID)
 
 	defer integration.CleanupTestData(t, ts.DB, userID)
