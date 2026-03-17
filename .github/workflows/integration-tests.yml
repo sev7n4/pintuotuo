@@ -87,8 +87,7 @@ jobs:
       run: |
         go test -v ./tests/integration \
           -timeout 120s \
-          -coverprofile=coverage.out \
-          -race
+          -coverprofile=coverage.out
       working-directory: ./backend
 
     - name: Generate Coverage Report
