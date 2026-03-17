@@ -233,9 +233,10 @@ func (s *service) ListPayments(ctx context.Context, userID int, params *ListPaym
 		return nil, wrapError("ListPayments", "count", err)
 	}
 
-	// Get paginated data (note: PostgreSQL syntax is LIMIT count OFFSET offset)
-	args = append(args, params.PerPage, offset)
+	// Add LIMIT and OFFSET for paginated data
+	limit := params.PerPage
 	query := "SELECT id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at FROM payments WHERE " + whereClause + " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(argIndex) + " OFFSET $" + strconv.Itoa(argIndex+1)
+	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -287,11 +288,12 @@ func (s *service) HandleAlipayCallback(ctx context.Context, payload *AlipayCallb
 
 	// Get current payment
 	var currentStatus string
+	var userID int
 	err = s.db.QueryRowContext(
 		ctx,
-		"SELECT status FROM payments WHERE id = $1",
+		"SELECT status, user_id FROM payments WHERE id = $1",
 		paymentID,
-	).Scan(&currentStatus)
+	).Scan(&currentStatus, &userID)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -394,11 +396,12 @@ func (s *service) HandleWechatCallback(ctx context.Context, payload *WechatCallb
 
 	// Get current payment
 	var currentStatus string
+	var userID int
 	err = s.db.QueryRowContext(
 		ctx,
-		"SELECT status FROM payments WHERE id = $1",
+		"SELECT status, user_id FROM payments WHERE id = $1",
 		paymentID,
-	).Scan(&currentStatus)
+	).Scan(&currentStatus, &userID)
 
 	if err != nil {
 		if err == sql.ErrNoRows {

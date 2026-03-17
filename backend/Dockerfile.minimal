@@ -1,0 +1,14 @@
+# Minimal production Dockerfile using scratch
+# Build locally, then package with scratch image
+
+FROM scratch
+
+# Copy the compiled binary
+COPY backend /backend
+
+# Copy database schema
+COPY scripts/db/ /scripts/db/
+
+EXPOSE 8080
+
+ENTRYPOINT ["/backend"]

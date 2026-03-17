@@ -36,8 +36,8 @@ func InitDB() error {
 	}
 
 	// Set connection pool settings
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(100)
+	db.SetMaxIdleConns(25)
 
 	DB = db
 	return nil

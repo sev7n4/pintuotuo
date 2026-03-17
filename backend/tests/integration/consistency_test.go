@@ -86,10 +86,9 @@ func TestRevenueCalculationConsistency(t *testing.T) {
 	defer TeardownPaymentTest(t, ts)
 
 	// Setup merchant with unique IDs for parallel test isolation
-	merchantID := TestMerchantID
 	uniqueID := GenerateUniqueID()
 	userID := SeedTestUser(t, ts.DB, uniqueID)
-	productID := SeedTestProduct(t, ts.DB, uniqueID)
+	productID, merchantID := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Create and pay for 3 orders
@@ -187,7 +186,7 @@ func TestPaymentAmountConsistency(t *testing.T) {
 
 	uniqueID := GenerateUniqueID()
 	userID := SeedTestUser(t, ts.DB, uniqueID)
-	productID := SeedTestProduct(t, ts.DB, uniqueID)
+	productID, _ := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Create order and payment
@@ -261,7 +260,7 @@ func TestPaymentListConsistency(t *testing.T) {
 
 	uniqueID := GenerateUniqueID()
 	userID := SeedTestUser(t, ts.DB, uniqueID)
-	productID := SeedTestProduct(t, ts.DB, uniqueID)
+	productID, _ := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Create 5 payments
@@ -370,7 +369,7 @@ func TestPaymentFilterConsistency(t *testing.T) {
 
 	uniqueID := GenerateUniqueID()
 	userID := SeedTestUser(t, ts.DB, uniqueID)
-	productID := SeedTestProduct(t, ts.DB, uniqueID)
+	productID, _ := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Create 3 alipay payments and 2 wechat payments

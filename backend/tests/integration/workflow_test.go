@@ -25,7 +25,7 @@ func TestCompleteGroupPurchaseWithPayment(t *testing.T) {
 	uniqueIDB := GenerateUniqueID()
 	userAID := SeedTestUser(t, ts.DB, uniqueIDA)
 	userBID := SeedTestUser(t, ts.DB, uniqueIDB)
-	productID := SeedTestProduct(t, ts.DB, uniqueIDA)
+	productID, _ := SeedTestProduct(t, ts.DB, uniqueIDA)
 
 	defer CleanupTestData(t, ts.DB, userAID)
 	defer CleanupTestData(t, ts.DB, userBID)
@@ -108,7 +108,7 @@ func TestMultiplePaymentsForDifferentOrders(t *testing.T) {
 
 	uniqueID := GenerateUniqueID()
 	userID := SeedTestUser(t, ts.DB, uniqueID)
-	productID := SeedTestProduct(t, ts.DB, uniqueID)
+	productID, _ := SeedTestProduct(t, ts.DB, uniqueID)
 	defer CleanupTestData(t, ts.DB, userID)
 
 	// Create 3 orders
@@ -227,7 +227,7 @@ func TestConcurrentPaymentsForDifferentUsers(t *testing.T) {
 	payments := make([]int, numUsers)
 
 	baseID := GenerateUniqueID()
-	productID := SeedTestProduct(t, ts.DB, baseID)
+	productID, _ := SeedTestProduct(t, ts.DB, baseID)
 
 	for i := 0; i < numUsers; i++ {
 		users[i] = SeedTestUser(t, ts.DB, baseID+i)
@@ -332,7 +332,7 @@ func TestConcurrentRefunds(t *testing.T) {
 	payments := make([]int, numPayments)
 
 	baseID := GenerateUniqueID()
-	productID := SeedTestProduct(t, ts.DB, baseID)
+	productID, _ := SeedTestProduct(t, ts.DB, baseID)
 
 	for i := 0; i < numPayments; i++ {
 		users[i] = SeedTestUser(t, ts.DB, baseID+i)

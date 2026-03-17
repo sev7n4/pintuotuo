@@ -54,7 +54,7 @@ func TestUserTokenIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create product
-		productId := SeedTestProduct(t, ts.DB, GenerateUniqueID())
+		productId, _ := SeedTestProduct(t, ts.DB, GenerateUniqueID())
 
 		// Create order
 		orderReq := &order.CreateOrderRequest{

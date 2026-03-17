@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/pintuotuo/backend/cache"
 )
@@ -97,7 +98,7 @@ func (s *service) CreateOrder(ctx context.Context, userID int, req *CreateOrderR
 	}
 
 	// Invalidate user's order list cache
-	_ = cache.InvalidatePatterns(ctx, "orders:user:"+string(rune(userID))+":*")
+	_ = cache.InvalidatePatterns(ctx, "orders:user:"+strconv.Itoa(userID)+":*")
 
 	s.log.Printf("Order created: id=%d, user_id=%d, product_id=%d, quantity=%d, total_price=%.2f", order.ID, userID, req.ProductID, req.Quantity, totalPrice)
 	return &order, nil
@@ -141,9 +142,13 @@ func (s *service) ListOrders(ctx context.Context, userID int, params *ListOrders
 	var orders []Order
 	for rows.Next() {
 		var o Order
-		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+		var groupID sql.NullInt64
+		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &groupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
 		if err != nil {
 			return nil, wrapError("ListOrders", "scan", err)
+		}
+		if groupID.Valid {
+			o.GroupID = int(groupID.Int64)
 		}
 		orders = append(orders, o)
 	}
@@ -170,17 +175,22 @@ func (s *service) ListOrders(ctx context.Context, userID int, params *ListOrders
 // GetOrderByID retrieves a single order by ID (ownership verified)
 func (s *service) GetOrderByID(ctx context.Context, userID int, orderID int) (*Order, error) {
 	var order Order
+	var groupID sql.NullInt64
 	err := s.db.QueryRowContext(
 		ctx,
 		"SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at FROM orders WHERE id = $1 AND user_id = $2",
 		orderID, userID,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	).Scan(&order.ID, &order.UserID, &order.ProductID, &groupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrOrderNotFound
 		}
 		return nil, wrapError("GetOrderByID", "query", err)
+	}
+
+	if groupID.Valid {
+		order.GroupID = int(groupID.Int64)
 	}
 
 	return &order, nil
@@ -206,9 +216,13 @@ func (s *service) GetOrdersByStatus(ctx context.Context, userID int, status stri
 	var orders []Order
 	for rows.Next() {
 		var o Order
-		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+		var groupID sql.NullInt64
+		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &groupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
 		if err != nil {
 			return nil, wrapError("GetOrdersByStatus", "scan", err)
+		}
+		if groupID.Valid {
+			o.GroupID = int(groupID.Int64)
 		}
 		orders = append(orders, o)
 	}
@@ -241,18 +255,23 @@ func (s *service) CancelOrder(ctx context.Context, userID int, orderID int) (*Or
 
 	// Update order status
 	var order Order
+	var groupID sql.NullInt64
 	err = s.db.QueryRowContext(
 		ctx,
 		"UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at",
 		"cancelled", orderID, userID,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	).Scan(&order.ID, &order.UserID, &order.ProductID, &groupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		return nil, wrapError("CancelOrder", "update", err)
 	}
 
+	if groupID.Valid {
+		order.GroupID = int(groupID.Int64)
+	}
+
 	// Invalidate cache
-	_ = cache.InvalidatePatterns(ctx, "orders:user:"+string(rune(userID))+":*")
+	_ = cache.InvalidatePatterns(ctx, "orders:user:"+strconv.Itoa(userID)+":*")
 
 	s.log.Printf("Order cancelled: id=%d, user_id=%d", orderID, userID)
 	return &order, nil
@@ -275,11 +294,12 @@ func (s *service) UpdateOrderStatus(ctx context.Context, userID int, orderID int
 
 	// Update order status
 	var order Order
+	var groupID sql.NullInt64
 	err := s.db.QueryRowContext(
 		ctx,
 		"UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at",
 		newStatus, orderID, userID,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	).Scan(&order.ID, &order.UserID, &order.ProductID, &groupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -288,8 +308,12 @@ func (s *service) UpdateOrderStatus(ctx context.Context, userID int, orderID int
 		return nil, wrapError("UpdateOrderStatus", "update", err)
 	}
 
+	if groupID.Valid {
+		order.GroupID = int(groupID.Int64)
+	}
+
 	// Invalidate cache
-	_ = cache.InvalidatePatterns(ctx, "orders:user:"+string(rune(userID))+":*")
+	_ = cache.InvalidatePatterns(ctx, "orders:user:"+strconv.Itoa(userID)+":*")
 
 	s.log.Printf("Order status updated: id=%d, user_id=%d, new_status=%s", orderID, userID, newStatus)
 	return &order, nil
