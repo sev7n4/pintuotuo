@@ -326,15 +326,20 @@ func (s *service) HandleAlipayCallback(ctx context.Context, payload *AlipayCallb
 	}
 
 	var payment Payment
-	err = s.db.QueryRowContext(
+	var transactionID sql.NullString
+	err := s.db.QueryRowContext(
 		ctx,
 		"UPDATE payments SET status = $1, transaction_id = $2, updated_at = NOW() WHERE id = $3 RETURNING id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at",
 		newStatus, payload.TradeNo, paymentID,
-	).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.TransactionID, &payment.CreatedAt, &payment.UpdatedAt)
+	).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
 
 	if err != nil {
 		s.log.Printf("Failed to update payment: %v", err)
 		return nil, wrapError("HandleAlipayCallback", "update", err)
+	}
+
+	if transactionID.Valid {
+		payment.TransactionID = transactionID.String
 	}
 
 	// If payment successful, update order status and recharge tokens
@@ -426,15 +431,20 @@ func (s *service) HandleWechatCallback(ctx context.Context, payload *WechatCallb
 	}
 
 	var payment Payment
+	var transactionID sql.NullString
 	err = s.db.QueryRowContext(
 		ctx,
 		"UPDATE payments SET status = $1, transaction_id = $2, updated_at = NOW() WHERE id = $3 RETURNING id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at",
 		newStatus, payload.TransactionID, paymentID,
-	).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.TransactionID, &payment.CreatedAt, &payment.UpdatedAt)
+	).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
 
 	if err != nil {
 		s.log.Printf("Failed to update payment: %v", err)
 		return nil, wrapError("HandleWechatCallback", "update", err)
+	}
+
+	if transactionID.Valid {
+		payment.TransactionID = transactionID.String
 	}
 
 	// If payment successful, update order status and recharge tokens
