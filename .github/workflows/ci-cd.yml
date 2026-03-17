@@ -49,7 +49,7 @@ jobs:
 
       - name: Initialize database schema
         run: |
-          psql -h localhost -U pintuotuo -d pintuotuo_test -f backend/scripts/db/full_schema.sql
+          psql -h localhost -U pintuotuo -d pintuotuo_test -f scripts/db/full_schema.sql
         env:
           PGPASSWORD: test_password
 

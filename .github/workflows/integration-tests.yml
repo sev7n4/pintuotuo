@@ -80,7 +80,7 @@ jobs:
           -h localhost \
           -U pintuotuo \
           -d pintuotuo_test \
-          -f scripts/db/full_schema.sql || true
+          -f ../scripts/db/full_schema.sql || true
       working-directory: ./backend
 
     - name: Run Integration Tests
