@@ -123,13 +123,12 @@ func SeedTestProduct(t *testing.T, db *sql.DB, productID int) int {
 	var id int
 	err := db.QueryRowContext(
 		ctx,
-		"INSERT INTO products (name, description, price, stock, merchant_id, category, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+		"INSERT INTO products (name, description, price, stock, merchant_id, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
 		fmt.Sprintf("Test Product %d", productID),
 		"Test product description",
 		TestProductPrice,
 		1000, // stock
 		TestMerchantID,
-		"test",
 		"active",
 	).Scan(&id)
 

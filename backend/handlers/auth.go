@@ -22,10 +22,12 @@ var jwtSecret = []byte(getEnv("JWT_SECRET", "pintuotuo-secret-key-dev"))
 // Initialize user service
 var userService user.Service
 
-func init() {
-	logger := log.New(os.Stderr, "[AuthHandler] ", log.LstdFlags)
-	tokenSvc := token.NewService(config.GetDB(), logger)
-	userService = user.NewService(config.GetDB(), logger, tokenSvc)
+func initAuthServices() {
+	if userService == nil {
+		logger := log.New(os.Stderr, "[AuthHandler] ", log.LstdFlags)
+		tokenSvc := token.NewService(config.GetDB(), logger)
+		userService = user.NewService(config.GetDB(), logger, tokenSvc)
+	}
 }
 
 // AuthResponse represents authentication response
@@ -42,6 +44,7 @@ type RefreshTokenResponse struct {
 
 // RegisterUser handles user registration
 func RegisterUser(c *gin.Context) {
+	initAuthServices()
 	var req user.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
@@ -78,6 +81,7 @@ func RegisterUser(c *gin.Context) {
 
 // LoginUser handles user login
 func LoginUser(c *gin.Context) {
+	initAuthServices()
 	var req struct {
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required"`
@@ -119,6 +123,7 @@ func LogoutUser(c *gin.Context) {
 
 // RefreshToken refreshes an expired JWT token
 func RefreshToken(c *gin.Context) {
+	initAuthServices()
 	var req struct {
 		Token string `json:"token" binding:"required"`
 	}
@@ -146,6 +151,7 @@ func RefreshToken(c *gin.Context) {
 
 // RequestPasswordReset initiates password reset
 func RequestPasswordReset(c *gin.Context) {
+	initAuthServices()
 	var req struct {
 		Email string `json:"email" binding:"required,email"`
 	}
@@ -173,6 +179,7 @@ func RequestPasswordReset(c *gin.Context) {
 
 // ResetPassword resets user password with reset token
 func ResetPassword(c *gin.Context) {
+	initAuthServices()
 	var req struct {
 		ResetToken  string `json:"reset_token" binding:"required"`
 		NewPassword string `json:"new_password" binding:"required,min=6"`
@@ -206,6 +213,7 @@ func ResetPassword(c *gin.Context) {
 
 // GetCurrentUser retrieves current authenticated user
 func GetCurrentUser(c *gin.Context) {
+	initAuthServices()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
@@ -236,6 +244,7 @@ func GetCurrentUser(c *gin.Context) {
 
 // UpdateCurrentUser updates current user profile
 func UpdateCurrentUser(c *gin.Context) {
+	initAuthServices()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
@@ -273,6 +282,7 @@ func UpdateCurrentUser(c *gin.Context) {
 
 // GetUserByID retrieves user by ID
 func GetUserByID(c *gin.Context) {
+	initAuthServices()
 	id := c.Param("id")
 	idInt, err := strconv.Atoi(id)
 	if err != nil {
@@ -298,6 +308,7 @@ func GetUserByID(c *gin.Context) {
 
 // UpdateUser updates user by ID (admin only)
 func UpdateUser(c *gin.Context) {
+	initAuthServices()
 	id := c.Param("id")
 	idInt, err := strconv.Atoi(id)
 	if err != nil {
