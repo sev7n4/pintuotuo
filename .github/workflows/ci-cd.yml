@@ -18,11 +18,6 @@ jobs:
           POSTGRES_USER: pintuotuo
           POSTGRES_PASSWORD: test_password
           POSTGRES_DB: pintuotuo_test
-        options: >-
-          --health-cmd "pg_isready -U pintuotuo"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
         ports:
           - 5432:5432
 
