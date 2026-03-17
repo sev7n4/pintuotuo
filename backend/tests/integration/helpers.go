@@ -119,6 +119,9 @@ func SeedTestUser(t *testing.T, db *sql.DB, userID int) int {
 func SeedTestProduct(t *testing.T, db *sql.DB, productID int) int {
 	ctx := context.Background()
 
+	// Ensure merchant exists first to avoid foreign key violation
+	merchantID := SeedTestUser(t, db, GenerateUniqueID())
+
 	// Insert product directly
 	var id int
 	err := db.QueryRowContext(
@@ -128,7 +131,7 @@ func SeedTestProduct(t *testing.T, db *sql.DB, productID int) int {
 		"Test product description",
 		TestProductPrice,
 		1000, // stock
-		TestMerchantID,
+		merchantID,
 		"active",
 	).Scan(&id)
 
