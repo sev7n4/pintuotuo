@@ -36,7 +36,6 @@ out/
 # Go
 bin/
 vendor/
-go.sum
 *.exe
 *.exe~
 *.dll
