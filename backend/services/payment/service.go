@@ -140,16 +140,16 @@ func (s *service) GetPaymentByID(ctx context.Context, userID int, paymentID int)
 		paymentID, userID,
 	).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
 
-	if transactionID.Valid {
-		payment.TransactionID = transactionID.String
-	}
-
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrPaymentNotFound
 		}
 		s.log.Printf("Failed to get payment: %v", err)
 		return nil, wrapError("GetPaymentByID", "select", err)
+	}
+
+	if transactionID.Valid {
+		payment.TransactionID = transactionID.String
 	}
 
 	// Cache the result
@@ -171,7 +171,7 @@ func (s *service) GetPaymentsByOrder(ctx context.Context, userID int, orderID in
 	}
 	defer rows.Close()
 
-	var payments []Payment
+	payments := []Payment{}
 	for rows.Next() {
 		var payment Payment
 		var transactionID sql.NullString
@@ -242,7 +242,7 @@ func (s *service) ListPayments(ctx context.Context, userID int, params *ListPaym
 	}
 	defer rows.Close()
 
-	var payments []Payment
+	payments := make([]Payment, 0, params.PerPage)
 	for rows.Next() {
 		var payment Payment
 		var transactionID sql.NullString
@@ -303,11 +303,15 @@ func (s *service) HandleAlipayCallback(ctx context.Context, payload *AlipayCallb
 		// Return existing payment
 		var payment Payment
 		var transactionID sql.NullString
-		_ = s.db.QueryRowContext(
+		err = s.db.QueryRowContext(
 			ctx,
 			"SELECT id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at FROM payments WHERE id = $1",
 			paymentID,
 		).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
+
+		if err != nil {
+			return nil, wrapError("HandleAlipayCallback", "select_existing", err)
+		}
 
 		if transactionID.Valid {
 			payment.TransactionID = transactionID.String
@@ -399,11 +403,15 @@ func (s *service) HandleWechatCallback(ctx context.Context, payload *WechatCallb
 		// Return existing payment
 		var payment Payment
 		var transactionID sql.NullString
-		_ = s.db.QueryRowContext(
+		err = s.db.QueryRowContext(
 			ctx,
 			"SELECT id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at FROM payments WHERE id = $1",
 			paymentID,
 		).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
+
+		if err != nil {
+			return nil, wrapError("HandleWechatCallback", "select_existing", err)
+		}
 
 		if transactionID.Valid {
 			payment.TransactionID = transactionID.String
@@ -486,15 +494,20 @@ func (s *service) RefundPayment(ctx context.Context, userID int, paymentID int, 
 
 	// Update payment status to refunded
 	var payment Payment
+	var transactionID sql.NullString
 	err = s.db.QueryRowContext(
 		ctx,
 		"UPDATE payments SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at",
 		"refunded", paymentID,
-	).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.TransactionID, &payment.CreatedAt, &payment.UpdatedAt)
+	).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
 
 	if err != nil {
 		s.log.Printf("Failed to update payment: %v", err)
 		return nil, wrapError("RefundPayment", "update", err)
+	}
+
+	if transactionID.Valid {
+		payment.TransactionID = transactionID.String
 	}
 
 	// Invalidate cache
