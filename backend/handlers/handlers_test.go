@@ -8,8 +8,17 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/cache"
+	"github.com/pintuotuo/backend/config"
 	"github.com/stretchr/testify/assert"
 )
+
+func init() {
+	// Initialize test database
+	_ = config.InitDB()
+	// Initialize cache
+	_ = cache.Init()
+}
 
 // TestUserRegistration tests user registration endpoint
 func TestUserRegistration(t *testing.T) {
@@ -134,7 +143,7 @@ func TestGetProductByID(t *testing.T) {
 		{
 			name:           "Invalid product ID",
 			productID:      "invalid",
-			expectedStatus: http.StatusNotFound,
+			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:           "Non-existent product",

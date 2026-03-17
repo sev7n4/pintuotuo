@@ -13,6 +13,7 @@ import (
 
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/services/token"
 )
 
 var testService Service
@@ -29,7 +30,8 @@ func init() {
 	}
 
 	logger := log.New(os.Stderr, "[TestUserService] ", log.LstdFlags)
-	testService = NewService(config.GetDB(), logger)
+	tokenSvc := token.NewService(config.GetDB(), logger)
+	testService = NewService(config.GetDB(), logger, tokenSvc)
 }
 
 // TestRegisterUserValid tests valid user registration
@@ -347,7 +349,8 @@ func TestRefreshTokenValid(t *testing.T) {
 
 	// Get initial service to generate token
 	logger := log.New(os.Stderr, "[Test] ", log.LstdFlags)
-	svc := NewService(config.GetDB(), logger)
+	tokenSvc := token.NewService(config.GetDB(), logger)
+	svc := NewService(config.GetDB(), logger, tokenSvc)
 
 	// Generate token manually for testing
 	service := svc.(*service)
@@ -376,7 +379,8 @@ func TestRefreshTokenInvalid(t *testing.T) {
 func TestRefreshTokenExpired(t *testing.T) {
 	// Create a token that's already expired
 	logger := log.New(os.Stderr, "[Test] ", log.LstdFlags)
-	svc := NewService(config.GetDB(), logger)
+	tokenSvc := token.NewService(config.GetDB(), logger)
+	svc := NewService(config.GetDB(), logger, tokenSvc)
 	service := svc.(*service)
 
 	// Create token with past expiry
@@ -594,7 +598,8 @@ func TestTokenClaimsValid(t *testing.T) {
 
 	// Generate token
 	logger := log.New(os.Stderr, "[Test] ", log.LstdFlags)
-	svc := NewService(config.GetDB(), logger)
+	tokenSvc := token.NewService(config.GetDB(), logger)
+	svc := NewService(config.GetDB(), logger, tokenSvc)
 	service := svc.(*service)
 	token := service.generateToken(created.ID, created.Email)
 

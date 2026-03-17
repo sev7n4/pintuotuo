@@ -84,6 +84,10 @@ jobs:
       working-directory: ./backend
 
     - name: Run Integration Tests
+      env:
+        DATABASE_URL: postgresql://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
+        REDIS_URL: redis://localhost:6379
+        GIN_MODE: release
       run: |
         go test -v ./tests/integration \
           -timeout 120s \
@@ -119,6 +123,10 @@ jobs:
       continue-on-error: true
 
     - name: Run Unit Tests (Service Layer)
+      env:
+        DATABASE_URL: postgresql://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
+        REDIS_URL: redis://localhost:6379
+        GIN_MODE: release
       run: |
         go test -v ./services/payment/service_test.go \
           -timeout 60s \
@@ -126,6 +134,10 @@ jobs:
       working-directory: ./backend
 
     - name: Run Stress Tests
+      env:
+        DATABASE_URL: postgresql://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
+        REDIS_URL: redis://localhost:6379
+        GIN_MODE: release
       run: |
         go test -v ./tests/integration -run "TestHighConcurrency|TestCache|TestDatabase|TestRace" \
           -timeout 300s

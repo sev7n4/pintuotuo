@@ -13,13 +13,23 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:15-alpine
         env:
           POSTGRES_USER: pintuotuo
           POSTGRES_PASSWORD: test_password
           POSTGRES_DB: pintuotuo_test
         ports:
           - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
 
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +67,7 @@ jobs:
         working-directory: ./backend
         env:
           DATABASE_URL: postgresql://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
+          REDIS_URL: redis://localhost:6379
           GIN_MODE: release
         run: go test -v ./...
 

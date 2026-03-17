@@ -20,7 +20,11 @@ var cacheInitialized bool
 
 func init() {
   // Initialize cache for all tests (runs once)
-  os.Setenv("REDIS_URL", "redis://localhost:6380")
+  redisURL := os.Getenv("REDIS_URL")
+  if redisURL == "" {
+    redisURL = "redis://localhost:6380"
+  }
+  os.Setenv("REDIS_URL", redisURL)
   err := cache.Init()
   if err == nil {
     cacheInitialized = true
@@ -41,7 +45,10 @@ func setupTestDB(t *testing.T) *sql.DB {
 
   // For testing, we use a real database connection
   // In production CI/CD, use a test database
-  connStr := "postgres://pintuotuo:dev_password_123@localhost:5433/pintuotuo_db?sslmode=disable"
+  connStr := os.Getenv("DATABASE_URL")
+  if connStr == "" {
+    connStr = "postgres://pintuotuo:dev_password_123@localhost:5433/pintuotuo_db?sslmode=disable"
+  }
   db, err := sql.Open("postgres", connStr)
   require.NoError(t, err, "Failed to connect to test database")
 

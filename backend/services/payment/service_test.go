@@ -13,6 +13,7 @@ import (
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/services/order"
+	"github.com/pintuotuo/backend/services/token"
 )
 
 var testService Service
@@ -29,8 +30,9 @@ func init() {
 	}
 
 	logger := log.New(os.Stderr, "[TestPaymentService] ", log.LstdFlags)
+	tokenSvc := token.NewService(config.GetDB(), logger)
 	orderService := order.NewService(config.GetDB(), logger)
-	testService = NewService(config.GetDB(), orderService, logger)
+	testService = NewService(config.GetDB(), orderService, logger, tokenSvc)
 }
 
 // ============================================================================
