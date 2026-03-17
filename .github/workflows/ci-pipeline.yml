@@ -1,0 +1,87 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pintuotuo
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: pintuotuo_test
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache: true
+          cache-dependency-path: 'backend/go.sum'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Install PostgreSQL Client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Initialize database schema
+        run: |
+          # Wait for PostgreSQL to be ready
+          until pg_isready -h localhost -p 5432 -U pintuotuo; do
+            echo 'Waiting for PostgreSQL...'
+            sleep 1
+          done
+          psql -h localhost -U pintuotuo -d pintuotuo_test -f scripts/db/full_schema.sql
+        env:
+          PGPASSWORD: test_password
+
+      - name: Run tests
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
+          GIN_MODE: release
+        run: go test -v ./...
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package.json'
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Run tests
+        working-directory: ./frontend
+        run: npm test --if-present --watchAll=false
