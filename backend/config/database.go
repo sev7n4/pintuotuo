@@ -35,9 +35,18 @@ func InitDB() error {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// Set connection pool settings
-	db.SetMaxOpenConns(100)
-	db.SetMaxIdleConns(25)
+	// Set connection pool settings based on environment
+	maxOpenConns := 100
+	maxIdleConns := 25
+
+	// Reduce connections in CI/CD to avoid hitting PostgreSQL limits
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		maxOpenConns = 15
+		maxIdleConns = 5
+	}
+
+	db.SetMaxOpenConns(maxOpenConns)
+	db.SetMaxIdleConns(maxIdleConns)
 
 	DB = db
 	return nil
