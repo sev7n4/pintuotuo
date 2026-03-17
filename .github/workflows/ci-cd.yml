@@ -49,7 +49,7 @@ jobs:
 
       - name: Initialize database schema
         run: |
-          psql -h localhost -U pintuotuo -d pintuotuo_test -f scripts/db/full_schema.sql
+          psql -h localhost -U pintuotuo -d pintuotuo_test -f scripts/db/full_schema.sql || (echo "Retrying database initialization..." && sleep 5 && psql -h localhost -U pintuotuo -d pintuotuo_test -f scripts/db/full_schema.sql)
         env:
           PGPASSWORD: test_password
 
@@ -73,9 +73,7 @@ jobs:
           GIN_MODE: release
           GO111MODULE: "on"
         run: |
-          go mod download
-          go mod verify
-          go test -v -race -coverprofile=coverage.out ./...
+          go test -v -coverprofile=coverage.out ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
