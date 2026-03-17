@@ -13,13 +13,13 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:16-alpine
         env:
           POSTGRES_USER: pintuotuo
           POSTGRES_PASSWORD: test_password
           POSTGRES_DB: pintuotuo_test
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U pintuotuo"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
