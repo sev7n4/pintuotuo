@@ -190,10 +190,15 @@ func AssertCacheKeyNotExists(t *testing.T, ctx context.Context, key string) {
 // GetPaymentFromDB retrieves payment directly from database
 func GetPaymentFromDB(t *testing.T, db *sql.DB, paymentID int) *payment.Payment {
 	var p payment.Payment
+	var transactionID sql.NullString
 	err := db.QueryRow(
 		"SELECT id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at FROM payments WHERE id = $1",
 		paymentID,
-	).Scan(&p.ID, &p.UserID, &p.OrderID, &p.Amount, &p.Method, &p.Status, &p.TransactionID, &p.CreatedAt, &p.UpdatedAt)
+	).Scan(&p.ID, &p.UserID, &p.OrderID, &p.Amount, &p.Method, &p.Status, &transactionID, &p.CreatedAt, &p.UpdatedAt)
+
+	if transactionID.Valid {
+		p.TransactionID = transactionID.String
+	}
 
 	require.NoError(t, err)
 	return &p
@@ -202,10 +207,15 @@ func GetPaymentFromDB(t *testing.T, db *sql.DB, paymentID int) *payment.Payment 
 // GetOrderFromDB retrieves order directly from database
 func GetOrderFromDB(t *testing.T, db *sql.DB, orderID int) *order.Order {
 	var o order.Order
+	var groupID sql.NullInt64
 	err := db.QueryRow(
 		"SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at FROM orders WHERE id = $1",
 		orderID,
-	).Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+	).Scan(&o.ID, &o.UserID, &o.ProductID, &groupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+
+	if groupID.Valid {
+		o.GroupID = int(groupID.Int64)
+	}
 
 	require.NoError(t, err)
 	return &o
@@ -298,7 +308,7 @@ func CleanupTestData(t *testing.T, db *sql.DB, userID int) {
 	require.NoError(t, err)
 
 	// Delete groups
-	_, err = db.ExecContext(ctx, "DELETE FROM groups WHERE user_id = $1", userID)
+	_, err = db.ExecContext(ctx, "DELETE FROM groups WHERE creator_id = $1", userID)
 	require.NoError(t, err)
 
 	// Delete token transactions first (foreign key dependency)

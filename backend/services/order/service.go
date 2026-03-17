@@ -73,12 +73,24 @@ func (s *service) CreateOrder(ctx context.Context, userID int, req *CreateOrderR
 	totalPrice := productPrice * float64(req.Quantity)
 
 	// Create order
+	var groupID sql.NullInt64
+	if req.GroupID != 0 {
+		groupID = sql.NullInt64{Int64: int64(req.GroupID), Valid: true}
+	} else {
+		groupID = sql.NullInt64{Valid: false}
+	}
+
 	var order Order
+	var resGroupID sql.NullInt64
 	err = s.db.QueryRowContext(
 		ctx,
 		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at",
-		userID, req.ProductID, req.GroupID, req.Quantity, productPrice, totalPrice, "pending",
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+		userID, req.ProductID, groupID, req.Quantity, productPrice, totalPrice, "pending",
+	).Scan(&order.ID, &order.UserID, &order.ProductID, &resGroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+
+	if resGroupID.Valid {
+		order.GroupID = int(resGroupID.Int64)
+	}
 
 	if err != nil {
 		return nil, wrapError("CreateOrder", "insert", err)

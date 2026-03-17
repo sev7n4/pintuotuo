@@ -133,11 +133,16 @@ func (s *service) GetPaymentByID(ctx context.Context, userID int, paymentID int)
 	}
 
 	var payment Payment
+	var transactionID sql.NullString
 	err := s.db.QueryRowContext(
 		ctx,
 		"SELECT id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at FROM payments WHERE id = $1 AND user_id = $2",
 		paymentID, userID,
-	).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.TransactionID, &payment.CreatedAt, &payment.UpdatedAt)
+	).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
+
+	if transactionID.Valid {
+		payment.TransactionID = transactionID.String
+	}
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -169,10 +174,14 @@ func (s *service) GetPaymentsByOrder(ctx context.Context, userID int, orderID in
 	var payments []Payment
 	for rows.Next() {
 		var payment Payment
-		err := rows.Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.TransactionID, &payment.CreatedAt, &payment.UpdatedAt)
+		var transactionID sql.NullString
+		err := rows.Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
 		if err != nil {
 			s.log.Printf("Failed to scan payment: %v", err)
 			return nil, wrapError("GetPaymentsByOrder", "scan", err)
+		}
+		if transactionID.Valid {
+			payment.TransactionID = transactionID.String
 		}
 		payments = append(payments, payment)
 	}
@@ -236,10 +245,14 @@ func (s *service) ListPayments(ctx context.Context, userID int, params *ListPaym
 	var payments []Payment
 	for rows.Next() {
 		var payment Payment
-		err := rows.Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.TransactionID, &payment.CreatedAt, &payment.UpdatedAt)
+		var transactionID sql.NullString
+		err := rows.Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
 		if err != nil {
 			s.log.Printf("Failed to scan payment: %v", err)
 			return nil, wrapError("ListPayments", "scan", err)
+		}
+		if transactionID.Valid {
+			payment.TransactionID = transactionID.String
 		}
 		payments = append(payments, payment)
 	}
@@ -289,11 +302,16 @@ func (s *service) HandleAlipayCallback(ctx context.Context, payload *AlipayCallb
 	if currentStatus == "success" || currentStatus == "failed" {
 		// Return existing payment
 		var payment Payment
+		var transactionID sql.NullString
 		_ = s.db.QueryRowContext(
 			ctx,
 			"SELECT id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at FROM payments WHERE id = $1",
 			paymentID,
-		).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.TransactionID, &payment.CreatedAt, &payment.UpdatedAt)
+		).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
+
+		if transactionID.Valid {
+			payment.TransactionID = transactionID.String
+		}
 		return &payment, nil
 	}
 
@@ -380,11 +398,16 @@ func (s *service) HandleWechatCallback(ctx context.Context, payload *WechatCallb
 	if currentStatus == "success" || currentStatus == "failed" {
 		// Return existing payment
 		var payment Payment
+		var transactionID sql.NullString
 		_ = s.db.QueryRowContext(
 			ctx,
 			"SELECT id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at FROM payments WHERE id = $1",
 			paymentID,
-		).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.TransactionID, &payment.CreatedAt, &payment.UpdatedAt)
+		).Scan(&payment.ID, &payment.UserID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &transactionID, &payment.CreatedAt, &payment.UpdatedAt)
+
+		if transactionID.Valid {
+			payment.TransactionID = transactionID.String
+		}
 		return &payment, nil
 	}
 
