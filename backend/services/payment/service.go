@@ -149,7 +149,7 @@ func (s *service) GetPaymentByID(ctx context.Context, userID int, paymentID int)
 	}
 
 	if transactionID.Valid {
-		payment.TransactionID = transactionID.String
+		payment.TransactionID = &transactionID.String
 	}
 
 	// Cache the result
@@ -181,7 +181,7 @@ func (s *service) GetPaymentsByOrder(ctx context.Context, userID int, orderID in
 			return nil, wrapError("GetPaymentsByOrder", "scan", err)
 		}
 		if transactionID.Valid {
-			payment.TransactionID = transactionID.String
+			payment.TransactionID = &transactionID.String
 		}
 		payments = append(payments, payment)
 	}
@@ -252,7 +252,7 @@ func (s *service) ListPayments(ctx context.Context, userID int, params *ListPaym
 			return nil, wrapError("ListPayments", "scan", err)
 		}
 		if transactionID.Valid {
-			payment.TransactionID = transactionID.String
+			payment.TransactionID = &transactionID.String
 		}
 		payments = append(payments, payment)
 	}
@@ -303,7 +303,7 @@ func (s *service) HandleAlipayCallback(ctx context.Context, payload *AlipayCallb
 		// Return existing payment
 		var payment Payment
 		var transactionID sql.NullString
-		err = s.db.QueryRowContext(
+		err := s.db.QueryRowContext(
 			ctx,
 			"SELECT id, user_id, order_id, amount, method, status, transaction_id, created_at, updated_at FROM payments WHERE id = $1",
 			paymentID,
@@ -314,7 +314,7 @@ func (s *service) HandleAlipayCallback(ctx context.Context, payload *AlipayCallb
 		}
 
 		if transactionID.Valid {
-			payment.TransactionID = transactionID.String
+			payment.TransactionID = &transactionID.String
 		}
 		return &payment, nil
 	}
@@ -339,7 +339,7 @@ func (s *service) HandleAlipayCallback(ctx context.Context, payload *AlipayCallb
 	}
 
 	if transactionID.Valid {
-		payment.TransactionID = transactionID.String
+		payment.TransactionID = &transactionID.String
 	}
 
 	// If payment successful, update order status and recharge tokens
@@ -419,7 +419,7 @@ func (s *service) HandleWechatCallback(ctx context.Context, payload *WechatCallb
 		}
 
 		if transactionID.Valid {
-			payment.TransactionID = transactionID.String
+			payment.TransactionID = &transactionID.String
 		}
 		return &payment, nil
 	}
@@ -444,7 +444,7 @@ func (s *service) HandleWechatCallback(ctx context.Context, payload *WechatCallb
 	}
 
 	if transactionID.Valid {
-		payment.TransactionID = transactionID.String
+		payment.TransactionID = &transactionID.String
 	}
 
 	// If payment successful, update order status and recharge tokens
@@ -517,7 +517,7 @@ func (s *service) RefundPayment(ctx context.Context, userID int, paymentID int, 
 	}
 
 	if transactionID.Valid {
-		payment.TransactionID = transactionID.String
+		payment.TransactionID = &transactionID.String
 	}
 
 	// Invalidate cache
