@@ -27,11 +27,17 @@ func SetupPaymentRouter(t *testing.T, ts *integration.TestServices) *gin.Engine 
 
 	// Setup payment endpoints
 	paymentGroup := router.Group("/api/v1")
+	paymentGroup.Use(func(c *gin.Context) {
+		if userIDStr := c.GetHeader("X-User-ID"); userIDStr != "" {
+			userID, _ := strconv.Atoi(userIDStr)
+			c.Set("userID", userID)
+		} else {
+			c.Set("userID", 9999) // default for tests that don't set it
+		}
+		c.Next()
+	})
 
 	paymentGroup.POST("/payments", func(c *gin.Context) {
-		// Mock auth middleware - set user ID
-		c.Set("userID", 9999) // Will be set by test
-
 		var req payment.InitiatePaymentRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -53,8 +59,6 @@ func SetupPaymentRouter(t *testing.T, ts *integration.TestServices) *gin.Engine 
 	})
 
 	paymentGroup.GET("/payments/:id", func(c *gin.Context) {
-		c.Set("userID", 9999)
-
 		paymentID, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payment ID"})
@@ -76,8 +80,6 @@ func SetupPaymentRouter(t *testing.T, ts *integration.TestServices) *gin.Engine 
 	})
 
 	paymentGroup.GET("/payments", func(c *gin.Context) {
-		c.Set("userID", 9999)
-
 		page := 1
 		perPage := 20
 		if p := c.Query("page"); p != "" {
@@ -105,8 +107,6 @@ func SetupPaymentRouter(t *testing.T, ts *integration.TestServices) *gin.Engine 
 	})
 
 	paymentGroup.POST("/payments/:id/refund", func(c *gin.Context) {
-		c.Set("userID", 9999)
-
 		paymentID, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payment ID"})
@@ -192,6 +192,7 @@ func TestInitiatePaymentEndpoint(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/api/v1/payments", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-User-ID", strconv.Itoa(userID))
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -225,6 +226,7 @@ func TestGetPaymentEndpoint(t *testing.T) {
 
 	// Make request
 	req := httptest.NewRequest("GET", "/api/v1/payments/"+strconv.Itoa(paymentID), nil)
+	req.Header.Set("X-User-ID", strconv.Itoa(userID))
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -265,6 +267,7 @@ func TestListPaymentsEndpoint(t *testing.T) {
 
 	// Make list request
 	httpReq := httptest.NewRequest("GET", "/api/v1/payments?page=1&per_page=10", nil)
+	httpReq.Header.Set("X-User-ID", strconv.Itoa(userID))
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, httpReq)
@@ -306,6 +309,7 @@ func TestRefundPaymentEndpoint(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/api/v1/payments/"+strconv.Itoa(paymentID)+"/refund", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-User-ID", strconv.Itoa(userID))
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -449,6 +453,7 @@ func TestOrderAlreadyPaidError(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/api/v1/payments", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-User-ID", strconv.Itoa(userID))
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -479,6 +484,7 @@ func TestInvalidPaymentMethodError(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/api/v1/payments", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-User-ID", strconv.Itoa(userID))
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
