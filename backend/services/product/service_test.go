@@ -2,8 +2,11 @@ package product
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,6 +27,17 @@ func init() {
 	// Initialize cache
 	if err := cache.Init(); err != nil {
 		log.Fatalf("Failed to init cache: %v", err)
+	}
+
+	// Clean database for CI environment
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		db := config.GetDB()
+		if db != nil {
+			tables := []string{"payments", "orders", "groups", "products", "users"}
+			for _, table := range tables {
+				_, _ = db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+			}
+		}
 	}
 
 	logger := log.New(os.Stderr, "[TestProductService] ", log.LstdFlags)
@@ -385,32 +399,35 @@ func TestDeleteProductNotFound(t *testing.T) {
 
 // TestConcurrentProductCreation tests concurrent product creation
 func TestConcurrentProductCreation(t *testing.T) {
-	done := make(chan bool)
-	count := 0
+	var count int32
+	var wg sync.WaitGroup
+	ctx := context.Background()
+
+	// Ensure merchant user exists
+	_, _ = config.GetDB().ExecContext(ctx, "INSERT INTO users (id, email, name, password_hash) VALUES (1, 'merchant@example.com', 'Merchant', 'hash') ON CONFLICT DO NOTHING")
 
 	// Create multiple products concurrently
 	for i := 0; i < 5; i++ {
+		wg.Add(1)
 		go func(idx int) {
+			defer wg.Done()
 			req := &CreateProductRequest{
-				Name:  "Concurrent Product " + string(rune(idx)),
+				Name:  "Concurrent Product " + string(rune(idx+65)), // Use A, B, C...
 				Price: 100.00 + float64(idx),
 				Stock: 50,
 			}
 			_, err := testService.CreateProduct(context.Background(), 1, req)
 			if err == nil {
-				count++
+				atomic.AddInt32(&count, 1)
 			}
-			done <- true
 		}(i)
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < 5; i++ {
-		<-done
-	}
+	wg.Wait()
 
 	// All should succeed
-	assert.Equal(t, 5, count)
+	assert.Equal(t, int32(5), count)
 }
 
 // TestProductFieldsOnCreate tests that all fields are properly set on creation

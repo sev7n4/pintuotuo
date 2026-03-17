@@ -2,8 +2,11 @@ package group
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -25,6 +28,17 @@ func init() {
 	// Initialize cache
 	if err := cache.Init(); err != nil {
 		log.Fatalf("Failed to init cache: %v", err)
+	}
+
+	// Clean database for CI environment
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		db := config.GetDB()
+		if db != nil {
+			tables := []string{"payments", "orders", "groups", "products", "users"}
+			for _, table := range tables {
+				_, _ = db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+			}
+		}
 	}
 
 	logger := log.New(os.Stderr, "[TestGroupService] ", log.LstdFlags)
@@ -225,17 +239,20 @@ func TestJoinGroupFull(t *testing.T) {
 func TestJoinGroupExpired(t *testing.T) {
 	ctx := context.Background()
 
-	// Create group with past deadline
+	// Create group with future deadline first (to pass validation)
 	req := &CreateGroupRequest{
 		ProductID:   1,
 		TargetCount: 5,
-		Deadline:    time.Now().Add(-1 * time.Hour), // Past deadline
+		Deadline:    time.Now().Add(24 * time.Hour),
 	}
 	created, err := testService.CreateGroup(ctx, 1, req)
 	require.NoError(t, err)
 
-	// Try to join expired group (should not be allowed in real scenario,
-	// but for test we'll still try)
+	// Manually update group deadline to the far past in database
+	_, err = config.GetDB().ExecContext(ctx, "UPDATE groups SET deadline = '2000-01-01 00:00:00' WHERE id = $1", created.ID)
+	require.NoError(t, err)
+
+	// Try to join expired group
 	result, err := testService.JoinGroup(ctx, 2, created.ID)
 	assert.Error(t, err)
 	assert.Nil(t, result)
@@ -339,32 +356,37 @@ func TestGroupCompletionOnJoin(t *testing.T) {
 
 // TestConcurrentGroupCreation tests concurrent group creation
 func TestConcurrentGroupCreation(t *testing.T) {
-	done := make(chan bool)
-	count := 0
+	var count int32
+	var wg sync.WaitGroup
+	ctx := context.Background()
+
+	// Ensure at least one product and user exist for testing
+	// These are typically pre-seeded or created in init/setup
+	_, _ = config.GetDB().ExecContext(ctx, "INSERT INTO users (id, email, name, password_hash) VALUES (1, 'creator@example.com', 'Creator', 'hash') ON CONFLICT DO NOTHING")
+	_, _ = config.GetDB().ExecContext(ctx, "INSERT INTO products (id, merchant_id, name, price, stock) VALUES (1, 1, 'Test Product', 99.99, 100) ON CONFLICT DO NOTHING")
 
 	// Create multiple groups concurrently
 	for i := 0; i < 5; i++ {
+		wg.Add(1)
 		go func(idx int) {
+			defer wg.Done()
 			req := &CreateGroupRequest{
 				ProductID:   1,
 				TargetCount: 5 + idx,
 				Deadline:    time.Now().Add(24 * time.Hour),
 			}
-			_, err := testService.CreateGroup(context.Background(), idx, req)
+			_, err := testService.CreateGroup(context.Background(), 1, req)
 			if err == nil {
-				count++
+				atomic.AddInt32(&count, 1)
 			}
-			done <- true
 		}(i)
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < 5; i++ {
-		<-done
-	}
+	wg.Wait()
 
 	// All should succeed
-	assert.Equal(t, 5, count)
+	assert.Equal(t, int32(5), count)
 }
 
 // TestGroupFieldsOnCreate tests that all fields are properly set on creation

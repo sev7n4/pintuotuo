@@ -3,8 +3,10 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +20,17 @@ func init() {
 	_ = config.InitDB()
 	// Initialize cache
 	_ = cache.Init()
+
+	// Clean database for CI environment
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		db := config.GetDB()
+		if db != nil {
+			tables := []string{"payments", "orders", "groups", "products", "users"}
+			for _, table := range tables {
+				_, _ = db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+			}
+		}
+	}
 }
 
 // TestUserRegistration tests user registration endpoint
@@ -79,7 +92,7 @@ func TestUserRegistration(t *testing.T) {
 			if tt.expectedError {
 				var response map[string]interface{}
 				_ = json.Unmarshal(w.Body.Bytes(), &response)
-				assert.NotNil(t, response["error"])
+				assert.NotNil(t, response["code"])
 			}
 		})
 	}

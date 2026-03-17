@@ -69,6 +69,19 @@ func SetupPaymentTest(t *testing.T) *TestServices {
 	}
 
 	db := config.GetDB()
+
+	// Truncate tables to ensure clean slate for each test suite
+	// This is critical for CI/CD environments to avoid data leakage between tests
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		tables := []string{"payments", "orders", "groups", "products", "users"}
+		for _, table := range tables {
+			_, err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
+			if err != nil {
+				t.Logf("Warning: Failed to truncate table %s: %v", table, err)
+			}
+		}
+	}
+
 	logger := log.New(os.Stderr, "[TestIntegration] ", log.LstdFlags)
 
 	// Initialize services
@@ -295,6 +308,18 @@ func SimulateWechatCallback(t *testing.T, ctx context.Context, db *sql.DB, payme
 // CleanupTestData removes test data from database
 func CleanupTestData(t *testing.T, db *sql.DB, userID int) {
 	// Skip cleanup in tests to allow debugging and avoid race conditions
-	// In a CI environment, the database is fresh each time
-	return
+	// unless we are in CI environment
+	if os.Getenv("GITHUB_ACTIONS") != "true" {
+		return
+	}
+
+	ctx := context.Background()
+	// Delete data in reverse order of foreign key dependencies
+	_, _ = db.ExecContext(ctx, "DELETE FROM group_members WHERE user_id = $1", userID)
+	_, _ = db.ExecContext(ctx, "DELETE FROM payments WHERE user_id = $1", userID)
+	_, _ = db.ExecContext(ctx, "DELETE FROM orders WHERE user_id = $1", userID)
+	_, _ = db.ExecContext(ctx, "DELETE FROM groups WHERE creator_id = $1", userID)
+	_, _ = db.ExecContext(ctx, "DELETE FROM products WHERE merchant_id = $1", userID)
+	_, _ = db.ExecContext(ctx, "DELETE FROM tokens WHERE user_id = $1", userID)
+	_, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", userID)
 }
