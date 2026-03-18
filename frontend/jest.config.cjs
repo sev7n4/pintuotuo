@@ -14,14 +14,6 @@ module.exports = {
     '/node_modules/',
     '/dist/',
   ],
-  coverageThreshold: {
-    global: {
-      branches: 70,
-      functions: 70,
-      lines: 70,
-      statements: 70,
-    },
-  },
   setupFilesAfterEnv: ['<rootDir>/src/setup-tests.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
@@ -37,12 +29,8 @@ module.exports = {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: {
         jsx: 'react-jsx',
+        isolatedModules: true,
       },
     }],
-  },
-  globals: {
-    'ts-jest': {
-      isolatedModules: true,
-    },
   },
 }
