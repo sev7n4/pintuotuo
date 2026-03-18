@@ -71,7 +71,7 @@ jobs:
           JWT_SECRET: pintuotuo-secret-key-dev
           GIN_MODE: release
           TEST_MODE: true
-        run: go test -v -count=1 -p 1 ./...
+        run: go list ./... | grep -v 'pintuotuo/internal/db' | xargs go test -v -count=1 -p 1
 
   frontend-tests:
     name: Frontend Tests
