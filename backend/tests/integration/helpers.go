@@ -105,7 +105,7 @@ func SeedTestUser(t *testing.T, db *sql.DB, uniqueID int) int {
 }
 
 // SeedTestProduct creates a test product and returns its ID and the merchant ID
-func SeedTestProduct(t *testing.T, db *sql.DB, productID int) (int, int) {
+func SeedTestProduct(t *testing.T, db *sql.DB, uniqueID int) (int, int) {
 	ctx := context.Background()
 
 	// Ensure merchant exists first to avoid foreign key violation
@@ -116,7 +116,7 @@ func SeedTestProduct(t *testing.T, db *sql.DB, productID int) (int, int) {
 	err := db.QueryRowContext(
 		ctx,
 		"INSERT INTO products (name, description, price, stock, merchant_id, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
-		fmt.Sprintf("Test Product %d", productID),
+		fmt.Sprintf("Test Product %d_%d_%d", uniqueID, time.Now().UnixNano(), rand.Intn(1000000)),
 		"Test product description",
 		TestProductPrice,
 		1000, // stock
