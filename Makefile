@@ -32,7 +32,26 @@ test: ## Run all tests
 
 test-backend: ## Run backend tests only
 	@echo "$(BLUE)Running backend tests...$(NC)"
-	cd backend && go test ./... -v -coverprofile=coverage.out
+	cd backend && go test -v -coverprofile=coverage.out \
+		github.com/pintuotuo/backend \
+		github.com/pintuotuo/backend/cache \
+		github.com/pintuotuo/backend/config \
+		github.com/pintuotuo/backend/errors \
+		github.com/pintuotuo/backend/handlers \
+		github.com/pintuotuo/backend/logger \
+		github.com/pintuotuo/backend/metrics \
+		github.com/pintuotuo/backend/middleware \
+		github.com/pintuotuo/backend/models \
+		github.com/pintuotuo/backend/routes \
+		github.com/pintuotuo/backend/services/analytics \
+		github.com/pintuotuo/backend/services/group \
+		github.com/pintuotuo/backend/services/order \
+		github.com/pintuotuo/backend/services/payment \
+		github.com/pintuotuo/backend/services/product \
+		github.com/pintuotuo/backend/services/token \
+		github.com/pintuotuo/backend/services/user \
+		github.com/pintuotuo/backend/tests \
+		github.com/pintuotuo/backend/tests/integration
 	cd backend && go tool cover -html=coverage.out
 
 test-frontend: ## Run frontend tests only
