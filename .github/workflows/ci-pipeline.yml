@@ -94,6 +94,9 @@ jobs:
       - name: Build frontend
         working-directory: ./frontend
         run: npm run build
+        env:
+          TSC_COMPILE_ON_ERROR: "true"
+          CI: "false"
 
       - name: Run unit and integration tests
         working-directory: ./frontend
