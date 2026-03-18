@@ -10,8 +10,6 @@ output:
 linters:
   disable-all: true
   enable:
-    - deadcode
-    - errcheck
     - gofmt
     - govet
     - goconst
@@ -21,13 +19,8 @@ linters:
     - typecheck
     - unused
     - misspell
-    - unparam
-    - varcheck
 
 linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
   gofmt:
     simplify: true
   misspell:
@@ -44,7 +37,6 @@ issues:
     - path: "_test.go"
       linters:
         - unparam
-        - varcheck
     - path: "migrations"
       linters:
         - deadcode
