@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -20,17 +19,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Failed to close database connection: %v", err)
+		}
+	}()
 
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
 
-	log.Println("✓ Connected to database")
+	log.Println("Connected to database")
 
-	// Read and execute migration files
 	migrationsDir := "./migrations"
-	files, err := ioutil.ReadDir(migrationsDir)
+	files, err := os.ReadDir(migrationsDir)
 	if err != nil {
 		log.Fatalf("Failed to read migrations directory: %v", err)
 	}
@@ -43,7 +45,7 @@ func main() {
 		migrationPath := filepath.Join(migrationsDir, file.Name())
 		log.Printf("Running migration: %s", file.Name())
 
-		sqlBytes, err := ioutil.ReadFile(migrationPath)
+		sqlBytes, err := os.ReadFile(migrationPath)
 		if err != nil {
 			log.Fatalf("Failed to read migration file %s: %v", file.Name(), err)
 		}
@@ -52,8 +54,8 @@ func main() {
 			log.Fatalf("Failed to execute migration %s: %v", file.Name(), err)
 		}
 
-		log.Printf("✓ Completed migration: %s", file.Name())
+		log.Printf("Completed migration: %s", file.Name())
 	}
 
-	log.Println("✓ All migrations completed successfully")
+	log.Println("All migrations completed successfully")
 }
