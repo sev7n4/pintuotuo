@@ -18,6 +18,22 @@ import (
 )
 
 var testService Service
+var userIDCounter int64
+
+func generateUserID() int {
+	return int(atomic.AddInt64(&userIDCounter, 1)) + 2000 + int(time.Now().Unix()%1000)
+}
+
+func createUser(t *testing.T, email string) int {
+	db := config.GetDB()
+	var id int
+	err := db.QueryRow("INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id", email, "Test User", "hash").Scan(&id)
+	require.NoError(t, err)
+
+	// Initialize tokens
+	_, _ = db.Exec("INSERT INTO tokens (user_id, balance) VALUES ($1, 1000.00) ON CONFLICT DO NOTHING", id)
+	return id
+}
 
 func init() {
 	// Initialize test database
@@ -30,16 +46,8 @@ func init() {
 		log.Fatalf("Failed to init cache: %v", err)
 	}
 
-	// Clean database for CI environment
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		db := config.GetDB()
-		if db != nil {
-			tables := []string{"payments", "orders", "groups", "products", "users"}
-			for _, table := range tables {
-				_, _ = db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
-			}
-		}
-	}
+	// Clean database and seed for CI environment
+	config.TruncateAndSeed()
 
 	logger := log.New(os.Stderr, "[TestGroupService] ", log.LstdFlags)
 	testService = NewService(config.GetDB(), logger)
@@ -47,13 +55,14 @@ func init() {
 
 // TestCreateGroupValid tests valid group creation
 func TestCreateGroupValid(t *testing.T) {
+	uid := createUser(t, fmt.Sprintf("groupvalid%d@test.com", generateUserID()))
 	req := &CreateGroupRequest{
 		ProductID:   1,
 		TargetCount: 5,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
 
-	group, err := testService.CreateGroup(context.Background(), 1, req)
+	group, err := testService.CreateGroup(context.Background(), uid, req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, group)
@@ -61,19 +70,20 @@ func TestCreateGroupValid(t *testing.T) {
 	assert.Equal(t, req.TargetCount, group.TargetCount)
 	assert.Equal(t, 1, group.CurrentCount) // Creator is first member
 	assert.Equal(t, "active", group.Status)
-	assert.Equal(t, 1, group.CreatorID)
+	assert.Equal(t, uid, group.CreatorID)
 	assert.True(t, group.ID > 0)
 }
 
 // TestCreateGroupInvalidTargetCount tests creation with invalid target count
 func TestCreateGroupInvalidTargetCount(t *testing.T) {
+	uid := createUser(t, fmt.Sprintf("groupinvtarget%d@test.com", generateUserID()))
 	req := &CreateGroupRequest{
 		ProductID:   1,
 		TargetCount: 0,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
 
-	group, err := testService.CreateGroup(context.Background(), 1, req)
+	group, err := testService.CreateGroup(context.Background(), uid, req)
 	assert.Error(t, err)
 	assert.Nil(t, group)
 	assert.Equal(t, ErrInvalidTargetCount, err)
@@ -81,13 +91,14 @@ func TestCreateGroupInvalidTargetCount(t *testing.T) {
 
 // TestCreateGroupInvalidDeadline tests creation with invalid deadline
 func TestCreateGroupInvalidDeadline(t *testing.T) {
+	uid := createUser(t, fmt.Sprintf("groupinvdeadline%d@test.com", generateUserID()))
 	req := &CreateGroupRequest{
 		ProductID:   1,
 		TargetCount: 5,
 		Deadline:    time.Now().Add(-1 * time.Hour), // Past deadline
 	}
 
-	group, err := testService.CreateGroup(context.Background(), 1, req)
+	group, err := testService.CreateGroup(context.Background(), uid, req)
 	assert.Error(t, err)
 	assert.Nil(t, group)
 	assert.Equal(t, ErrInvalidDeadline, err)
@@ -95,13 +106,14 @@ func TestCreateGroupInvalidDeadline(t *testing.T) {
 
 // TestGetGroupByIDValid tests retrieving group by valid ID
 func TestGetGroupByIDValid(t *testing.T) {
+	uid := createUser(t, fmt.Sprintf("groupget%d@test.com", generateUserID()))
 	// Create group first
 	req := &CreateGroupRequest{
 		ProductID:   1,
 		TargetCount: 5,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
-	created, err := testService.CreateGroup(context.Background(), 1, req)
+	created, err := testService.CreateGroup(context.Background(), uid, req)
 	require.NoError(t, err)
 
 	// Retrieve group
@@ -172,6 +184,7 @@ func TestListGroupsPagination(t *testing.T) {
 // TestGetGroupProgress tests group progress calculation
 func TestGetGroupProgress(t *testing.T) {
 	ctx := context.Background()
+	uid := createUser(t, fmt.Sprintf("groupprogress%d@test.com", generateUserID()))
 
 	// Create group
 	req := &CreateGroupRequest{
@@ -179,7 +192,7 @@ func TestGetGroupProgress(t *testing.T) {
 		TargetCount: 10,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
-	created, err := testService.CreateGroup(ctx, 1, req)
+	created, err := testService.CreateGroup(ctx, uid, req)
 	require.NoError(t, err)
 
 	// Get progress
@@ -196,6 +209,8 @@ func TestGetGroupProgress(t *testing.T) {
 // TestJoinGroupValid tests valid group join
 func TestJoinGroupValid(t *testing.T) {
 	ctx := context.Background()
+	uid1 := createUser(t, fmt.Sprintf("groupjoin1_%d@test.com", generateUserID()))
+	uid2 := createUser(t, fmt.Sprintf("groupjoin2_%d@test.com", generateUserID()))
 
 	// Create group
 	req := &CreateGroupRequest{
@@ -203,11 +218,11 @@ func TestJoinGroupValid(t *testing.T) {
 		TargetCount: 5,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
-	created, err := testService.CreateGroup(ctx, 1, req)
+	created, err := testService.CreateGroup(ctx, uid1, req)
 	require.NoError(t, err)
 
 	// Join group
-	result, err := testService.JoinGroup(ctx, 2, created.ID)
+	result, err := testService.JoinGroup(ctx, uid2, created.ID)
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, created.ID, result.Group.ID)
@@ -218,6 +233,8 @@ func TestJoinGroupValid(t *testing.T) {
 // TestJoinGroupFull tests joining a full group
 func TestJoinGroupFull(t *testing.T) {
 	ctx := context.Background()
+	uid1 := createUser(t, fmt.Sprintf("groupfull1_%d@test.com", generateUserID()))
+	uid2 := createUser(t, fmt.Sprintf("groupfull2_%d@test.com", generateUserID()))
 
 	// Create group with target 1 (already full with creator)
 	req := &CreateGroupRequest{
@@ -225,11 +242,11 @@ func TestJoinGroupFull(t *testing.T) {
 		TargetCount: 1,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
-	created, err := testService.CreateGroup(ctx, 1, req)
+	created, err := testService.CreateGroup(ctx, uid1, req)
 	require.NoError(t, err)
 
 	// Try to join full group
-	result, err := testService.JoinGroup(ctx, 2, created.ID)
+	result, err := testService.JoinGroup(ctx, uid2, created.ID)
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Equal(t, ErrGroupFull, err)
@@ -238,6 +255,8 @@ func TestJoinGroupFull(t *testing.T) {
 // TestJoinGroupExpired tests joining an expired group
 func TestJoinGroupExpired(t *testing.T) {
 	ctx := context.Background()
+	uid1 := createUser(t, fmt.Sprintf("groupexp1_%d@test.com", generateUserID()))
+	uid2 := createUser(t, fmt.Sprintf("groupexp2_%d@test.com", generateUserID()))
 
 	// Create group with future deadline first (to pass validation)
 	req := &CreateGroupRequest{
@@ -245,7 +264,7 @@ func TestJoinGroupExpired(t *testing.T) {
 		TargetCount: 5,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
-	created, err := testService.CreateGroup(ctx, 1, req)
+	created, err := testService.CreateGroup(ctx, uid1, req)
 	require.NoError(t, err)
 
 	// Manually update group deadline to the far past in database
@@ -253,7 +272,7 @@ func TestJoinGroupExpired(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to join expired group
-	result, err := testService.JoinGroup(ctx, 2, created.ID)
+	result, err := testService.JoinGroup(ctx, uid2, created.ID)
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Equal(t, ErrGroupExpired, err)
@@ -262,6 +281,8 @@ func TestJoinGroupExpired(t *testing.T) {
 // TestJoinGroupInactive tests joining an inactive group
 func TestJoinGroupInactive(t *testing.T) {
 	ctx := context.Background()
+	uid1 := createUser(t, fmt.Sprintf("groupinact1_%d@test.com", generateUserID()))
+	uid2 := createUser(t, fmt.Sprintf("groupinact2_%d@test.com", generateUserID()))
 
 	// Create and then cancel group
 	req := &CreateGroupRequest{
@@ -269,15 +290,15 @@ func TestJoinGroupInactive(t *testing.T) {
 		TargetCount: 5,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
-	created, err := testService.CreateGroup(ctx, 1, req)
+	created, err := testService.CreateGroup(ctx, uid1, req)
 	require.NoError(t, err)
 
 	// Cancel group
-	err = testService.CancelGroup(ctx, 1, created.ID)
+	err = testService.CancelGroup(ctx, uid1, created.ID)
 	require.NoError(t, err)
 
 	// Try to join cancelled group
-	result, err := testService.JoinGroup(ctx, 2, created.ID)
+	result, err := testService.JoinGroup(ctx, uid2, created.ID)
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Equal(t, ErrGroupInactive, err)
@@ -286,6 +307,7 @@ func TestJoinGroupInactive(t *testing.T) {
 // TestCancelGroupValid tests valid group cancellation
 func TestCancelGroupValid(t *testing.T) {
 	ctx := context.Background()
+	uid := createUser(t, fmt.Sprintf("groupcancel%d@test.com", generateUserID()))
 
 	// Create group
 	req := &CreateGroupRequest{
@@ -293,11 +315,11 @@ func TestCancelGroupValid(t *testing.T) {
 		TargetCount: 5,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
-	created, err := testService.CreateGroup(ctx, 1, req)
+	created, err := testService.CreateGroup(ctx, uid, req)
 	require.NoError(t, err)
 
 	// Cancel group
-	err = testService.CancelGroup(ctx, 1, created.ID)
+	err = testService.CancelGroup(ctx, uid, created.ID)
 	assert.NoError(t, err)
 
 	// Verify status is cancelled
@@ -309,6 +331,8 @@ func TestCancelGroupValid(t *testing.T) {
 // TestCancelGroupNotCreator tests cancelling group as non-creator
 func TestCancelGroupNotCreator(t *testing.T) {
 	ctx := context.Background()
+	uid1 := createUser(t, fmt.Sprintf("groupnotcr1_%d@test.com", generateUserID()))
+	uid2 := createUser(t, fmt.Sprintf("groupnotcr2_%d@test.com", generateUserID()))
 
 	// Create group
 	req := &CreateGroupRequest{
@@ -316,18 +340,19 @@ func TestCancelGroupNotCreator(t *testing.T) {
 		TargetCount: 5,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
-	created, err := testService.CreateGroup(ctx, 1, req)
+	created, err := testService.CreateGroup(ctx, uid1, req)
 	require.NoError(t, err)
 
 	// Try to cancel as different user
-	err = testService.CancelGroup(ctx, 2, created.ID)
+	err = testService.CancelGroup(ctx, uid2, created.ID)
 	assert.Error(t, err)
 	assert.Equal(t, ErrNotGroupCreator, err)
 }
 
 // TestCancelGroupNotFound tests cancelling non-existent group
 func TestCancelGroupNotFound(t *testing.T) {
-	err := testService.CancelGroup(context.Background(), 1, 99999)
+	uid := createUser(t, fmt.Sprintf("groupcancelnotfound%d@test.com", generateUserID()))
+	err := testService.CancelGroup(context.Background(), uid, 99999)
 	assert.Error(t, err)
 	assert.Equal(t, ErrGroupNotFound, err)
 }
@@ -335,6 +360,8 @@ func TestCancelGroupNotFound(t *testing.T) {
 // TestGroupCompletionOnJoin tests group auto-completion when target reached
 func TestGroupCompletionOnJoin(t *testing.T) {
 	ctx := context.Background()
+	uid1 := createUser(t, fmt.Sprintf("groupcompl1_%d@test.com", generateUserID()))
+	uid2 := createUser(t, fmt.Sprintf("groupcompl2_%d@test.com", generateUserID()))
 
 	// Create group with target 2 (1 for creator + 1 needed)
 	req := &CreateGroupRequest{
@@ -342,13 +369,13 @@ func TestGroupCompletionOnJoin(t *testing.T) {
 		TargetCount: 2,
 		Deadline:    time.Now().Add(24 * time.Hour),
 	}
-	created, err := testService.CreateGroup(ctx, 1, req)
+	created, err := testService.CreateGroup(ctx, uid1, req)
 	require.NoError(t, err)
 	assert.Equal(t, "active", created.Status)
 	assert.Equal(t, 1, created.CurrentCount)
 
 	// Join to complete group
-	result, err := testService.JoinGroup(ctx, 2, created.ID)
+	result, err := testService.JoinGroup(ctx, uid2, created.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, "completed", result.Group.Status)
 	assert.Equal(t, 2, result.Group.CurrentCount)
@@ -362,8 +389,8 @@ func TestConcurrentGroupCreation(t *testing.T) {
 
 	// Ensure at least one product and user exist for testing
 	// These are typically pre-seeded or created in init/setup
-	_, _ = config.GetDB().ExecContext(ctx, "INSERT INTO users (id, email, name, password_hash) VALUES (1, 'creator@example.com', 'Creator', 'hash') ON CONFLICT DO NOTHING")
-	_, _ = config.GetDB().ExecContext(ctx, "INSERT INTO products (id, merchant_id, name, price, stock) VALUES (1, 1, 'Test Product', 99.99, 100) ON CONFLICT DO NOTHING")
+	uid := createUser(t, "concurrent_creator@example.com")
+	_, _ = config.GetDB().ExecContext(ctx, "INSERT INTO products (id, merchant_id, name, price, stock) VALUES (1, $1, 'Test Product', 99.99, 100) ON CONFLICT DO NOTHING", uid)
 
 	// Create multiple groups concurrently
 	for i := 0; i < 5; i++ {
@@ -375,7 +402,7 @@ func TestConcurrentGroupCreation(t *testing.T) {
 				TargetCount: 5 + idx,
 				Deadline:    time.Now().Add(24 * time.Hour),
 			}
-			_, err := testService.CreateGroup(context.Background(), 1, req)
+			_, err := testService.CreateGroup(context.Background(), uid, req)
 			if err == nil {
 				atomic.AddInt32(&count, 1)
 			}
@@ -391,6 +418,7 @@ func TestConcurrentGroupCreation(t *testing.T) {
 
 // TestGroupFieldsOnCreate tests that all fields are properly set on creation
 func TestGroupFieldsOnCreate(t *testing.T) {
+	uid := createUser(t, fmt.Sprintf("groupfields%d@test.com", generateUserID()))
 	deadline := time.Now().Add(48 * time.Hour)
 	req := &CreateGroupRequest{
 		ProductID:   1,
@@ -398,11 +426,11 @@ func TestGroupFieldsOnCreate(t *testing.T) {
 		Deadline:    deadline,
 	}
 
-	group, err := testService.CreateGroup(context.Background(), 42, req)
+	group, err := testService.CreateGroup(context.Background(), uid, req)
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, group.ProductID)
-	assert.Equal(t, 42, group.CreatorID)
+	assert.Equal(t, uid, group.CreatorID)
 	assert.Equal(t, 10, group.TargetCount)
 	assert.Equal(t, 1, group.CurrentCount)
 	assert.Equal(t, "active", group.Status)

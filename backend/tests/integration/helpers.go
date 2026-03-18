@@ -70,18 +70,6 @@ func SetupPaymentTest(t *testing.T) *TestServices {
 
 	db := config.GetDB()
 
-	// Truncate tables to ensure clean slate for each test suite
-	// This is critical for CI/CD environments to avoid data leakage between tests
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		tables := []string{"payments", "orders", "groups", "products", "users"}
-		for _, table := range tables {
-			_, err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
-			if err != nil {
-				t.Logf("Warning: Failed to truncate table %s: %v", table, err)
-			}
-		}
-	}
-
 	logger := log.New(os.Stderr, "[TestIntegration] ", log.LstdFlags)
 
 	// Initialize services

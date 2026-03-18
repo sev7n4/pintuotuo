@@ -87,10 +87,13 @@ jobs:
       env:
         DATABASE_URL: postgresql://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
         REDIS_URL: redis://localhost:6379
+        JWT_SECRET: pintuotuo-secret-key-dev
         GIN_MODE: release
+        TEST_MODE: true
       run: |
         go test -v ./tests/integration \
           -timeout 120s \
+          -count=1 -p 1 \
           -coverprofile=coverage.out
       working-directory: ./backend
 

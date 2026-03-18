@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/cache"
@@ -15,22 +16,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var handlerIDCounter int64
+
+func generateUniqueEmail() string {
+	id := atomic.AddInt64(&handlerIDCounter, 1)
+	return fmt.Sprintf("test%d_%d@example.com", id, time.Now().UnixNano())
+}
+
 func init() {
 	// Initialize test database
 	_ = config.InitDB()
 	// Initialize cache
 	_ = cache.Init()
-
-	// Clean database for CI environment
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		db := config.GetDB()
-		if db != nil {
-			tables := []string{"payments", "orders", "groups", "products", "users"}
-			for _, table := range tables {
-				_, _ = db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table))
-			}
-		}
-	}
 }
 
 // TestUserRegistration tests user registration endpoint
@@ -50,7 +47,7 @@ func TestUserRegistration(t *testing.T) {
 		{
 			name: "Valid registration",
 			payload: map[string]string{
-				"email":    "test@example.com",
+				"email":    "register-test@example.com",
 				"name":     "Test User",
 				"password": "password123",
 			},
@@ -80,7 +77,13 @@ func TestUserRegistration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			body, _ := json.Marshal(tt.payload)
+			payload := tt.payload
+			if tt.name == "Valid registration" {
+				// Make email unique to avoid conflict with previous failed runs
+				payload["email"] = generateUniqueEmail()
+			}
+
+			body, _ := json.Marshal(payload)
 			req := httptest.NewRequest("POST", "/users/register", bytes.NewBuffer(body))
 			req.Header.Set("Content-Type", "application/json")
 

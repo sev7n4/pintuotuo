@@ -21,6 +21,9 @@ type Service interface {
 	CreateProduct(ctx context.Context, merchantID int, req *CreateProductRequest) (*Product, error)
 	UpdateProduct(ctx context.Context, merchantID int, productID int, req *UpdateProductRequest) (*Product, error)
 	DeleteProduct(ctx context.Context, merchantID int, productID int) error
+
+	// Internal/System operations
+	UpdateStock(ctx context.Context, productID int, delta int) error
 }
 
 // service implements the Service interface
@@ -72,13 +75,13 @@ func (s *service) ListProducts(ctx context.Context, params *ListProductsParams) 
 	if params.Status == "all" {
 		rows, err = s.db.QueryContext(
 			ctx,
-			"SELECT id, merchant_id, name, description, price, COALESCE(original_price, 0), stock, status, created_at, updated_at FROM products ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+			"SELECT id, merchant_id, name, COALESCE(description, ''), price, COALESCE(original_price, 0), stock, status, created_at, updated_at FROM products ORDER BY created_at DESC LIMIT $1 OFFSET $2",
 			params.PerPage, offset,
 		)
 	} else {
 		rows, err = s.db.QueryContext(
 			ctx,
-			"SELECT id, merchant_id, name, description, price, COALESCE(original_price, 0), stock, status, created_at, updated_at FROM products WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+			"SELECT id, merchant_id, name, COALESCE(description, ''), price, COALESCE(original_price, 0), stock, status, created_at, updated_at FROM products WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
 			params.Status, params.PerPage, offset,
 		)
 	}
@@ -141,7 +144,7 @@ func (s *service) GetProductByID(ctx context.Context, productID int) (*Product, 
 	var product Product
 	err := s.db.QueryRowContext(
 		ctx,
-		"SELECT id, merchant_id, name, description, price, COALESCE(original_price, 0), stock, status, created_at, updated_at FROM products WHERE id = $1",
+		"SELECT id, merchant_id, name, COALESCE(description, ''), price, COALESCE(original_price, 0), stock, status, created_at, updated_at FROM products WHERE id = $1",
 		productID,
 	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.OriginalPrice, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
 
@@ -190,7 +193,7 @@ func (s *service) SearchProducts(ctx context.Context, params *SearchProductsPara
 
 	rows, err := s.db.QueryContext(
 		ctx,
-		"SELECT id, merchant_id, name, description, price, COALESCE(original_price, 0), stock, status, created_at, updated_at FROM products WHERE status = 'active' AND (name ILIKE $1 OR description ILIKE $1) ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+		"SELECT id, merchant_id, name, COALESCE(description, ''), price, COALESCE(original_price, 0), stock, status, created_at, updated_at FROM products WHERE status = 'active' AND (name ILIKE $1 OR description ILIKE $1) ORDER BY created_at DESC LIMIT $2 OFFSET $3",
 		searchQuery, params.PerPage, offset,
 	)
 
@@ -250,7 +253,7 @@ func (s *service) CreateProduct(ctx context.Context, merchantID int, req *Create
 	var product Product
 	err := s.db.QueryRowContext(
 		ctx,
-		"INSERT INTO products (merchant_id, name, description, price, original_price, stock, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, merchant_id, name, description, price, COALESCE(original_price, 0), stock, status, created_at, updated_at",
+		"INSERT INTO products (merchant_id, name, description, price, original_price, stock, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, merchant_id, name, COALESCE(description, ''), price, COALESCE(original_price, 0), stock, status, created_at, updated_at",
 		merchantID, req.Name, req.Description, req.Price, req.OriginalPrice, req.Stock, "active",
 	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.OriginalPrice, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
 
@@ -286,7 +289,7 @@ func (s *service) UpdateProduct(ctx context.Context, merchantID int, productID i
 	var product Product
 	err = s.db.QueryRowContext(
 		ctx,
-		"UPDATE products SET name = COALESCE(NULLIF($1, ''), name), description = COALESCE(NULLIF($2, ''), description), price = CASE WHEN $3 > 0 THEN $3 ELSE price END, original_price = CASE WHEN $4 > 0 THEN $4 ELSE original_price END, stock = CASE WHEN $5 >= 0 THEN $5 ELSE stock END, status = COALESCE(NULLIF($6, ''), status), updated_at = NOW() WHERE id = $7 RETURNING id, merchant_id, name, description, price, COALESCE(original_price, 0), stock, status, created_at, updated_at",
+		"UPDATE products SET name = COALESCE(NULLIF($1, ''), name), description = COALESCE(NULLIF($2, ''), description), price = CASE WHEN $3::decimal > 0 THEN $3::decimal ELSE price END, original_price = CASE WHEN $4::decimal > 0 THEN $4::decimal ELSE original_price END, stock = CASE WHEN $5 >= 0 THEN $5 ELSE stock END, status = COALESCE(NULLIF($6, ''), status), updated_at = NOW() WHERE id = $7 RETURNING id, merchant_id, name, COALESCE(description, ''), price, COALESCE(original_price, 0), stock, status, created_at, updated_at",
 		req.Name, req.Description, req.Price, req.OriginalPrice, req.Stock, req.Status, productID,
 	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.OriginalPrice, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
 
@@ -340,5 +343,57 @@ func (s *service) DeleteProduct(ctx context.Context, merchantID int, productID i
 	_ = cache.InvalidatePatterns(ctx, "products:search:*")
 
 	s.log.Printf("Product deleted: id=%d, merchant_id=%d", productID, merchantID)
+	return nil
+}
+
+// UpdateStock updates product stock with atomic check
+func (s *service) UpdateStock(ctx context.Context, productID int, delta int) error {
+	var res sql.Result
+	var err error
+
+	if delta < 0 {
+		// Use atomic decrement with check
+		res, err = s.db.ExecContext(
+			ctx,
+			"UPDATE products SET stock = stock + $1, updated_at = NOW() WHERE id = $2 AND stock >= $3",
+			delta, productID, -delta,
+		)
+	} else {
+		// Increment
+		res, err = s.db.ExecContext(
+			ctx,
+			"UPDATE products SET stock = stock + $1, updated_at = NOW() WHERE id = $2",
+			delta, productID,
+		)
+	}
+
+	if err != nil {
+		return wrapError("UpdateStock", "exec", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return wrapError("UpdateStock", "rowsAffected", err)
+	}
+
+	if rows == 0 {
+		// Check if product exists
+		var exists bool
+		err = s.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM products WHERE id = $1)", productID).Scan(&exists)
+		if err != nil {
+			return wrapError("UpdateStock", "checkExists", err)
+		}
+		if !exists {
+			return ErrProductNotFound
+		}
+		if delta < 0 {
+			return ErrInsufficientStock
+		}
+	}
+
+	// Invalidate cache
+	_ = cache.Delete(ctx, cache.ProductKey(productID))
+	_ = cache.InvalidatePatterns(ctx, "products:list:*")
+
 	return nil
 }

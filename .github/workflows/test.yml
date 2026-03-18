@@ -67,11 +67,14 @@ jobs:
       env:
         DATABASE_URL: "postgresql://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable"
         REDIS_URL: "redis://localhost:6379"
+        JWT_SECRET: "pintuotuo-secret-key-dev"
+        TEST_MODE: "true"
+        GIN_MODE: "release"
         GO111MODULE: "on"
       run: |
         go mod download
         go mod verify
-        go test -v ./tests/integration -timeout 120s
+        go test -v ./tests/integration -timeout 120s -count=1 -p 1
 
     # Race detector disabled: redis client library (go-redis/v9) has internal race conditions
     # in its hook processing when used concurrently. This is a limitation of the library, not
@@ -89,8 +92,11 @@ jobs:
       env:
         DATABASE_URL: "postgresql://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable"
         REDIS_URL: "redis://localhost:6379"
+        JWT_SECRET: "pintuotuo-secret-key-dev"
+        TEST_MODE: "true"
+        GIN_MODE: "release"
       run: |
-        go test -cover ./services/... ./handlers/...
+        go test -cover -count=1 -p 1 ./services/... ./handlers/...
 
   build:
     name: Build Docker Image

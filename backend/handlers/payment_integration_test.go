@@ -177,8 +177,9 @@ func TestInitiatePaymentEndpoint(t *testing.T) {
 
 	router := SetupPaymentRouter(t, ts)
 
-	userID := integration.SeedTestUser(t, ts.DB, 10)
-	productID, _ := integration.SeedTestProduct(t, ts.DB, 10)
+	uid := integration.GenerateUniqueID()
+	userID := integration.SeedTestUser(t, ts.DB, uid)
+	productID, _ := integration.SeedTestProduct(t, ts.DB, uid)
 	orderID := integration.SeedTestOrder(t, ts.DB, userID, productID)
 
 	defer integration.CleanupTestData(t, ts.DB, userID)

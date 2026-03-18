@@ -29,6 +29,9 @@ func init() {
 		log.Fatalf("Failed to init cache: %v", err)
 	}
 
+	// Clean database and seed for CI environment
+	config.TruncateAndSeed()
+
 	logger := log.New(os.Stderr, "[TestPaymentService] ", log.LstdFlags)
 	tokenSvc := token.NewService(config.GetDB(), logger)
 	orderService := order.NewService(config.GetDB(), logger)
