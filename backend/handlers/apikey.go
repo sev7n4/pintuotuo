@@ -1,17 +1,27 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 )
+
+const APIKeyListTTL = 5 * time.Minute
+
+func APIKeyListKey(userID int) string {
+	return fmt.Sprintf("apikeys:user:%d", userID)
+}
 
 // ListAPIKeys retrieves all API keys for current user
 func ListAPIKeys(c *gin.Context) {
@@ -21,7 +31,28 @@ func ListAPIKeys(c *gin.Context) {
 		return
 	}
 
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	ctx := context.Background()
+	cacheKey := APIKeyListKey(userIDInt)
+
+	if cachedKeys, err := cache.Get(ctx, cacheKey); err == nil {
+		var apiKeys []map[string]interface{}
+		if err := json.Unmarshal([]byte(cachedKeys), &apiKeys); err == nil {
+			c.JSON(http.StatusOK, apiKeys)
+			return
+		}
+	}
+
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	rows, err := db.Query(
 		"SELECT id, user_id, name, status, last_used_at, created_at, updated_at FROM api_keys WHERE user_id = $1 ORDER BY created_at DESC",
@@ -55,6 +86,10 @@ func ListAPIKeys(c *gin.Context) {
 			"created_at":   createdAt,
 			"updated_at":   updatedAt,
 		})
+	}
+
+	if keysJSON, err := json.Marshal(apiKeys); err == nil {
+		cache.Set(ctx, cacheKey, string(keysJSON), APIKeyListTTL)
 	}
 
 	c.JSON(http.StatusOK, apiKeys)
@@ -94,6 +129,10 @@ func CreateAPIKey(c *gin.Context) {
 	keyHash := hashAPIKey(apiKey)
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	var id int
 	err = db.QueryRow(
@@ -111,7 +150,9 @@ func CreateAPIKey(c *gin.Context) {
 		return
 	}
 
-	// Return the key (only time it's visible)
+	userIDInt, _ := userID.(int)
+	cache.Delete(context.Background(), APIKeyListKey(userIDInt))
+
 	c.JSON(http.StatusCreated, gin.H{
 		"id":     id,
 		"key":    apiKey,
@@ -141,6 +182,10 @@ func UpdateAPIKey(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Verify ownership
 	var ownerID int
@@ -176,6 +221,8 @@ func UpdateAPIKey(c *gin.Context) {
 		return
 	}
 
+	cache.Delete(context.Background(), APIKeyListKey(userIDInt))
+
 	c.JSON(http.StatusOK, gin.H{
 		"id":         apiID,
 		"user_id":    apiUserID,
@@ -197,6 +244,10 @@ func DeleteAPIKey(c *gin.Context) {
 	id := c.Param("id")
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Verify ownership
 	var ownerID int
@@ -222,6 +273,8 @@ func DeleteAPIKey(c *gin.Context) {
 		))
 		return
 	}
+
+	cache.Delete(context.Background(), APIKeyListKey(userIDInt))
 
 	c.JSON(http.StatusOK, gin.H{"message": "API key deleted successfully"})
 }

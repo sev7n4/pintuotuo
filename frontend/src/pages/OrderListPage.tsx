@@ -11,7 +11,7 @@ import {
 } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useOrderStore } from '@stores/orderStore'
-import type { Order } from '@types/index'
+import type { Order } from '@/types'
 
 const statusMap: Record<string, { color: string; label: string }> = {
   pending: { color: 'orange', label: '待支付' },

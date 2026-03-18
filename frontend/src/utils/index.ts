@@ -14,18 +14,13 @@ export const formatDateTime = (date: string): string => {
 
 export const getStatusLabel = (status: string): string => {
   const labels: Record<string, string> = {
-    // Order status
     'pending': '待支付',
     'paid': '已支付',
     'completed': '已完成',
     'failed': '失败',
-    // Product status
     'active': '上架',
     'inactive': '下架',
     'archived': '归档',
-    // Group status
-    'completed': '已成团',
-    'failed': '已失败',
   }
   return labels[status] || status
 }

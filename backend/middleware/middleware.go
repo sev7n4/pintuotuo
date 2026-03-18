@@ -125,7 +125,11 @@ func min(a, b int) int {
 
 // RespondWithError is a helper function to respond with an AppError
 func RespondWithError(c *gin.Context, appErr *errors.AppError) {
-	c.JSON(appErr.Status, appErr)
+	c.JSON(appErr.Status, gin.H{
+		"error":   appErr.Message,
+		"code":    appErr.Code,
+		"message": appErr.Message,
+	})
 }
 
 // RateLimitMiddleware limits request rate (to be implemented)

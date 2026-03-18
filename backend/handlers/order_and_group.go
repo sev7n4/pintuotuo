@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
@@ -32,6 +35,10 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Get product info
 	var product models.Product
@@ -50,11 +57,42 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	// Create order
+	tx, err := db.Begin()
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"TRANSACTION_START_FAILED",
+			"Failed to start transaction",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+	defer tx.Rollback()
+
+	result, err := tx.Exec(
+		"UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1",
+		req.Quantity, req.ProductID,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"STOCK_UPDATE_FAILED",
+			"Failed to update stock",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
+		return
+	}
+
 	var order models.Order
 	totalPrice := product.Price * float64(req.Quantity)
 
-	err = db.QueryRow(
+	err = tx.QueryRow(
 		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, user_id, product_id, group_id, quantity, total_price, status, created_at, updated_at",
 		userID, req.ProductID, req.GroupID, req.Quantity, product.Price, totalPrice, "pending",
 	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
@@ -63,6 +101,16 @@ func CreateOrder(c *gin.Context) {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"ORDER_CREATION_FAILED",
 			"Failed to create order",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"TRANSACTION_COMMIT_FAILED",
+			"Failed to commit transaction",
 			http.StatusInternalServerError,
 			err,
 		))
@@ -96,6 +144,10 @@ func ListOrders(c *gin.Context) {
 	offset := (pageNum - 1) * perPageNum
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	rows, err := db.Query(
 		"SELECT id, user_id, product_id, group_id, quantity, total_price, status, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
@@ -138,8 +190,25 @@ func GetOrderByID(c *gin.Context) {
 	}
 
 	id := c.Param("id")
+	orderID, _ := strconv.Atoi(id)
+	ctx := context.Background()
+
+	cacheKey := cache.OrderKey(orderID)
+	if cachedOrder, err := cache.Get(ctx, cacheKey); err == nil {
+		var order models.Order
+		if err := json.Unmarshal([]byte(cachedOrder), &order); err == nil {
+			if order.UserID == userID.(int) {
+				c.JSON(http.StatusOK, order)
+				return
+			}
+		}
+	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	var order models.Order
 	err := db.QueryRow(
@@ -150,6 +219,10 @@ func GetOrderByID(c *gin.Context) {
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
+	}
+
+	if orderJSON, err := json.Marshal(order); err == nil {
+		cache.Set(ctx, cacheKey, string(orderJSON), cache.OrderCacheTTL)
 	}
 
 	c.JSON(http.StatusOK, order)
@@ -166,26 +239,45 @@ func CancelOrder(c *gin.Context) {
 	id := c.Param("id")
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
-	// Check order status
-	var status string
+	var orderInfo struct {
+		status    string
+		productID int
+		quantity  int
+	}
 	err := db.QueryRow(
-		"SELECT status FROM orders WHERE id = $1 AND user_id = $2",
+		"SELECT status, product_id, quantity FROM orders WHERE id = $1 AND user_id = $2",
 		id, userID,
-	).Scan(&status)
+	).Scan(&orderInfo.status, &orderInfo.productID, &orderInfo.quantity)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
 	}
 
-	if status != "pending" {
+	if orderInfo.status != "pending" {
 		middleware.RespondWithError(c, apperrors.ErrCannotCancelOrder)
 		return
 	}
 
+	tx, err := db.Begin()
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"TRANSACTION_START_FAILED",
+			"Failed to start transaction",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+	defer tx.Rollback()
+
 	var order models.Order
-	err = db.QueryRow(
+	err = tx.QueryRow(
 		"UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING id, user_id, product_id, group_id, quantity, total_price, status, created_at, updated_at",
 		"cancelled", id, userID,
 	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
@@ -199,6 +291,32 @@ func CancelOrder(c *gin.Context) {
 		))
 		return
 	}
+
+	_, err = tx.Exec(
+		"UPDATE products SET stock = stock + $1 WHERE id = $2",
+		orderInfo.quantity, orderInfo.productID,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"STOCK_RESTORE_FAILED",
+			"Failed to restore stock",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"TRANSACTION_COMMIT_FAILED",
+			"Failed to commit transaction",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	cache.Delete(context.Background(), cache.OrderKey(order.ID))
 
 	c.JSON(http.StatusOK, order)
 }
@@ -229,6 +347,10 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Verify product exists
 	var productID int
@@ -276,6 +398,10 @@ func ListGroups(c *gin.Context) {
 	offset := (pageNum - 1) * perPageNum
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	rows, err := db.Query(
 		"SELECT id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at FROM groups WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
@@ -312,8 +438,23 @@ func ListGroups(c *gin.Context) {
 // GetGroupByID retrieves a group by ID
 func GetGroupByID(c *gin.Context) {
 	id := c.Param("id")
+	groupID, _ := strconv.Atoi(id)
+	ctx := context.Background()
+
+	cacheKey := cache.GroupKey(groupID)
+	if cachedGroup, err := cache.Get(ctx, cacheKey); err == nil {
+		var group models.Group
+		if err := json.Unmarshal([]byte(cachedGroup), &group); err == nil {
+			c.JSON(http.StatusOK, group)
+			return
+		}
+	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	var group models.Group
 	err := db.QueryRow(
@@ -324,6 +465,10 @@ func GetGroupByID(c *gin.Context) {
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
 		return
+	}
+
+	if groupJSON, err := json.Marshal(group); err == nil {
+		cache.Set(ctx, cacheKey, string(groupJSON), 5*time.Minute)
 	}
 
 	c.JSON(http.StatusOK, group)
@@ -340,6 +485,10 @@ func JoinGroup(c *gin.Context) {
 	groupID := c.Param("id")
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Get group info
 	var group models.Group
@@ -430,6 +579,8 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
+	cache.Delete(context.Background(), cache.GroupKey(group.ID))
+
 	c.JSON(http.StatusOK, group)
 }
 
@@ -444,6 +595,10 @@ func CancelGroup(c *gin.Context) {
 	id := c.Param("id")
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Verify creator
 	var creatorID int
@@ -470,6 +625,9 @@ func CancelGroup(c *gin.Context) {
 		return
 	}
 
+	groupID, _ := strconv.Atoi(id)
+	cache.Delete(context.Background(), cache.GroupKey(groupID))
+
 	c.JSON(http.StatusOK, gin.H{"message": "Group cancelled successfully"})
 }
 
@@ -478,6 +636,10 @@ func GetGroupProgress(c *gin.Context) {
 	id := c.Param("id")
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	var group models.Group
 	err := db.QueryRow(

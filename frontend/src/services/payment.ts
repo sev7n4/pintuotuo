@@ -1,5 +1,5 @@
 import api from './api'
-import { Payment, APIResponse } from '@types/index'
+import { Payment, APIResponse } from '@/types'
 
 interface InitiatePaymentRequest {
   order_id: number

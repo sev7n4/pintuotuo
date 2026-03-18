@@ -3,10 +3,8 @@ import {
   List,
   Card,
   Button,
-  Space,
   Tag,
   Progress,
-  Modal,
   Spin,
   Empty,
   message,
@@ -14,7 +12,7 @@ import {
 import { UserAddOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useGroupStore } from '@stores/groupStore'
-import type { Group } from '@types/index'
+import type { Group } from '@/types'
 
 const statusMap: Record<string, { color: string; label: string }> = {
   active: { color: 'blue', label: '进行中' },
@@ -63,15 +61,12 @@ export const GroupListPage: React.FC = () => {
 
   if (groups.length === 0) {
     return (
-      <Empty
-        description="暂无分组"
-        style={{ marginTop: 50 }}
-        extra={
-          <Button type="primary" onClick={() => navigate('/create-group')}>
-            创建分组
-          </Button>
-        }
-      />
+      <div style={{ marginTop: 50, textAlign: 'center' }}>
+        <Empty description="暂无分组" />
+        <Button type="primary" style={{ marginTop: 16 }} onClick={() => navigate('/create-group')}>
+          创建分组
+        </Button>
+      </div>
     )
   }
 

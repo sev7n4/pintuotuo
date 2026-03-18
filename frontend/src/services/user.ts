@@ -1,5 +1,5 @@
 import api from './api'
-import { User, APIResponse } from '@types/index'
+import { User, APIResponse } from '@/types'
 
 export const userService = {
   // Get current user

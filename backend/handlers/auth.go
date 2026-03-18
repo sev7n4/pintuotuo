@@ -48,6 +48,10 @@ func RegisterUser(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Check if user exists
 	var existingUser models.User
@@ -113,6 +117,10 @@ func LoginUser(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidCredentials)
+		return
+	}
 
 	// Find user by email
 	var user models.User

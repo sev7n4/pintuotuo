@@ -14,7 +14,7 @@ import { ShoppingCartOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useProductStore } from '@stores/productStore'
 import { useCartStore } from '@stores/cartStore'
-import type { Product } from '@types/index'
+import type { Product } from '@/types'
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()

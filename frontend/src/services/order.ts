@@ -1,5 +1,5 @@
 import api from './api'
-import { Order, APIResponse, PaginatedResponse } from '@types/index'
+import { Order, APIResponse, PaginatedResponse } from '@/types'
 
 interface CreateOrderRequest {
   product_id: number

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +17,6 @@ func TestUserRegistration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 
-	// Setup route
 	router.POST("/users/register", RegisterUser)
 
 	tests := []struct {
@@ -24,6 +24,7 @@ func TestUserRegistration(t *testing.T) {
 		payload        map[string]string
 		expectedStatus int
 		expectedError  bool
+		skipIfNoDB     bool
 	}{
 		{
 			name: "Valid registration",
@@ -34,6 +35,7 @@ func TestUserRegistration(t *testing.T) {
 			},
 			expectedStatus: http.StatusCreated,
 			expectedError:  false,
+			skipIfNoDB:     true,
 		},
 		{
 			name: "Missing email",
@@ -43,6 +45,7 @@ func TestUserRegistration(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  true,
+			skipIfNoDB:     false,
 		},
 		{
 			name: "Short password",
@@ -53,11 +56,16 @@ func TestUserRegistration(t *testing.T) {
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  true,
+			skipIfNoDB:     false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.skipIfNoDB && config.GetDB() == nil {
+				t.Skip("Skipping test that requires database connection")
+			}
+
 			body, _ := json.Marshal(tt.payload)
 			req := httptest.NewRequest("POST", "/users/register", bytes.NewBuffer(body))
 			req.Header.Set("Content-Type", "application/json")

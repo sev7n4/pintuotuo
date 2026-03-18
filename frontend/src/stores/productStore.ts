@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { Product, PaginatedResponse } from '@types/index'
-import { productService } from '@services/product'
+import { Product, PaginatedResponse, APIResponse } from '@/types'
+import { productService } from '@/services/product'
 
 interface ProductFilters {
   status?: string
@@ -16,7 +16,6 @@ interface ProductState {
   isLoading: boolean
   error: string | null
 
-  // Actions
   fetchProducts: (filters?: Partial<ProductFilters>) => Promise<void>
   fetchProductByID: (id: number) => Promise<Product | null>
   searchProducts: (query: string) => Promise<void>
@@ -36,9 +35,10 @@ export const useProductStore = create<ProductState>((set, get) => ({
     try {
       const filters = { ...get().filters, ...newFilters }
       const response = await productService.listProducts(filters)
+      const apiResponse = response.data as APIResponse<PaginatedResponse<Product>>
       set({
-        products: response.data.data,
-        total: response.data.total,
+        products: apiResponse.data?.data || [],
+        total: apiResponse.data?.total || 0,
         filters,
         isLoading: false,
       })
@@ -52,8 +52,9 @@ export const useProductStore = create<ProductState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await productService.getProductByID(id)
+      const apiResponse = response.data as APIResponse<Product>
       set({ isLoading: false })
-      return response.data
+      return apiResponse.data || null
     } catch (error) {
       const message = error instanceof Error ? error.message : '获取产品详情失败'
       set({ error: message, isLoading: false })
@@ -65,9 +66,10 @@ export const useProductStore = create<ProductState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await productService.searchProducts(query)
+      const apiResponse = response.data as APIResponse<PaginatedResponse<Product>>
       set({
-        products: response.data.data,
-        total: response.data.total,
+        products: apiResponse.data?.data || [],
+        total: apiResponse.data?.total || 0,
         isLoading: false,
       })
     } catch (error) {

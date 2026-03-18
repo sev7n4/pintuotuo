@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { Order } from '@types/index'
-import { orderService } from '@services/order'
+import { Order, APIResponse, PaginatedResponse } from '@/types'
+import { orderService } from '@/services/order'
 
 interface OrderState {
   orders: Order[]
@@ -8,7 +8,6 @@ interface OrderState {
   isLoading: boolean
   error: string | null
 
-  // Actions
   fetchOrders: (page?: number, per_page?: number) => Promise<void>
   fetchOrderByID: (id: number) => Promise<void>
   createOrder: (productId: number, quantity: number, groupId?: number) => Promise<void>
@@ -26,7 +25,8 @@ export const useOrderStore = create<OrderState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await orderService.listOrders(page, per_page)
-      set({ orders: response.data.data, isLoading: false })
+      const apiResponse = response.data as APIResponse<PaginatedResponse<Order>>
+      set({ orders: apiResponse.data?.data || [], isLoading: false })
     } catch (error) {
       const message = error instanceof Error ? error.message : '获取订单列表失败'
       set({ error: message, isLoading: false })
@@ -37,7 +37,8 @@ export const useOrderStore = create<OrderState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await orderService.getOrderByID(id)
-      set({ currentOrder: response.data, isLoading: false })
+      const apiResponse = response.data as APIResponse<Order>
+      set({ currentOrder: apiResponse.data || null, isLoading: false })
     } catch (error) {
       const message = error instanceof Error ? error.message : '获取订单详情失败'
       set({ error: message, isLoading: false })
@@ -52,11 +53,15 @@ export const useOrderStore = create<OrderState>((set) => ({
         quantity,
         group_id: groupId,
       })
-      set((state) => ({
-        orders: [response.data, ...state.orders],
-        currentOrder: response.data,
-        isLoading: false,
-      }))
+      const apiResponse = response.data as APIResponse<Order>
+      const newOrder = apiResponse.data
+      if (newOrder) {
+        set((state) => ({
+          orders: [newOrder, ...state.orders],
+          currentOrder: newOrder,
+          isLoading: false,
+        }))
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : '创建订单失败'
       set({ error: message, isLoading: false })
@@ -68,12 +73,16 @@ export const useOrderStore = create<OrderState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await orderService.cancelOrder(id)
-      set((state) => ({
-        orders: state.orders.map((order) =>
-          order.id === id ? response.data : order
-        ),
-        isLoading: false,
-      }))
+      const apiResponse = response.data as APIResponse<Order>
+      const cancelledOrder = apiResponse.data
+      if (cancelledOrder) {
+        set((state) => ({
+          orders: state.orders.map((order) =>
+            order.id === id ? cancelledOrder : order
+          ),
+          isLoading: false,
+        }))
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : '取消订单失败'
       set({ error: message, isLoading: false })

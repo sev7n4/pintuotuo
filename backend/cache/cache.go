@@ -56,6 +56,9 @@ func Close() error {
 
 // Get retrieves a value from cache
 func Get(ctx context.Context, key string) (string, error) {
+	if client == nil {
+		return "", fmt.Errorf("redis client not initialized")
+	}
 	return client.Get(ctx, key).Result()
 }
 

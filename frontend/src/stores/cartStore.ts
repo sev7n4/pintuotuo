@@ -1,11 +1,10 @@
 import { create } from 'zustand'
-import { CartItem, Product } from '@types/index'
+import { CartItem, Product } from '@/types'
 
 interface CartState {
   items: CartItem[]
   total: number
 
-  // Actions
   addItem: (product: Product, quantity: number, groupId?: number) => void
   removeItem: (id: string) => void
   updateQuantity: (id: string, quantity: number) => void

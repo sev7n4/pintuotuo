@@ -1,5 +1,5 @@
 import api from './api'
-import { Group, APIResponse, PaginatedResponse } from '@types/index'
+import { Group, APIResponse, PaginatedResponse } from '@/types'
 
 interface CreateGroupRequest {
   product_id: number

@@ -11,10 +11,10 @@ import {
   Statistic,
   message,
 } from 'antd'
-import { DeleteOutlined, ShoppingOutlined } from '@ant-design/icons'
+import { DeleteOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useCartStore } from '@stores/cartStore'
-import type { CartItem } from '@types/index'
+import type { CartItem } from '@/types'
 
 export const CartPage: React.FC = () => {
   const navigate = useNavigate()
@@ -22,15 +22,12 @@ export const CartPage: React.FC = () => {
 
   if (items.length === 0) {
     return (
-      <Empty
-        description="购物车是空的"
-        style={{ marginTop: 50 }}
-        extra={
-          <Button type="primary" onClick={() => navigate('/products')}>
-            继续购物
-          </Button>
-        }
-      />
+      <div style={{ marginTop: 50, textAlign: 'center' }}>
+        <Empty description="购物车是空的" />
+        <Button type="primary" style={{ marginTop: 16 }} onClick={() => navigate('/products')}>
+          继续购物
+        </Button>
+      </div>
     )
   }
 

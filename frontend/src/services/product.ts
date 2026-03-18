@@ -1,5 +1,5 @@
 import api from './api'
-import { Product, APIResponse, PaginatedResponse } from '@types/index'
+import { Product, APIResponse, PaginatedResponse } from '@/types'
 
 interface ProductFilters {
   page?: number

@@ -14,7 +14,7 @@ import {
 import { SearchOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useProductStore } from '@stores/productStore'
-import type { Product } from '@types/index'
+import type { Product } from '@/types'
 
 export const ProductListPage: React.FC = () => {
   const navigate = useNavigate()

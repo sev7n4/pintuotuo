@@ -117,8 +117,14 @@ func GetProductByID(c *gin.Context) {
 	id := c.Param("id")
 	ctx := context.Background()
 
-	// Try cache first
-	cacheKey := cache.ProductKey(idToInt(id))
+	productID := idToInt(id)
+	if productID <= 0 {
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
+	}
+
+	// Try cache first (ignore errors if cache is not available)
+	cacheKey := cache.ProductKey(productID)
 	if cachedProduct, err := cache.Get(ctx, cacheKey); err == nil {
 		var product models.Product
 		if err := json.Unmarshal([]byte(cachedProduct), &product); err == nil {
@@ -129,10 +135,15 @@ func GetProductByID(c *gin.Context) {
 
 	// Query database
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
+	}
+
 	var product models.Product
 	err := db.QueryRow(
 		"SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products WHERE id = $1",
-		id,
+		productID,
 	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
 
 	if err != nil {

@@ -32,6 +32,10 @@ func InitiatePayment(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Verify order belongs to user
 	var order models.Order
@@ -80,6 +84,10 @@ func GetPaymentByID(c *gin.Context) {
 	id := c.Param("id")
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	var payment models.Payment
 	err := db.QueryRow(
@@ -106,6 +114,10 @@ func RefundPayment(c *gin.Context) {
 	id := c.Param("id")
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Get payment details
 	var payment models.Payment
@@ -158,6 +170,10 @@ func HandleAlipayCallback(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Verify payment exists
 	var paymentStatus string
@@ -219,6 +235,10 @@ func HandleWechatCallback(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Verify payment exists
 	var paymentStatus string
@@ -291,6 +311,10 @@ func GetTokenBalance(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	var token models.Token
 	err := db.QueryRow(
@@ -320,6 +344,10 @@ func GetTokenConsumption(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	rows, err := db.Query(
 		"SELECT id, type, amount, reason, created_at FROM token_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100",
@@ -375,6 +403,10 @@ func TransferTokens(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	// Get sender balance
 	var senderBalance float64

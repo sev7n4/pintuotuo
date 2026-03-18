@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { Group, PaginatedResponse } from '@types/index'
-import { groupService } from '@services/group'
+import { Group, APIResponse, PaginatedResponse } from '@/types'
+import { groupService } from '@/services/group'
 
 interface GroupState {
   groups: Group[]
@@ -9,7 +9,6 @@ interface GroupState {
   isLoading: boolean
   error: string | null
 
-  // Actions
   fetchGroups: (page?: number, perPage?: number) => Promise<Group[] | null>
   fetchGroupByID: (id: number) => Promise<void>
   createGroup: (productId: number, targetCount: number, deadline: string) => Promise<void>
@@ -19,7 +18,7 @@ interface GroupState {
   clearError: () => void
 }
 
-export const useGroupStore = create<GroupState>((set, get) => ({
+export const useGroupStore = create<GroupState>((set) => ({
   groups: [],
   currentGroup: null,
   total: 0,
@@ -30,13 +29,14 @@ export const useGroupStore = create<GroupState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await groupService.listGroups(page, perPage)
-      const data = response.data as PaginatedResponse<Group>
+      const apiResponse = response.data as APIResponse<PaginatedResponse<Group>>
+      const data = apiResponse.data
       set({
-        groups: data.data,
-        total: data.total,
+        groups: data?.data || [],
+        total: data?.total || 0,
         isLoading: false,
       })
-      return data.data
+      return data?.data || []
     } catch (error) {
       const message = error instanceof Error ? error.message : '获取分组列表失败'
       set({ error: message, isLoading: false })
@@ -48,7 +48,8 @@ export const useGroupStore = create<GroupState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await groupService.getGroupByID(id)
-      set({ currentGroup: response.data, isLoading: false })
+      const apiResponse = response.data as APIResponse<Group>
+      set({ currentGroup: apiResponse.data || null, isLoading: false })
     } catch (error) {
       const message = error instanceof Error ? error.message : '获取分组详情失败'
       set({ error: message, isLoading: false })
@@ -63,11 +64,15 @@ export const useGroupStore = create<GroupState>((set, get) => ({
         target_count: targetCount,
         deadline: new Date(deadline).toISOString(),
       })
-      set((state) => ({
-        groups: [response.data, ...state.groups],
-        currentGroup: response.data,
-        isLoading: false,
-      }))
+      const apiResponse = response.data as APIResponse<Group>
+      const newGroup = apiResponse.data
+      if (newGroup) {
+        set((state) => ({
+          groups: [newGroup, ...state.groups],
+          currentGroup: newGroup,
+          isLoading: false,
+        }))
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : '创建分组失败'
       set({ error: message, isLoading: false })
@@ -79,13 +84,17 @@ export const useGroupStore = create<GroupState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await groupService.joinGroup(id)
-      set((state) => ({
-        groups: state.groups.map((g) =>
-          g.id === id ? response.data : g
-        ),
-        currentGroup: response.data,
-        isLoading: false,
-      }))
+      const apiResponse = response.data as APIResponse<Group>
+      const updatedGroup = apiResponse.data
+      if (updatedGroup) {
+        set((state) => ({
+          groups: state.groups.map((g) =>
+            g.id === id ? updatedGroup : g
+          ),
+          currentGroup: updatedGroup,
+          isLoading: false,
+        }))
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : '加入分组失败'
       set({ error: message, isLoading: false })
@@ -112,7 +121,8 @@ export const useGroupStore = create<GroupState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await groupService.getGroupProgress(id)
-      set({ currentGroup: response.data, isLoading: false })
+      const apiResponse = response.data as APIResponse<Group>
+      set({ currentGroup: apiResponse.data || null, isLoading: false })
     } catch (error) {
       const message = error instanceof Error ? error.message : '获取分组进度失败'
       set({ error: message, isLoading: false })
