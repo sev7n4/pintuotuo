@@ -99,16 +99,17 @@ func TestHighConcurrencyWebhookCallbacks(t *testing.T) {
 		t.Skip("Skipping stress test in short mode")
 	}
 
-	t.Parallel()
+	// Do not run heavy stress tests in parallel to get stable performance metrics
+	// t.Parallel()
 	ctx := context.Background()
 	ts := SetupPaymentTest(t)
-	defer TeardownPaymentTest(t, ts)
+	t.Cleanup(func() { TeardownPaymentTest(t, ts) })
 
 	const numPayments = 50
 	uniqueID := GenerateUniqueID()
 	userID := SeedTestUser(t, ts.DB, uniqueID)
 	productID, _ := SeedTestProduct(t, ts.DB, uniqueID)
-	defer CleanupTestData(t, ts.DB, userID)
+	t.Cleanup(func() { CleanupTestData(t, ts.DB, userID) })
 
 	// Create 50 pending payments
 	paymentIDs := make([]int, numPayments)
@@ -189,7 +190,7 @@ func TestHighConcurrencyWebhookCallbacks(t *testing.T) {
 	}
 }
 
-// TestCacheUnderLoad tests cache performance with 100 reads
+// TestCacheUnderLoad tests cache performance with 1000 reads
 func TestCacheUnderLoad(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping stress test in short mode")
@@ -198,12 +199,12 @@ func TestCacheUnderLoad(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	ts := SetupPaymentTest(t)
-	defer TeardownPaymentTest(t, ts)
+	t.Cleanup(func() { TeardownPaymentTest(t, ts) })
 
 	uniqueID := GenerateUniqueID()
 	userID := SeedTestUser(t, ts.DB, uniqueID)
 	productID, _ := SeedTestProduct(t, ts.DB, uniqueID)
-	defer CleanupTestData(t, ts.DB, userID)
+	t.Cleanup(func() { CleanupTestData(t, ts.DB, userID) })
 
 	// Create 10 payments
 	paymentIDs := make([]int, 10)
@@ -227,9 +228,14 @@ func TestCacheUnderLoad(t *testing.T) {
 	// Read each payment 100 times concurrently
 	var wg sync.WaitGroup
 	const readsPerPayment = 100
+
+	// Use a map to simulate cache hit/miss tracking.
+	// The first access to a key is a "miss", subsequent ones are "hits".
+	var firstAccess sync.Map
 	var mutex sync.Mutex
 	cacheHits := 0
 	cacheMisses := 0
+	errorCount := 0
 
 	start := time.Now()
 
@@ -239,10 +245,22 @@ func TestCacheUnderLoad(t *testing.T) {
 			go func(paymentIdx int) {
 				defer wg.Done()
 
-				_, err := ts.PaymentService.GetPaymentByID(ctx, userID, paymentIDs[paymentIdx])
+				paymentID := paymentIDs[paymentIdx]
+				_, err := ts.PaymentService.GetPaymentByID(ctx, userID, paymentID)
+
+				if err != nil {
+					mutex.Lock()
+					errorCount++
+					mutex.Unlock()
+					return
+				}
+
+				// Atomically check if this is the first successful read for this paymentID.
+				// `loaded` will be true if the key was already present.
+				_, loaded := firstAccess.LoadOrStore(paymentID, true)
 
 				mutex.Lock()
-				if err == nil {
+				if loaded {
 					cacheHits++
 				} else {
 					cacheMisses++
@@ -258,14 +276,15 @@ func TestCacheUnderLoad(t *testing.T) {
 	totalReads := 10 * readsPerPayment
 
 	// Verify results
-	require.Equal(t, totalReads, cacheHits, "All reads should succeed")
-	require.Equal(t, 0, cacheMisses, "Should have no read failures")
+	require.Equal(t, 0, errorCount, "Should have no read failures")
+	require.Equal(t, 10, cacheMisses, "Should have 10 cache misses (one for each payment's first read)")
+	require.Equal(t, totalReads-10, cacheHits, "Should have 990 cache hits for subsequent reads")
 
-	// Calculate hit rate (after first read, subsequent reads should hit cache)
-	hitRate := float64(cacheHits) / float64(totalReads) * 100
+	// Calculate hit rate
+	hitRate := float64(cacheHits) / float64(totalReads-errorCount) * 100
 
 	// Log performance metrics
-	t.Logf("Performed %d concurrent reads in %v (%.2f reads/sec), hit rate: %.1f%%",
+	t.Logf("Performed %d concurrent reads in %v (%.2f reads/sec), simulated hit rate: %.1f%%",
 		totalReads, elapsed, float64(totalReads)/elapsed.Seconds(), hitRate)
 
 	// Verify performance is reasonable (< 5 seconds for 1000 reads)
@@ -278,7 +297,9 @@ func TestDatabaseConnectionPoolUnderLoad(t *testing.T) {
 		t.Skip("Skipping stress test in short mode")
 	}
 
-	t.Parallel()
+	// This is a heavy stress test and should not be run in parallel with other tests
+	// to ensure accurate performance measurement and avoid resource contention.
+	// t.Parallel()
 	ctx := context.Background()
 	ts := SetupPaymentTest(t)
 	defer TeardownPaymentTest(t, ts)

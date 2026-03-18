@@ -8,9 +8,10 @@ test.describe('Smoke Test', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          success: true,
+          code: 200,
+          message: 'success',
           data: {
-            user: { id: '1', email: 'test@example.com', name: 'Test User' },
+            user: { id: 1, email: 'test@example.com', name: 'Test User' },
             token: 'mock-token'
           }
         }),
@@ -23,11 +24,17 @@ test.describe('Smoke Test', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          success: true,
-          data: [
-            { id: '1', name: 'Test Product 1', price: 100, originalPrice: 200, groupPrice: 80, stock: 10, imageUrl: '' },
-            { id: '2', name: 'Test Product 2', price: 200, originalPrice: 300, groupPrice: 150, stock: 5, imageUrl: '' },
-          ]
+          code: 200,
+          message: 'success',
+          data: {
+            total: 2,
+            page: 1,
+            per_page: 20,
+            data: [
+              { id: 1, name: 'Test Product 1', price: 100, originalPrice: 200, groupPrice: 80, stock: 10, imageUrl: '', status: 'active' },
+              { id: 2, name: 'Test Product 2', price: 200, originalPrice: 300, groupPrice: 150, stock: 5, imageUrl: '', status: 'active' },
+            ]
+          }
         }),
       });
     });
@@ -36,9 +43,10 @@ test.describe('Smoke Test', () => {
     await page.goto('/login');
 
     // Fill login form
-    await page.fill('input[name="email"]', 'test@example.com');
-    await page.fill('input[name="password"]', 'password');
-    await page.click('button[type="submit"]');
+    // Ant Design inputs are best targeted by their labels or placeholders
+    await page.getByLabel('邮箱').fill('test@example.com');
+    await page.getByLabel('密码').fill('password');
+    await page.locator('button[type="submit"]').click();
 
     // Wait for the products API response to ensure the page is loaded
     await page.waitForResponse('**/api/v1/products*');

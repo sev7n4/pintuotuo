@@ -5,11 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"sync/atomic"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
@@ -18,6 +17,7 @@ import (
 	"github.com/pintuotuo/backend/services/product"
 	"github.com/pintuotuo/backend/services/token"
 	"github.com/pintuotuo/backend/services/user"
+	"github.com/stretchr/testify/require"
 )
 
 // Test constants
@@ -91,11 +91,12 @@ func TeardownPaymentTest(t *testing.T, ts *TestServices) {
 }
 
 // SeedTestUser creates a test user
-func SeedTestUser(t *testing.T, db *sql.DB) int {
-	email := fmt.Sprintf("test%d_%d@example.com", GenerateUniqueID(), rand.Intn(100000))
-	password := "password"
+func SeedTestUser(t *testing.T, db *sql.DB, uniqueID int) int {
+	email := fmt.Sprintf("test%d_%d@example.com", uniqueID, rand.Intn(100000))
+	name := fmt.Sprintf("Test User %d", uniqueID)
+	passwordHash := "hashed_password"
 	var userID int
-	err := db.QueryRow("INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id", email, password).Scan(&userID)
+	err := db.QueryRow("INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id", email, name, passwordHash).Scan(&userID)
 	require.NoError(t, err, "SeedTestUser failed")
 	return userID
 }

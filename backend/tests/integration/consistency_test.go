@@ -414,14 +414,11 @@ func TestPaymentFilterConsistency(t *testing.T) {
 	alipayResult, err := ts.PaymentService.ListPayments(ctx, userID, alipayParams)
 	require.NoError(t, err)
 
-	// Count alipay payments
-	alipayCount := 0
+	assert.Equal(t, 3, alipayResult.Total, "Should have a total of 3 alipay payments")
+	assert.Len(t, alipayResult.Data, 3, "Should have 3 alipay payments in the data slice")
 	for _, p := range alipayResult.Data {
-		if p.Method == "alipay" {
-			alipayCount++
-		}
+		assert.Equal(t, "alipay", p.Method, "Payment method should be alipay")
 	}
-	assert.GreaterOrEqual(t, alipayCount, 3, "Should have at least 3 alipay payments")
 
 	// 2. Filter by wechat method
 	wechatParams := &payment.ListPaymentsParams{
@@ -432,12 +429,9 @@ func TestPaymentFilterConsistency(t *testing.T) {
 	wechatResult, err := ts.PaymentService.ListPayments(ctx, userID, wechatParams)
 	require.NoError(t, err)
 
-	// Count wechat payments
-	wechatCount := 0
+	assert.Equal(t, 2, wechatResult.Total, "Should have a total of 2 wechat payments")
+	assert.Len(t, wechatResult.Data, 2, "Should have 2 wechat payments in the data slice")
 	for _, p := range wechatResult.Data {
-		if p.Method == "wechat" {
-			wechatCount++
-		}
+		assert.Equal(t, "wechat", p.Method, "Payment method should be wechat")
 	}
-	assert.GreaterOrEqual(t, wechatCount, 2, "Should have at least 2 wechat payments")
 }
