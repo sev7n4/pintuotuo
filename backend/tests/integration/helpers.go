@@ -9,6 +9,7 @@ import (
 	"os"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
@@ -92,7 +93,9 @@ func TeardownPaymentTest(t *testing.T, ts *TestServices) {
 
 // SeedTestUser creates a test user
 func SeedTestUser(t *testing.T, db *sql.DB, uniqueID int) int {
-	email := fmt.Sprintf("test%d_%d@example.com", uniqueID, rand.Intn(100000))
+	// Add a random component to the email to ensure it's truly unique across parallel tests
+	// even if the uniqueID somehow collides (e.g. across different test packages)
+	email := fmt.Sprintf("test%d_%d_%d@example.com", uniqueID, time.Now().UnixNano(), rand.Intn(1000000))
 	name := fmt.Sprintf("Test User %d", uniqueID)
 	passwordHash := "hashed_password"
 	var userID int
