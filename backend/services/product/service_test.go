@@ -119,21 +119,6 @@ func TestCreateProductValid(t *testing.T) {
 	assert.Equal(t, uid, product.MerchantID)
 }
 
-// TestCreateProduct tests product creation with invalid price, matching the CI failure
-func TestCreateProduct(t *testing.T) {
-	req := &CreateProductRequest{
-		Name:        "Test Product",
-		Description: "A test product",
-		Price:       -50,
-		Stock:       100,
-	}
-
-	product, err := testService.CreateProduct(context.Background(), 1, req)
-	assert.Error(t, err)
-	assert.Nil(t, product)
-	assert.Equal(t, ErrInvalidPrice, err)
-}
-
 // TestCreateProductInvalidPrice tests product creation with invalid price
 func TestCreateProductInvalidPrice(t *testing.T) {
 	req := &CreateProductRequest{
