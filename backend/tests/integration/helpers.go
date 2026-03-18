@@ -65,7 +65,7 @@ func SetupPaymentTest(t *testing.T) *TestServices {
 
 	// Initialize cache (idempotent - only initializes once)
 	if err := cache.Init(); err != nil {
-		t.Logf("Warning: Cache already initialized or failed to init: %v", err)
+		t.Fatalf("Failed to init cache: %v", err)
 	}
 
 	db := config.GetDB()
