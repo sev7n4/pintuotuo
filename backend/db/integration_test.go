@@ -9,13 +9,13 @@ import (
 
 // PaymentTransactionFlow represents the flow of a payment transaction
 type PaymentTransactionFlow struct {
-	PaymentID    int
-	OrderID      int
-	UserID       int
-	Amount       float64
-	Status       string
-	CreatedAt    time.Time
-	CompletedAt  time.Time
+	PaymentID   int
+	OrderID     int
+	UserID      int
+	Amount      float64
+	Status      string
+	CreatedAt   time.Time
+	CompletedAt time.Time
 }
 
 // GroupPurchaseTransactionFlow represents the flow of a group purchase transaction
@@ -33,12 +33,12 @@ type GroupPurchaseTransactionFlow struct {
 func TestPaymentTransactionFlow(t *testing.T) {
 	// Step 1: Simulate payment creation
 	payment := PaymentTransactionFlow{
-		PaymentID:   1,
-		OrderID:     100,
-		UserID:      10,
-		Amount:      99.99,
-		Status:      "pending",
-		CreatedAt:   time.Now(),
+		PaymentID: 1,
+		OrderID:   100,
+		UserID:    10,
+		Amount:    99.99,
+		Status:    "pending",
+		CreatedAt: time.Now(),
 	}
 
 	assert.Equal(t, "pending", payment.Status, "Payment should start in pending state")
@@ -65,12 +65,12 @@ func TestPaymentTransactionFlow(t *testing.T) {
 func TestPaymentTransactionRollback(t *testing.T) {
 	// Simulate payment that needs to be rolled back
 	payment := PaymentTransactionFlow{
-		PaymentID:  2,
-		OrderID:    101,
-		UserID:     11,
-		Amount:     50.00,
-		Status:     "pending",
-		CreatedAt:  time.Now(),
+		PaymentID: 2,
+		OrderID:   101,
+		UserID:    11,
+		Amount:    50.00,
+		Status:    "pending",
+		CreatedAt: time.Now(),
 	}
 
 	// Simulate failure during processing
@@ -198,12 +198,12 @@ func TestConcurrentPaymentTransactions(t *testing.T) {
 func TestPaymentOrderCoherence(t *testing.T) {
 	// Create a payment that belongs to an order
 	payment := PaymentTransactionFlow{
-		PaymentID:  10,
-		OrderID:    1000,
-		UserID:     100,
-		Amount:     150.00,
-		Status:     "success",
-		CreatedAt:  time.Now(),
+		PaymentID:   10,
+		OrderID:     1000,
+		UserID:      100,
+		Amount:      150.00,
+		Status:      "success",
+		CreatedAt:   time.Now(),
 		CompletedAt: time.Now(),
 	}
 

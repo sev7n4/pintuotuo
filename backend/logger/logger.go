@@ -22,15 +22,15 @@ const (
 
 // RequestLog represents a structured request log
 type RequestLog struct {
-	Timestamp   time.Time `json:"timestamp"`
-	Method      string    `json:"method"`
-	Path        string    `json:"path"`
-	Status      int       `json:"status"`
-	Duration    int64     `json:"duration_ms"`
+	Timestamp   time.Time   `json:"timestamp"`
+	Method      string      `json:"method"`
+	Path        string      `json:"path"`
+	Status      int         `json:"status"`
+	Duration    int64       `json:"duration_ms"`
 	UserID      interface{} `json:"user_id,omitempty"`
-	RequestID   string    `json:"request_id,omitempty"`
-	Error       string    `json:"error,omitempty"`
-	ClientIP    string    `json:"client_ip"`
+	RequestID   string      `json:"request_id,omitempty"`
+	Error       string      `json:"error,omitempty"`
+	ClientIP    string      `json:"client_ip"`
 	RequestBody interface{} `json:"request_body,omitempty"`
 }
 
@@ -45,9 +45,9 @@ type AppLog struct {
 }
 
 var (
-	jsonLogger = log.New(os.Stdout, "", 0)
+	jsonLogger  = log.New(os.Stdout, "", 0)
 	plainLogger = log.New(os.Stdout, "", log.LstdFlags)
-	useJSON    = os.Getenv("LOG_FORMAT") == "json"
+	useJSON     = os.Getenv("LOG_FORMAT") == "json"
 )
 
 // LogRequest logs an HTTP request
@@ -55,14 +55,14 @@ func LogRequest(c *gin.Context, duration time.Duration, status int, requestID st
 	userID, _ := c.Get("user_id")
 
 	rl := RequestLog{
-		Timestamp:   time.Now(),
-		Method:      c.Request.Method,
-		Path:        c.Request.URL.Path,
-		Status:      status,
-		Duration:    duration.Milliseconds(),
-		UserID:      userID,
-		RequestID:   requestID,
-		ClientIP:    c.ClientIP(),
+		Timestamp: time.Now(),
+		Method:    c.Request.Method,
+		Path:      c.Request.URL.Path,
+		Status:    status,
+		Duration:  duration.Milliseconds(),
+		UserID:    userID,
+		RequestID: requestID,
+		ClientIP:  c.ClientIP(),
 	}
 
 	// Log error if present
@@ -89,7 +89,7 @@ func LogDatabase(component string, operation string, duration time.Duration, err
 		Message:   message,
 		Component: component,
 		Data: map[string]interface{}{
-			"operation": operation,
+			"operation":   operation,
 			"duration_ms": duration.Milliseconds(),
 		},
 	}
@@ -124,8 +124,8 @@ func LogCache(operation string, key string, hit bool, duration time.Duration, er
 		Message:   message,
 		Component: "cache",
 		Data: map[string]interface{}{
-			"key": key,
-			"hit": hit,
+			"key":         key,
+			"hit":         hit,
 			"duration_ms": duration.Milliseconds(),
 		},
 	}
@@ -151,9 +151,9 @@ func LogPayment(operation string, orderID int, amount float64, method string, da
 		Component: "payment",
 		Data: map[string]interface{}{
 			"order_id": orderID,
-			"amount": amount,
-			"method": method,
-			"details": data,
+			"amount":   amount,
+			"method":   method,
+			"details":  data,
 		},
 	}
 
@@ -177,7 +177,7 @@ func LogAuth(operation string, email string, userID interface{}, err error) {
 		Message:   "auth:" + operation,
 		Component: "auth",
 		Data: map[string]interface{}{
-			"email": email,
+			"email":   email,
 			"user_id": userID,
 		},
 	}

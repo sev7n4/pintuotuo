@@ -336,4 +336,3 @@ func TestHTTPStatusCodeConsistency(t *testing.T) {
 		})
 	}
 }
-

@@ -37,10 +37,10 @@ func ListProducts(c *gin.Context) {
 	// Try cache first
 	if cachedList, err := cache.Get(ctx, cacheKey); err == nil {
 		var cachedData struct {
-			Total   int                `json:"total"`
-			Page    int                `json:"page"`
-			PerPage int                `json:"per_page"`
-			Data    []models.Product   `json:"data"`
+			Total   int              `json:"total"`
+			Page    int              `json:"page"`
+			PerPage int              `json:"per_page"`
+			Data    []models.Product `json:"data"`
 		}
 		if err := json.Unmarshal([]byte(cachedList), &cachedData); err == nil {
 			c.JSON(http.StatusOK, cachedData)
@@ -186,10 +186,10 @@ func SearchProducts(c *gin.Context) {
 	// Try cache first
 	if cachedResults, err := cache.Get(ctx, cacheKey); err == nil {
 		var cachedData struct {
-			Total   int                `json:"total"`
-			Page    int                `json:"page"`
-			PerPage int                `json:"per_page"`
-			Data    []models.Product   `json:"data"`
+			Total   int              `json:"total"`
+			Page    int              `json:"page"`
+			PerPage int              `json:"per_page"`
+			Data    []models.Product `json:"data"`
 		}
 		if err := json.Unmarshal([]byte(cachedResults), &cachedData); err == nil {
 			c.JSON(http.StatusOK, cachedData)
@@ -255,11 +255,11 @@ func CreateProduct(c *gin.Context) {
 	}
 
 	var req struct {
-		Name            string  `json:"name" binding:"required"`
-		Description     string  `json:"description"`
-		Price           float64 `json:"price" binding:"required,gt=0"`
-		OriginalPrice   float64 `json:"original_price"`
-		Stock           int     `json:"stock" binding:"required,gte=0"`
+		Name          string  `json:"name" binding:"required"`
+		Description   string  `json:"description"`
+		Price         float64 `json:"price" binding:"required,gt=0"`
+		OriginalPrice float64 `json:"original_price"`
+		Stock         int     `json:"stock" binding:"required,gte=0"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {

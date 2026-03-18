@@ -192,10 +192,10 @@ func TestMetricsFormatting(t *testing.T) {
 
 	// Test various numeric values
 	values := []int64{
-		100,      // $1.00
-		10000,    // $100.00
-		100000,   // $1000.00
-		1000000,  // $10000.00
+		100,     // $1.00
+		10000,   // $100.00
+		100000,  // $1000.00
+		1000000, // $10000.00
 	}
 
 	for _, value := range values {

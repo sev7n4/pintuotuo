@@ -62,7 +62,11 @@ func ListAPIKeys(c *gin.Context) {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			fmt.Printf("Failed to close rows: %v\n", err)
+		}
+	}()
 
 	var apiKeys []map[string]interface{}
 	for rows.Next() {
@@ -89,7 +93,7 @@ func ListAPIKeys(c *gin.Context) {
 	}
 
 	if keysJSON, err := json.Marshal(apiKeys); err == nil {
-		cache.Set(ctx, cacheKey, string(keysJSON), APIKeyListTTL)
+		_ = cache.Set(ctx, cacheKey, string(keysJSON), APIKeyListTTL)
 	}
 
 	c.JSON(http.StatusOK, apiKeys)

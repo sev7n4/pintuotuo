@@ -158,10 +158,10 @@ func RefundPayment(c *gin.Context) {
 // HandleAlipayCallback handles Alipay payment callback
 func HandleAlipayCallback(c *gin.Context) {
 	var req struct {
-		PaymentID   int    `json:"payment_id" binding:"required"`
-		Status      string `json:"status" binding:"required"`
-		Amount      float64 `json:"amount" binding:"required"`
-		TransactionID string `json:"transaction_id"`
+		PaymentID     int     `json:"payment_id" binding:"required"`
+		Status        string  `json:"status" binding:"required"`
+		Amount        float64 `json:"amount" binding:"required"`
+		TransactionID string  `json:"transaction_id"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -223,10 +223,10 @@ func HandleAlipayCallback(c *gin.Context) {
 // HandleWechatCallback handles WeChat payment callback
 func HandleWechatCallback(c *gin.Context) {
 	var req struct {
-		PaymentID   int    `json:"payment_id" binding:"required"`
-		Status      string `json:"status" binding:"required"`
-		Amount      float64 `json:"amount" binding:"required"`
-		TransactionID string `json:"transaction_id"`
+		PaymentID     int     `json:"payment_id" binding:"required"`
+		Status        string  `json:"status" binding:"required"`
+		Amount        float64 `json:"amount" binding:"required"`
+		TransactionID string  `json:"transaction_id"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {

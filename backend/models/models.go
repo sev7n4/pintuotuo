@@ -8,7 +8,7 @@ type User struct {
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
 	Password  string    `json:"-"`
-	Role      string    `json:"role"`       // user, merchant, admin
+	Role      string    `json:"role"` // user, merchant, admin
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -21,7 +21,7 @@ type Product struct {
 	Description string    `json:"description"`
 	Price       float64   `json:"price"`
 	Stock       int       `json:"stock"`
-	Status      string    `json:"status"`       // active, inactive, archived
+	Status      string    `json:"status"` // active, inactive, archived
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -34,7 +34,7 @@ type Order struct {
 	GroupID    int       `json:"group_id"`
 	Quantity   int       `json:"quantity"`
 	TotalPrice float64   `json:"total_price"`
-	Status     string    `json:"status"`       // pending, paid, completed, failed
+	Status     string    `json:"status"` // pending, paid, completed, failed
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
@@ -46,7 +46,7 @@ type Group struct {
 	CreatorID    int       `json:"creator_id"`
 	TargetCount  int       `json:"target_count"`
 	CurrentCount int       `json:"current_count"`
-	Status       string    `json:"status"`       // active, completed, failed
+	Status       string    `json:"status"` // active, completed, failed
 	Deadline     time.Time `json:"deadline"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
@@ -66,8 +66,8 @@ type Payment struct {
 	ID        int       `json:"id"`
 	OrderID   int       `json:"order_id"`
 	Amount    float64   `json:"amount"`
-	Method    string    `json:"method"`       // alipay, wechat
-	Status    string    `json:"status"`       // pending, success, failed
+	Method    string    `json:"method"` // alipay, wechat
+	Status    string    `json:"status"` // pending, success, failed
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -79,7 +79,7 @@ type APIKey struct {
 	Key       string    `json:"-"`
 	KeyHash   string    `json:"-"`
 	Name      string    `json:"name"`
-	Status    string    `json:"status"`       // active, inactive
+	Status    string    `json:"status"` // active, inactive
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

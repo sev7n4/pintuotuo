@@ -8,7 +8,7 @@ import (
 
 // Transaction wraps database transactions with automatic rollback
 type Transaction struct {
-	tx *sql.Tx
+	tx  *sql.Tx
 	ctx context.Context
 }
 

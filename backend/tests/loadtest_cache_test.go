@@ -14,16 +14,16 @@ import (
 
 // LoadTestMetrics tracks performance and cache statistics
 type LoadTestMetrics struct {
-	TotalRequests      int64
-	CacheHits          int64
-	CacheMisses        int64
-	DatabaseQueries    int64
-	TotalResponseTime  time.Duration
-	MinResponseTime    time.Duration
-	MaxResponseTime    time.Duration
-	Errors             int64
-	StartTime          time.Time
-	EndTime            time.Time
+	TotalRequests     int64
+	CacheHits         int64
+	CacheMisses       int64
+	DatabaseQueries   int64
+	TotalResponseTime time.Duration
+	MinResponseTime   time.Duration
+	MaxResponseTime   time.Duration
+	Errors            int64
+	StartTime         time.Time
+	EndTime           time.Time
 }
 
 // CacheHitRatio calculates the percentage of cache hits
@@ -59,14 +59,14 @@ type ProductRequest struct {
 
 // ProductResponse represents a cached product response
 type ProductResponse struct {
-	ID           int    `json:"id"`
-	Name         string `json:"name"`
-	Description  string `json:"description"`
-	Price        float64 `json:"price"`
-	Stock        int    `json:"stock"`
-	Status       string `json:"status"`
-	CachedAt     time.Time
-	IsCachHit    bool
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+	Stock       int     `json:"stock"`
+	Status      string  `json:"status"`
+	CachedAt    time.Time
+	IsCachHit   bool
 }
 
 // SimulateProductCache simulates cache behavior for load testing
@@ -132,8 +132,8 @@ func TestCacheLookupColdCache(t *testing.T) {
 	t.Run("Cold cache - all requests hit database", func(t *testing.T) {
 		cache := NewSimulateProductCache()
 		metrics := &LoadTestMetrics{
-			StartTime: time.Now(),
-			MinResponseTime: time.Duration(1 << 63 - 1),
+			StartTime:       time.Now(),
+			MinResponseTime: time.Duration(1<<63 - 1),
 		}
 
 		// 100 requests for 100 different products (no cache hits expected)
@@ -187,8 +187,8 @@ func TestCacheLookupWarmCache(t *testing.T) {
 	t.Run("Warm cache - repeated requests hit cache", func(t *testing.T) {
 		cache := NewSimulateProductCache()
 		metrics := &LoadTestMetrics{
-			StartTime: time.Now(),
-			MinResponseTime: time.Duration(1 << 63 - 1),
+			StartTime:       time.Now(),
+			MinResponseTime: time.Duration(1<<63 - 1),
 		}
 
 		// Warm up: populate cache with 20 products
@@ -251,8 +251,8 @@ func TestCacheHitRatioTarget70Percent(t *testing.T) {
 	t.Run("Mixed workload - target 70% cache hit ratio", func(t *testing.T) {
 		cache := NewSimulateProductCache()
 		metrics := &LoadTestMetrics{
-			StartTime: time.Now(),
-			MinResponseTime: time.Duration(1 << 63 - 1),
+			StartTime:       time.Now(),
+			MinResponseTime: time.Duration(1<<63 - 1),
 		}
 
 		// Simulate 50 unique products
@@ -325,8 +325,8 @@ func TestConcurrentCacheAccess(t *testing.T) {
 	t.Run("Concurrent requests with 100 goroutines", func(t *testing.T) {
 		cache := NewSimulateProductCache()
 		metrics := &LoadTestMetrics{
-			StartTime: time.Now(),
-			MinResponseTime: time.Duration(1 << 63 - 1),
+			StartTime:       time.Now(),
+			MinResponseTime: time.Duration(1<<63 - 1),
 		}
 
 		// Pre-warm cache
@@ -341,7 +341,7 @@ func TestConcurrentCacheAccess(t *testing.T) {
 		var wg sync.WaitGroup
 		var mutex sync.Mutex
 
-		minTime := time.Duration(1 << 63 - 1)
+		minTime := time.Duration(1<<63 - 1)
 		maxTime := time.Duration(0)
 
 		start := time.Now()
@@ -414,8 +414,8 @@ func TestCacheInvalidationImpact(t *testing.T) {
 	t.Run("Cache invalidation and refresh cycle", func(t *testing.T) {
 		cache := NewSimulateProductCache()
 		metrics := &LoadTestMetrics{
-			StartTime: time.Now(),
-			MinResponseTime: time.Duration(1 << 63 - 1),
+			StartTime:       time.Now(),
+			MinResponseTime: time.Duration(1<<63 - 1),
 		}
 
 		numCycles := 5
@@ -505,8 +505,8 @@ func TestRealRedisCache(t *testing.T) {
 		rdb.FlushDB(ctx)
 
 		metrics := &LoadTestMetrics{
-			StartTime: time.Now(),
-			MinResponseTime: time.Duration(1 << 63 - 1),
+			StartTime:       time.Now(),
+			MinResponseTime: time.Duration(1<<63 - 1),
 		}
 
 		// 1000 requests with mixed hit/miss

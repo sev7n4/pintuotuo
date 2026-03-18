@@ -20,13 +20,13 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer func() {
-		if err := db.Close(); err != nil {
-			log.Printf("Failed to close database connection: %v", err)
+		if closeErr := db.Close(); closeErr != nil {
+			log.Printf("Failed to close database connection: %v", closeErr)
 		}
 	}()
 
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+	if pingErr := db.Ping(); pingErr != nil {
+		log.Fatalf("Failed to ping database: %v", pingErr)
 	}
 
 	log.Println("Connected to database")
@@ -45,13 +45,13 @@ func main() {
 		migrationPath := filepath.Join(migrationsDir, file.Name())
 		log.Printf("Running migration: %s", file.Name())
 
-		sqlBytes, err := os.ReadFile(migrationPath)
-		if err != nil {
-			log.Fatalf("Failed to read migration file %s: %v", file.Name(), err)
+		sqlBytes, readErr := os.ReadFile(migrationPath)
+		if readErr != nil {
+			log.Fatalf("Failed to read migration file %s: %v", file.Name(), readErr)
 		}
 
-		if _, err := db.Exec(string(sqlBytes)); err != nil {
-			log.Fatalf("Failed to execute migration %s: %v", file.Name(), err)
+		if _, execErr := db.Exec(string(sqlBytes)); execErr != nil {
+			log.Fatalf("Failed to execute migration %s: %v", file.Name(), execErr)
 		}
 
 		log.Printf("Completed migration: %s", file.Name())

@@ -32,15 +32,15 @@ func TestRequestLogStructure(t *testing.T) {
 
 func TestRequestLogWithError(t *testing.T) {
 	log := RequestLog{
-		Timestamp:   time.Now(),
-		Method:      "POST",
-		Path:        "/api/v1/orders",
-		Status:      400,
-		Duration:    50,
-		UserID:      123,
-		RequestID:   "req-12346",
-		Error:       "invalid request body",
-		ClientIP:    "127.0.0.1",
+		Timestamp: time.Now(),
+		Method:    "POST",
+		Path:      "/api/v1/orders",
+		Status:    400,
+		Duration:  50,
+		UserID:    123,
+		RequestID: "req-12346",
+		Error:     "invalid request body",
+		ClientIP:  "127.0.0.1",
 	}
 
 	assert.Equal(t, "invalid request body", log.Error)

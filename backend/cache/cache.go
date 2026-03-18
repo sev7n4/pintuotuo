@@ -12,13 +12,13 @@ import (
 var client *redis.Client
 
 const (
-	ProductCacheTTL    = 1 * time.Hour
-	ProductListTTL     = 5 * time.Minute
-	UserCacheTTL       = 30 * time.Minute
-	GroupCacheTTL      = time.Duration(0) // No caching for real-time groups
-	OrderCacheTTL      = 10 * time.Minute
-	TokenBalanceTTL    = 5 * time.Minute
-	SearchResultsTTL   = 10 * time.Minute
+	ProductCacheTTL  = 1 * time.Hour
+	ProductListTTL   = 5 * time.Minute
+	UserCacheTTL     = 30 * time.Minute
+	GroupCacheTTL    = time.Duration(0) // No caching for real-time groups
+	OrderCacheTTL    = 10 * time.Minute
+	TokenBalanceTTL  = 5 * time.Minute
+	SearchResultsTTL = 10 * time.Minute
 )
 
 // Init initializes the Redis client

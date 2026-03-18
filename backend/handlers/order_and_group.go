@@ -330,9 +330,9 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	var req struct {
-		ProductID  int       `json:"product_id" binding:"required"`
-		TargetCount int      `json:"target_count" binding:"required,gt=0"`
-		Deadline   time.Time `json:"deadline" binding:"required"`
+		ProductID   int       `json:"product_id" binding:"required"`
+		TargetCount int       `json:"target_count" binding:"required,gt=0"`
+		Deadline    time.Time `json:"deadline" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {

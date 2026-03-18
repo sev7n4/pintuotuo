@@ -11,10 +11,10 @@ import (
 )
 
 type OrderScheduler struct {
-	interval   time.Duration
-	timeout    time.Duration
-	stopChan   chan struct{}
-	wg         sync.WaitGroup
+	interval time.Duration
+	timeout  time.Duration
+	stopChan chan struct{}
+	wg       sync.WaitGroup
 }
 
 func NewOrderScheduler(interval, timeout time.Duration) *OrderScheduler {
@@ -106,7 +106,7 @@ func (s *OrderScheduler) cancelExpiredOrders() {
 	log.Printf("Scheduler: found %d expired orders to cancel", len(orders))
 
 	for _, o := range orders {
-		_, err := tx.ExecContext(ctx, 
+		_, err := tx.ExecContext(ctx,
 			"UPDATE orders SET status = $1 WHERE id = $2",
 			"cancelled", o.id,
 		)

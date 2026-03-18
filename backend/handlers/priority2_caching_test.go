@@ -222,4 +222,3 @@ func TestPriority2TTLConfiguration(t *testing.T) {
 		assert.True(t, true, "TTL values appropriate for data types")
 	})
 }
-
