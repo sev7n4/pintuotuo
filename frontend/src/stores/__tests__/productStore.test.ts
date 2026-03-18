@@ -1,5 +1,4 @@
 import { useProductStore } from '../productStore'
-import { productService } from '@/services/product'
 import { Product } from '@/types'
 
 jest.mock('@/services/product')
