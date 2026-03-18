@@ -95,12 +95,12 @@ jobs:
         working-directory: ./backend
         run: |
           coverage=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
-          echo "📊 Test coverage: ${coverage}%"
+          echo "Test coverage: ${coverage}%"
           if (( $(echo "$coverage < 60" | bc -l) )); then
-            echo "⚠️ Coverage is ${coverage}%, minimum required is 60%"
+            echo "Warning: Coverage is ${coverage}%, minimum recommended is 60%"
             echo "Consider adding more tests to improve coverage"
           fi
-          echo "✅ Coverage check passed"
+          echo "Coverage check passed"
 
   frontend-build:
     name: Frontend Build
@@ -236,14 +236,25 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Check Docker credentials
+        id: check-docker
+        run: |
+          if [ -n "${{ secrets.DOCKER_USERNAME }}" ] && [ -n "${{ secrets.DOCKER_PASSWORD }}" ]; then
+            echo "has-credentials=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-credentials=false" >> $GITHUB_OUTPUT
+            echo "Docker credentials not configured, skipping push"
+          fi
+
       - name: Login to Docker Hub
+        if: steps.check-docker.outputs.has-credentials == 'true'
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-        if: ${{ secrets.DOCKER_USERNAME != '' }}
 
       - name: Extract metadata for backend
+        if: steps.check-docker.outputs.has-credentials == 'true'
         id: meta-backend
         uses: docker/metadata-action@v4
         with:
@@ -254,17 +265,30 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push backend
+        if: steps.check-docker.outputs.has-credentials == 'true'
         uses: docker/build-push-action@v4
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          push: ${{ secrets.DOCKER_USERNAME != '' }}
+          push: true
           tags: ${{ steps.meta-backend.outputs.tags }}
           labels: ${{ steps.meta-backend.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build backend (no push)
+        if: steps.check-docker.outputs.has-credentials != 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: pintuotuo/backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Extract metadata for frontend
+        if: steps.check-docker.outputs.has-credentials == 'true'
         id: meta-frontend
         uses: docker/metadata-action@v4
         with:
@@ -275,13 +299,25 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push frontend
+        if: steps.check-docker.outputs.has-credentials == 'true'
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
-          push: ${{ secrets.DOCKER_USERNAME != '' }}
+          push: true
           tags: ${{ steps.meta-frontend.outputs.tags }}
           labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend (no push)
+        if: steps.check-docker.outputs.has-credentials != 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: pintuotuo/frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
