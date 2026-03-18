@@ -100,7 +100,7 @@ func TestListProductsPagination(t *testing.T) {
 
 // TestCreateProductValid tests valid product creation
 func TestCreateProductValid(t *testing.T) {
-	uid := 1
+	uid := createUser(t, fmt.Sprintf("prod_create_valid_%d@test.com", time.Now().UnixNano()))
 	req := &CreateProductRequest{
 		Name:          "Test Product",
 		Description:   "A test product",
@@ -185,6 +185,7 @@ func TestGetProductByIDValid(t *testing.T) {
 // TestGetProductByIDCache tests caching in GetProductByID
 func TestGetProductByIDCache(t *testing.T) {
 	ctx := context.Background()
+	uid := createUser(t, fmt.Sprintf("prod_cache_test_%d@test.com", time.Now().UnixNano()))
 
 	// Create product
 	req := &CreateProductRequest{
@@ -192,7 +193,7 @@ func TestGetProductByIDCache(t *testing.T) {
 		Price: 75.50,
 		Stock: 150,
 	}
-	created, err := testService.CreateProduct(ctx, 1, req)
+	created, err := testService.CreateProduct(ctx, uid, req)
 	require.NoError(t, err)
 
 	// First call - should hit database
