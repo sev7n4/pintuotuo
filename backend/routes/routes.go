@@ -13,6 +13,11 @@ func RegisterUserRoutes(router *gin.RouterGroup) {
 		users.POST("/register", handlers.RegisterUser)
 		users.POST("/login", handlers.LoginUser)
 		users.POST("/logout", handlers.LogoutUser)
+		users.POST("/refresh", handlers.RefreshToken)
+
+		// Password reset endpoints (no auth required)
+		users.POST("/password/reset-request", handlers.RequestPasswordReset)
+		users.POST("/password/reset", handlers.ResetPassword)
 
 		// User management endpoints
 		users.GET("/me", handlers.GetCurrentUser)

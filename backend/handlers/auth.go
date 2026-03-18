@@ -321,6 +321,185 @@ func UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// RefreshToken refreshes the JWT token for authenticated user
+func RefreshToken(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	// Verify user still exists and is active
+	var user models.User
+	err := db.QueryRow(
+		"SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1 AND status = 'active'",
+		userID,
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrUserNotFound)
+		return
+	}
+
+	// Generate new JWT token
+	token := generateToken(user.ID, user.Email)
+
+	c.JSON(http.StatusOK, gin.H{
+		"user":  user,
+		"token": token,
+	})
+}
+
+// RequestPasswordResetRequest represents password reset request
+type RequestPasswordResetRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// ResetPasswordRequest represents password reset with token
+type ResetPasswordRequest struct {
+	Token    string `json:"token" binding:"required"`
+	Password string `json:"password" binding:"required,min=6"`
+}
+
+// RequestPasswordReset handles password reset request
+func RequestPasswordReset(c *gin.Context) {
+	var req RequestPasswordResetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	// Check if user exists
+	var userID int
+	err := db.QueryRow(
+		"SELECT id FROM users WHERE email = $1 AND status = 'active'",
+		req.Email,
+	).Scan(&userID)
+
+	if err != nil {
+		// Don't reveal if user exists or not for security
+		c.JSON(http.StatusOK, gin.H{
+			"message": "If the email exists, a reset link has been sent",
+		})
+		return
+	}
+
+	// Generate reset token (valid for 1 hour)
+	resetToken := generateResetToken(userID)
+
+	// Store reset token in database
+	_, err = db.Exec(
+		`INSERT INTO password_reset_tokens (user_id, token, expires_at) 
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (user_id) DO UPDATE SET token = $2, expires_at = $3, created_at = NOW()`,
+		userID, resetToken, time.Now().Add(time.Hour),
+	)
+
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"RESET_TOKEN_FAILED",
+			"Failed to generate reset token",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	// In production, send email with reset link
+	// For demo, log the reset token
+	fmt.Printf("[Password Reset] Email: %s, Reset Token: %s\n", req.Email, resetToken)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "If the email exists, a reset link has been sent",
+		// Only in development - remove in production
+		"debug_token": resetToken,
+	})
+}
+
+// ResetPassword handles password reset with token
+func ResetPassword(c *gin.Context) {
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	// Verify reset token
+	var userID int
+	var expiresAt time.Time
+	err := db.QueryRow(
+		"SELECT user_id, expires_at FROM password_reset_tokens WHERE token = $1",
+		req.Token,
+	).Scan(&userID, &expiresAt)
+
+	if err != nil || time.Now().After(expiresAt) {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_RESET_TOKEN",
+			"Invalid or expired reset token",
+			http.StatusBadRequest,
+			err,
+		))
+		return
+	}
+
+	// Hash new password
+	passwordHash := hashPassword(req.Password)
+
+	// Update password
+	_, err = db.Exec(
+		"UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+		passwordHash, userID,
+	)
+
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"PASSWORD_UPDATE_FAILED",
+			"Failed to update password",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	// Delete used reset token
+	_, _ = db.Exec("DELETE FROM password_reset_tokens WHERE token = $1", req.Token)
+
+	// Invalidate user cache
+	ctx := context.Background()
+	cache.Delete(ctx, cache.UserKey(userID))
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
+}
+
+func generateResetToken(userID int) string {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": userID,
+		"type":    "password_reset",
+		"exp":     time.Now().Add(time.Hour).Unix(),
+	})
+
+	tokenString, _ := token.SignedString(jwtSecret)
+	return tokenString
+}
+
 // Helper functions
 
 func hashPassword(password string) string {
