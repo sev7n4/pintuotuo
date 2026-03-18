@@ -91,23 +91,13 @@ func TeardownPaymentTest(t *testing.T, ts *TestServices) {
 }
 
 // SeedTestUser creates a test user
-func SeedTestUser(t *testing.T, db *sql.DB, userID int) int {
-	ctx := context.Background()
-	logger := log.New(os.Stderr, "[SeedUser] ", log.LstdFlags)
-	tokenSvc := token.NewService(db, logger)
-	userService := user.NewService(db, logger, tokenSvc)
-
-	req := &user.RegisterRequest{
-		Email:    fmt.Sprintf("test%d@example.com", userID),
-		Password: "TestPassword123!",
-		Name:     fmt.Sprintf("Test User %d", userID),
-	}
-
-	registeredUser, err := userService.RegisterUser(ctx, req)
-	require.NoError(t, err)
-	require.NotNil(t, registeredUser)
-
-	return registeredUser.ID
+func SeedTestUser(t *testing.T, db *sql.DB) int {
+	email := fmt.Sprintf("test%d_%d@example.com", GenerateUniqueID(), rand.Intn(100000))
+	password := "password"
+	var userID int
+	err := db.QueryRow("INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id", email, password).Scan(&userID)
+	require.NoError(t, err, "SeedTestUser failed")
+	return userID
 }
 
 // SeedTestProduct creates a test product and returns its ID and the merchant ID
