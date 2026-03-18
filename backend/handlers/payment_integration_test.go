@@ -251,8 +251,9 @@ func TestListPaymentsEndpoint(t *testing.T) {
 
 	router := SetupPaymentRouter(t, ts)
 
-	userID := integration.SeedTestUser(t, ts.DB, 11)
-	productID, _ := integration.SeedTestProduct(t, ts.DB, 11)
+	uid := integration.GenerateUniqueID()
+	userID := integration.SeedTestUser(t, ts.DB, uid)
+	productID, _ := integration.SeedTestProduct(t, ts.DB, uid)
 	defer integration.CleanupTestData(t, ts.DB, userID)
 
 	// Create 5 test payments
