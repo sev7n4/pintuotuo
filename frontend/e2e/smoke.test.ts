@@ -33,12 +33,15 @@ test.describe('Smoke Test', () => {
     });
 
     // Go to login page
-    await page.goto('/LoginPage');
+    await page.goto('/login');
 
     // Fill login form
     await page.fill('input[name="email"]', 'test@example.com');
     await page.fill('input[name="password"]', 'password');
     await page.click('button[type="submit"]');
+
+    // Wait for the products API response to ensure the page is loaded
+    await page.waitForResponse('**/api/v1/products*');
 
     // Should redirect to products page
     await expect(page).toHaveURL(/\/products/);
