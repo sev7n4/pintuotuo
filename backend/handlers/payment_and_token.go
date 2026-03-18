@@ -13,6 +13,8 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
+const PaymentStatusSuccess = "success"
+
 // InitiatePayment initiates a payment for an order
 func InitiatePayment(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -131,7 +133,7 @@ func RefundPayment(c *gin.Context) {
 		return
 	}
 
-	if payment.Status != "success" {
+	if payment.Status != PaymentStatusSuccess {
 		middleware.RespondWithError(c, apperrors.ErrPaymentAlreadyProcessed)
 		return
 	}
@@ -201,7 +203,7 @@ func HandleAlipayCallback(c *gin.Context) {
 	}
 
 	// If payment successful, update order status
-	if req.Status == "success" {
+	if req.Status == PaymentStatusSuccess {
 		_, err := db.Exec(
 			"UPDATE orders SET status = $1 WHERE id = (SELECT order_id FROM payments WHERE id = $2)",
 			"paid", req.PaymentID,
@@ -266,7 +268,7 @@ func HandleWechatCallback(c *gin.Context) {
 	}
 
 	// If payment successful, update order status
-	if req.Status == "success" {
+	if req.Status == PaymentStatusSuccess {
 		_, err := db.Exec(
 			"UPDATE orders SET status = $1 WHERE id = (SELECT order_id FROM payments WHERE id = $2)",
 			"paid", req.PaymentID,
@@ -451,15 +453,33 @@ func TransferTokens(c *gin.Context) {
 	}
 
 	// Record transaction
-	_, err = db.Exec(
+	_, insertErr := db.Exec(
 		"INSERT INTO token_transactions (user_id, type, amount, reason) VALUES ($1, $2, $3, $4)",
 		userID, "transfer", -req.Amount, "Transfer to user",
 	)
+	if insertErr != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"TOKEN_TRANSFER_FAILED",
+			"Failed to record sender transaction",
+			http.StatusInternalServerError,
+			insertErr,
+		))
+		return
+	}
 
-	_, err = db.Exec(
+	_, insertErr = db.Exec(
 		"INSERT INTO token_transactions (user_id, type, amount, reason) VALUES ($1, $2, $3, $4)",
 		req.RecipientID, "transfer", req.Amount, "Transfer from user",
 	)
+	if insertErr != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"TOKEN_TRANSFER_FAILED",
+			"Failed to record recipient transaction",
+			http.StatusInternalServerError,
+			insertErr,
+		))
+		return
+	}
 
 	// Invalidate token balance caches for both users
 	ctx := context.Background()

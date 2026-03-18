@@ -279,7 +279,7 @@ func CancelOrder(c *gin.Context) {
 	var order models.Order
 	err = tx.QueryRow(
 		"UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING id, user_id, product_id, group_id, quantity, total_price, status, created_at, updated_at",
-		"cancelled", id, userID,
+		"canceled", id, userID,
 	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
@@ -628,7 +628,7 @@ func CancelGroup(c *gin.Context) {
 	groupID, _ := strconv.Atoi(id)
 	cache.Delete(context.Background(), cache.GroupKey(groupID))
 
-	c.JSON(http.StatusOK, gin.H{"message": "Group cancelled successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "Group canceled successfully"})
 }
 
 // GetGroupProgress retrieves group progress

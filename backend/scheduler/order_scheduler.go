@@ -108,7 +108,7 @@ func (s *OrderScheduler) cancelExpiredOrders() {
 	for _, o := range orders {
 		_, err := tx.ExecContext(ctx,
 			"UPDATE orders SET status = $1 WHERE id = $2",
-			"cancelled", o.id,
+			"canceled", o.id,
 		)
 		if err != nil {
 			log.Printf("Scheduler: failed to cancel order %d: %v", o.id, err)
@@ -129,7 +129,7 @@ func (s *OrderScheduler) cancelExpiredOrders() {
 		return
 	}
 
-	log.Printf("Scheduler: successfully cancelled %d expired orders", len(orders))
+	log.Printf("Scheduler: successfully canceled %d expired orders", len(orders))
 }
 
 func (s *OrderScheduler) CancelOrderManually(orderID int) error {
@@ -161,7 +161,7 @@ func (s *OrderScheduler) CancelOrderManually(orderID int) error {
 	}
 
 	_, err = tx.ExecContext(ctx,
-		"UPDATE orders SET status = 'cancelled' WHERE id = $1",
+		"UPDATE orders SET status = 'canceled' WHERE id = $1",
 		orderID,
 	)
 	if err != nil {
