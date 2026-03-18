@@ -95,6 +95,14 @@ jobs:
         working-directory: ./frontend
         run: npm run build
 
-      - name: Run tests
+      - name: Run unit and integration tests
         working-directory: ./frontend
-        run: npm test --if-present --watchAll=false
+        run: npm test -- --passWithNoTests
+
+      - name: Install Playwright Browsers
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E tests
+        working-directory: ./frontend
+        run: npx playwright test

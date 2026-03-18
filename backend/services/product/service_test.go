@@ -26,7 +26,10 @@ func generateUserID() int {
 func createUser(t *testing.T, email string) int {
 	db := config.GetDB()
 	var id int
-	err := db.QueryRow("INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) RETURNING id", email, "Test User", "hash").Scan(&id)
+	err := db.QueryRow(
+		"INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3) ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name RETURNING id",
+		email, "Test User", "hash",
+	).Scan(&id)
 	require.NoError(t, err)
 	return id
 }
@@ -97,7 +100,7 @@ func TestListProductsPagination(t *testing.T) {
 
 // TestCreateProductValid tests valid product creation
 func TestCreateProductValid(t *testing.T) {
-	uid := createUser(t, "prod_creator@test.com")
+	uid := 1
 	req := &CreateProductRequest{
 		Name:          "Test Product",
 		Description:   "A test product",
