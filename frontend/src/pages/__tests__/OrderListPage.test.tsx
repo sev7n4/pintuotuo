@@ -1,21 +1,18 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import OrderListPage from '../OrderListPage'
 import { useOrderStore } from '@/stores/orderStore'
 
-// 模拟 useOrderStore
 jest.mock('@/stores/orderStore')
 
-// 模拟 useNavigate
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: jest.fn(),
 }))
 
-// 模拟 antd
 jest.mock('antd', () => ({
   ...jest.requireActual('antd'),
-  Table: jest.fn(({ columns, dataSource, rowKey, pagination, locale }) => (
+  Table: jest.fn(({ columns, dataSource, rowKey, locale }) => (
     <div data-testid="order-table">
       {dataSource.length > 0 ? (
         dataSource.map((item: any) => (
@@ -62,7 +59,7 @@ jest.mock('antd', () => ({
       {children}
     </div>
   )),
-  Modal: jest.fn(({ title, open, onCancel, footer, children }) => (
+  Modal: jest.fn(({ title, open, onCancel }) => (
     open ? (
       <div data-testid="modal" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)' }}>
         <div style={{ background: 'white', margin: '50px auto', padding: '20px', width: '500px' }}>

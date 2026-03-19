@@ -1,22 +1,18 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import CartPage from '../CartPage'
 import { useCartStore } from '@/stores/cartStore'
 
-// 模拟 useCartStore
 jest.mock('@/stores/cartStore')
 
-// 模拟 useNavigate
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: jest.fn(),
 }))
 
-// 模拟 antd
 jest.mock('antd', () => ({
   ...jest.requireActual('antd'),
-  Table: jest.fn(({ columns, dataSource, rowKey, pagination, style }) => {
-    // 辅助函数：获取嵌套的dataIndex值
+  Table: jest.fn(({ columns, dataSource, rowKey, style }) => {
     const getValue = (obj: any, path: any) => {
       if (Array.isArray(path)) {
         return path.reduce((acc, key) => acc && acc[key], obj);
@@ -38,7 +34,7 @@ jest.mock('antd', () => ({
       </div>
     );
   }),
-  Button: jest.fn(({ type, danger, icon, children, onClick, size }) => (
+  Button: jest.fn(({ type, danger, children, onClick, size }) => (
     <button 
       data-testid="button" 
       onClick={onClick}
@@ -67,7 +63,7 @@ jest.mock('antd', () => ({
       data-testid="input-number"
     />
   )),
-  Row: jest.fn(({ gutter, children, justify }) => (
+  Row: jest.fn(({ children, justify }) => (
     <div data-testid="row" style={{ display: 'flex', justifyContent: justify }}>
       {children}
     </div>

@@ -1,10 +1,18 @@
 import { groupService } from '../group'
 import api from '../api'
+import type { AxiosResponse } from 'axios'
 
-// 模拟 api
 jest.mock('../api')
 
 const mockApi = api as jest.Mocked<typeof api>
+
+const createMockResponse = <T>(data: T): AxiosResponse<T> => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: {} as any,
+})
 
 describe('groupService', () => {
   beforeEach(() => {
@@ -32,12 +40,12 @@ describe('groupService', () => {
       message: 'Group created successfully',
     }
 
-    mockApi.post.mockResolvedValue(mockResponse)
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await groupService.createGroup(mockData)
 
     expect(mockApi.post).toHaveBeenCalledWith('/groups', mockData)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('listGroups calls api.get with correct parameters', async () => {
@@ -65,14 +73,14 @@ describe('groupService', () => {
       message: 'Groups retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await groupService.listGroups(mockPage, mockPerPage)
 
     expect(mockApi.get).toHaveBeenCalledWith('/groups', {
       params: { page: mockPage, per_page: mockPerPage },
     })
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('listGroups calls api.get without parameters when page and per_page are not provided', async () => {
@@ -87,14 +95,14 @@ describe('groupService', () => {
       message: 'Groups retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await groupService.listGroups()
 
     expect(mockApi.get).toHaveBeenCalledWith('/groups', {
       params: { page: undefined, per_page: undefined },
     })
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getGroupByID calls api.get with correct parameters', async () => {
@@ -114,12 +122,12 @@ describe('groupService', () => {
       message: 'Group retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await groupService.getGroupByID(mockGroupId)
 
     expect(mockApi.get).toHaveBeenCalledWith(`/groups/${mockGroupId}`)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('joinGroup calls api.post with correct parameters', async () => {
@@ -139,12 +147,12 @@ describe('groupService', () => {
       message: 'Joined group successfully',
     }
 
-    mockApi.post.mockResolvedValue(mockResponse)
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await groupService.joinGroup(mockGroupId)
 
     expect(mockApi.post).toHaveBeenCalledWith(`/groups/${mockGroupId}/join`, {})
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('cancelGroup calls api.delete with correct parameters', async () => {
@@ -155,12 +163,12 @@ describe('groupService', () => {
       message: 'Group cancelled successfully',
     }
 
-    mockApi.delete.mockResolvedValue(mockResponse)
+    mockApi.delete.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await groupService.cancelGroup(mockGroupId)
 
     expect(mockApi.delete).toHaveBeenCalledWith(`/groups/${mockGroupId}`)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getGroupProgress calls api.get with correct parameters', async () => {
@@ -180,11 +188,11 @@ describe('groupService', () => {
       message: 'Group progress retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await groupService.getGroupProgress(mockGroupId)
 
     expect(mockApi.get).toHaveBeenCalledWith(`/groups/${mockGroupId}/progress`)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 })

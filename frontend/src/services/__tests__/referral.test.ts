@@ -1,10 +1,18 @@
 import { referralService } from '../referral'
 import api from '../api'
+import type { AxiosResponse } from 'axios'
 
-// 模拟 api
 jest.mock('../api')
 
 const mockApi = api as jest.Mocked<typeof api>
+
+const createMockResponse = <T>(data: T): AxiosResponse<T> => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: {} as any,
+})
 
 describe('referralService', () => {
   beforeEach(() => {
@@ -20,12 +28,12 @@ describe('referralService', () => {
       message: 'Referral code retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await referralService.getMyReferralCode()
 
     expect(mockApi.get).toHaveBeenCalledWith('/referrals/code')
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('validateReferralCode calls api.get with correct parameters', async () => {
@@ -40,12 +48,12 @@ describe('referralService', () => {
       message: 'Referral code validated successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await referralService.validateReferralCode(mockCode)
 
     expect(mockApi.get).toHaveBeenCalledWith(`/referrals/validate/${mockCode}`)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('bindReferralCode calls api.post with correct parameters', async () => {
@@ -58,12 +66,12 @@ describe('referralService', () => {
       message: 'Referral code bound successfully',
     }
 
-    mockApi.post.mockResolvedValue(mockResponse)
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await referralService.bindReferralCode(mockCode)
 
     expect(mockApi.post).toHaveBeenCalledWith('/referrals/bind', { code: mockCode })
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getReferralStats calls api.get with correct parameters', async () => {
@@ -74,12 +82,12 @@ describe('referralService', () => {
       paid_rewards: 400,
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await referralService.getReferralStats()
 
     expect(mockApi.get).toHaveBeenCalledWith('/referrals/stats')
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getReferralList calls api.get with correct parameters', async () => {
@@ -105,14 +113,14 @@ describe('referralService', () => {
       message: 'Referrals retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await referralService.getReferralList(mockPage, mockPerPage)
 
     expect(mockApi.get).toHaveBeenCalledWith('/referrals/list', {
       params: { page: mockPage, per_page: mockPerPage },
     })
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getReferralRewards calls api.get with correct parameters', async () => {
@@ -139,14 +147,14 @@ describe('referralService', () => {
       message: 'Referral rewards retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await referralService.getReferralRewards(mockPage, mockPerPage, mockStatus)
 
     expect(mockApi.get).toHaveBeenCalledWith('/referrals/rewards', {
       params: { page: mockPage, per_page: mockPerPage, status: mockStatus },
     })
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('payReferralRewards calls api.post with correct parameters', async () => {
@@ -159,11 +167,11 @@ describe('referralService', () => {
       message: 'Referral rewards paid successfully',
     }
 
-    mockApi.post.mockResolvedValue(mockResponse)
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await referralService.payReferralRewards(mockRewardIds)
 
     expect(mockApi.post).toHaveBeenCalledWith('/referrals/rewards/pay', { reward_ids: mockRewardIds })
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 })

@@ -1,10 +1,18 @@
 import { orderService } from '../order'
 import api from '../api'
+import type { AxiosResponse } from 'axios'
 
-// 模拟 api
 jest.mock('../api')
 
 const mockApi = api as jest.Mocked<typeof api>
+
+const createMockResponse = <T>(data: T): AxiosResponse<T> => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: {} as any,
+})
 
 describe('orderService', () => {
   beforeEach(() => {
@@ -33,12 +41,12 @@ describe('orderService', () => {
       message: 'Order created successfully',
     }
 
-    mockApi.post.mockResolvedValue(mockResponse)
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await orderService.createOrder(mockData)
 
     expect(mockApi.post).toHaveBeenCalledWith('/orders', mockData)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('createOrder calls api.post with group_id when provided', async () => {
@@ -65,12 +73,12 @@ describe('orderService', () => {
       message: 'Order created successfully',
     }
 
-    mockApi.post.mockResolvedValue(mockResponse)
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await orderService.createOrder(mockData)
 
     expect(mockApi.post).toHaveBeenCalledWith('/orders', mockData)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('listOrders calls api.get with correct parameters', async () => {
@@ -100,14 +108,14 @@ describe('orderService', () => {
       message: 'Orders retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await orderService.listOrders(mockPage, mockPerPage)
 
     expect(mockApi.get).toHaveBeenCalledWith('/orders', {
       params: { page: mockPage, per_page: mockPerPage },
     })
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('listOrders calls api.get without parameters when page and per_page are not provided', async () => {
@@ -122,14 +130,14 @@ describe('orderService', () => {
       message: 'Orders retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await orderService.listOrders()
 
     expect(mockApi.get).toHaveBeenCalledWith('/orders', {
       params: { page: undefined, per_page: undefined },
     })
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getOrderByID calls api.get with correct parameters', async () => {
@@ -151,12 +159,12 @@ describe('orderService', () => {
       message: 'Order retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await orderService.getOrderByID(mockOrderId)
 
     expect(mockApi.get).toHaveBeenCalledWith(`/orders/${mockOrderId}`)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('cancelOrder calls api.put with correct parameters', async () => {
@@ -178,11 +186,11 @@ describe('orderService', () => {
       message: 'Order cancelled successfully',
     }
 
-    mockApi.put.mockResolvedValue(mockResponse)
+    mockApi.put.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await orderService.cancelOrder(mockOrderId)
 
     expect(mockApi.put).toHaveBeenCalledWith(`/orders/${mockOrderId}/cancel`, {})
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 })

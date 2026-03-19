@@ -15,7 +15,7 @@ jest.mock('react-router-dom', () => ({
 // 模拟 antd
 jest.mock('antd', () => ({
   ...jest.requireActual('antd'),
-  Table: jest.fn(({ columns, dataSource, rowKey, pagination, locale }) => (
+  Table: jest.fn(({ columns, dataSource, rowKey, locale }) => (
     <div data-testid="product-table">
       {dataSource.length > 0 ? (
         dataSource.map((item: any) => (
@@ -33,12 +33,11 @@ jest.mock('antd', () => ({
     </div>
   )),
   Input: {
-    Search: jest.fn(({ placeholder, prefix, onSearch, style }) => (
+    Search: jest.fn(({ placeholder, onSearch }) => (
       <div data-testid="search-input">
         <input
           type="text"
           placeholder={placeholder}
-          onSearch={onSearch}
           data-testid="search-input-field"
         />
         <button onClick={() => onSearch((document.querySelector('[data-testid="search-input-field"]') as HTMLInputElement).value)}>
@@ -47,7 +46,7 @@ jest.mock('antd', () => ({
       </div>
     )),
   },
-  Button: jest.fn(({ type, icon, children, onClick }) => (
+  Button: jest.fn(({ type, children, onClick }) => (
     <button 
       data-testid="button" 
       onClick={onClick}
@@ -56,13 +55,13 @@ jest.mock('antd', () => ({
       {children}
     </button>
   )),
-  Row: jest.fn(({ gutter, style, children }) => (
-    <div data-testid="row" style={style}>
+  Row: jest.fn(({ children }) => (
+    <div data-testid="row">
       {children}
     </div>
   )),
-  Col: jest.fn(({ flex, children }) => (
-    <div data-testid="col" style={{ flex }}>
+  Col: jest.fn(({ children }) => (
+    <div data-testid="col">
       {children}
     </div>
   )),
@@ -81,8 +80,8 @@ jest.mock('antd', () => ({
       {children}
     </div>
   )),
-  Pagination: jest.fn(({ current, pageSize, total, onChange, style }) => (
-    <div data-testid="pagination" style={style}>
+  Pagination: jest.fn(({ current, pageSize, onChange }) => (
+    <div data-testid="pagination">
       <button onClick={() => onChange(current - 1, pageSize)}>上一页</button>
       <span>第 {current} 页</span>
       <button onClick={() => onChange(current + 1, pageSize)}>下一页</button>

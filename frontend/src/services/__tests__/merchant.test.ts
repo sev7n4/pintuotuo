@@ -1,10 +1,18 @@
 import { merchantService } from '../merchant'
 import api from '../api'
+import type { AxiosResponse } from 'axios'
 
-// 模拟 api
 jest.mock('../api')
 
 const mockApi = api as jest.Mocked<typeof api>
+
+const createMockResponse = <T>(data: T): AxiosResponse<T> => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: {} as any,
+})
 
 describe('merchantService', () => {
   beforeEach(() => {
@@ -30,12 +38,12 @@ describe('merchantService', () => {
       updated_at: '2024-01-01T00:00:00Z',
     }
 
-    mockApi.post.mockResolvedValue(mockResponse)
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.registerMerchant(mockData)
 
     expect(mockApi.post).toHaveBeenCalledWith('/merchants/register', mockData)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getProfile calls api.get with correct parameters', async () => {
@@ -51,12 +59,12 @@ describe('merchantService', () => {
       updated_at: '2024-01-01T00:00:00Z',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.getProfile()
 
     expect(mockApi.get).toHaveBeenCalledWith('/merchants/profile')
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('updateProfile calls api.put with correct parameters', async () => {
@@ -76,12 +84,12 @@ describe('merchantService', () => {
       updated_at: '2024-01-01T00:00:00Z',
     }
 
-    mockApi.put.mockResolvedValue(mockResponse)
+    mockApi.put.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.updateProfile(mockData)
 
     expect(mockApi.put).toHaveBeenCalledWith('/merchants/profile', mockData)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getStats calls api.get with correct parameters', async () => {
@@ -92,12 +100,12 @@ describe('merchantService', () => {
       pending_orders: 5,
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.getStats()
 
     expect(mockApi.get).toHaveBeenCalledWith('/merchants/stats')
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getProducts calls api.get with correct parameters', async () => {
@@ -125,14 +133,14 @@ describe('merchantService', () => {
       message: 'Products retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.getProducts(mockPage, mockPerPage, mockStatus)
 
     expect(mockApi.get).toHaveBeenCalledWith('/merchants/products', {
       params: { page: mockPage, per_page: mockPerPage, status: mockStatus },
     })
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getOrders calls api.get with correct parameters', async () => {
@@ -161,14 +169,14 @@ describe('merchantService', () => {
       message: 'Orders retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.getOrders(mockPage, mockPerPage, mockStatus)
 
     expect(mockApi.get).toHaveBeenCalledWith('/merchants/orders', {
       params: { page: mockPage, per_page: mockPerPage, status: mockStatus },
     })
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getSettlements calls api.get with correct parameters', async () => {
@@ -187,12 +195,12 @@ describe('merchantService', () => {
       message: 'Settlements retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.getSettlements()
 
     expect(mockApi.get).toHaveBeenCalledWith('/merchants/settlements')
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('requestSettlement calls api.post with correct parameters', async () => {
@@ -205,12 +213,12 @@ describe('merchantService', () => {
       updated_at: '2024-01-01T00:00:00Z',
     }
 
-    mockApi.post.mockResolvedValue(mockResponse)
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.requestSettlement()
 
     expect(mockApi.post).toHaveBeenCalledWith('/merchants/settlements')
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getSettlementDetail calls api.get with correct parameters', async () => {
@@ -224,12 +232,12 @@ describe('merchantService', () => {
       updated_at: '2024-01-01T00:00:00Z',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.getSettlementDetail(mockSettlementId)
 
     expect(mockApi.get).toHaveBeenCalledWith(`/merchants/settlements/${mockSettlementId}`)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getAPIKeys calls api.get with correct parameters', async () => {
@@ -251,12 +259,12 @@ describe('merchantService', () => {
       message: 'API keys retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.getAPIKeys()
 
     expect(mockApi.get).toHaveBeenCalledWith('/merchants/api-keys')
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('createAPIKey calls api.post with correct parameters', async () => {
@@ -279,12 +287,12 @@ describe('merchantService', () => {
       updated_at: '2024-01-01T00:00:00Z',
     }
 
-    mockApi.post.mockResolvedValue(mockResponse)
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.createAPIKey(mockData)
 
     expect(mockApi.post).toHaveBeenCalledWith('/merchants/api-keys', mockData)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('updateAPIKey calls api.put with correct parameters', async () => {
@@ -305,12 +313,12 @@ describe('merchantService', () => {
       updated_at: '2024-01-01T00:00:00Z',
     }
 
-    mockApi.put.mockResolvedValue(mockResponse)
+    mockApi.put.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.updateAPIKey(mockApiKeyId, mockData)
 
     expect(mockApi.put).toHaveBeenCalledWith(`/merchants/api-keys/${mockApiKeyId}`, mockData)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('deleteAPIKey calls api.delete with correct parameters', async () => {
@@ -320,12 +328,12 @@ describe('merchantService', () => {
       message: 'API key deleted successfully',
     }
 
-    mockApi.delete.mockResolvedValue(mockResponse)
+    mockApi.delete.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.deleteAPIKey(mockApiKeyId)
 
     expect(mockApi.delete).toHaveBeenCalledWith(`/merchants/api-keys/${mockApiKeyId}`)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getAPIKeyUsage calls api.get with correct parameters', async () => {
@@ -343,11 +351,11 @@ describe('merchantService', () => {
       message: 'API key usage retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await merchantService.getAPIKeyUsage()
 
     expect(mockApi.get).toHaveBeenCalledWith('/merchants/api-keys/usage')
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 })

@@ -14,7 +14,6 @@ import { useProductStore } from '@/stores/productStore'
 import { useOrderStore } from '@/stores/orderStore'
 import { useCartStore } from '@/stores/cartStore'
 import { useMerchantStore } from '@/stores/merchantStore'
-import { message } from 'antd'
 
 jest.mock('@/stores/authStore')
 jest.mock('@/stores/productStore')
@@ -66,7 +65,6 @@ const mockUseProductStore = useProductStore as jest.MockedFunction<typeof usePro
 const mockUseOrderStore = useOrderStore as jest.MockedFunction<typeof useOrderStore>
 const mockUseCartStore = useCartStore as jest.MockedFunction<typeof useCartStore>
 const mockUseMerchantStore = useMerchantStore as jest.MockedFunction<typeof useMerchantStore>
-const mockMessageSuccess = message.success as jest.MockedFunction<typeof message.success>
 
 describe('Page Navigation Integration Tests', () => {
   beforeEach(() => {

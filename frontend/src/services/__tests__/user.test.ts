@@ -1,10 +1,18 @@
 import { userService } from '../user'
 import api from '../api'
+import type { AxiosResponse } from 'axios'
 
-// 模拟 api
 jest.mock('../api')
 
 const mockApi = api as jest.Mocked<typeof api>
+
+const createMockResponse = <T>(data: T): AxiosResponse<T> => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: {} as any,
+})
 
 describe('userService', () => {
   beforeEach(() => {
@@ -25,12 +33,12 @@ describe('userService', () => {
       message: 'User retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await userService.getCurrentUser()
 
     expect(mockApi.get).toHaveBeenCalledWith('/users/me')
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('updateCurrentUser calls api.put with correct parameters', async () => {
@@ -51,12 +59,12 @@ describe('userService', () => {
       message: 'User updated successfully',
     }
 
-    mockApi.put.mockResolvedValue(mockResponse)
+    mockApi.put.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await userService.updateCurrentUser(mockData)
 
     expect(mockApi.put).toHaveBeenCalledWith('/users/me', mockData)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('getUserByID calls api.get with correct parameters', async () => {
@@ -74,19 +82,19 @@ describe('userService', () => {
       message: 'User retrieved successfully',
     }
 
-    mockApi.get.mockResolvedValue(mockResponse)
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await userService.getUserByID(mockUserId)
 
     expect(mockApi.get).toHaveBeenCalledWith(`/users/${mockUserId}`)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 
   test('updateUser calls api.put with correct parameters', async () => {
     const mockUserId = 1
     const mockData = {
       name: 'Updated User',
-      role: 'admin',
+      role: 'admin' as const,
     }
     const mockResponse = {
       success: true,
@@ -101,11 +109,11 @@ describe('userService', () => {
       message: 'User updated successfully',
     }
 
-    mockApi.put.mockResolvedValue(mockResponse)
+    mockApi.put.mockResolvedValue(createMockResponse(mockResponse))
 
     const result = await userService.updateUser(mockUserId, mockData)
 
     expect(mockApi.put).toHaveBeenCalledWith(`/users/${mockUserId}`, mockData)
-    expect(result).toEqual(mockResponse)
+    expect(result.data).toEqual(mockResponse)
   })
 })

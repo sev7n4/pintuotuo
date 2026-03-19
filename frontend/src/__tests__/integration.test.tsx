@@ -7,17 +7,13 @@ import RegisterPage from '../pages/RegisterPage'
 import { useAuthStore } from '@/stores/authStore'
 import { useReferralStore } from '@/stores/referralStore'
 import { useCartStore } from '@/stores/cartStore'
-import { message } from 'antd'
 
-// 模拟 store
 jest.mock('@/stores/authStore')
 jest.mock('@/stores/referralStore')
 jest.mock('@/stores/cartStore')
 
-// 模拟 CSS 模块
 jest.mock('../pages/ReferralPage.module.css', () => ({}))
 
-// 模拟 message
 jest.mock('antd', () => {
   const antd = jest.requireActual('antd');
   return {
@@ -45,8 +41,6 @@ jest.mock('antd', () => {
 const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>
 const mockUseReferralStore = useReferralStore as jest.MockedFunction<typeof useReferralStore>
 const mockUseCartStore = useCartStore as jest.MockedFunction<typeof useCartStore>
-const mockMessageSuccess = message.success as jest.MockedFunction<typeof message.success>
-const mockMessageError = message.error as jest.MockedFunction<typeof message.error>
 
 // 模拟 clipboard API
 Object.defineProperty(navigator, 'clipboard', {

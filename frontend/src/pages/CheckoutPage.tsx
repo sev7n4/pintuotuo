@@ -23,7 +23,7 @@ type PaymentMethod = 'alipay' | 'wechat'
 
 const CheckoutPage: React.FC = () => {
   const navigate = useNavigate()
-  const { items, total, clear } = useCartStore()
+  const { items, clear } = useCartStore()
   const { createOrder, isLoading } = useOrderStore()
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('alipay')
   const [selectedItems, setSelectedItems] = useState<string[]>(
