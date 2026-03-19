@@ -37,6 +37,11 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := config.InitDB(); err != nil {
+		log.Fatalf("Failed to initialize config database: %v", err)
+	}
+	defer config.CloseDB()
+
 	if err := cache.Init(); err != nil {
 		log.Fatalf("Failed to initialize Redis: %v", err)
 	}
