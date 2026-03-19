@@ -1,0 +1,78 @@
+name: Deploy to Tencent Cloud
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to Tencent Cloud
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.TENCENT_CLOUD_SSH_KEY }}
+
+      - name: Add server to known hosts
+        run: ssh-keyscan -H ${{ secrets.TENCENT_CLOUD_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Tencent Cloud
+        run: |
+          ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} "
+            cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }} && \
+            git pull origin ${{ github.event.inputs.branch || github.ref_name }} && \
+            ./deploy/deploy-prod.sh
+          "
+
+      - name: Verify deployment
+        run: |
+          sleep 30
+          curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.TENCENT_CLOUD_IP }} | grep -E '200|302'
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Tencent Cloud | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | ${{ github.event.inputs.branch || github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Server | ${{ secrets.TENCENT_CLOUD_IP }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Send email notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER || 'smtp.gmail.com' }}
+          server_port: ${{ secrets.SMTP_PORT || 587 }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "[Deployment] Pintuotuo Project - ${{ job.status }}"
+          body: |
+            Deployment Status: ${{ job.status }}
+            Branch: ${{ github.event.inputs.branch || github.ref_name }}
+            Server: ${{ secrets.TENCENT_CLOUD_IP }}
+            Commit: ${{ github.sha }}
+            Deployed by: ${{ github.actor }}
+            
+            View deployment details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          to: ${{ secrets.DEPLOYMENT_NOTIFICATION_EMAIL }}
+          from: "GitHub Actions <${{ secrets.SMTP_USERNAME }}>"
+        continue-on-error: true

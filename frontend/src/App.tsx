@@ -11,7 +11,9 @@ import HomePage from '@pages/HomePage'
 import ProductListPage from '@pages/ProductListPage'
 import ProductDetailPage from '@pages/ProductDetailPage'
 import CartPage from '@pages/CartPage'
+import CheckoutPage from '@pages/CheckoutPage'
 import OrderListPage from '@pages/OrderListPage'
+import PaymentPage from '@pages/PaymentPage'
 import GroupListPage from '@pages/GroupListPage'
 import ReferralPage from '@pages/ReferralPage'
 import MyToken from '@pages/MyToken'
@@ -45,9 +47,11 @@ function App() {
 
             {/* Shopping */}
             <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
 
             {/* Orders */}
             <Route path="/orders" element={<OrderListPage />} />
+            <Route path="/payment/:id" element={<PaymentPage />} />
 
             {/* Groups */}
             <Route path="/groups" element={<GroupListPage />} />

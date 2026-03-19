@@ -20,6 +20,7 @@ const ReferralPage = () => {
     fetchStats,
     fetchReferrals,
     fetchRewards,
+    bindReferralCode,
   } = useReferralStore()
 
   const [bindCode, setBindCode] = useState('')
@@ -40,6 +41,13 @@ const ReferralPage = () => {
     const shareUrl = `${window.location.origin}/register?code=${referralCode}`
     navigator.clipboard.writeText(shareUrl)
     message.success('分享链接已复制到剪贴板')
+  }
+
+  const handleBindCode = () => {
+    if (bindCode && bindCode.length === 8) {
+      bindReferralCode(bindCode)
+      message.success('邀请码绑定成功')
+    }
   }
 
   const referralColumns: ColumnsType<Referral> = [
@@ -213,7 +221,7 @@ const ReferralPage = () => {
             onChange={(e) => setBindCode(e.target.value.toUpperCase())}
             maxLength={8}
           />
-          <Button type="primary" disabled={!bindCode || bindCode.length !== 8}>
+          <Button type="primary" disabled={!bindCode || bindCode.length !== 8} onClick={handleBindCode}>
             绑定
           </Button>
         </Space.Compact>
