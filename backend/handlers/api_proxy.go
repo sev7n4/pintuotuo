@@ -20,6 +20,8 @@ import (
 	"github.com/pintuotuo/backend/utils"
 )
 
+const providerAnthropic = "anthropic"
+
 var providerBaseURLs = map[string]string{
 	"openai":    "https://api.openai.com/v1",
 	"anthropic": "https://api.anthropic.com/v1",
@@ -147,7 +149,7 @@ func ProxyAPIRequest(c *gin.Context) {
 	}
 
 	endpoint := fmt.Sprintf("%s/chat/completions", baseURL)
-	if req.Provider == "anthropic" {
+	if req.Provider == providerAnthropic {
 		endpoint = fmt.Sprintf("%s/messages", baseURL)
 	}
 
@@ -159,7 +161,7 @@ func ProxyAPIRequest(c *gin.Context) {
 
 	if req.Options != nil {
 		var options map[string]interface{}
-		if err := json.Unmarshal(req.Options, &options); err == nil {
+		if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
 			for k, v := range options {
 				requestBody[k] = v
 			}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -345,10 +344,12 @@ func GetMerchantProducts(c *gin.Context) {
 
 	pageNum := 1
 	perPageNum := 20
-	if p, err := parseInt(page); err == nil && p > 0 {
+	p, parseErr := parseInt(page)
+	if parseErr == nil && p > 0 {
 		pageNum = p
 	}
-	if pp, err := parseInt(perPage); err == nil && pp > 0 && pp <= 100 {
+	pp, parseErr2 := parseInt(perPage)
+	if parseErr2 == nil && pp > 0 && pp <= 100 {
 		perPageNum = pp
 	}
 
@@ -439,11 +440,13 @@ func GetMerchantOrders(c *gin.Context) {
 
 	pageNum := 1
 	perPageNum := 20
-	if p, err := parseInt(page); err == nil && p > 0 {
-		pageNum = p
+	pVal, parseErr3 := parseInt(page)
+	if parseErr3 == nil && pVal > 0 {
+		pageNum = pVal
 	}
-	if pp, err := parseInt(perPage); err == nil && pp > 0 && pp <= 100 {
-		perPageNum = pp
+	ppVal, parseErr4 := parseInt(perPage)
+	if parseErr4 == nil && ppVal > 0 && ppVal <= 100 {
+		perPageNum = ppVal
 	}
 
 	offset := (pageNum - 1) * perPageNum
@@ -579,8 +582,4 @@ func GetMerchantSettlements(c *gin.Context) {
 
 func parseInt(s string) (int, error) {
 	return strconv.Atoi(s)
-}
-
-func formatString(format string, a ...interface{}) string {
-	return fmt.Sprintf(format, a...)
 }

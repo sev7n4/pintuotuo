@@ -11,6 +11,8 @@ import (
 	"github.com/pintuotuo/backend/middleware"
 )
 
+const allProviders = "all"
+
 func GetConsumptionRecords(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -58,7 +60,7 @@ func GetConsumptionRecords(c *gin.Context) {
 		args = append(args, endDate+" 23:59:59")
 		argIndex++
 	}
-	if provider != "" && provider != "all" {
+	if provider != "" && provider != allProviders {
 		baseQuery += " AND provider = $" + strconv.Itoa(argIndex)
 		args = append(args, provider)
 		argIndex++
@@ -108,10 +110,10 @@ func GetConsumptionRecords(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"data":       records,
-		"total":      total,
-		"page":       page,
-		"page_size":  pageSize,
+		"data":      records,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
 	})
 }
 

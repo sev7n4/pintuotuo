@@ -14,12 +14,12 @@ import (
 )
 
 type PricingTier struct {
-	Provider     string  `json:"provider"`
-	Model        string  `json:"model"`
-	InputPrice   float64 `json:"input_price"`   // per 1M tokens
-	OutputPrice  float64 `json:"output_price"`  // per 1M tokens
-	Currency     string  `json:"currency"`
-	EffectiveAt  string  `json:"effective_at"`
+	Provider    string  `json:"provider"`
+	Model       string  `json:"model"`
+	InputPrice  float64 `json:"input_price"`  // per 1M tokens
+	OutputPrice float64 `json:"output_price"` // per 1M tokens
+	Currency    string  `json:"currency"`
+	EffectiveAt string  `json:"effective_at"`
 }
 
 type BillingEngine struct {
@@ -300,10 +300,10 @@ func (e *BillingEngine) GetUsageStats(userID int, startDate, endDate time.Time) 
 	}
 
 	var stats struct {
-		TotalUsage      float64 `json:"total_usage"`
-		TotalRequests   int     `json:"total_requests"`
-		TotalInputTok   int64   `json:"total_input_tokens"`
-		TotalOutputTok  int64   `json:"total_output_tokens"`
+		TotalUsage     float64 `json:"total_usage"`
+		TotalRequests  int     `json:"total_requests"`
+		TotalInputTok  int64   `json:"total_input_tokens"`
+		TotalOutputTok int64   `json:"total_output_tokens"`
 	}
 
 	err := e.db.QueryRow(
