@@ -117,11 +117,11 @@ func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, from string, to 
 }
 
 type EmailTemplate struct {
-	Welcome     *template.Template
-	ResetPassword *template.Template
-	OrderConfirm  *template.Template
+	Welcome        *template.Template
+	ResetPassword  *template.Template
+	OrderConfirm   *template.Template
 	PaymentSuccess *template.Template
-	LowBalance    *template.Template
+	LowBalance     *template.Template
 }
 
 var emailTemplates *EmailTemplate
@@ -343,8 +343,8 @@ func (s *PushService) SendFCM(msg *PushMessage) error {
 	payload := map[string]interface{}{
 		"to": msg.Token,
 		"notification": map[string]interface{}{
-			"title":       msg.Title,
-			"body":        msg.Body,
+			"title":        msg.Title,
+			"body":         msg.Body,
 			"click_action": msg.ClickAction,
 		},
 		"data": msg.Data,
@@ -392,19 +392,19 @@ func NewNotificationService(emailConfig *EmailConfig, pushConfig *PushConfig) *N
 type NotificationType string
 
 const (
-	NotificationWelcome       NotificationType = "welcome"
-	NotificationResetPassword NotificationType = "reset_password"
-	NotificationOrderConfirm  NotificationType = "order_confirm"
+	NotificationWelcome        NotificationType = "welcome"
+	NotificationResetPassword  NotificationType = "reset_password"
+	NotificationOrderConfirm   NotificationType = "order_confirm"
 	NotificationPaymentSuccess NotificationType = "payment_success"
-	NotificationLowBalance    NotificationType = "low_balance"
+	NotificationLowBalance     NotificationType = "low_balance"
 )
 
 type NotificationRequest struct {
-	Type     NotificationType
-	UserID   int
-	Email    string
-	Name     string
-	Data     map[string]interface{}
+	Type      NotificationType
+	UserID    int
+	Email     string
+	Name      string
+	Data      map[string]interface{}
 	PushToken string
 }
 

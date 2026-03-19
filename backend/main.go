@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/pintuotuo/backend/docs"
 	"github.com/pintuotuo/backend/config"
+	_ "github.com/pintuotuo/backend/docs"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/routes"
 	"github.com/pintuotuo/backend/scheduler"

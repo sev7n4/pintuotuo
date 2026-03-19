@@ -634,9 +634,9 @@ func GetHomeData(c *gin.Context) {
 	var hotProducts []models.Product
 	for hotRows.Next() {
 		var p models.Product
-		err := hotRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
+		scanErr := hotRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
 			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
-		if err != nil {
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
@@ -659,9 +659,9 @@ func GetHomeData(c *gin.Context) {
 	var newProducts []models.Product
 	for newRows.Next() {
 		var p models.Product
-		err := newRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
+		scanErr2 := newRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
 			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
-		if err != nil {
+		if scanErr2 != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}

@@ -154,12 +154,12 @@ func ValidateReferralCode(c *gin.Context) {
 	}
 
 	result := gin.H{
-		"valid":        true,
-		"referrer_id":  referrerID,
+		"valid":         true,
+		"referrer_id":   referrerID,
 		"referrer_name": referrerName,
 	}
 
-	if resultJSON, err := json.Marshal(result); err == nil {
+	if resultJSON, marshalErr := json.Marshal(result); marshalErr == nil {
 		cache.Set(ctx, cacheKey, string(resultJSON), 5*60)
 	}
 
