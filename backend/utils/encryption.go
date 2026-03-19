@@ -15,9 +15,13 @@ var encryptionKey []byte
 func InitEncryption() error {
 	key := os.Getenv("ENCRYPTION_KEY")
 	if key == "" {
-		key = "default-encryption-key-32byte"
+		key = "default-encryption-key-32byte-length"
 	}
-	if len(key) != 16 && len(key) != 24 && len(key) != 32 {
+	// 确保密钥长度为16、24或32字节
+	for len(key) < 32 {
+		key += key
+	}
+	if len(key) > 32 {
 		key = key[:32]
 	}
 	encryptionKey = []byte(key)

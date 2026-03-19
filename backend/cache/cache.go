@@ -67,11 +67,17 @@ func Get(ctx context.Context, key string) (string, error) {
 
 // Set sets a value in cache with TTL
 func Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+	if client == nil {
+		return fmt.Errorf("redis client not initialized")
+	}
 	return client.Set(ctx, key, value, ttl).Err()
 }
 
 // SetNX sets a value only if the key doesn't exist
 func SetNX(ctx context.Context, key string, value interface{}, ttl time.Duration) (bool, error) {
+	if client == nil {
+		return false, fmt.Errorf("redis client not initialized")
+	}
 	result, err := client.SetNX(ctx, key, value, ttl).Result()
 	return result, err
 }
@@ -81,27 +87,42 @@ func Delete(ctx context.Context, keys ...string) error {
 	if len(keys) == 0 {
 		return nil
 	}
+	if client == nil {
+		return fmt.Errorf("redis client not initialized")
+	}
 	return client.Del(ctx, keys...).Err()
 }
 
 // Exists checks if a key exists in cache
 func Exists(ctx context.Context, key string) (bool, error) {
+	if client == nil {
+		return false, fmt.Errorf("redis client not initialized")
+	}
 	val, err := client.Exists(ctx, key).Result()
 	return val > 0, err
 }
 
 // Increment increments an integer value
 func Increment(ctx context.Context, key string) (int64, error) {
+	if client == nil {
+		return 0, fmt.Errorf("redis client not initialized")
+	}
 	return client.Incr(ctx, key).Result()
 }
 
 // Decrement decrements an integer value
 func Decrement(ctx context.Context, key string) (int64, error) {
+	if client == nil {
+		return 0, fmt.Errorf("redis client not initialized")
+	}
 	return client.Decr(ctx, key).Result()
 }
 
 // IncrementBy increments by a specific amount
 func IncrementBy(ctx context.Context, key string, delta int64) (int64, error) {
+	if client == nil {
+		return 0, fmt.Errorf("redis client not initialized")
+	}
 	return client.IncrBy(ctx, key, delta).Result()
 }
 
@@ -173,6 +194,9 @@ func MerchantAPIKeysKey(merchantID int) string {
 
 // InvalidatePatterns invalidates cache keys matching a pattern
 func InvalidatePatterns(ctx context.Context, pattern string) error {
+	if client == nil {
+		return fmt.Errorf("redis client not initialized")
+	}
 	iter := client.Scan(ctx, 0, pattern, 100).Iterator()
 	var keys []string
 

@@ -432,14 +432,14 @@ func BindReferralCode(c *gin.Context) {
 		return
 	}
 
-	var referredBy int
+	var referredBy sql.NullInt64
 	err := db.QueryRow("SELECT referred_by FROM users WHERE id = $1", userIDInt).Scan(&referredBy)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 
-	if referredBy != 0 {
+	if referredBy.Valid && int(referredBy.Int64) != 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Already bound to a referrer",
 		})
