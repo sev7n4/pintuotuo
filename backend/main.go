@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/db"
 	_ "github.com/pintuotuo/backend/docs"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/routes"
@@ -30,10 +32,15 @@ func init() {
 }
 
 func main() {
-	if err := config.InitDB(); err != nil {
+	if err := db.Init(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer config.CloseDB()
+	defer db.Close()
+
+	if err := cache.Init(); err != nil {
+		log.Fatalf("Failed to initialize Redis: %v", err)
+	}
+	defer cache.Close()
 
 	orderScheduler = scheduler.NewOrderScheduler(
 		5*time.Minute,
