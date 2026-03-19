@@ -153,7 +153,7 @@ func GetConsumptionStats(c *gin.Context) {
 		args = append(args, endDate+" 23:59:59")
 		argIndex++
 	}
-	if provider != "" && provider != "all" {
+	if provider != "" && provider != allProviders {
 		baseQuery += " AND provider = $" + strconv.Itoa(argIndex)
 		args = append(args, provider)
 	}
