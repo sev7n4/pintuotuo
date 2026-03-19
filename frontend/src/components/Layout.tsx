@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Layout as AntLayout, Menu, Dropdown, Avatar, Space } from 'antd'
-import { UserOutlined, GiftOutlined, WalletOutlined, LogoutOutlined, BarChartOutlined } from '@ant-design/icons'
+import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, message } from 'antd'
+import { UserOutlined, GiftOutlined, WalletOutlined, LogoutOutlined, BarChartOutlined, ShopOutlined } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import './Layout.css'
 
@@ -9,7 +9,7 @@ const { Header, Content, Footer } = AntLayout
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useAuthStore()
+  const { user, logout, isAuthenticated } = useAuthStore()
 
   const menuItems = [
     { key: '/', label: <Link to="/">首页</Link> },
@@ -27,9 +27,11 @@ export default function Layout() {
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
   ]
 
-  const handleUserMenuClick = ({ key }: { key: string }) => {
+  const handleUserMenuClick = async ({ key }: { key: string }) => {
     if (key === 'logout') {
-      logout()
+      await logout()
+      message.success('已退出登录')
+      navigate('/login')
     } else if (key === 'profile') {
       navigate('/profile')
     } else if (key === 'consumption') {
@@ -48,15 +50,24 @@ export default function Layout() {
           className="layout-menu"
         />
         <div className="layout-user">
-          {user ? (
-            <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} placement="bottomRight">
-              <Space style={{ cursor: 'pointer' }}>
+          {isAuthenticated && user ? (
+            <Dropdown 
+              menu={{ items: userMenuItems, onClick: handleUserMenuClick }} 
+              placement="bottomRight"
+            >
+              <Space 
+                style={{ cursor: 'pointer' }} 
+                data-testid="user-dropdown"
+              >
                 <Avatar icon={<UserOutlined />} />
                 <span>{user.name || user.email}</span>
               </Space>
             </Dropdown>
           ) : (
-            <Link to="/login">登录</Link>
+            <Space>
+              <Link to="/login">登录</Link>
+              <Link to="/register">注册</Link>
+            </Space>
           )}
         </div>
       </Header>

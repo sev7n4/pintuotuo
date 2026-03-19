@@ -1,12 +1,16 @@
-import React from 'react'
-import { Form, Input, Button, Card, message } from 'antd'
+import React, { useState } from 'react'
+import { Form, Input, Button, Card, message, Radio, Space } from 'antd'
+import { UserOutlined, ShopOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@stores/authStore'
+
+type UserRole = 'user' | 'merchant'
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate()
   const { register, isLoading, error } = useAuthStore()
   const [form] = Form.useForm()
+  const [role, setRole] = useState<UserRole>('user')
 
   const onFinish = async (values: {
     email: string
@@ -20,9 +24,13 @@ export const RegisterPage: React.FC = () => {
     }
 
     try {
-      await register(values.email, values.name, values.password)
-      message.success('注册成功，正在重定向...')
-      navigate('/products')
+      await register(values.email, values.name, values.password, role)
+      message.success('注册成功')
+      if (role === 'merchant') {
+        navigate('/merchant/dashboard')
+      } else {
+        navigate('/products')
+      }
     } catch (err) {
       message.error(error || '注册失败，请稍后重试')
     }
@@ -36,7 +44,41 @@ export const RegisterPage: React.FC = () => {
           layout="vertical"
           onFinish={onFinish}
           autoComplete="off"
+          initialValues={{ role: 'user' }}
         >
+          <Form.Item label="选择角色" name="role">
+            <Radio.Group 
+              onChange={(e) => setRole(e.target.value)} 
+              value={role}
+              style={{ width: '100%' }}
+            >
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Radio.Button 
+                  value="user" 
+                  style={{ width: '100%', height: 60, display: 'flex', alignItems: 'center' }}
+                >
+                  <UserOutlined style={{ marginRight: 8 }} />
+                  <span>
+                    <strong>普通用户</strong>
+                    <br />
+                    <small>购买 Token、参与拼团</small>
+                  </span>
+                </Radio.Button>
+                <Radio.Button 
+                  value="merchant" 
+                  style={{ width: '100%', height: 60, display: 'flex', alignItems: 'center' }}
+                >
+                  <ShopOutlined style={{ marginRight: 8 }} />
+                  <span>
+                    <strong>商家</strong>
+                    <br />
+                    <small>上架商品、管理订单</small>
+                  </span>
+                </Radio.Button>
+              </Space>
+            </Radio.Group>
+          </Form.Item>
+
           <Form.Item
             label="邮箱"
             name="email"
