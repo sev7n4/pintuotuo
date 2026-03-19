@@ -11,14 +11,7 @@ import (
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
-	"github.com/pintuotuo/backend/notification"
 )
-
-var notificationService *notification.NotificationService
-
-func InitNotificationService(emailConfig *notification.EmailConfig, pushConfig *notification.PushConfig) {
-	notificationService = notification.NewNotificationService(emailConfig, pushConfig)
-}
 
 func GetNotifications(c *gin.Context) {
 	userID, exists := c.Get("user_id")

@@ -578,8 +578,8 @@ func PayReferralRewards(c *gin.Context) {
 	for _, rewardID := range req.RewardIDs {
 		var referrerID int
 		var status string
-		err := tx.QueryRow("SELECT referrer_id, status FROM referral_rewards WHERE id = $1", rewardID).Scan(&referrerID, &status)
-		if err != nil {
+		queryErr := tx.QueryRow("SELECT referrer_id, status FROM referral_rewards WHERE id = $1", rewardID).Scan(&referrerID, &status)
+		if queryErr != nil {
 			continue
 		}
 
@@ -587,8 +587,8 @@ func PayReferralRewards(c *gin.Context) {
 			continue
 		}
 
-		_, err = tx.Exec("UPDATE referral_rewards SET status = 'paid', paid_at = $1 WHERE id = $2", time.Now(), rewardID)
-		if err != nil {
+		_, execErr := tx.Exec("UPDATE referral_rewards SET status = 'paid', paid_at = $1 WHERE id = $2", time.Now(), rewardID)
+		if execErr != nil {
 			continue
 		}
 	}

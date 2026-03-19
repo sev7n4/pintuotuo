@@ -80,7 +80,3 @@ func main() {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
-
-func getCurrentTime() string {
-	return time.Now().Format(time.RFC3339)
-}

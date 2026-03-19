@@ -38,7 +38,7 @@ func CreateMerchantAPIKey(c *gin.Context) {
 		QuotaLimit  float64 `json:"quota_limit"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
@@ -144,9 +144,9 @@ func ListMerchantAPIKeys(c *gin.Context) {
 	ctx := context.Background()
 	cacheKey := cache.MerchantAPIKeysKey(merchantID)
 
-	if cachedKeys, err := cache.Get(ctx, cacheKey); err == nil {
+	if cachedKeys, cacheErr := cache.Get(ctx, cacheKey); cacheErr == nil {
 		var apiKeys []models.MerchantAPIKey
-		if err := json.Unmarshal([]byte(cachedKeys), &apiKeys); err == nil {
+		if unmarshalErr := json.Unmarshal([]byte(cachedKeys), &apiKeys); unmarshalErr == nil {
 			c.JSON(http.StatusOK, gin.H{"data": apiKeys})
 			return
 		}
@@ -212,7 +212,7 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		Status     string  `json:"status"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr2 := c.ShouldBindJSON(&req); bindErr2 != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}

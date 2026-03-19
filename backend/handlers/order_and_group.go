@@ -15,6 +15,8 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
+const orderStatusPending = "pending"
+
 // CreateOrder creates a new order
 func CreateOrder(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -94,7 +96,7 @@ func CreateOrder(c *gin.Context) {
 
 	err = tx.QueryRow(
 		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, user_id, product_id, group_id, quantity, total_price, status, created_at, updated_at",
-		userID, req.ProductID, req.GroupID, req.Quantity, product.Price, totalPrice, "pending",
+		userID, req.ProductID, req.GroupID, req.Quantity, product.Price, totalPrice, orderStatusPending,
 	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
@@ -259,7 +261,7 @@ func CancelOrder(c *gin.Context) {
 		return
 	}
 
-	if orderInfo.status != "pending" {
+	if orderInfo.status != orderStatusPending {
 		middleware.RespondWithError(c, apperrors.ErrCannotCancelOrder)
 		return
 	}
@@ -533,7 +535,7 @@ func JoinGroup(c *gin.Context) {
 	var orderID int
 	err = db.QueryRow(
 		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-		userID, group.ProductID, group.ID, 1, product.Price, product.Price, "pending",
+		userID, group.ProductID, group.ID, 1, product.Price, product.Price, orderStatusPending,
 	).Scan(&orderID)
 
 	if err != nil {

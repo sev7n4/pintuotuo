@@ -4,33 +4,33 @@ import "time"
 
 // User represents a user in the system
 type User struct {
-	ID            int       `json:"id"`
-	Email         string    `json:"email"`
-	Name          string    `json:"name"`
-	Password      string    `json:"-"`
-	Role          string    `json:"role"` // user, merchant, admin
-	ReferralCode  string    `json:"referral_code,omitempty"`
-	ReferredBy    int       `json:"referred_by,omitempty"`
-	TotalReferrals int      `json:"total_referrals,omitempty"`
-	TotalRewards  float64   `json:"total_rewards,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID             int       `json:"id"`
+	Email          string    `json:"email"`
+	Name           string    `json:"name"`
+	Password       string    `json:"-"`
+	Role           string    `json:"role"` // user, merchant, admin
+	ReferralCode   string    `json:"referral_code,omitempty"`
+	ReferredBy     int       `json:"referred_by,omitempty"`
+	TotalReferrals int       `json:"total_referrals,omitempty"`
+	TotalRewards   float64   `json:"total_rewards,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // Product represents a token product
 type Product struct {
-	ID           int       `json:"id"`
-	MerchantID   int       `json:"merchant_id"`
-	Name         string    `json:"name"`
-	Description  string    `json:"description"`
-	Price        float64   `json:"price"`
-	OriginalPrice float64  `json:"original_price,omitempty"`
-	Stock        int       `json:"stock"`
-	SoldCount    int       `json:"sold_count"`
-	Category     string    `json:"category,omitempty"`
-	Status       string    `json:"status"` // active, inactive, archived
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID            int       `json:"id"`
+	MerchantID    int       `json:"merchant_id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description"`
+	Price         float64   `json:"price"`
+	OriginalPrice float64   `json:"original_price,omitempty"`
+	Stock         int       `json:"stock"`
+	SoldCount     int       `json:"sold_count"`
+	Category      string    `json:"category,omitempty"`
+	Status        string    `json:"status"` // active, inactive, archived
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // Order represents a user's order
@@ -110,7 +110,7 @@ type Referral struct {
 	ReferrerID int       `json:"referrer_id"`
 	RefereeID  int       `json:"referee_id"`
 	CodeUsed   string    `json:"code_used"`
-	Status     string    `json:"status"` // active, cancelled
+	Status     string    `json:"status"` // active, canceled
 	CreatedAt  time.Time `json:"created_at"`
 }
 
@@ -121,27 +121,27 @@ type ReferralReward struct {
 	RefereeID  int       `json:"referee_id"`
 	OrderID    int       `json:"order_id,omitempty"`
 	Amount     float64   `json:"amount"`
-	Status     string    `json:"status"` // pending, paid, cancelled
+	Status     string    `json:"status"` // pending, paid, canceled
 	CreatedAt  time.Time `json:"created_at"`
 	PaidAt     time.Time `json:"paid_at,omitempty"`
 }
 
 // Merchant represents a merchant/seller
 type Merchant struct {
-	ID             int       `json:"id"`
-	UserID         int       `json:"user_id"`
-	CompanyName    string    `json:"company_name"`
-	BusinessLicense string   `json:"business_license,omitempty"`
-	ContactName    string    `json:"contact_name,omitempty"`
-	ContactPhone   string    `json:"contact_phone,omitempty"`
-	ContactEmail   string    `json:"contact_email,omitempty"`
-	Address        string    `json:"address,omitempty"`
-	Description    string    `json:"description,omitempty"`
-	LogoURL        string    `json:"logo_url,omitempty"`
-	Status         string    `json:"status"` // pending, active, suspended, rejected
-	VerifiedAt     time.Time `json:"verified_at,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID              int       `json:"id"`
+	UserID          int       `json:"user_id"`
+	CompanyName     string    `json:"company_name"`
+	BusinessLicense string    `json:"business_license,omitempty"`
+	ContactName     string    `json:"contact_name,omitempty"`
+	ContactPhone    string    `json:"contact_phone,omitempty"`
+	ContactEmail    string    `json:"contact_email,omitempty"`
+	Address         string    `json:"address,omitempty"`
+	Description     string    `json:"description,omitempty"`
+	LogoURL         string    `json:"logo_url,omitempty"`
+	Status          string    `json:"status"` // pending, active, suspended, rejected
+	VerifiedAt      time.Time `json:"verified_at,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // MerchantAPIKey represents a merchant's API key for token托管
