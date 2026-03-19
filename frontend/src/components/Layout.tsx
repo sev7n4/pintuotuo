@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, message } from 'antd'
-import { UserOutlined, GiftOutlined, WalletOutlined, LogoutOutlined, BarChartOutlined, ShopOutlined } from '@ant-design/icons'
+import { UserOutlined, GiftOutlined, WalletOutlined, LogoutOutlined, BarChartOutlined } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import './Layout.css'
 
