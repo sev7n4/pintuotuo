@@ -1,6 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { act } from 'react'
 import ReferralPage from '../ReferralPage'
 import { useReferralStore } from '@/stores/referralStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -25,9 +24,6 @@ jest.mock('antd', () => ({
 
 const mockUseReferralStore = useReferralStore as jest.MockedFunction<typeof useReferralStore>
 const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>
-
-import { message } from 'antd'
-const mockMessage = message as jest.Mocked<typeof message>
 
 describe('ReferralPage Component', () => {
   beforeEach(() => {

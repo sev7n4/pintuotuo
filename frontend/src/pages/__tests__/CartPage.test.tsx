@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { message } from 'antd'
@@ -113,7 +113,7 @@ describe('CartPage', () => {
       updateQuantity: jest.fn(),
     })
 
-    const { container } = render(
+    render(
       <BrowserRouter>
         <CartPage />
       </BrowserRouter>

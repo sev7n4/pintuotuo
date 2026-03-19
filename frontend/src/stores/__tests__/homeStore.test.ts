@@ -19,11 +19,8 @@ const mockProduct: Product = {
 }
 
 const mockCategory: Category = {
-  id: 1,
   name: 'Test Category',
-  icon: 'icon-test',
-  created_at: '2024-01-01T00:00:00Z',
-  updated_at: '2024-01-01T00:00:00Z',
+  count: 10,
 }
 
 const mockBanner: Banner = {
@@ -31,9 +28,6 @@ const mockBanner: Banner = {
   title: 'Test Banner',
   image: 'https://example.com/banner.jpg',
   link: '/product/1',
-  status: 'active',
-  created_at: '2024-01-01T00:00:00Z',
-  updated_at: '2024-01-01T00:00:00Z',
 }
 
 describe('HomeStore', () => {

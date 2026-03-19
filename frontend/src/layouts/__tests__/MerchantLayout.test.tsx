@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import MerchantLayout from '../MerchantLayout'
 import { useAuthStore } from '@/stores/authStore'
@@ -34,9 +34,7 @@ describe('MerchantLayout Component', () => {
 
     render(
       <MemoryRouter>
-        <MerchantLayout>
-          <div>Test Content</div>
-        </MerchantLayout>
+        <MerchantLayout />
       </MemoryRouter>
     )
 
@@ -64,9 +62,7 @@ describe('MerchantLayout Component', () => {
 
     render(
       <MemoryRouter>
-        <MerchantLayout>
-          <div>Test Content</div>
-        </MerchantLayout>
+        <MerchantLayout />
       </MemoryRouter>
     )
 
@@ -92,9 +88,7 @@ describe('MerchantLayout Component', () => {
 
     render(
       <MemoryRouter>
-        <MerchantLayout>
-          <div>Test Content</div>
-        </MerchantLayout>
+        <MerchantLayout />
       </MemoryRouter>
     )
 

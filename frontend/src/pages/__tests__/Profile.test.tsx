@@ -1,6 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { act } from 'react'
 import Profile from '../Profile'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -20,9 +19,6 @@ jest.mock('antd', () => ({
 }))
 
 const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>
-
-import { message } from 'antd'
-const mockMessage = message as jest.Mocked<typeof message>
 
 describe('Profile Component', () => {
   beforeEach(() => {

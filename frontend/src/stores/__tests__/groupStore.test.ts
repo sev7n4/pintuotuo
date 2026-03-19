@@ -9,8 +9,7 @@ const mockedGroupService = groupService as jest.Mocked<typeof groupService>
 const mockGroup: Group = {
   id: 1,
   product_id: 1,
-  merchant_id: 1,
-  initiator_id: 1,
+  creator_id: 1,
   current_count: 2,
   target_count: 5,
   status: 'active',
@@ -22,8 +21,7 @@ const mockGroup: Group = {
 const mockGroup2: Group = {
   id: 2,
   product_id: 2,
-  merchant_id: 1,
-  initiator_id: 2,
+  creator_id: 2,
   current_count: 3,
   target_count: 4,
   status: 'active',

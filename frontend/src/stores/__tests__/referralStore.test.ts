@@ -31,7 +31,7 @@ describe('referralStore', () => {
   test('fetchReferralCode 成功获取邀请码', async () => {
     const mockCode = 'TESTCODE123'
 
-    mockReferralService.getMyReferralCode.mockResolvedValue({ data: { code: mockCode } })
+    mockReferralService.getMyReferralCode.mockResolvedValue({ data: { code: mockCode } } as any)
 
     const store = useReferralStore.getState()
     await store.fetchReferralCode()
@@ -61,9 +61,10 @@ describe('referralStore', () => {
       total_rewards: 1000,
       pending_rewards: 200,
       completed_rewards: 800,
+      paid_rewards: 600,
     }
 
-    mockReferralService.getReferralStats.mockResolvedValue({ data: mockStats })
+    mockReferralService.getReferralStats.mockResolvedValue({ data: mockStats } as any)
 
     const store = useReferralStore.getState()
     await store.fetchStats()
@@ -98,7 +99,7 @@ describe('referralStore', () => {
         data: mockReferrals,
         pagination: { total: 2, page: 1, per_page: 20 },
       },
-    })
+    } as any)
 
     const store = useReferralStore.getState()
     await store.fetchReferrals()
@@ -133,7 +134,7 @@ describe('referralStore', () => {
         data: mockRewards,
         pagination: { total: 2, page: 1, per_page: 20 },
       },
-    })
+    } as any)
 
     const store = useReferralStore.getState()
     await store.fetchRewards()
@@ -164,10 +165,23 @@ describe('referralStore', () => {
       total_rewards: 100,
       pending_rewards: 100,
       completed_rewards: 0,
+      paid_rewards: 0,
     }
 
-    mockReferralService.bindReferralCode.mockResolvedValue({ data: { success: true } })
-    mockReferralService.getReferralStats.mockResolvedValue({ data: mockStats })
+    mockReferralService.bindReferralCode.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'success',
+        data: { message: '绑定成功' },
+      },
+    } as any)
+    mockReferralService.getReferralStats.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'success',
+        data: mockStats,
+      },
+    } as any)
 
     const store = useReferralStore.getState()
     const success = await store.bindReferralCode(mockCode)

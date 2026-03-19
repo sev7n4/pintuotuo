@@ -27,8 +27,32 @@ describe('orderStore', () => {
 
   test('fetchOrders 成功获取订单列表', async () => {
     const mockOrders = [
-      { id: 1, order_id: 'ORD123', amount: 100, status: 'completed', product_id: 1, quantity: 2 },
-      { id: 2, order_id: 'ORD124', amount: 200, status: 'pending', product_id: 2, quantity: 1 },
+      {
+        id: 1,
+        user_id: 1,
+        group_id: 1,
+        order_id: 'ORD123',
+        total_price: 100,
+        amount: 100,
+        status: 'completed',
+        product_id: 1,
+        quantity: 2,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        user_id: 1,
+        group_id: null,
+        order_id: 'ORD124',
+        total_price: 200,
+        amount: 200,
+        status: 'pending',
+        product_id: 2,
+        quantity: 1,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
     ]
 
     mockOrderService.listOrders.mockResolvedValue({
@@ -36,11 +60,13 @@ describe('orderStore', () => {
         code: 0,
         message: 'success',
         data: {
+          total: 2,
+          page: 1,
+          per_page: 20,
           data: mockOrders,
-          pagination: { total: 2, page: 1, per_page: 20 },
         },
       },
-    })
+    } as any)
 
     const store = useOrderStore.getState()
     await store.fetchOrders()
@@ -67,12 +93,16 @@ describe('orderStore', () => {
   test('fetchOrderByID 成功获取订单详情', async () => {
     const mockOrder = {
       id: 1,
+      user_id: 1,
+      group_id: 1,
       order_id: 'ORD123',
+      total_price: 100,
       amount: 100,
       status: 'completed',
       product_id: 1,
       quantity: 2,
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
     mockOrderService.getOrderByID.mockResolvedValue({
@@ -81,7 +111,7 @@ describe('orderStore', () => {
         message: 'success',
         data: mockOrder,
       },
-    })
+    } as any)
 
     const store = useOrderStore.getState()
     await store.fetchOrderByID(1)
@@ -108,12 +138,16 @@ describe('orderStore', () => {
   test('createOrder 成功创建订单', async () => {
     const mockOrder = {
       id: 3,
+      user_id: 1,
+      group_id: 1,
       order_id: 'ORD125',
+      total_price: 150,
       amount: 150,
       status: 'pending',
       product_id: 1,
       quantity: 1,
-      group_id: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
     mockOrderService.createOrder.mockResolvedValue({
@@ -122,7 +156,7 @@ describe('orderStore', () => {
         message: 'success',
         data: mockOrder,
       },
-    })
+    } as any)
 
     const store = useOrderStore.getState()
     await store.createOrder(1, 1, 1)
@@ -149,17 +183,46 @@ describe('orderStore', () => {
 
   test('cancelOrder 成功取消订单', async () => {
     const initialOrders = [
-      { id: 1, order_id: 'ORD123', amount: 100, status: 'pending', product_id: 1, quantity: 2 },
-      { id: 2, order_id: 'ORD124', amount: 200, status: 'completed', product_id: 2, quantity: 1 },
+      {
+        id: 1,
+        user_id: 1,
+        group_id: 1,
+        order_id: 'ORD123',
+        total_price: 100,
+        amount: 100,
+        status: 'pending' as const,
+        product_id: 1,
+        quantity: 2,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        user_id: 1,
+        group_id: 2,
+        order_id: 'ORD124',
+        total_price: 200,
+        amount: 200,
+        status: 'completed' as const,
+        product_id: 2,
+        quantity: 1,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
     ]
 
     const cancelledOrder = {
       id: 1,
+      user_id: 1,
+      group_id: 1,
       order_id: 'ORD123',
+      total_price: 100,
       amount: 100,
-      status: 'cancelled',
+      status: 'failed' as const,
       product_id: 1,
       quantity: 2,
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
     }
 
     // 设置初始订单状态
@@ -171,7 +234,7 @@ describe('orderStore', () => {
         message: 'success',
         data: cancelledOrder,
       },
-    })
+    } as any)
 
     const store = useOrderStore.getState()
     await store.cancelOrder(1)

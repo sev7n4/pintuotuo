@@ -34,11 +34,12 @@ describe('tokenStore', () => {
       user_id: 1,
       amount: 1000,
       frozen_amount: 100,
+      balance: 900,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
 
-    mockTokenService.getBalance.mockResolvedValue({ data: mockBalance })
+    mockTokenService.getBalance.mockResolvedValue({ data: mockBalance } as any)
 
     const store = useTokenStore.getState()
     await store.fetchBalance()
@@ -64,11 +65,11 @@ describe('tokenStore', () => {
 
   test('fetchTransactions 成功获取交易记录', async () => {
     const mockTransactions = [
-      { id: 1, user_id: 1, amount: -100, type: 'consumption', status: 'completed', created_at: new Date().toISOString() },
-      { id: 2, user_id: 1, amount: 50, type: 'reward', status: 'completed', created_at: new Date().toISOString() },
+      { id: 1, user_id: 1, amount: -100, type: 'usage' as const, status: 'completed', created_at: new Date().toISOString() },
+      { id: 2, user_id: 1, amount: 50, type: 'reward' as const, status: 'completed', created_at: new Date().toISOString() },
     ]
 
-    mockTokenService.getConsumption.mockResolvedValue({ data: mockTransactions })
+    mockTokenService.getConsumption.mockResolvedValue({ data: mockTransactions } as any)
 
     const store = useTokenStore.getState()
     await store.fetchTransactions()
@@ -94,8 +95,24 @@ describe('tokenStore', () => {
 
   test('fetchAPIKeys 成功获取API密钥', async () => {
     const mockAPIKeys = [
-      { id: 1, user_id: 1, name: '测试密钥1', api_key: 'test_key1', status: 'active', created_at: new Date().toISOString() },
-      { id: 2, user_id: 1, name: '测试密钥2', api_key: 'test_key2', status: 'inactive', created_at: new Date().toISOString() },
+      {
+        id: 1,
+        user_id: 1,
+        name: '测试密钥1',
+        api_key: 'test_key1',
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 2,
+        user_id: 1,
+        name: '测试密钥2',
+        api_key: 'test_key2',
+        status: 'inactive',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
     ]
 
     mockTokenService.getAPIKeys.mockResolvedValue({
@@ -103,7 +120,7 @@ describe('tokenStore', () => {
         data: mockAPIKeys,
         pagination: { total: 2, page: 1, per_page: 20 },
       },
-    })
+    } as any)
 
     const store = useTokenStore.getState()
     await store.fetchAPIKeys()
@@ -130,7 +147,21 @@ describe('tokenStore', () => {
   test('createAPIKey 成功创建API密钥', async () => {
     const mockName = '新API密钥'
 
-    mockTokenService.createAPIKey.mockResolvedValue({ data: { success: true } })
+    mockTokenService.createAPIKey.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'success',
+        data: {
+          id: 3,
+          user_id: 1,
+          name: mockName,
+          api_key: 'new_api_key',
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      },
+    } as any)
 
     const store = useTokenStore.getState()
     const success = await store.createAPIKey(mockName)
@@ -157,7 +188,13 @@ describe('tokenStore', () => {
   test('deleteAPIKey 成功删除API密钥', async () => {
     const mockId = 1
 
-    mockTokenService.deleteAPIKey.mockResolvedValue({ data: { success: true } })
+    mockTokenService.deleteAPIKey.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'success',
+        data: { message: '删除成功' },
+      },
+    } as any)
 
     const store = useTokenStore.getState()
     const success = await store.deleteAPIKey(mockId)
@@ -185,7 +222,13 @@ describe('tokenStore', () => {
     const mockRecipientId = 2
     const mockAmount = 100
 
-    mockTokenService.transfer.mockResolvedValue({ data: { success: true } })
+    mockTokenService.transfer.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'success',
+        data: { message: '转账成功' },
+      },
+    } as any)
 
     const store = useTokenStore.getState()
     const success = await store.transfer(mockRecipientId, mockAmount)

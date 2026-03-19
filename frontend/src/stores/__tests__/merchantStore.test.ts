@@ -41,15 +41,19 @@ describe('merchantStore', () => {
   test('fetchProfile 成功获取商家信息', async () => {
     const mockProfile = {
       id: 1,
+      user_id: 1,
       name: '测试商家',
+      company_name: '测试公司',
       email: 'test@merchant.com',
       phone: '13800138000',
       address: '测试地址',
       business_license: '1234567890',
       status: 'active',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
     }
 
-    mockMerchantService.getProfile.mockResolvedValue({ data: mockProfile })
+    mockMerchantService.getProfile.mockResolvedValue({ data: mockProfile } as any)
 
     const store = useMerchantStore.getState()
     await store.fetchProfile()
@@ -76,18 +80,22 @@ describe('merchantStore', () => {
   test('updateProfile 成功更新商家信息', async () => {
     const mockProfile = {
       id: 1,
+      user_id: 1,
       name: '测试商家',
+      company_name: '测试公司',
       email: 'test@merchant.com',
       phone: '13800138000',
       address: '测试地址',
       business_license: '1234567890',
       status: 'active',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
     }
 
-    const updateData = { name: '更新后的商家' }
+    const updateData = { company_name: '更新后的商家' }
     const updatedProfile = { ...mockProfile, ...updateData }
 
-    mockMerchantService.updateProfile.mockResolvedValue({ data: updatedProfile })
+    mockMerchantService.updateProfile.mockResolvedValue({ data: updatedProfile } as any)
 
     const store = useMerchantStore.getState()
     const success = await store.updateProfile(updateData)
@@ -104,7 +112,7 @@ describe('merchantStore', () => {
     mockMerchantService.updateProfile.mockRejectedValue(new Error(errorMessage))
 
     const store = useMerchantStore.getState()
-    const success = await store.updateProfile({ name: '更新后的商家' })
+    const success = await store.updateProfile({ company_name: '更新后的商家' } as any)
 
     const newState = useMerchantStore.getState()
     expect(success).toBe(false)
@@ -118,9 +126,12 @@ describe('merchantStore', () => {
       total_sales: 10000,
       total_products: 50,
       pending_orders: 5,
+      active_products: 45,
+      month_sales: 5000,
+      month_orders: 50,
     }
 
-    mockMerchantService.getStats.mockResolvedValue({ data: mockStats })
+    mockMerchantService.getStats.mockResolvedValue({ data: mockStats } as any)
 
     const store = useMerchantStore.getState()
     await store.fetchStats()
@@ -152,10 +163,12 @@ describe('merchantStore', () => {
 
     mockMerchantService.getProducts.mockResolvedValue({
       data: {
+        total: 2,
+        page: 1,
+        per_page: 20,
         data: mockProducts,
-        pagination: { total: 2, page: 1, per_page: 20 },
       },
-    })
+    } as any)
 
     const store = useMerchantStore.getState()
     await store.fetchProducts()
@@ -187,10 +200,12 @@ describe('merchantStore', () => {
 
     mockMerchantService.getOrders.mockResolvedValue({
       data: {
+        total: 2,
+        page: 1,
+        per_page: 20,
         data: mockOrders,
-        pagination: { total: 2, page: 1, per_page: 20 },
       },
-    })
+    } as any)
 
     const store = useMerchantStore.getState()
     await store.fetchOrders()
@@ -216,16 +231,40 @@ describe('merchantStore', () => {
 
   test('fetchSettlements 成功获取结算记录', async () => {
     const mockSettlements = [
-      { id: 1, amount: 1000, status: 'completed', created_at: new Date().toISOString() },
-      { id: 2, amount: 2000, status: 'pending', created_at: new Date().toISOString() },
+      {
+        id: 1,
+        merchant_id: 1,
+        amount: 1000,
+        status: 'completed',
+        period_start: new Date().toISOString(),
+        period_end: new Date().toISOString(),
+        total_sales: 5000,
+        fee: 100,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 2,
+        merchant_id: 1,
+        amount: 2000,
+        status: 'pending',
+        period_start: new Date().toISOString(),
+        period_end: new Date().toISOString(),
+        total_sales: 10000,
+        fee: 200,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
     ]
 
     mockMerchantService.getSettlements.mockResolvedValue({
       data: {
+        total: 2,
+        page: 1,
+        per_page: 20,
         data: mockSettlements,
-        pagination: { total: 2, page: 1, per_page: 20 },
       },
-    })
+    } as any)
 
     const store = useMerchantStore.getState()
     await store.fetchSettlements()
@@ -250,7 +289,13 @@ describe('merchantStore', () => {
   })
 
   test('requestSettlement 成功申请结算', async () => {
-    mockMerchantService.requestSettlement.mockResolvedValue({ data: { success: true } })
+    mockMerchantService.requestSettlement.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'success',
+        data: { message: '申请结算成功' },
+      },
+    } as any)
 
     const store = useMerchantStore.getState()
     const success = await store.requestSettlement()
@@ -276,16 +321,40 @@ describe('merchantStore', () => {
 
   test('fetchAPIKeys 成功获取API密钥', async () => {
     const mockAPIKeys = [
-      { id: 1, name: '测试密钥', api_key: 'test_key', provider: 'openai', status: 'active' },
-      { id: 2, name: '测试密钥2', api_key: 'test_key2', provider: 'claude', status: 'inactive' },
+      {
+        id: 1,
+        merchant_id: 1,
+        name: '测试密钥',
+        api_key: 'test_key',
+        provider: 'openai',
+        status: 'active' as const,
+        quota_limit: 1000,
+        quota_used: 0,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 2,
+        merchant_id: 1,
+        name: '测试密钥2',
+        api_key: 'test_key2',
+        provider: 'claude',
+        status: 'inactive' as const,
+        quota_limit: 2000,
+        quota_used: 500,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
     ]
 
     mockMerchantService.getAPIKeys.mockResolvedValue({
       data: {
+        total: 2,
+        page: 1,
+        per_page: 20,
         data: mockAPIKeys,
-        pagination: { total: 2, page: 1, per_page: 20 },
       },
-    })
+    } as any)
 
     const store = useMerchantStore.getState()
     await store.fetchAPIKeys()
@@ -317,7 +386,24 @@ describe('merchantStore', () => {
       quota_limit: 1000,
     }
 
-    mockMerchantService.createAPIKey.mockResolvedValue({ data: { success: true } })
+    mockMerchantService.createAPIKey.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'success',
+        data: {
+          id: 3,
+          merchant_id: 1,
+          name: '新密钥',
+          api_key: 'new_api_key',
+          provider: 'openai',
+          status: 'active' as const,
+          quota_limit: 1000,
+          quota_used: 0,
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z',
+        },
+      },
+    } as any)
 
     const store = useMerchantStore.getState()
     const success = await store.createAPIKey(apiKeyData)
@@ -346,9 +432,26 @@ describe('merchantStore', () => {
   })
 
   test('updateAPIKey 成功更新API密钥', async () => {
-    const updateData = { name: '更新的密钥', status: 'active' }
+    const updateData = { name: '更新的密钥', status: 'active' as const }
 
-    mockMerchantService.updateAPIKey.mockResolvedValue({ data: { success: true } })
+    mockMerchantService.updateAPIKey.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'success',
+        data: {
+          id: 1,
+          merchant_id: 1,
+          name: '更新的密钥',
+          api_key: 'test_key',
+          provider: 'openai',
+          status: 'active' as const,
+          quota_limit: 1000,
+          quota_used: 0,
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z',
+        },
+      },
+    } as any)
 
     const store = useMerchantStore.getState()
     const success = await store.updateAPIKey(1, updateData)
@@ -373,7 +476,13 @@ describe('merchantStore', () => {
   })
 
   test('deleteAPIKey 成功删除API密钥', async () => {
-    mockMerchantService.deleteAPIKey.mockResolvedValue({ data: { success: true } })
+    mockMerchantService.deleteAPIKey.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'success',
+        data: { message: '删除成功' },
+      },
+    } as any)
 
     const store = useMerchantStore.getState()
     const success = await store.deleteAPIKey(1)
@@ -399,16 +508,40 @@ describe('merchantStore', () => {
 
   test('fetchAPIKeyUsage 成功获取API密钥使用情况', async () => {
     const mockUsage = [
-      { id: 1, api_key_id: 1, requests: 100, tokens: 5000, date: '2024-01-01' },
-      { id: 2, api_key_id: 1, requests: 200, tokens: 10000, date: '2024-01-02' },
+      {
+        id: 1,
+        api_key_id: 1,
+        name: '测试密钥',
+        provider: 'openai',
+        requests: 100,
+        tokens: 5000,
+        quota_limit: 1000,
+        quota_used: 100,
+        usage_percentage: 10,
+        date: '2024-01-01',
+      },
+      {
+        id: 2,
+        api_key_id: 1,
+        name: '测试密钥',
+        provider: 'openai',
+        requests: 200,
+        tokens: 10000,
+        quota_limit: 1000,
+        quota_used: 300,
+        usage_percentage: 30,
+        date: '2024-01-02',
+      },
     ]
 
     mockMerchantService.getAPIKeyUsage.mockResolvedValue({
       data: {
+        total: 2,
+        page: 1,
+        per_page: 20,
         data: mockUsage,
-        pagination: { total: 2, page: 1, per_page: 20 },
       },
-    })
+    } as any)
 
     const store = useMerchantStore.getState()
     await store.fetchAPIKeyUsage()
