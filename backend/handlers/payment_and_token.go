@@ -58,9 +58,9 @@ func InitiatePayment(c *gin.Context) {
 
 	var payment models.Payment
 	err = db.QueryRow(
-		"INSERT INTO payments (order_id, user_id, amount, method, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, order_id, amount, method, status, created_at, updated_at",
+		"INSERT INTO payments (order_id, user_id, amount, pay_method, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, order_id, amount, pay_method, status, created_at, updated_at",
 		req.OrderID, userID, order.TotalPrice, req.Method, "pending",
-	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.CreatedAt, &payment.UpdatedAt)
+	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.PayMethod, &payment.Status, &payment.CreatedAt, &payment.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -93,9 +93,9 @@ func GetPaymentByID(c *gin.Context) {
 
 	var payment models.Payment
 	err := db.QueryRow(
-		"SELECT id, order_id, amount, method, status, created_at, updated_at FROM payments WHERE id = $1 AND user_id = $2",
+		"SELECT id, order_id, amount, pay_method, status, created_at, updated_at FROM payments WHERE id = $1 AND user_id = $2",
 		id, userID,
-	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.CreatedAt, &payment.UpdatedAt)
+	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.PayMethod, &payment.Status, &payment.CreatedAt, &payment.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrPaymentNotFound)
@@ -124,9 +124,9 @@ func RefundPayment(c *gin.Context) {
 	// Get payment details
 	var payment models.Payment
 	err := db.QueryRow(
-		"SELECT id, order_id, amount, method, status FROM payments WHERE id = $1 AND user_id = $2",
+		"SELECT id, order_id, amount, pay_method, status FROM payments WHERE id = $1 AND user_id = $2",
 		id, userID,
-	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status)
+	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.PayMethod, &payment.Status)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrPaymentNotFound)
@@ -140,9 +140,9 @@ func RefundPayment(c *gin.Context) {
 
 	// Update payment status
 	err = db.QueryRow(
-		"UPDATE payments SET status = $1 WHERE id = $2 RETURNING id, order_id, amount, method, status, created_at, updated_at",
+		"UPDATE payments SET status = $1 WHERE id = $2 RETURNING id, order_id, amount, pay_method, status, created_at, updated_at",
 		"refunded", id,
-	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.Method, &payment.Status, &payment.CreatedAt, &payment.UpdatedAt)
+	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.PayMethod, &payment.Status, &payment.CreatedAt, &payment.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -186,11 +186,11 @@ func HandleAlipayCallback(c *gin.Context) {
 	}
 
 	// Update payment status
-	var method string
+	var payMethod string
 	err = db.QueryRow(
-		"UPDATE payments SET status = $1, transaction_id = $2 WHERE id = $3 RETURNING method",
+		"UPDATE payments SET status = $1, transaction_id = $2 WHERE id = $3 RETURNING pay_method",
 		req.Status, req.TransactionID, req.PaymentID,
-	).Scan(&method)
+	).Scan(&payMethod)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -251,11 +251,11 @@ func HandleWechatCallback(c *gin.Context) {
 	}
 
 	// Update payment status
-	var method string
+	var payMethod string
 	err = db.QueryRow(
-		"UPDATE payments SET status = $1, transaction_id = $2 WHERE id = $3 RETURNING method",
+		"UPDATE payments SET status = $1, transaction_id = $2 WHERE id = $3 RETURNING pay_method",
 		req.Status, req.TransactionID, req.PaymentID,
-	).Scan(&method)
+	).Scan(&payMethod)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(

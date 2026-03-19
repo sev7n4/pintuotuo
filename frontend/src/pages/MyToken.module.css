@@ -1,0 +1,48 @@
+.myToken {
+  padding: 0;
+}
+
+.pageTitle {
+  margin-bottom: 24px !important;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.statsRow {
+  margin-bottom: 16px;
+}
+
+.actionCard {
+  margin-bottom: 16px;
+}
+
+.tabsCard {
+  margin-top: 0;
+}
+
+.tabHeader {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.newKeyDisplay {
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.keyText {
+  font-size: 14px;
+  word-break: break-all;
+}
+
+@media (max-width: 768px) {
+  .pageTitle {
+    font-size: 18px;
+  }
+
+  .tabHeader {
+    justify-content: flex-start;
+  }
+}

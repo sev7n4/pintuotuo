@@ -1,0 +1,56 @@
+.settings {
+  padding: 0;
+}
+
+.pageTitle {
+  margin-bottom: 24px !important;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.card {
+  margin-bottom: 24px;
+}
+
+.logoSection {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.logo {
+  background-color: #1890ff;
+}
+
+.statusSection {
+  padding: 8px 0;
+}
+
+.statusItem {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+.label {
+  width: 100px;
+  color: #666;
+}
+
+.value {
+  color: #333;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .logoSection {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pageTitle {
+    font-size: 18px;
+  }
+}

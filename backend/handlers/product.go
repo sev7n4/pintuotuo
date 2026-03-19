@@ -412,3 +412,308 @@ func idToInt(id string) int {
 	idInt, _ := strconv.Atoi(id)
 	return idInt
 }
+
+// GetHotProducts retrieves hot/popular products
+func GetHotProducts(c *gin.Context) {
+	limit := c.DefaultQuery("limit", "10")
+	limitNum, _ := strconv.Atoi(limit)
+	if limitNum < 1 || limitNum > 50 {
+		limitNum = 10
+	}
+
+	ctx := context.Background()
+	cacheKey := "products:hot:" + strconv.Itoa(limitNum)
+
+	// Try cache first
+	if cachedProducts, err := cache.Get(ctx, cacheKey); err == nil {
+		var products []models.Product
+		if err := json.Unmarshal([]byte(cachedProducts), &products); err == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"data": products,
+			})
+			return
+		}
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	rows, err := db.Query(
+		`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price) as original_price, 
+		 stock, COALESCE(sold_count, 0) as sold_count, COALESCE(category, '') as category, status, created_at, updated_at 
+		 FROM products WHERE status = 'active' AND stock > 0 
+		 ORDER BY sold_count DESC, created_at DESC LIMIT $1`,
+		limitNum,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer rows.Close()
+
+	var products []models.Product
+	for rows.Next() {
+		var p models.Product
+		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice, 
+			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		products = append(products, p)
+	}
+
+	// Cache for 5 minutes
+	if productsJSON, err := json.Marshal(products); err == nil {
+		cache.Set(ctx, cacheKey, string(productsJSON), 5*60)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": products,
+	})
+}
+
+// GetNewProducts retrieves new arrivals
+func GetNewProducts(c *gin.Context) {
+	limit := c.DefaultQuery("limit", "10")
+	limitNum, _ := strconv.Atoi(limit)
+	if limitNum < 1 || limitNum > 50 {
+		limitNum = 10
+	}
+
+	ctx := context.Background()
+	cacheKey := "products:new:" + strconv.Itoa(limitNum)
+
+	// Try cache first
+	if cachedProducts, err := cache.Get(ctx, cacheKey); err == nil {
+		var products []models.Product
+		if err := json.Unmarshal([]byte(cachedProducts), &products); err == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"data": products,
+			})
+			return
+		}
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	rows, err := db.Query(
+		`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price) as original_price, 
+		 stock, COALESCE(sold_count, 0) as sold_count, COALESCE(category, '') as category, status, created_at, updated_at 
+		 FROM products WHERE status = 'active' AND stock > 0 
+		 ORDER BY created_at DESC LIMIT $1`,
+		limitNum,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer rows.Close()
+
+	var products []models.Product
+	for rows.Next() {
+		var p models.Product
+		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice, 
+			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		products = append(products, p)
+	}
+
+	// Cache for 5 minutes
+	if productsJSON, err := json.Marshal(products); err == nil {
+		cache.Set(ctx, cacheKey, string(productsJSON), 5*60)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": products,
+	})
+}
+
+// GetCategories retrieves product categories
+func GetCategories(c *gin.Context) {
+	ctx := context.Background()
+	cacheKey := "categories:all"
+
+	// Try cache first
+	if cachedCategories, err := cache.Get(ctx, cacheKey); err == nil {
+		var categories []map[string]interface{}
+		if err := json.Unmarshal([]byte(cachedCategories), &categories); err == nil {
+			c.JSON(http.StatusOK, gin.H{
+				"data": categories,
+			})
+			return
+		}
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	rows, err := db.Query(
+		`SELECT COALESCE(category, '未分类') as category, COUNT(*) as count 
+		 FROM products WHERE status = 'active' 
+		 GROUP BY category 
+		 ORDER BY count DESC`,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer rows.Close()
+
+	var categories []map[string]interface{}
+	for rows.Next() {
+		var category string
+		var count int
+		err := rows.Scan(&category, &count)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		categories = append(categories, map[string]interface{}{
+			"name":  category,
+			"count": count,
+		})
+	}
+
+	// Cache for 30 minutes
+	if categoriesJSON, err := json.Marshal(categories); err == nil {
+		cache.Set(ctx, cacheKey, string(categoriesJSON), 30*60)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": categories,
+	})
+}
+
+// GetHomeData retrieves all data needed for homepage
+func GetHomeData(c *gin.Context) {
+	ctx := context.Background()
+	cacheKey := "home:data"
+
+	// Try cache first
+	if cachedData, err := cache.Get(ctx, cacheKey); err == nil {
+		var homeData map[string]interface{}
+		if err := json.Unmarshal([]byte(cachedData), &homeData); err == nil {
+			c.JSON(http.StatusOK, homeData)
+			return
+		}
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	// Get hot products
+	hotRows, err := db.Query(
+		`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price) as original_price, 
+		 stock, COALESCE(sold_count, 0) as sold_count, COALESCE(category, '') as category, status, created_at, updated_at 
+		 FROM products WHERE status = 'active' AND stock > 0 
+		 ORDER BY sold_count DESC, created_at DESC LIMIT 10`,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer hotRows.Close()
+
+	var hotProducts []models.Product
+	for hotRows.Next() {
+		var p models.Product
+		err := hotRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice, 
+			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		hotProducts = append(hotProducts, p)
+	}
+
+	// Get new products
+	newRows, err := db.Query(
+		`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price) as original_price, 
+		 stock, COALESCE(sold_count, 0) as sold_count, COALESCE(category, '') as category, status, created_at, updated_at 
+		 FROM products WHERE status = 'active' AND stock > 0 
+		 ORDER BY created_at DESC LIMIT 10`,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer newRows.Close()
+
+	var newProducts []models.Product
+	for newRows.Next() {
+		var p models.Product
+		err := newRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice, 
+			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		newProducts = append(newProducts, p)
+	}
+
+	// Get categories
+	catRows, err := db.Query(
+		`SELECT COALESCE(category, '未分类') as category, COUNT(*) as count 
+		 FROM products WHERE status = 'active' 
+		 GROUP BY category 
+		 ORDER BY count DESC`,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer catRows.Close()
+
+	var categories []map[string]interface{}
+	for catRows.Next() {
+		var category string
+		var count int
+		err := catRows.Scan(&category, &count)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		categories = append(categories, map[string]interface{}{
+			"name":  category,
+			"count": count,
+		})
+	}
+
+	// Get banners (placeholder for now)
+	banners := []map[string]interface{}{
+		{"id": 1, "title": "新人专享", "image": "/banners/newuser.png", "link": "/products?category=newuser"},
+		{"id": 2, "title": "限时特惠", "image": "/banners/sale.png", "link": "/products?category=sale"},
+		{"id": 3, "title": "热门推荐", "image": "/banners/hot.png", "link": "/products?sort=hot"},
+	}
+
+	homeData := map[string]interface{}{
+		"banners":   banners,
+		"hot":       hotProducts,
+		"new":       newProducts,
+		"categories": categories,
+	}
+
+	// Cache for 5 minutes
+	if homeDataJSON, err := json.Marshal(homeData); err == nil {
+		cache.Set(ctx, cacheKey, string(homeDataJSON), 5*60)
+	}
+
+	c.JSON(http.StatusOK, homeData)
+}

@@ -1,0 +1,43 @@
+.settlements {
+  padding: 0;
+}
+
+.pageTitle {
+  margin-bottom: 24px !important;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.statsRow {
+  margin-bottom: 24px;
+}
+
+.tableCard {
+  margin-top: 0;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.amount {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1890ff;
+}
+
+@media (max-width: 768px) {
+  .pageTitle {
+    font-size: 18px;
+  }
+
+  .cardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

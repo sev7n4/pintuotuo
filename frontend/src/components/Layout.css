@@ -3,13 +3,23 @@
   align-items: center;
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 0 24px;
 }
 
 .layout-logo {
   font-size: 20px;
   font-weight: bold;
   color: #1890ff;
-  margin-left: 20px;
+  margin-right: 24px;
+}
+
+.layout-menu {
+  flex: 1;
+  border-bottom: none;
+}
+
+.layout-user {
+  margin-left: auto;
 }
 
 .layout-content {
@@ -21,4 +31,23 @@
 .layout-footer {
   background: #f0f2f5;
   text-align: center;
+}
+
+@media (max-width: 768px) {
+  .layout-header {
+    padding: 0 12px;
+  }
+
+  .layout-logo {
+    font-size: 16px;
+    margin-right: 12px;
+  }
+
+  .layout-menu {
+    display: none;
+  }
+
+  .layout-content {
+    padding: 12px;
+  }
 }

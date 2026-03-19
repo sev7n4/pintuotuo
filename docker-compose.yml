@@ -1,131 +1,134 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pintuotuo-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DATABASE_URL=postgresql://pintuotuo:${DB_PASSWORD}@postgres:5432/pintuotuo_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - DB_MAX_OPEN_CONNS=50
+      - DB_MAX_IDLE_CONNS=10
+      - DB_CONN_MAX_LIFETIME=30m
+      - DB_CONN_MAX_IDLE_TIME=10m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pintuotuo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/v1/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8080/api/v1}
+    container_name: pintuotuo-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - pintuotuo-network
+
   postgres:
     image: postgres:15-alpine
-    container_name: pintuotuo_postgres
+    container_name: pintuotuo-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: pintuotuo
-      POSTGRES_PASSWORD: dev_password_123
-      POSTGRES_DB: pintuotuo_db
-      POSTGRES_INITDB_ARGS: "-E UTF8"
-    ports:
-      - "5432:5432"
+      - POSTGRES_USER=pintuotuo
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=pintuotuo_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - pintuotuo-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pintuotuo"]
+      test: ["CMD-SHELL", "pg_isready -U pintuotuo -d pintuotuo_db"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - pintuotuo_network
-    command: postgres -c max_connections=200
 
-  # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: pintuotuo_redis
-    ports:
-      - "6379:6379"
+    container_name: pintuotuo-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - pintuotuo-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - pintuotuo_network
-    command: redis-server --appendonly yes
 
-  # Kafka Broker (for async messaging)
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: pintuotuo_kafka
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://127.0.0.1:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-    ports:
-      - "9092:9092"
-      - "29092:29092"
-    depends_on:
-      - zookeeper
-    healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - pintuotuo_network
-
-  # Zookeeper (required by Kafka)
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    container_name: pintuotuo_zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: pintuotuo-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
     volumes:
-      - zookeeper_data:/var/lib/zookeeper/data
-    networks:
-      - pintuotuo_network
-
-  # Elasticsearch (for logging/analytics - optional, can be added later)
-  # elasticsearch:
-  #   image: docker.elastic.co/elasticsearch/elasticsearch:8.5.0
-  #   container_name: pintuotuo_elasticsearch
-  #   environment:
-  #     - discovery.type=single-node
-  #     - xpack.security.enabled=false
-  #   ports:
-  #     - "9200:9200"
-  #   volumes:
-  #     - elasticsearch_data:/usr/share/elasticsearch/data
-  #   networks:
-  #     - pintuotuo_network
-
-  # Mock API Server (JSON Server for frontend development)
-  mock_api:
-    image: node:18-alpine
-    container_name: pintuotuo_mock_api
-    working_dir: /app
-    volumes:
-      - ./services/mock-api:/app
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
     ports:
-      - "3001:3001"
-    environment:
-      PORT: 3001
-    command: sh -c "npm install && npm start"
-    depends_on:
-      - postgres
+      - "9090:9090"
     networks:
-      - pintuotuo_network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/api/products"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - pintuotuo-network
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: pintuotuo-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - pintuotuo-network
+
+networks:
+  pintuotuo-network:
+    driver: bridge
 
 volumes:
   postgres_data:
-    driver: local
   redis_data:
-    driver: local
-  zookeeper_data:
-    driver: local
-  # elasticsearch_data:
-  #   driver: local
-
-networks:
-  pintuotuo_network:
-    driver: bridge
+  prometheus_data:
+  grafana_data:

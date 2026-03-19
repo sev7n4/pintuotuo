@@ -33,7 +33,8 @@
       "@stores/*": ["src/stores/*"],
       "@hooks/*": ["src/hooks/*"],
       "@types/*": ["src/types/*"],
-      "@utils/*": ["src/utils/*"]
+      "@utils/*": ["src/utils/*"],
+      "@layouts/*": ["src/layouts/*"]
     }
   },
   "include": ["src"],

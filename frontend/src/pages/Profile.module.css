@@ -1,0 +1,155 @@
+.profile {
+  padding: 0;
+}
+
+.pageTitle {
+  margin-bottom: 24px !important;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.avatarCard {
+  height: 100%;
+}
+
+.avatarSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0;
+}
+
+.avatar {
+  margin-bottom: 16px;
+  background: #1890ff;
+}
+
+.userName {
+  margin: 0 0 8px 0 !important;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.levelSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: #f6ffed;
+  border-radius: 20px;
+}
+
+.levelIcon {
+  color: #faad14;
+  font-size: 16px;
+}
+
+.levelName {
+  color: #52c41a;
+  font-weight: 500;
+}
+
+.levelBadge {
+  background: #52c41a;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.statsSection {
+  padding: 16px 0;
+}
+
+.infoCard {
+  min-height: 400px;
+}
+
+.form {
+  max-width: 500px;
+}
+
+.infoSection {
+  padding: 16px 0;
+}
+
+.infoHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.infoHeader h3 {
+  margin: 0 !important;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.securitySection {
+  padding: 16px 0;
+}
+
+.securityItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.securityInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.securityIcon {
+  font-size: 24px;
+  color: #1890ff;
+}
+
+.securityInfo h4 {
+  margin: 0 0 4px 0 !important;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.securityDesc {
+  margin: 0 !important;
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .pageTitle {
+    font-size: 18px;
+  }
+
+  .avatarSection {
+    padding: 16px 0;
+  }
+
+  .avatar {
+    width: 80px !important;
+    height: 80px !important;
+    line-height: 80px !important;
+  }
+
+  .userName {
+    font-size: 16px;
+  }
+
+  .levelSection {
+    padding: 6px 12px;
+  }
+
+  .securityItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
