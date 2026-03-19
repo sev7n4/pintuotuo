@@ -11,11 +11,11 @@ import (
 )
 
 type HealthResponse struct {
-	Status    string            `json:"status"`
-	Timestamp string            `json:"timestamp"`
-	Version   string            `json:"version"`
+	Status    string             `json:"status"`
+	Timestamp string             `json:"timestamp"`
+	Version   string             `json:"version"`
 	Services  map[string]Service `json:"services"`
-	System    SystemInfo        `json:"system"`
+	System    SystemInfo         `json:"system"`
 }
 
 type Service struct {

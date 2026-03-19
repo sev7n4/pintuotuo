@@ -79,9 +79,9 @@ func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, from string, to 
 	}
 	defer conn.Close()
 
-	client, err := smtp.NewClient(conn, s.config.SMTPHost)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
+	client, err2 := smtp.NewClient(conn, s.config.SMTPHost)
+	if err2 != nil {
+		return fmt.Errorf("failed to create client: %w", err2)
 	}
 	defer client.Close()
 
@@ -99,14 +99,14 @@ func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, from string, to 
 		}
 	}
 
-	w, err := client.Data()
-	if err != nil {
-		return fmt.Errorf("failed to get data writer: %w", err)
+	w, err3 := client.Data()
+	if err3 != nil {
+		return fmt.Errorf("failed to get data writer: %w", err3)
 	}
 
-	_, err = w.Write(msg)
-	if err != nil {
-		return fmt.Errorf("failed to write message: %w", err)
+	_, err4 := w.Write(msg)
+	if err4 != nil {
+		return fmt.Errorf("failed to write message: %w", err4)
 	}
 
 	if err := w.Close(); err != nil {

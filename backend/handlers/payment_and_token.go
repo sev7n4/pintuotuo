@@ -15,6 +15,8 @@ import (
 
 const PaymentStatusSuccess = "success"
 
+const paymentStatusPending = "pending"
+
 // InitiatePayment initiates a payment for an order
 func InitiatePayment(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -51,7 +53,7 @@ func InitiatePayment(c *gin.Context) {
 		return
 	}
 
-	if order.Status != "pending" {
+	if order.Status != paymentStatusPending {
 		middleware.RespondWithError(c, apperrors.ErrOrderAlreadyPaid)
 		return
 	}
@@ -59,7 +61,7 @@ func InitiatePayment(c *gin.Context) {
 	var payment models.Payment
 	err = db.QueryRow(
 		"INSERT INTO payments (order_id, user_id, amount, pay_method, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, order_id, amount, pay_method, status, created_at, updated_at",
-		req.OrderID, userID, order.TotalPrice, req.Method, "pending",
+		req.OrderID, userID, order.TotalPrice, req.Method, paymentStatusPending,
 	).Scan(&payment.ID, &payment.OrderID, &payment.Amount, &payment.PayMethod, &payment.Status, &payment.CreatedAt, &payment.UpdatedAt)
 
 	if err != nil {

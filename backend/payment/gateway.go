@@ -16,13 +16,15 @@ import (
 	"time"
 )
 
+const resultSuccess = "SUCCESS"
+
 type AlipayConfig struct {
-	AppID        string
-	PrivateKey   *rsa.PrivateKey
+	AppID           string
+	PrivateKey      *rsa.PrivateKey
 	AlipayPublicKey *rsa.PublicKey
-	NotifyURL    string
-	ReturnURL    string
-	Sandbox      bool
+	NotifyURL       string
+	ReturnURL       string
+	Sandbox         bool
 }
 
 type AlipayClient struct {
@@ -53,16 +55,16 @@ type AlipayTradePayResponse struct {
 
 func (c *AlipayClient) CreateTradePagePay(req *AlipayTradePayRequest) (string, error) {
 	params := map[string]string{
-		"app_id":        c.config.AppID,
-		"method":        "alipay.trade.page.pay",
-		"format":        "JSON",
-		"return_url":    c.config.ReturnURL,
-		"notify_url":    c.config.NotifyURL,
-		"charset":       "utf-8",
-		"sign_type":     "RSA2",
-		"timestamp":     time.Now().Format("2006-01-02 15:04:05"),
-		"version":       "1.0",
-		"biz_content":   fmt.Sprintf(`{"out_trade_no":"%s","total_amount":"%.2f","subject":"%s","product_code":"FAST_INSTANT_TRADE_PAY"}`, req.OutTradeNo, req.TotalAmount, req.Subject),
+		"app_id":      c.config.AppID,
+		"method":      "alipay.trade.page.pay",
+		"format":      "JSON",
+		"return_url":  c.config.ReturnURL,
+		"notify_url":  c.config.NotifyURL,
+		"charset":     "utf-8",
+		"sign_type":   "RSA2",
+		"timestamp":   time.Now().Format("2006-01-02 15:04:05"),
+		"version":     "1.0",
+		"biz_content": fmt.Sprintf(`{"out_trade_no":"%s","total_amount":"%.2f","subject":"%s","product_code":"FAST_INSTANT_TRADE_PAY"}`, req.OutTradeNo, req.TotalAmount, req.Subject),
 	}
 
 	sign, err := c.sign(params)
@@ -135,13 +137,13 @@ func (c *AlipayClient) sign(params map[string]string) (string, error) {
 }
 
 type WechatPayConfig struct {
-	AppID      string
-	MchID      string
-	APIKey     string
-	NotifyURL  string
-	CertPath   string
-	KeyPath    string
-	Sandbox    bool
+	AppID     string
+	MchID     string
+	APIKey    string
+	NotifyURL string
+	CertPath  string
+	KeyPath   string
+	Sandbox   bool
 }
 
 type WechatPayClient struct {
@@ -157,9 +159,9 @@ func NewWechatPayClient(config *WechatPayConfig) *WechatPayClient {
 }
 
 type WechatNativePayRequest struct {
-	OutTradeNo string  `json:"out_trade_no"`
-	TotalFee   int     `json:"total_fee"`
-	Body       string  `json:"body"`
+	OutTradeNo string `json:"out_trade_no"`
+	TotalFee   int    `json:"total_fee"`
+	Body       string `json:"body"`
 }
 
 type WechatNativePayResponse struct {
@@ -201,10 +203,10 @@ func (c *WechatPayClient) CreateNativePay(req *WechatNativePayRequest) (*WechatN
 	}
 
 	result := parseXMLToMap(string(body))
-	if result["return_code"] != "SUCCESS" {
+	if result["return_code"] != resultSuccess {
 		return nil, fmt.Errorf("wechat pay error: %s", result["return_msg"])
 	}
-	if result["result_code"] != "SUCCESS" {
+	if result["result_code"] != resultSuccess {
 		return nil, fmt.Errorf("wechat pay business error: %s", result["err_code_des"])
 	}
 
@@ -216,7 +218,7 @@ func (c *WechatPayClient) CreateNativePay(req *WechatNativePayRequest) (*WechatN
 func (c *WechatPayClient) VerifyNotification(xmlData string) (map[string]string, error) {
 	params := parseXMLToMap(xmlData)
 
-	if params["return_code"] != "SUCCESS" {
+	if params["return_code"] != resultSuccess {
 		return nil, fmt.Errorf("return code is not success")
 	}
 
@@ -281,8 +283,8 @@ func xmlToJSON(xmlStr string) string {
 }
 
 type PaymentService struct {
-	alipay  *AlipayClient
-	wechat  *WechatPayClient
+	alipay *AlipayClient
+	wechat *WechatPayClient
 }
 
 func NewPaymentService(alipayConfig *AlipayConfig, wechatConfig *WechatPayConfig) *PaymentService {

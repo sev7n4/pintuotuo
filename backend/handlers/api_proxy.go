@@ -43,13 +43,13 @@ type ChatMessage struct {
 }
 
 type APIProxyResponse struct {
-	ID      string                 `json:"id"`
-	Object  string                 `json:"object"`
-	Created int64                  `json:"created"`
-	Model   string                 `json:"model"`
-	Choices []APIChoice            `json:"choices"`
-	Usage   APIUsage               `json:"usage"`
-	Error   *APIError              `json:"error,omitempty"`
+	ID      string      `json:"id"`
+	Object  string      `json:"object"`
+	Created int64       `json:"created"`
+	Model   string      `json:"model"`
+	Choices []APIChoice `json:"choices"`
+	Usage   APIUsage    `json:"usage"`
+	Error   *APIError   `json:"error,omitempty"`
 }
 
 type APIChoice struct {
@@ -329,7 +329,7 @@ func calculateTokenCost(provider, model string, inputTokens, outputTokens int) f
 func GetAPIProviders(c *gin.Context) {
 	providers := []map[string]interface{}{
 		{
-			"name":        "openai",
+			"name":         "openai",
 			"display_name": "OpenAI",
 			"models": []string{
 				"gpt-4-turbo-preview",
@@ -338,7 +338,7 @@ func GetAPIProviders(c *gin.Context) {
 			},
 		},
 		{
-			"name":        "anthropic",
+			"name":         "anthropic",
 			"display_name": "Anthropic",
 			"models": []string{
 				"claude-3-opus-20240229",
@@ -347,7 +347,7 @@ func GetAPIProviders(c *gin.Context) {
 			},
 		},
 		{
-			"name":        "google",
+			"name":         "google",
 			"display_name": "Google AI",
 			"models": []string{
 				"gemini-pro",
@@ -378,10 +378,10 @@ func GetAPIUsageStats(c *gin.Context) {
 	}
 
 	var stats struct {
-		TotalRequests  int     `json:"total_requests"`
-		TotalTokens    int     `json:"total_tokens"`
-		TotalCost      float64 `json:"total_cost"`
-		AvgLatencyMs   int     `json:"avg_latency_ms"`
+		TotalRequests int     `json:"total_requests"`
+		TotalTokens   int     `json:"total_tokens"`
+		TotalCost     float64 `json:"total_cost"`
+		AvgLatencyMs  int     `json:"avg_latency_ms"`
 	}
 
 	db.QueryRow(
