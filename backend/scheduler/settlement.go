@@ -9,9 +9,9 @@ import (
 )
 
 type SettlementScheduler struct {
-	interval    time.Duration
-	stopChan    chan struct{}
-	isRunning   bool
+	interval  time.Duration
+	stopChan  chan struct{}
+	isRunning bool
 }
 
 func NewSettlementScheduler(interval time.Duration) *SettlementScheduler {
@@ -122,8 +122,8 @@ func (s *SettlementScheduler) processSettlement(db *sql.DB, settlementID, mercha
 		return
 	}
 
-	if err := tx.Commit(); err != nil {
-		log.Printf("Settlement scheduler: failed to commit transaction for settlement %d: %v", settlementID, err)
+	if commitErr := tx.Commit(); commitErr != nil {
+		log.Printf("Settlement scheduler: failed to commit transaction for settlement %d: %v", settlementID, commitErr)
 		return
 	}
 

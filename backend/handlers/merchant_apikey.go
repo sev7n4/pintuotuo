@@ -31,11 +31,11 @@ func CreateMerchantAPIKey(c *gin.Context) {
 	}
 
 	var req struct {
-		Name        string  `json:"name" binding:"required"`
-		Provider    string  `json:"provider" binding:"required"`
-		APIKey      string  `json:"api_key" binding:"required"`
-		APISecret   string  `json:"api_secret"`
-		QuotaLimit  float64 `json:"quota_limit"`
+		Name       string  `json:"name" binding:"required"`
+		Provider   string  `json:"provider" binding:"required"`
+		APIKey     string  `json:"api_key" binding:"required"`
+		APISecret  string  `json:"api_secret"`
+		QuotaLimit float64 `json:"quota_limit"`
 	}
 
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
@@ -377,11 +377,11 @@ func GetMerchantAPIKeyUsage(c *gin.Context) {
 	defer rows.Close()
 
 	type UsageInfo struct {
-		ID             int     `json:"id"`
-		Name           string  `json:"name"`
-		Provider       string  `json:"provider"`
-		QuotaLimit     float64 `json:"quota_limit"`
-		QuotaUsed      float64 `json:"quota_used"`
+		ID              int     `json:"id"`
+		Name            string  `json:"name"`
+		Provider        string  `json:"provider"`
+		QuotaLimit      float64 `json:"quota_limit"`
+		QuotaUsed       float64 `json:"quota_used"`
 		UsagePercentage float64 `json:"usage_percentage"`
 	}
 

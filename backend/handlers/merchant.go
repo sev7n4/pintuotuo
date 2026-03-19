@@ -63,8 +63,8 @@ func RegisterMerchant(c *gin.Context) {
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending') 
 		 RETURNING id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, created_at, updated_at`,
 		userIDInt, req.CompanyName, req.BusinessLicense, req.ContactName, req.ContactPhone, req.ContactEmail, req.Address, req.Description,
-	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense, &merchant.ContactName, 
-		&merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address, &merchant.Description, &merchant.Status, 
+	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense, &merchant.ContactName,
+		&merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address, &merchant.Description, &merchant.Status,
 		&merchant.CreatedAt, &merchant.UpdatedAt)
 
 	if err != nil {
@@ -169,13 +169,13 @@ func UpdateMerchantProfile(c *gin.Context) {
 	}
 
 	var req struct {
-		CompanyName string `json:"company_name"`
-		ContactName string `json:"contact_name"`
+		CompanyName  string `json:"company_name"`
+		ContactName  string `json:"contact_name"`
 		ContactPhone string `json:"contact_phone"`
 		ContactEmail string `json:"contact_email"`
-		Address     string `json:"address"`
-		Description string `json:"description"`
-		LogoURL     string `json:"logo_url"`
+		Address      string `json:"address"`
+		Description  string `json:"description"`
+		LogoURL      string `json:"logo_url"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {

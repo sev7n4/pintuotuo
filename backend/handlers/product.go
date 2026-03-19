@@ -457,7 +457,7 @@ func GetHotProducts(c *gin.Context) {
 	var products []models.Product
 	for rows.Next() {
 		var p models.Product
-		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice, 
+		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
 			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -520,7 +520,7 @@ func GetNewProducts(c *gin.Context) {
 	var products []models.Product
 	for rows.Next() {
 		var p models.Product
-		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice, 
+		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
 			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -634,7 +634,7 @@ func GetHomeData(c *gin.Context) {
 	var hotProducts []models.Product
 	for hotRows.Next() {
 		var p models.Product
-		err := hotRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice, 
+		err := hotRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
 			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -659,7 +659,7 @@ func GetHomeData(c *gin.Context) {
 	var newProducts []models.Product
 	for newRows.Next() {
 		var p models.Product
-		err := newRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice, 
+		err := newRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
 			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -704,9 +704,9 @@ func GetHomeData(c *gin.Context) {
 	}
 
 	homeData := map[string]interface{}{
-		"banners":   banners,
-		"hot":       hotProducts,
-		"new":       newProducts,
+		"banners":    banners,
+		"hot":        hotProducts,
+		"new":        newProducts,
 		"categories": categories,
 	}
 
