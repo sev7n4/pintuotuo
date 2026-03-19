@@ -1,0 +1,150 @@
+name: E2E Tests
+
+on:
+  workflow_run:
+    workflows: ["Integration Tests"]
+    types:
+      - completed
+    branches: [main, master, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Test environment'
+        required: false
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  GO_VERSION: '1.21'
+  NODE_VERSION: '18'
+
+jobs:
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: pintuotuo
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: pintuotuo_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: go mod download
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm install
+
+      - name: Install Playwright browsers
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Run database migrations
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
+        run: |
+          for f in migrations/*.sql; do
+            echo "Running migration: $f"
+            psql "$DATABASE_URL" -f "$f" || echo "Migration $f completed with warnings"
+          done
+
+      - name: Start backend server
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
+          REDIS_URL: localhost:6379
+          JWT_SECRET: test-jwt-secret-for-e2e
+          ENCRYPTION_KEY: test-encryption-key-32-characters
+          GIN_MODE: test
+        run: |
+          go run main.go &
+          sleep 5
+
+      - name: Start frontend preview server
+        working-directory: ./frontend
+        run: |
+          npx serve -s dist -l 5173 &
+          sleep 3
+
+      - name: Run E2E tests
+        working-directory: ./frontend
+        run: npm run test:e2e
+        continue-on-error: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Upload test screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-screenshots
+          path: frontend/test-results/
+          retention-days: 7
+
+  notify:
+    name: Notify Status
+    runs-on: ubuntu-latest
+    needs: [e2e-tests]
+    if: always()
+
+    steps:
+      - name: Check job status
+        run: |
+          echo "## E2E Tests Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY

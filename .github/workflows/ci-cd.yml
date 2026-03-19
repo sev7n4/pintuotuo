@@ -16,34 +16,9 @@ env:
   NODE_VERSION: '18'
 
 jobs:
-  backend-tests:
-    name: Backend Tests
+  backend-unit-tests:
+    name: Backend Unit Tests
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: pintuotuo
-          POSTGRES_PASSWORD: test_password
-          POSTGRES_DB: pintuotuo_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
 
     steps:
       - uses: actions/checkout@v4
@@ -68,21 +43,17 @@ jobs:
           args: --timeout=5m
         continue-on-error: true
 
-      - name: Run tests
+      - name: Run unit tests
         working-directory: ./backend
-        env:
-          DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
-          REDIS_URL: localhost:6379
-          GIN_MODE: test
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 || echo "Tests completed with some failures"
+        run: go test -v -short -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 || echo "Tests completed with some failures"
         continue-on-error: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           files: ./backend/coverage.out
-          flags: backend
-          name: backend-coverage
+          flags: backend-unit
+          name: backend-unit-coverage
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -90,7 +61,7 @@ jobs:
         working-directory: ./backend
         run: |
           coverage=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
-          echo "Test coverage: ${coverage}%"
+          echo "Unit test coverage: ${coverage}%"
           echo "Coverage check passed"
 
   frontend-build:
@@ -129,8 +100,8 @@ jobs:
           path: frontend/dist/
           retention-days: 7
 
-  frontend-tests:
-    name: Frontend Tests
+  frontend-unit-tests:
+    name: Frontend Unit Tests
     runs-on: ubuntu-latest
     needs: frontend-build
 
@@ -146,7 +117,7 @@ jobs:
         working-directory: ./frontend
         run: npm install
 
-      - name: Run tests
+      - name: Run unit tests
         working-directory: ./frontend
         run: npm test -- --coverage --watchAll=false --passWithNoTests
         continue-on-error: true
@@ -155,8 +126,8 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           files: ./frontend/coverage/coverage-final.json
-          flags: frontend
-          name: frontend-coverage
+          flags: frontend-unit
+          name: frontend-unit-coverage
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -198,7 +169,7 @@ jobs:
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-build]
+    needs: [backend-unit-tests, frontend-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
@@ -295,7 +266,7 @@ jobs:
   notify:
     name: Notify Status
     runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-build, frontend-tests, security-scan]
+    needs: [backend-unit-tests, frontend-build, frontend-unit-tests, security-scan]
     if: always()
 
     steps:
@@ -305,7 +276,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Backend Tests | ${{ needs.backend-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Unit Tests | ${{ needs.backend-unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Frontend Build | ${{ needs.frontend-build.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend Tests | ${{ needs.frontend-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Unit Tests | ${{ needs.frontend-unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Security Scan | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
