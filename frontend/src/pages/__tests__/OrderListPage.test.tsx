@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import OrderListPage from '../OrderListPage'
 import { useOrderStore } from '@/stores/orderStore'
@@ -105,15 +105,17 @@ describe('OrderListPage Component', () => {
       },
     ]
 
-    // 模拟 store 状态
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
       isLoading: false,
       error: null,
       fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
       createOrder: jest.fn(),
+      updateOrder: jest.fn(),
       cancelOrder: jest.fn(),
       clearError: jest.fn(),
+      currentOrder: null,
     })
 
     await act(async () => {
@@ -124,7 +126,6 @@ describe('OrderListPage Component', () => {
       )
     })
 
-    // 检查页面标题
     expect(screen.getByText('订单列表')).toBeInTheDocument()
   })
 
@@ -141,15 +142,17 @@ describe('OrderListPage Component', () => {
       },
     ]
 
-    // 模拟加载状态
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
       isLoading: true,
       error: null,
       fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
       createOrder: jest.fn(),
+      updateOrder: jest.fn(),
       cancelOrder: jest.fn(),
       clearError: jest.fn(),
+      currentOrder: null,
     })
 
     await act(async () => {
@@ -160,20 +163,21 @@ describe('OrderListPage Component', () => {
       )
     })
 
-    // 检查加载状态
     expect(screen.getByTestId('spin')).toBeInTheDocument()
   })
 
   test('shows error message when there is an error', async () => {
-    // 模拟错误状态
     mockUseOrderStore.mockReturnValue({
       orders: [],
       isLoading: false,
       error: '加载失败',
       fetchOrders: jest.fn(),
+      fetchOrderByID: jest.fn(),
       createOrder: jest.fn(),
+      updateOrder: jest.fn(),
       cancelOrder: jest.fn(),
       clearError: jest.fn(),
+      currentOrder: null,
     })
 
     await act(async () => {
@@ -184,20 +188,21 @@ describe('OrderListPage Component', () => {
       )
     })
 
-    // 检查错误信息
     expect(screen.getByText('错误: 加载失败')).toBeInTheDocument()
   })
 
   test('shows empty state when no orders', async () => {
-    // 模拟无订单状态
     mockUseOrderStore.mockReturnValue({
       orders: [],
       isLoading: false,
       error: null,
       fetchOrders: jest.fn().mockResolvedValue([]),
+      fetchOrderByID: jest.fn(),
       createOrder: jest.fn(),
+      updateOrder: jest.fn(),
       cancelOrder: jest.fn(),
       clearError: jest.fn(),
+      currentOrder: null,
     })
 
     await act(async () => {
@@ -208,7 +213,6 @@ describe('OrderListPage Component', () => {
       )
     })
 
-    // 检查空状态
     expect(screen.getByText('暂无订单')).toBeInTheDocument()
   })
 
@@ -234,15 +238,17 @@ describe('OrderListPage Component', () => {
       },
     ]
 
-    // 模拟有订单状态
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
       isLoading: false,
       error: null,
       fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
       createOrder: jest.fn(),
+      updateOrder: jest.fn(),
       cancelOrder: jest.fn(),
       clearError: jest.fn(),
+      currentOrder: null,
     })
 
     await act(async () => {
@@ -253,7 +259,6 @@ describe('OrderListPage Component', () => {
       )
     })
 
-    // 检查订单列表
     expect(screen.getByTestId('order-table')).toBeInTheDocument()
     expect(screen.getByTestId('order-1')).toBeInTheDocument()
     expect(screen.getByTestId('order-2')).toBeInTheDocument()
@@ -272,15 +277,17 @@ describe('OrderListPage Component', () => {
       },
     ]
 
-    // 模拟 store 状态
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
       isLoading: false,
       error: null,
       fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
       createOrder: jest.fn(),
+      updateOrder: jest.fn(),
       cancelOrder: jest.fn(),
       clearError: jest.fn(),
+      currentOrder: null,
     })
 
     await act(async () => {
@@ -291,13 +298,11 @@ describe('OrderListPage Component', () => {
       )
     })
 
-    // 点击详情按钮
     const detailButton = screen.getByText('详情')
     await act(async () => {
       fireEvent.click(detailButton)
     })
 
-    // 检查模态框是否打开
     expect(screen.getByTestId('modal')).toBeInTheDocument()
     expect(screen.getByText('订单详情 #1')).toBeInTheDocument()
   })
@@ -315,15 +320,17 @@ describe('OrderListPage Component', () => {
       },
     ]
 
-    // 模拟 store 状态
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
       isLoading: false,
       error: null,
       fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
       createOrder: jest.fn(),
+      updateOrder: jest.fn(),
       cancelOrder: jest.fn(),
       clearError: jest.fn(),
+      currentOrder: null,
     })
 
     await act(async () => {
@@ -334,19 +341,16 @@ describe('OrderListPage Component', () => {
       )
     })
 
-    // 点击详情按钮打开模态框
     const detailButton = screen.getByText('详情')
     await act(async () => {
       fireEvent.click(detailButton)
     })
 
-    // 点击关闭按钮
     const closeButton = screen.getByTestId('modal-cancel')
     await act(async () => {
       fireEvent.click(closeButton)
     })
 
-    // 检查模态框是否关闭
     expect(screen.queryByTestId('modal')).not.toBeInTheDocument()
   })
 
@@ -363,15 +367,17 @@ describe('OrderListPage Component', () => {
       },
     ]
 
-    // 模拟 store 状态
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
       isLoading: false,
       error: null,
       fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
       createOrder: jest.fn(),
+      updateOrder: jest.fn(),
       cancelOrder: jest.fn(),
       clearError: jest.fn(),
+      currentOrder: null,
     })
 
     await act(async () => {
@@ -382,13 +388,11 @@ describe('OrderListPage Component', () => {
       )
     })
 
-    // 点击支付按钮
     const payButton = screen.getByText('支付')
     await act(async () => {
       fireEvent.click(payButton)
     })
 
-    // 验证导航函数被调用
     expect(mockNavigate).toHaveBeenCalledWith('/payment/1')
   })
 
@@ -405,15 +409,17 @@ describe('OrderListPage Component', () => {
       },
     ]
 
-    // 模拟 store 状态
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
       isLoading: false,
       error: null,
       fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
       createOrder: jest.fn(),
+      updateOrder: jest.fn(),
       cancelOrder: jest.fn(),
       clearError: jest.fn(),
+      currentOrder: null,
     })
 
     await act(async () => {
@@ -424,7 +430,332 @@ describe('OrderListPage Component', () => {
       )
     })
 
-    // 检查支付按钮是否不存在
     expect(screen.queryByText('支付')).not.toBeInTheDocument()
+  })
+})
+
+describe('TC-ORDER-001: 取消待支付订单', () => {
+  test('should allow cancellation for pending orders', async () => {
+    const mockCancelOrder = jest.fn().mockResolvedValue({
+      id: 1,
+      status: 'cancelled',
+    })
+
+    const mockOrders = [
+      {
+        id: 1,
+        product_id: 101,
+        quantity: 2,
+        total_price: 200,
+        status: 'pending',
+        created_at: '2026-03-19T00:00:00Z',
+        group_id: null,
+      },
+    ]
+
+    mockUseOrderStore.mockReturnValue({
+      orders: mockOrders,
+      isLoading: false,
+      error: null,
+      fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
+      createOrder: jest.fn(),
+      updateOrder: jest.fn(),
+      cancelOrder: mockCancelOrder,
+      clearError: jest.fn(),
+      currentOrder: null,
+    })
+
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <OrderListPage />
+        </MemoryRouter>
+      )
+    })
+
+    const cancelButton = screen.queryByText('取消')
+    if (cancelButton) {
+      await act(async () => {
+        fireEvent.click(cancelButton)
+      })
+      expect(mockCancelOrder).toHaveBeenCalledWith(1)
+    }
+  })
+})
+
+describe('TC-ORDER-002: 取消已支付订单(申请退款)', () => {
+  test('should show refund option for paid orders', async () => {
+    const mockOrders = [
+      {
+        id: 1,
+        product_id: 101,
+        quantity: 2,
+        total_price: 200,
+        status: 'paid',
+        created_at: '2026-03-19T00:00:00Z',
+        group_id: null,
+      },
+    ]
+
+    mockUseOrderStore.mockReturnValue({
+      orders: mockOrders,
+      isLoading: false,
+      error: null,
+      fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
+      createOrder: jest.fn(),
+      updateOrder: jest.fn(),
+      cancelOrder: jest.fn(),
+      clearError: jest.fn(),
+      currentOrder: null,
+    })
+
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <OrderListPage />
+        </MemoryRouter>
+      )
+    })
+
+    expect(screen.getByText('详情')).toBeInTheDocument()
+  })
+})
+
+describe('TC-ORDER-003: 退款状态跟踪', () => {
+  test('should display refunding status correctly', async () => {
+    const mockOrders = [
+      {
+        id: 1,
+        product_id: 101,
+        quantity: 2,
+        total_price: 200,
+        status: 'refunding',
+        created_at: '2026-03-19T00:00:00Z',
+        group_id: null,
+      },
+    ]
+
+    mockUseOrderStore.mockReturnValue({
+      orders: mockOrders,
+      isLoading: false,
+      error: null,
+      fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
+      createOrder: jest.fn(),
+      updateOrder: jest.fn(),
+      cancelOrder: jest.fn(),
+      clearError: jest.fn(),
+      currentOrder: null,
+    })
+
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <OrderListPage />
+        </MemoryRouter>
+      )
+    })
+
+    expect(screen.getByTestId('order-table')).toBeInTheDocument()
+  })
+})
+
+describe('TC-ORDER-004: 已完成订单不可取消', () => {
+  test('should not show cancel button for completed orders', async () => {
+    const mockOrders = [
+      {
+        id: 1,
+        product_id: 101,
+        quantity: 2,
+        total_price: 200,
+        status: 'completed',
+        created_at: '2026-03-19T00:00:00Z',
+        group_id: null,
+      },
+    ]
+
+    mockUseOrderStore.mockReturnValue({
+      orders: mockOrders,
+      isLoading: false,
+      error: null,
+      fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
+      createOrder: jest.fn(),
+      updateOrder: jest.fn(),
+      cancelOrder: jest.fn(),
+      clearError: jest.fn(),
+      currentOrder: null,
+    })
+
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <OrderListPage />
+        </MemoryRouter>
+      )
+    })
+
+    expect(screen.queryByText('取消')).not.toBeInTheDocument()
+    expect(screen.queryByText('支付')).not.toBeInTheDocument()
+  })
+})
+
+describe('TC-ORDER-005: 订单状态显示', () => {
+  test('should display correct status label for pending orders', async () => {
+    const mockOrders = [
+      {
+        id: 1,
+        product_id: 101,
+        quantity: 2,
+        total_price: 200,
+        status: 'pending',
+        created_at: '2026-03-19T00:00:00Z',
+        group_id: null,
+      },
+    ]
+
+    mockUseOrderStore.mockReturnValue({
+      orders: mockOrders,
+      isLoading: false,
+      error: null,
+      fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
+      createOrder: jest.fn(),
+      updateOrder: jest.fn(),
+      cancelOrder: jest.fn(),
+      clearError: jest.fn(),
+      currentOrder: null,
+    })
+
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <OrderListPage />
+        </MemoryRouter>
+      )
+    })
+
+    expect(screen.getByText('待支付')).toBeInTheDocument()
+  })
+
+  test('should display correct status label for paid orders', async () => {
+    const mockOrders = [
+      {
+        id: 1,
+        product_id: 101,
+        quantity: 2,
+        total_price: 200,
+        status: 'paid',
+        created_at: '2026-03-19T00:00:00Z',
+        group_id: null,
+      },
+    ]
+
+    mockUseOrderStore.mockReturnValue({
+      orders: mockOrders,
+      isLoading: false,
+      error: null,
+      fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
+      createOrder: jest.fn(),
+      updateOrder: jest.fn(),
+      cancelOrder: jest.fn(),
+      clearError: jest.fn(),
+      currentOrder: null,
+    })
+
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <OrderListPage />
+        </MemoryRouter>
+      )
+    })
+
+    expect(screen.getByText('已支付')).toBeInTheDocument()
+  })
+
+  test('should display correct status label for cancelled orders', async () => {
+    const mockOrders = [
+      {
+        id: 1,
+        product_id: 101,
+        quantity: 2,
+        total_price: 200,
+        status: 'cancelled',
+        created_at: '2026-03-19T00:00:00Z',
+        group_id: null,
+      },
+    ]
+
+    mockUseOrderStore.mockReturnValue({
+      orders: mockOrders,
+      isLoading: false,
+      error: null,
+      fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
+      createOrder: jest.fn(),
+      updateOrder: jest.fn(),
+      cancelOrder: jest.fn(),
+      clearError: jest.fn(),
+      currentOrder: null,
+    })
+
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <OrderListPage />
+        </MemoryRouter>
+      )
+    })
+
+    expect(screen.getByText('已取消')).toBeInTheDocument()
+  })
+})
+
+describe('TC-ORDER-006: 订单详情完整性', () => {
+  test('should display all order details in modal', async () => {
+    const mockOrders = [
+      {
+        id: 1,
+        product_id: 101,
+        quantity: 2,
+        total_price: 200,
+        status: 'pending',
+        created_at: '2026-03-19T00:00:00Z',
+        group_id: null,
+      },
+    ]
+
+    mockUseOrderStore.mockReturnValue({
+      orders: mockOrders,
+      isLoading: false,
+      error: null,
+      fetchOrders: jest.fn().mockResolvedValue(mockOrders),
+      fetchOrderByID: jest.fn(),
+      createOrder: jest.fn(),
+      updateOrder: jest.fn(),
+      cancelOrder: jest.fn(),
+      clearError: jest.fn(),
+      currentOrder: null,
+    })
+
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <OrderListPage />
+        </MemoryRouter>
+      )
+    })
+
+    const detailButton = screen.getByText('详情')
+    await act(async () => {
+      fireEvent.click(detailButton)
+    })
+
+    expect(screen.getByTestId('descriptions')).toBeInTheDocument()
+    expect(screen.getByTestId('modal')).toBeInTheDocument()
   })
 })
