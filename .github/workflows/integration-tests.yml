@@ -5,6 +5,9 @@ on:
     workflows: ["CI/CD Pipeline"]
     types:
       - completed
+  pull_request:
+    branches: [main, master, develop]
+  push:
     branches: [main, master, develop]
   workflow_dispatch:
 
