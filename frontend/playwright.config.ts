@@ -1,7 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
-
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -21,7 +19,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: isCI ? undefined : {
+  webServer: process.env.CI ? undefined : {
     command: 'npm run dev',
     url: 'http://localhost:5173',
     reuseExistingServer: false,

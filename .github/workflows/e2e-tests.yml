@@ -121,6 +121,8 @@ jobs:
 
       - name: Run E2E tests
         working-directory: ./frontend
+        env:
+          CI: true
         run: npm run test:e2e
         continue-on-error: true
 
