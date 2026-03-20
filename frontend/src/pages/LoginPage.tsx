@@ -1,5 +1,5 @@
 import React from 'react'
-import { Form, Input, Button, Card, message } from 'antd'
+import { Form, Input, Button, Card, message, Checkbox } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@stores/authStore'
 
@@ -8,9 +8,9 @@ export const LoginPage: React.FC = () => {
   const { login, isLoading, error } = useAuthStore()
   const [form] = Form.useForm()
 
-  const onFinish = async (values: { email: string; password: string }) => {
+  const onFinish = async (values: { email: string; password: string; rememberMe?: boolean }) => {
     try {
-      await login(values.email, values.password)
+      await login(values.email, values.password, values.rememberMe || false)
       message.success('登录成功')
       const role = useAuthStore.getState().user?.role
       if (role === 'admin') {
@@ -33,6 +33,7 @@ export const LoginPage: React.FC = () => {
           layout="vertical"
           onFinish={onFinish}
           autoComplete="off"
+          initialValues={{ rememberMe: true }}
         >
           <Form.Item
             label="邮箱"
@@ -51,6 +52,10 @@ export const LoginPage: React.FC = () => {
             rules={[{ required: true, message: '请输入密码' }]}
           >
             <Input.Password placeholder="输入密码" />
+          </Form.Item>
+
+          <Form.Item name="rememberMe" valuePropName="checked">
+            <Checkbox>记住我</Checkbox>
           </Form.Item>
 
           <Form.Item>

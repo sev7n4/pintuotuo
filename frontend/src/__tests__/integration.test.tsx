@@ -76,13 +76,16 @@ describe('Integration Tests', () => {
       stats: null,
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -108,7 +111,7 @@ describe('Integration Tests', () => {
 
     // 初始未认证状态，登录后切换到认证状态
     let isAuthenticated = false
-    mockUseAuthStore.mockImplementation(() => ({
+    const mockStore = {
       user: isAuthenticated ? { id: 1, email: 'user@example.com', role: 'user' } : null,
       token: isAuthenticated ? 'test-token' : null,
       isLoading: false,
@@ -124,20 +127,41 @@ describe('Integration Tests', () => {
       fetchUser: mockFetchUser,
       setUser: jest.fn(),
       clearError: jest.fn(),
+    }
+    
+    mockUseAuthStore.mockImplementation(() => mockStore)
+    
+    mockUseAuthStore.getState = jest.fn(() => ({
+      user: { id: 1, email: 'user@example.com', name: 'Test User', role: 'user', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+      token: 'test-token',
+      isLoading: false,
+      error: null,
+      isAuthenticated: true,
+      rememberMe: false,
+      login: jest.fn(),
+      register: jest.fn(),
+      logout: jest.fn(),
+      fetchUser: mockFetchUser,
+      setUser: jest.fn(),
+      clearError: jest.fn(),
+      setRememberMe: jest.fn(),
     }))
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -193,13 +217,16 @@ describe('Integration Tests', () => {
       stats: null,
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: mockBindReferralCode,
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -253,16 +280,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -328,16 +358,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: 'Invalid referral code',
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: mockBindReferralCode,
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -381,16 +414,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: mockFetchReferralCode,
       fetchStats: mockFetchStats,
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -433,16 +469,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 5, totalRewards: 50, pendingRewards: 10, paidRewards: 40 },
+      stats: { totalReferrals: 5, totalRewards: 50, pendingRewards: 10, paidRewards: 40, availableRewards: 30 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -481,16 +520,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'SHARE123',
-      stats: { totalReferrals: 0, totalRewards: 0, pendingRewards: 0, paidRewards: 0 },
+      stats: { totalReferrals: 0, totalRewards: 0, pendingRewards: 0, paidRewards: 0, availableRewards: 0 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -536,7 +578,7 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
       referrals: [],
       rewards: [
         {
@@ -552,13 +594,16 @@ describe('Integration Tests', () => {
           created_at: '2024-01-02T00:00:00Z',
         },
       ],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -596,16 +641,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 25, totalRewards: 250, pendingRewards: 50, paidRewards: 200 },
+      stats: { totalReferrals: 25, totalRewards: 250, pendingRewards: 50, paidRewards: 200, availableRewards: 150 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -645,16 +693,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -707,13 +758,16 @@ describe('Integration Tests', () => {
       stats: null,
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: true,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -797,16 +851,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 5, totalRewards: 50, pendingRewards: 10, paidRewards: 40 },
+      stats: { totalReferrals: 5, totalRewards: 50, pendingRewards: 10, paidRewards: 40, availableRewards: 30 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -831,7 +888,7 @@ describe('Integration Tests', () => {
     })
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123')
+      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123', true)
     })
   })
 
@@ -855,13 +912,16 @@ describe('Integration Tests', () => {
       stats: null,
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: 'Network error',
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -896,16 +956,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'DISCOUNT10',
-      stats: { totalReferrals: 15, totalRewards: 150, pendingRewards: 30, paidRewards: 120 },
+      stats: { totalReferrals: 15, totalRewards: 150, pendingRewards: 30, paidRewards: 120, availableRewards: 90 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -971,16 +1034,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'FIRSTCODE',
-      stats: { totalReferrals: 0, totalRewards: 0, pendingRewards: 0, paidRewards: 0 },
+      stats: { totalReferrals: 0, totalRewards: 0, pendingRewards: 0, paidRewards: 0, availableRewards: 0 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: mockBindReferralCode,
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -1037,13 +1103,16 @@ describe('Integration Tests', () => {
       stats: null,
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -1136,16 +1205,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'MERCHANT1',
-      stats: { totalReferrals: 50, totalRewards: 500, pendingRewards: 100, paidRewards: 400 },
+      stats: { totalReferrals: 50, totalRewards: 500, pendingRewards: 100, paidRewards: 400, availableRewards: 300 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -1184,13 +1256,16 @@ describe('Integration Tests', () => {
       stats: null,
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: 'Timeout',
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -1228,16 +1303,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'CONCURRENT',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: mockFetchStats,
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: mockBindReferralCode,
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -1322,16 +1400,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TOKEN123',
-      stats: { totalReferrals: 20, totalRewards: 200, pendingRewards: 40, paidRewards: 160 },
+      stats: { totalReferrals: 20, totalRewards: 200, pendingRewards: 40, paidRewards: 160, availableRewards: 120 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -1420,16 +1501,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'VALIDCODE',
-      stats: { totalReferrals: 0, totalRewards: 0, pendingRewards: 0, paidRewards: 0 },
+      stats: { totalReferrals: 0, totalRewards: 0, pendingRewards: 0, paidRewards: 0, availableRewards: 0 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -1472,16 +1556,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'SYNC123',
-      stats: { totalReferrals: 5, totalRewards: 50, pendingRewards: 10, paidRewards: 40 },
+      stats: { totalReferrals: 5, totalRewards: 50, pendingRewards: 10, paidRewards: 40, availableRewards: 30 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: mockFetchReferralCode,
       fetchStats: mockFetchStats,
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -1532,13 +1619,16 @@ describe('Integration Tests', () => {
       stats: null,
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: 'Failed to load referral data',
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -1573,16 +1663,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'ADMIN001',
-      stats: { totalReferrals: 100, totalRewards: 1000, pendingRewards: 200, paidRewards: 800 },
+      stats: { totalReferrals: 100, totalRewards: 1000, pendingRewards: 200, paidRewards: 800, availableRewards: 600 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -1673,16 +1766,19 @@ describe('Integration Tests', () => {
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'LINKTEST',
-      stats: { totalReferrals: 3, totalRewards: 30, pendingRewards: 6, paidRewards: 24 },
+      stats: { totalReferrals: 3, totalRewards: 30, pendingRewards: 6, paidRewards: 24, availableRewards: 18 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 

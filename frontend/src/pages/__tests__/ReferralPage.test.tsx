@@ -59,16 +59,19 @@ describe('ReferralPage Component', () => {
     // 模拟 store 状态
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -103,16 +106,19 @@ describe('ReferralPage Component', () => {
     // 模拟 store 状态
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 0, paidRewards: 100, availableRewards: 0 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -151,16 +157,19 @@ describe('ReferralPage Component', () => {
     // 模拟 store 状态
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 0, paidRewards: 100, availableRewards: 0 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -219,16 +228,19 @@ describe('ReferralPage Component', () => {
     // 模拟 store 状态
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 0, paidRewards: 100, availableRewards: 0 },
       referrals: mockReferrals,
       rewards: mockRewards,
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -263,16 +275,19 @@ describe('ReferralPage Component', () => {
     // 模拟 store 状态
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100 },
+      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 0, paidRewards: 100, availableRewards: 0 },
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: false,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: mockBindReferralCode,
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -314,6 +329,24 @@ describe('ReferralPage Component', () => {
 
   test('renders correctly when not authenticated', () => {
     // 模拟未认证状态
+    mockUseReferralStore.mockReturnValue({
+      referralCode: '',
+      stats: null,
+      referrals: [],
+      rewards: [],
+      withdrawals: [],
+      isLoading: false,
+      error: null,
+      fetchReferralCode: jest.fn(),
+      fetchStats: jest.fn(),
+      fetchReferrals: jest.fn(),
+      fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
+      bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
+      clearError: jest.fn(),
+    })
+
     mockUseAuthStore.mockReturnValue({
       user: null,
       token: null,
@@ -345,13 +378,16 @@ describe('ReferralPage Component', () => {
       stats: null,
       referrals: [],
       rewards: [],
+      withdrawals: [],
       isLoading: true,
       error: null,
       fetchReferralCode: jest.fn(),
       fetchStats: jest.fn(),
       fetchReferrals: jest.fn(),
       fetchRewards: jest.fn(),
+      fetchWithdrawals: jest.fn(),
       bindReferralCode: jest.fn(),
+      requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
     })
 
@@ -379,5 +415,145 @@ describe('ReferralPage Component', () => {
     expect(screen.getByText('邀请好友')).toBeInTheDocument()
     // 检查是否显示加载状态（通过检查是否存在ant-spin元素）
     expect(document.querySelector('.ant-spin-spinning')).toBeInTheDocument()
+  })
+
+  describe('TC-REF-004: 推荐奖励提现', () => {
+    test('should render withdrawal button when available rewards > 0', () => {
+      mockUseReferralStore.mockReturnValue({
+        referralCode: 'TESTCODE',
+        stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
+        referrals: [],
+        rewards: [],
+        withdrawals: [],
+        isLoading: false,
+        error: null,
+        fetchReferralCode: jest.fn(),
+        fetchStats: jest.fn(),
+        fetchReferrals: jest.fn(),
+        fetchRewards: jest.fn(),
+        fetchWithdrawals: jest.fn(),
+        bindReferralCode: jest.fn(),
+        requestWithdrawal: jest.fn(),
+        clearError: jest.fn(),
+      })
+
+      mockUseAuthStore.mockReturnValue({
+        user: { id: 1, email: 'user@example.com', role: 'user' },
+        token: 'test-token',
+        isLoading: false,
+        error: null,
+        isAuthenticated: true,
+        login: jest.fn(),
+        register: jest.fn(),
+        logout: jest.fn(),
+        fetchUser: jest.fn(),
+        setUser: jest.fn(),
+        clearError: jest.fn(),
+      })
+
+      render(
+        <MemoryRouter>
+          <ReferralPage />
+        </MemoryRouter>
+      )
+
+      expect(screen.getByText('可提现金额')).toBeInTheDocument()
+      expect(screen.getByText('申请提现')).toBeInTheDocument()
+    })
+
+    test('should disable withdrawal button when available rewards <= 0', () => {
+      mockUseReferralStore.mockReturnValue({
+        referralCode: 'TESTCODE',
+        stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 0 },
+        referrals: [],
+        rewards: [],
+        withdrawals: [],
+        isLoading: false,
+        error: null,
+        fetchReferralCode: jest.fn(),
+        fetchStats: jest.fn(),
+        fetchReferrals: jest.fn(),
+        fetchRewards: jest.fn(),
+        fetchWithdrawals: jest.fn(),
+        bindReferralCode: jest.fn(),
+        requestWithdrawal: jest.fn(),
+        clearError: jest.fn(),
+      })
+
+      mockUseAuthStore.mockReturnValue({
+        user: { id: 1, email: 'user@example.com', role: 'user' },
+        token: 'test-token',
+        isLoading: false,
+        error: null,
+        isAuthenticated: true,
+        login: jest.fn(),
+        register: jest.fn(),
+        logout: jest.fn(),
+        fetchUser: jest.fn(),
+        setUser: jest.fn(),
+        clearError: jest.fn(),
+      })
+
+      render(
+        <MemoryRouter>
+          <ReferralPage />
+        </MemoryRouter>
+      )
+
+      const withdrawalButton = screen.getByRole('button', { name: /申请提现/i })
+      expect(withdrawalButton).toBeDisabled()
+    })
+
+    test('should render withdrawal record tab', () => {
+      const mockWithdrawals = [
+        {
+          id: 1,
+          amount: 50,
+          method: 'alipay',
+          status: 'completed',
+          created_at: '2024-01-01T00:00:00Z',
+        },
+      ]
+
+      mockUseReferralStore.mockReturnValue({
+        referralCode: 'TESTCODE',
+        stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
+        referrals: [],
+        rewards: [],
+        withdrawals: mockWithdrawals,
+        isLoading: false,
+        error: null,
+        fetchReferralCode: jest.fn(),
+        fetchStats: jest.fn(),
+        fetchReferrals: jest.fn(),
+        fetchRewards: jest.fn(),
+        fetchWithdrawals: jest.fn(),
+        bindReferralCode: jest.fn(),
+        requestWithdrawal: jest.fn(),
+        clearError: jest.fn(),
+      })
+
+      mockUseAuthStore.mockReturnValue({
+        user: { id: 1, email: 'user@example.com', role: 'user' },
+        token: 'test-token',
+        isLoading: false,
+        error: null,
+        isAuthenticated: true,
+        login: jest.fn(),
+        register: jest.fn(),
+        logout: jest.fn(),
+        fetchUser: jest.fn(),
+        setUser: jest.fn(),
+        clearError: jest.fn(),
+      })
+
+      render(
+        <MemoryRouter>
+          <ReferralPage />
+        </MemoryRouter>
+      )
+
+      expect(screen.getByText('提现记录')).toBeInTheDocument()
+    })
   })
 })

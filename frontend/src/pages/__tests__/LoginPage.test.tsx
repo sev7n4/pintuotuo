@@ -30,12 +30,14 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         isLoading: false,
         error: null,
         isAuthenticated: false,
+        rememberMe: false,
         login: mockLogin,
         register: jest.fn(),
         logout: jest.fn(),
         fetchUser: jest.fn(),
         setUser: jest.fn(),
         clearError: jest.fn(),
+        setRememberMe: jest.fn(),
       })
 
       mockUseAuthStore.getState = jest.fn().mockReturnValue({
@@ -64,7 +66,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       })
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123')
+        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', true)
       })
 
       await waitFor(() => {
@@ -81,12 +83,14 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         isLoading: false,
         error: null,
         isAuthenticated: false,
+        rememberMe: false,
         login: mockLogin,
         register: jest.fn(),
         logout: jest.fn(),
         fetchUser: jest.fn(),
         setUser: jest.fn(),
         clearError: jest.fn(),
+        setRememberMe: jest.fn(),
       })
 
       mockUseAuthStore.getState = jest.fn().mockReturnValue({
@@ -126,12 +130,14 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         isLoading: false,
         error: null,
         isAuthenticated: false,
+        rememberMe: false,
         login: mockLogin,
         register: jest.fn(),
         logout: jest.fn(),
         fetchUser: jest.fn(),
         setUser: jest.fn(),
         clearError: jest.fn(),
+        setRememberMe: jest.fn(),
       })
 
       mockUseAuthStore.getState = jest.fn().mockReturnValue({
@@ -304,7 +310,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       })
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('wrong@example.com', 'wrongpassword')
+        expect(mockLogin).toHaveBeenCalledWith('wrong@example.com', 'wrongpassword', true)
       })
     })
 
@@ -545,7 +551,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       })
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('wrong@example.com', 'wrongpassword')
+        expect(mockLogin).toHaveBeenCalledWith('wrong@example.com', 'wrongpassword', true)
       })
 
       await act(async () => {
@@ -555,7 +561,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       })
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('correct@example.com', 'correctpassword')
+        expect(mockLogin).toHaveBeenCalledWith('correct@example.com', 'correctpassword', true)
       })
     })
   })
@@ -602,8 +608,136 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       })
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123')
+        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', true)
         expect(screen.getByText('Products Page')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('TC-AUTH-008: 记住我功能', () => {
+    test('should render remember me checkbox and be checked by default', () => {
+      const mockLogin = jest.fn()
+
+      mockUseAuthStore.mockReturnValue({
+        user: null,
+        token: null,
+        isLoading: false,
+        error: null,
+        isAuthenticated: false,
+        rememberMe: false,
+        login: mockLogin,
+        register: jest.fn(),
+        logout: jest.fn(),
+        fetchUser: jest.fn(),
+        setUser: jest.fn(),
+        clearError: jest.fn(),
+        setRememberMe: jest.fn(),
+      })
+
+      render(
+        <MemoryRouter>
+          <LoginPage />
+        </MemoryRouter>
+      )
+
+      const checkbox = screen.getByLabelText('记住我')
+      expect(checkbox).toBeInTheDocument()
+      expect(checkbox).toBeChecked()
+    })
+
+    test('should call login with rememberMe parameter', async () => {
+      const mockLogin = jest.fn().mockResolvedValue({ token: 'user-token' })
+
+      mockUseAuthStore.mockReturnValue({
+        user: null,
+        token: null,
+        isLoading: false,
+        error: null,
+        isAuthenticated: false,
+        rememberMe: false,
+        login: mockLogin,
+        register: jest.fn(),
+        logout: jest.fn(),
+        fetchUser: jest.fn(),
+        setUser: jest.fn(),
+        clearError: jest.fn(),
+        setRememberMe: jest.fn(),
+      })
+
+      mockUseAuthStore.getState = jest.fn().mockReturnValue({
+        user: { id: 1, email: 'user@example.com', role: 'user' },
+      })
+
+      render(
+        <MemoryRouter initialEntries={['/login']}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/products" element={<div>Products Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      )
+
+      const emailInput = screen.getByPlaceholderText('example@email.com')
+      const passwordInput = screen.getByPlaceholderText('输入密码')
+      const loginButton = screen.getByText('登 录')
+
+      await act(async () => {
+        fireEvent.change(emailInput, { target: { value: 'user@example.com' } })
+        fireEvent.change(passwordInput, { target: { value: 'password123' } })
+        fireEvent.click(loginButton)
+      })
+
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', true)
+      })
+    })
+
+    test('should call login with rememberMe false when checkbox is unchecked', async () => {
+      const mockLogin = jest.fn().mockResolvedValue({ token: 'user-token' })
+
+      mockUseAuthStore.mockReturnValue({
+        user: null,
+        token: null,
+        isLoading: false,
+        error: null,
+        isAuthenticated: false,
+        rememberMe: false,
+        login: mockLogin,
+        register: jest.fn(),
+        logout: jest.fn(),
+        fetchUser: jest.fn(),
+        setUser: jest.fn(),
+        clearError: jest.fn(),
+        setRememberMe: jest.fn(),
+      })
+
+      mockUseAuthStore.getState = jest.fn().mockReturnValue({
+        user: { id: 1, email: 'user@example.com', role: 'user' },
+      })
+
+      render(
+        <MemoryRouter initialEntries={['/login']}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/products" element={<div>Products Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      )
+
+      const emailInput = screen.getByPlaceholderText('example@email.com')
+      const passwordInput = screen.getByPlaceholderText('输入密码')
+      const checkbox = screen.getByLabelText('记住我')
+      const loginButton = screen.getByText('登 录')
+
+      await act(async () => {
+        fireEvent.click(checkbox)
+        fireEvent.change(emailInput, { target: { value: 'user@example.com' } })
+        fireEvent.change(passwordInput, { target: { value: 'password123' } })
+        fireEvent.click(loginButton)
+      })
+
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', false)
       })
     })
   })

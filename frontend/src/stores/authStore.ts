@@ -14,23 +14,30 @@ interface AuthState {
   isLoading: boolean
   error: string | null
   isAuthenticated: boolean
+  rememberMe: boolean
 
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>
   register: (email: string, name: string, password: string, role?: string) => Promise<void>
   logout: () => Promise<void>
   fetchUser: () => Promise<void>
   setUser: (user: User) => void
   clearError: () => void
+  setRememberMe: (remember: boolean) => void
+}
+
+const getTokenFromStorage = (): string | null => {
+  return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: localStorage.getItem('auth_token'),
+  token: getTokenFromStorage(),
   isLoading: false,
   error: null,
-  isAuthenticated: !!localStorage.getItem('auth_token'),
+  isAuthenticated: !!getTokenFromStorage(),
+  rememberMe: localStorage.getItem('remember_me') === 'true',
 
-  login: async (email, password) => {
+  login: async (email, password, rememberMe = false) => {
     set({ isLoading: true, error: null })
     try {
       const response = await authService.login({ email, password })
@@ -38,8 +45,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       const data = apiResponse.data
       if (data) {
         const { user, token } = data
-        localStorage.setItem('auth_token', token)
-        set({ user, token, isAuthenticated: true, isLoading: false })
+        if (rememberMe) {
+          localStorage.setItem('auth_token', token)
+          localStorage.setItem('remember_me', 'true')
+        } else {
+          sessionStorage.setItem('auth_token', token)
+          localStorage.removeItem('remember_me')
+        }
+        set({ user, token, isAuthenticated: true, isLoading: false, rememberMe })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '登录失败'
@@ -72,12 +85,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       await authService.logout()
     } finally {
       localStorage.removeItem('auth_token')
-      set({ user: null, token: null, isAuthenticated: false, isLoading: false })
+      localStorage.removeItem('remember_me')
+      sessionStorage.removeItem('auth_token')
+      set({ user: null, token: null, isAuthenticated: false, isLoading: false, rememberMe: false })
     }
   },
 
   fetchUser: async () => {
-    if (!localStorage.getItem('auth_token')) return
+    if (!getTokenFromStorage()) return
 
     set({ isLoading: true, error: null })
     try {
@@ -93,4 +108,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   setUser: (user) => set({ user }),
 
   clearError: () => set({ error: null }),
+
+  setRememberMe: (remember) => {
+    if (remember) {
+      localStorage.setItem('remember_me', 'true')
+    } else {
+      localStorage.removeItem('remember_me')
+    }
+    set({ rememberMe: remember })
+  },
 }))

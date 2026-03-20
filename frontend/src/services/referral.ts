@@ -1,5 +1,5 @@
 import api from './api'
-import { ReferralStats, Referral, ReferralReward, APIResponse, PaginatedResponse } from '@/types'
+import { ReferralStats, Referral, ReferralReward, ReferralWithdrawal, ReferralWithdrawalRequest, APIResponse, PaginatedResponse } from '@/types'
 
 export const referralService = {
   getMyReferralCode: () =>
@@ -26,4 +26,12 @@ export const referralService = {
 
   payReferralRewards: (rewardIds: number[]) =>
     api.post<APIResponse<{ message: string }>>('/referrals/rewards/pay', { reward_ids: rewardIds }),
+
+  getWithdrawalHistory: (page?: number, perPage?: number) =>
+    api.get<APIResponse<PaginatedResponse<ReferralWithdrawal>>>('/referrals/withdrawals', {
+      params: { page, per_page: perPage },
+    }),
+
+  requestWithdrawal: (request: ReferralWithdrawalRequest) =>
+    api.post<APIResponse<{ message: string; withdrawal?: ReferralWithdrawal }>>('/referrals/withdrawals', request),
 }
