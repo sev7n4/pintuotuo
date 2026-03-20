@@ -8,6 +8,11 @@
 - Node.js v18+ (for frontend development)
 - Go 1.21+ (for backend development)
 
+### Test Workflow Verification
+
+This project uses a complete CI/CD pipeline with the following workflow:
+1. CI/CD Pipeline → 2. Integration Tests → 3. E2E Tests → 4. Deploy to Tencent Cloud
+
 ### Setup
 
 ```bash
