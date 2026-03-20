@@ -5,16 +5,19 @@ class LoginPage {
 
   async goto() {
     await this.page.goto('/login');
+    await this.page.waitForSelector('text=拼脱脱 - 登录');
   }
 
   async login(email: string, password: string) {
-    await this.page.fill('input[placeholder="example@email.com"]', email);
-    await this.page.fill('input[placeholder="输入密码"]', password);
-    await this.page.click('button:has-text("登录")');
+    await this.page.getByPlaceholder('example@email.com').fill(email);
+    await this.page.getByPlaceholder('输入密码').fill(password);
+    const submitButton = this.page.getByRole('button', { name: '登录' });
+    await submitButton.waitFor({ state: 'visible' });
+    await submitButton.click();
   }
 
   async expectLoginSuccess() {
-    await expect(this.page.locator('text=登录成功')).toBeVisible();
+    await expect(this.page.getByText('登录成功')).toBeVisible();
   }
 
   async expectLoginError() {
@@ -27,47 +30,52 @@ class RegisterPage {
 
   async goto() {
     await this.page.goto('/register');
+    await this.page.waitForSelector('text=拼脱脱 - 注册');
   }
 
   async register(email: string, name: string, password: string, role: 'user' | 'merchant' = 'user') {
     if (role === 'merchant') {
-      await this.page.click('text=商家');
+      await this.page.getByText('商家', { exact: true }).click();
     }
-    await this.page.fill('input[placeholder="example@email.com"]', email);
-    await this.page.fill('input[placeholder="输入你的名字"]', name);
-    await this.page.fill('input[placeholder="设置密码"]', password);
-    await this.page.fill('input[placeholder="再次输入密码"]', password);
-    await this.page.click('button:has-text("创建账户")');
+    await this.page.getByPlaceholder('example@email.com').fill(email);
+    await this.page.getByPlaceholder('输入你的名字').fill(name);
+    await this.page.getByPlaceholder('设置密码').fill(password);
+    await this.page.getByPlaceholder('再次输入密码').fill(password);
+    const submitButton = this.page.getByRole('button', { name: '创建账户' });
+    await submitButton.waitFor({ state: 'visible' });
+    await submitButton.click();
   }
 }
 
 test.describe('Authentication', () => {
   test('should display login page', async ({ page }) => {
     await page.goto('/login');
-    await expect(page.locator('text=拼脱脱 - 登录')).toBeVisible();
+    await expect(page.getByText('拼脱脱 - 登录')).toBeVisible();
   });
 
   test('should show validation error for empty fields', async ({ page }) => {
     await page.goto('/login');
-    await page.click('button:has-text("登录")');
-    await expect(page.locator('text=请输入邮箱')).toBeVisible();
+    await page.waitForSelector('text=拼脱脱 - 登录');
+    await page.getByRole('button', { name: '登录' }).click();
+    await expect(page.getByText('请输入邮箱')).toBeVisible();
   });
 
   test('should navigate between login and register', async ({ page }) => {
     await page.goto('/login');
-    await page.click('text=创建新账户');
-    await expect(page.locator('text=拼脱脱 - 注册')).toBeVisible();
+    await page.getByText('创建新账户').click();
+    await expect(page.getByText('拼脱脱 - 注册')).toBeVisible();
     
-    await page.click('text=立即登录');
-    await expect(page.locator('text=拼脱脱 - 登录')).toBeVisible();
+    await page.getByText('立即登录').click();
+    await expect(page.getByText('拼脱脱 - 登录')).toBeVisible();
   });
 
   test('should show error for invalid email format', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input[placeholder="example@email.com"]', 'invalid-email');
-    await page.fill('input[placeholder="输入密码"]', 'somepassword');
-    await page.click('button:has-text("登录")');
-    await expect(page.locator('text=邮箱格式不正确')).toBeVisible();
+    await page.waitForSelector('text=拼脱脱 - 登录');
+    await page.getByPlaceholder('example@email.com').fill('invalid-email');
+    await page.getByPlaceholder('输入密码').fill('somepassword');
+    await page.getByRole('button', { name: '登录' }).click();
+    await expect(page.getByText('邮箱格式不正确')).toBeVisible();
   });
 });
 
@@ -106,9 +114,9 @@ test.describe('Login Flow', () => {
     await loginPage.login('demo@example.com', 'demo123456');
     await expect(page).toHaveURL(/.*products/);
     
-    await page.click('[data-testid="user-dropdown"]');
-    await page.click('text=退出登录');
-    await expect(page.locator('text=登录')).toBeVisible();
+    await page.locator('[data-testid="user-dropdown"]').click();
+    await page.getByText('退出登录').click();
+    await expect(page.getByText('登录')).toBeVisible();
   });
 
   test('should persist login state after page refresh', async ({ page }) => {
@@ -129,15 +137,15 @@ test.describe('Registration', () => {
   });
 
   test('should have role selection on register page', async ({ page }) => {
-    await expect(page.locator('text=用户')).toBeVisible();
-    await expect(page.locator('text=商家')).toBeVisible();
+    await expect(page.getByText('用户', { exact: true })).toBeVisible();
+    await expect(page.getByText('商家', { exact: true })).toBeVisible();
   });
 
   test('should register new user and redirect to products', async ({ page }) => {
     const uniqueEmail = `test${Date.now()}@example.com`;
     await registerPage.register(uniqueEmail, 'testuser', 'Test123456!');
     
-    await expect(page.locator('text=注册成功')).toBeVisible();
+    await expect(page.getByText('注册成功')).toBeVisible();
     await expect(page).toHaveURL(/.*products/);
   });
 
@@ -145,25 +153,25 @@ test.describe('Registration', () => {
     const uniqueEmail = `merchant${Date.now()}@example.com`;
     await registerPage.register(uniqueEmail, 'merchant_user', 'Test123456!', 'merchant');
     
-    await expect(page.locator('text=注册成功')).toBeVisible();
+    await expect(page.getByText('注册成功')).toBeVisible();
     await expect(page).toHaveURL(/.*merchant/);
   });
 
   test('should show error for duplicate email', async ({ page }) => {
     await registerPage.register('demo@example.com', 'testuser', 'Test123456!');
-    await expect(page.locator('text=注册失败')).toBeVisible();
+    await expect(page.getByText('注册失败')).toBeVisible();
   });
 
   test('should show error for password mismatch', async ({ page }) => {
     const uniqueEmail = `test${Date.now()}@example.com`;
     
-    await page.fill('input[placeholder="example@email.com"]', uniqueEmail);
-    await page.fill('input[placeholder="输入你的名字"]', 'testuser');
-    await page.fill('input[placeholder="设置密码"]', 'Test123456!');
-    await page.fill('input[placeholder="再次输入密码"]', 'DifferentPassword!');
-    await page.click('button:has-text("创建账户")');
+    await page.getByPlaceholder('example@email.com').fill(uniqueEmail);
+    await page.getByPlaceholder('输入你的名字').fill('testuser');
+    await page.getByPlaceholder('设置密码').fill('Test123456!');
+    await page.getByPlaceholder('再次输入密码').fill('DifferentPassword!');
+    await page.getByRole('button', { name: '创建账户' }).click();
     
-    await expect(page.locator('text=两次输入的密码不一致')).toBeVisible();
+    await expect(page.getByText('两次输入的密码不一致')).toBeVisible();
   });
 });
 
@@ -201,6 +209,6 @@ test.describe('Access Control', () => {
     await loginPage.login('admin@example.com', 'admin123456');
     
     await page.goto('/admin');
-    await expect(page.locator('text=运营管理')).toBeVisible();
+    await expect(page.getByText('运营管理')).toBeVisible();
   });
 });
