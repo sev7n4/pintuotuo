@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, message } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, message, Spin } from 'antd'
 import {
   ShopOutlined,
   AppstoreOutlined,
@@ -53,8 +53,53 @@ const menuItems = [
 const MerchantLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout } = useAuthStore()
+  const { user, logout, isAuthenticated, fetchUser } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const hasToken = !!(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'))
+      if (!hasToken) {
+        navigate('/login', { state: { from: location.pathname } })
+        return
+      }
+
+      if (!user) {
+        try {
+          await fetchUser()
+        } catch (error) {
+          localStorage.removeItem('auth_token')
+          sessionStorage.removeItem('auth_token')
+          navigate('/login', { state: { from: location.pathname } })
+          return
+        }
+      }
+
+      setCheckingAuth(false)
+    }
+
+    checkAuth()
+  }, [isAuthenticated, user, fetchUser, navigate, location.pathname])
+
+  useEffect(() => {
+    if (!checkingAuth && user && user.role !== 'merchant') {
+      message.error('无权限访问商户后台')
+      navigate('/')
+    }
+  }, [checkingAuth, user, navigate])
+
+  if (checkingAuth) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated || (user && user.role !== 'merchant')) {
+    return null
+  }
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)

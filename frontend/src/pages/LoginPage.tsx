@@ -12,10 +12,10 @@ export const LoginPage: React.FC = () => {
     try {
       await login(values.email, values.password, values.rememberMe || false)
       message.success('登录成功')
-      const role = useAuthStore.getState().user?.role
-      if (role === 'admin') {
+      const currentUser = useAuthStore.getState().user
+      if (currentUser?.role === 'admin') {
         navigate('/admin')
-      } else if (role === 'merchant') {
+      } else if (currentUser?.role === 'merchant') {
         navigate('/merchant/dashboard')
       } else {
         navigate('/products')

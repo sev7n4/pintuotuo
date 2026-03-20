@@ -57,7 +57,7 @@ const AdminLayout = () => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const hasToken = !!localStorage.getItem('auth_token')
+      const hasToken = !!(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'))
       if (!hasToken) {
         navigate('/login', { state: { from: location.pathname } })
         return
@@ -68,6 +68,7 @@ const AdminLayout = () => {
           await fetchUser()
         } catch (error) {
           localStorage.removeItem('auth_token')
+          sessionStorage.removeItem('auth_token')
           navigate('/login', { state: { from: location.pathname } })
           return
         }

@@ -70,7 +70,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (data) {
         const { user, token } = data
         localStorage.setItem('auth_token', token)
-        set({ user, token, isAuthenticated: true, isLoading: false })
+        localStorage.setItem('remember_me', 'true')
+        set({ user, token, isAuthenticated: true, isLoading: false, rememberMe: true })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '注册失败'
@@ -92,16 +93,22 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   fetchUser: async () => {
-    if (!getTokenFromStorage()) return
+    const token = getTokenFromStorage()
+    if (!token) {
+      set({ isAuthenticated: false, user: null })
+      return
+    }
 
     set({ isLoading: true, error: null })
     try {
       const response = await userService.getCurrentUser()
       const apiResponse = response.data as APIResponse<User>
-      set({ user: apiResponse.data || null, isLoading: false })
+      const fetchedUser = apiResponse.data || null
+      set({ user: fetchedUser, isLoading: false, isAuthenticated: true })
     } catch (error) {
-      const message = error instanceof Error ? error.message : '获取用户信息失败'
-      set({ error: message, isLoading: false })
+      localStorage.removeItem('auth_token')
+      sessionStorage.removeItem('auth_token')
+      set({ user: null, token: null, isAuthenticated: false, isLoading: false })
     }
   },
 
