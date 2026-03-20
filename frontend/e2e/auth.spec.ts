@@ -211,3 +211,53 @@ test.describe('Login Redirect Tests', () => {
     await expect(page).not.toHaveURL(/.*merchant/, { timeout: 5000 });
   });
 });
+
+test.describe('Admin Tests', () => {
+  test('should redirect admin user to admin dashboard after login', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('input[placeholder="example@email.com"]', 'admin@example.com');
+    await page.fill('input[placeholder="输入密码"]', 'admin123456');
+    await page.click('button:has-text("登录")');
+    
+    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/.*admin/, { timeout: 10000 });
+  });
+
+  test('should deny access to admin dashboard for regular user', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('input[placeholder="example@email.com"]', 'demo@example.com');
+    await page.fill('input[placeholder="输入密码"]', 'demo123456');
+    await page.click('button:has-text("登录")');
+    
+    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    
+    await page.goto('/admin');
+    
+    await expect(page).not.toHaveURL(/.*admin/, { timeout: 5000 });
+  });
+
+  test('should deny access to admin dashboard for merchant user', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
+    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
+    await page.click('button:has-text("登录")');
+    
+    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    
+    await page.goto('/admin');
+    
+    await expect(page).not.toHaveURL(/.*admin/, { timeout: 5000 });
+  });
+
+  test('should display admin dashboard when logged in as admin', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('input[placeholder="example@email.com"]', 'admin@example.com');
+    await page.fill('input[placeholder="输入密码"]', 'admin123456');
+    await page.click('button:has-text("登录")');
+    
+    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    
+    await page.goto('/admin');
+    await expect(page.locator('text=运营管理')).toBeVisible({ timeout: 5000 });
+  });
+});
