@@ -15,7 +15,18 @@ const localStorageMock = (() => {
   }
 })()
 
+const sessionStorageMock = (() => {
+  let store: Record<string, string> = {}
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => { store[key] = value },
+    removeItem: (key: string) => { delete store[key] },
+    clear: () => { store = {} },
+  }
+})()
+
 Object.defineProperty(window, 'localStorage', { value: localStorageMock })
+Object.defineProperty(window, 'sessionStorage', { value: sessionStorageMock })
 
 const mockedAuthService = authService as jest.Mocked<typeof authService>
 const mockedUserService = userService as jest.Mocked<typeof userService>
@@ -23,6 +34,7 @@ const mockedUserService = userService as jest.Mocked<typeof userService>
 describe('AuthStore', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
     jest.clearAllMocks()
     // 重置 store 状态
     useAuthStore.setState({
@@ -30,6 +42,8 @@ describe('AuthStore', () => {
       token: null,
       isLoading: false,
       error: null,
+      isAuthenticated: false,
+      rememberMe: false,
     })
   })
 
@@ -45,7 +59,40 @@ describe('AuthStore', () => {
   })
 
   describe('login', () => {
-    it('should login successfully', async () => {
+    it('should login successfully with rememberMe true', async () => {
+      const mockResponse = {
+        data: {
+          code: 0,
+          message: 'success',
+          data: {
+            user: {
+              id: 1,
+              email: 'test@example.com',
+              name: 'Test User',
+              role: 'user',
+              created_at: '2024-01-01T00:00:00Z',
+              updated_at: '2024-01-01T00:00:00Z',
+            },
+            token: 'test-token',
+          },
+        },
+      }
+
+      mockedAuthService.login.mockResolvedValueOnce(mockResponse as any)
+
+      const store = useAuthStore.getState()
+      await store.login('test@example.com', 'password', true)
+
+      const newState = useAuthStore.getState()
+      expect(newState.user?.email).toBe('test@example.com')
+      expect(newState.token).toBe('test-token')
+      expect(newState.isAuthenticated).toBe(true)
+      expect(newState.isLoading).toBe(false)
+      expect(localStorage.getItem('auth_token')).toBe('test-token')
+      expect(localStorage.getItem('remember_me')).toBe('true')
+    })
+
+    it('should login successfully with rememberMe false (default)', async () => {
       const mockResponse = {
         data: {
           code: 0,
@@ -74,7 +121,8 @@ describe('AuthStore', () => {
       expect(newState.token).toBe('test-token')
       expect(newState.isAuthenticated).toBe(true)
       expect(newState.isLoading).toBe(false)
-      expect(localStorage.getItem('auth_token')).toBe('test-token')
+      expect(sessionStorage.getItem('auth_token')).toBe('test-token')
+      expect(localStorage.getItem('auth_token')).toBeNull()
     })
 
     it('should handle login error', async () => {
@@ -385,18 +433,23 @@ describe('AuthStore', () => {
       
       const store = useAuthStore.getState()
       await store.login('test@example.com', 'password')
-      expect(store.isAuthenticated).toBe(true)
+      
+      // 重新获取最新的 store 状态
+      const updatedStore = useAuthStore.getState()
+      expect(updatedStore.isAuthenticated).toBe(true)
     })
 
     it('should be false when no token', () => {
       // 清理 localStorage 并重置状态
       localStorage.clear()
+      sessionStorage.clear()
       useAuthStore.setState({
         user: null,
         token: null,
         isLoading: false,
         error: null,
-        isAuthenticated: false
+        isAuthenticated: false,
+        rememberMe: false
       })
       const store = useAuthStore.getState()
       expect(store.isAuthenticated).toBe(false)
