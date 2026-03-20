@@ -139,7 +139,7 @@ test.describe('Merchant Registration', () => {
     await expect(page.locator('text=商家')).toBeVisible();
   });
 
-  test('should register as merchant', async ({ page }) => {
+  test('should register as merchant and redirect to merchant dashboard', async ({ page }) => {
     const uniqueEmail = `merchant${Date.now()}@example.com`;
     
     await page.goto('/register');
@@ -151,5 +151,63 @@ test.describe('Merchant Registration', () => {
     await page.click('button:has-text("创建账户")');
     
     await expect(page.locator('text=注册成功')).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/.*merchant/, { timeout: 10000 });
+  });
+});
+
+test.describe('Login Redirect Tests', () => {
+  test('should redirect merchant user to merchant dashboard after login', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
+    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
+    await page.click('button:has-text("登录")');
+    
+    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/.*merchant/, { timeout: 10000 });
+  });
+
+  test('should redirect regular user to products page after login', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('input[placeholder="example@email.com"]', 'demo@example.com');
+    await page.fill('input[placeholder="输入密码"]', 'demo123456');
+    await page.click('button:has-text("登录")');
+    
+    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/.*products/, { timeout: 10000 });
+  });
+
+  test('should redirect regular user to products page on second login', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('input[placeholder="example@email.com"]', 'demo@example.com');
+    await page.fill('input[placeholder="输入密码"]', 'demo123456');
+    await page.click('button:has-text("登录")');
+    
+    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/.*products/, { timeout: 10000 });
+    
+    await page.click('[data-testid="user-dropdown"]');
+    await page.click('text=退出登录');
+    
+    await expect(page.locator('text=登录')).toBeVisible({ timeout: 5000 });
+    
+    await page.fill('input[placeholder="example@email.com"]', 'demo@example.com');
+    await page.fill('input[placeholder="输入密码"]', 'demo123456');
+    await page.click('button:has-text("登录")');
+    
+    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/.*products/, { timeout: 10000 });
+  });
+
+  test('should deny access to merchant dashboard for regular user', async ({ page }) => {
+    await page.goto('/login');
+    await page.fill('input[placeholder="example@email.com"]', 'demo@example.com');
+    await page.fill('input[placeholder="输入密码"]', 'demo123456');
+    await page.click('button:has-text("登录")');
+    
+    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    
+    await page.goto('/merchant/dashboard');
+    
+    await expect(page).not.toHaveURL(/.*merchant/, { timeout: 5000 });
   });
 });
