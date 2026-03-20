@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Form, Input, Button, Card, message, Radio, Space } from 'antd'
 import { UserOutlined, ShopOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -10,29 +10,29 @@ export const RegisterPage: React.FC = () => {
   const navigate = useNavigate()
   const { register, isLoading, error } = useAuthStore()
   const [form] = Form.useForm()
+  const [selectedRole, setSelectedRole] = useState<UserRole>('user')
 
   const onFinish = async (values: {
     email: string
     name: string
     password: string
     confirmPassword: string
-    role: UserRole
   }) => {
     if (values.password !== values.confirmPassword) {
       message.error('两次输入的密码不一致')
       return
     }
 
+    const role = selectedRole || 'user'
+
     try {
-      await register(values.email, values.name, values.password, values.role || 'user')
+      await register(values.email, values.name, values.password, role)
       message.success('注册成功')
-      setTimeout(() => {
-        if (values.role === 'merchant') {
-          navigate('/merchant/dashboard', { replace: true })
-        } else {
-          navigate('/', { replace: true })
-        }
-      }, 100)
+      if (role === 'merchant') {
+        navigate('/merchant/dashboard', { replace: true })
+      } else {
+        navigate('/', { replace: true })
+      }
     } catch (err) {
       message.error(error || '注册失败，请稍后重试')
     }
@@ -46,13 +46,16 @@ export const RegisterPage: React.FC = () => {
           layout="vertical"
           onFinish={onFinish}
           autoComplete="off"
-          initialValues={{ role: 'user' }}
         >
           <Form.Item label="选择角色" name="role">
-            <Radio.Group style={{ width: '100%' }}>
+            <Radio.Group
+              style={{ width: '100%' }}
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+            >
               <Space direction="vertical" style={{ width: '100%' }}>
-                <Radio.Button 
-                  value="user" 
+                <Radio.Button
+                  value="user"
                   style={{ width: '100%', height: 60, display: 'flex', alignItems: 'center' }}
                 >
                   <UserOutlined style={{ marginRight: 8 }} />
@@ -62,8 +65,8 @@ export const RegisterPage: React.FC = () => {
                     <small>购买 Token、参与拼团</small>
                   </span>
                 </Radio.Button>
-                <Radio.Button 
-                  value="merchant" 
+                <Radio.Button
+                  value="merchant"
                   style={{ width: '100%', height: 60, display: 'flex', alignItems: 'center' }}
                 >
                   <ShopOutlined style={{ marginRight: 8 }} />

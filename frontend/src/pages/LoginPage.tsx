@@ -12,7 +12,14 @@ export const LoginPage: React.FC = () => {
     try {
       await login(values.email, values.password)
       message.success('登录成功')
-      navigate('/products')
+      const role = useAuthStore.getState().user?.role
+      if (role === 'admin') {
+        navigate('/admin')
+      } else if (role === 'merchant') {
+        navigate('/merchant/dashboard')
+      } else {
+        navigate('/products')
+      }
     } catch (err) {
       message.error(error || '登录失败，请检查邮箱和密码')
     }
