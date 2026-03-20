@@ -161,6 +161,28 @@ export interface ReferralStats {
   total_rewards: number
   pending_rewards: number
   paid_rewards: number
+  available_rewards: number
+}
+
+export interface ReferralWithdrawal {
+  id: number
+  user_id: number
+  amount: number
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  method: 'alipay' | 'wechat' | 'bank'
+  account_info: string
+  request_note?: string
+  reject_reason?: string
+  created_at: string
+  processed_at?: string
+  completed_at?: string
+}
+
+export interface ReferralWithdrawalRequest {
+  amount: number
+  method: string
+  account_info: string
+  request_note?: string
 }
 
 // Merchant related types

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Card, Row, Col, Typography, Button, Statistic, Table, Tabs, message, Input, Space, Spin } from 'antd'
-import { CopyOutlined, ShareAltOutlined, GiftOutlined, TeamOutlined, DollarOutlined } from '@ant-design/icons'
+import { Card, Row, Col, Typography, Button, Statistic, Table, Tabs, message, Input, Space, Spin, Modal, Form, Select, InputNumber } from 'antd'
+import { CopyOutlined, ShareAltOutlined, GiftOutlined, TeamOutlined, DollarOutlined, WalletOutlined } from '@ant-design/icons'
 import { useReferralStore } from '@/stores/referralStore'
-import { Referral, ReferralReward } from '@/types'
+import { Referral, ReferralReward, ReferralWithdrawal } from '@/types'
 import type { ColumnsType } from 'antd/es/table'
 import styles from './ReferralPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
 const { TabPane } = Tabs
+const { Option } = Select
 
 const ReferralPage = () => {
   const {
@@ -15,22 +16,28 @@ const ReferralPage = () => {
     stats,
     referrals,
     rewards,
+    withdrawals,
     isLoading,
     fetchReferralCode,
     fetchStats,
     fetchReferrals,
     fetchRewards,
+    fetchWithdrawals,
     bindReferralCode,
+    requestWithdrawal,
   } = useReferralStore()
 
   const [bindCode, setBindCode] = useState('')
+  const [withdrawalModalVisible, setWithdrawalModalVisible] = useState(false)
+  const [form] = Form.useForm()
 
   useEffect(() => {
     fetchReferralCode()
     fetchStats()
     fetchReferrals()
     fetchRewards()
-  }, [fetchReferralCode, fetchStats, fetchReferrals, fetchRewards])
+    fetchWithdrawals()
+  }, [fetchReferralCode, fetchStats, fetchReferrals, fetchRewards, fetchWithdrawals])
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(referralCode)
@@ -49,6 +56,58 @@ const ReferralPage = () => {
       message.success('邀请码绑定成功')
     }
   }
+
+  const handleWithdrawalSubmit = async (values: any) => {
+    const success = await requestWithdrawal(values)
+    if (success) {
+      message.success('提现申请已提交')
+      setWithdrawalModalVisible(false)
+      form.resetFields()
+    }
+  }
+
+  const withdrawalColumns: ColumnsType<ReferralWithdrawal> = [
+    {
+      title: '提现金额',
+      dataIndex: 'amount',
+      key: 'amount',
+      render: (amount: number) => `¥${amount.toFixed(2)}`,
+    },
+    {
+      title: '提现方式',
+      dataIndex: 'method',
+      key: 'method',
+      render: (method: string) => {
+        const methodMap: Record<string, string> = {
+          alipay: '支付宝',
+          wechat: '微信支付',
+          bank: '银行卡',
+        }
+        return methodMap[method] || method
+      },
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => {
+        const statusMap: Record<string, { text: string; className: string }> = {
+          pending: { text: '待处理', className: styles.statusPending },
+          processing: { text: '处理中', className: styles.statusProcessing },
+          completed: { text: '已完成', className: styles.statusPaid },
+          failed: { text: '失败', className: styles.statusCancelled },
+        }
+        const { text, className } = statusMap[status] || { text: status, className: '' }
+        return <span className={className}>{text}</span>
+      },
+    },
+    {
+      title: '申请时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
+    },
+  ]
 
   const referralColumns: ColumnsType<Referral> = [
     {
@@ -184,6 +243,26 @@ const ReferralPage = () => {
                 />
               </Col>
             </Row>
+            <Row gutter={16} style={{ marginTop: 24 }}>
+              <Col span={24}>
+                <Statistic
+                  title="可提现金额"
+                  value={stats?.available_rewards || 0}
+                  precision={2}
+                  valueStyle={{ color: '#1890ff' }}
+                  suffix="元"
+                  prefix={<WalletOutlined />}
+                />
+                <Button
+                  type="primary"
+                  style={{ marginTop: 16, width: '100%' }}
+                  disabled={(stats?.available_rewards || 0) <= 0}
+                  onClick={() => setWithdrawalModalVisible(true)}
+                >
+                  申请提现
+                </Button>
+              </Col>
+            </Row>
           </Card>
         </Col>
       </Row>
@@ -210,6 +289,16 @@ const ReferralPage = () => {
               locale={{ emptyText: '暂无返利记录' }}
             />
           </TabPane>
+          <TabPane tab="提现记录" key="withdrawals">
+            <Table
+              columns={withdrawalColumns}
+              dataSource={withdrawals}
+              rowKey="id"
+              pagination={{ pageSize: 10 }}
+              loading={isLoading}
+              locale={{ emptyText: '暂无提现记录' }}
+            />
+          </TabPane>
         </Tabs>
       </Card>
 
@@ -229,6 +318,81 @@ const ReferralPage = () => {
           如果您有好友的邀请码，可以在此绑定，绑定后不可更改。
         </Paragraph>
       </Card>
+
+      <Modal
+        title="申请提现"
+        open={withdrawalModalVisible}
+        onCancel={() => setWithdrawalModalVisible(false)}
+        footer={null}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleWithdrawalSubmit}
+          initialValues={{
+            amount: stats?.available_rewards || 0,
+            method: 'alipay',
+          }}
+        >
+          <Form.Item
+            label="提现金额"
+            name="amount"
+            rules={[
+              { required: true, message: '请输入提现金额' },
+              {
+                type: 'number',
+                min: 1,
+                max: stats?.available_rewards || 0,
+                message: `提现金额必须在1元到${stats?.available_rewards || 0}元之间`,
+              },
+            ]}
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              placeholder="请输入提现金额"
+              min={1}
+              max={stats?.available_rewards || 0}
+              precision={2}
+              addonBefore="¥"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="提现方式"
+            name="method"
+            rules={[{ required: true, message: '请选择提现方式' }]}
+          >
+            <Select placeholder="请选择提现方式">
+              <Option value="alipay">支付宝</Option>
+              <Option value="wechat">微信支付</Option>
+              <Option value="bank">银行卡</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="账户信息"
+            name="account_info"
+            rules={[{ required: true, message: '请输入账户信息' }]}
+          >
+            <Input placeholder="请输入支付宝账号/微信号/银行卡号" />
+          </Form.Item>
+
+          <Form.Item label="备注" name="request_note">
+            <Input.TextArea placeholder="请输入备注（可选）" rows={3} />
+          </Form.Item>
+
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={isLoading}>
+                提交申请
+              </Button>
+              <Button onClick={() => setWithdrawalModalVisible(false)}>
+                取消
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }

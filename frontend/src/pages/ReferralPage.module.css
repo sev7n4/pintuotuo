@@ -50,6 +50,10 @@
   color: #ff4d4f;
 }
 
+.statusProcessing {
+  color: #1890ff;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 16px;

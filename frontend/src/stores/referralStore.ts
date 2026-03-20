@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { ReferralStats, Referral, ReferralReward, PaginatedResponse } from '@/types'
+import { ReferralStats, Referral, ReferralReward, ReferralWithdrawal, ReferralWithdrawalRequest, PaginatedResponse } from '@/types'
 import { referralService } from '@/services/referral'
 
 interface ReferralState {
@@ -7,6 +7,7 @@ interface ReferralState {
   stats: ReferralStats | null
   referrals: Referral[]
   rewards: ReferralReward[]
+  withdrawals: ReferralWithdrawal[]
   isLoading: boolean
   error: string | null
 
@@ -14,7 +15,9 @@ interface ReferralState {
   fetchStats: () => Promise<void>
   fetchReferrals: (page?: number, perPage?: number) => Promise<void>
   fetchRewards: (page?: number, perPage?: number, status?: string) => Promise<void>
+  fetchWithdrawals: (page?: number, perPage?: number) => Promise<void>
   bindReferralCode: (code: string) => Promise<boolean>
+  requestWithdrawal: (request: ReferralWithdrawalRequest) => Promise<boolean>
   clearError: () => void
 }
 
@@ -23,6 +26,7 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
   stats: null,
   referrals: [],
   rewards: [],
+  withdrawals: [],
   isLoading: false,
   error: null,
 
@@ -73,6 +77,18 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
     }
   },
 
+  fetchWithdrawals: async (page = 1, perPage = 20) => {
+    set({ isLoading: true, error: null })
+    try {
+      const response = await referralService.getWithdrawalHistory(page, perPage)
+      const data = response.data as unknown as PaginatedResponse<ReferralWithdrawal>
+      set({ withdrawals: data?.data || [], isLoading: false })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '获取提现记录失败'
+      set({ error: message, isLoading: false })
+    }
+  },
+
   bindReferralCode: async (code: string) => {
     set({ isLoading: true, error: null })
     try {
@@ -82,6 +98,21 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : '绑定邀请码失败'
+      set({ error: message, isLoading: false })
+      return false
+    }
+  },
+
+  requestWithdrawal: async (request: ReferralWithdrawalRequest) => {
+    set({ isLoading: true, error: null })
+    try {
+      await referralService.requestWithdrawal(request)
+      set({ isLoading: false })
+      get().fetchStats()
+      get().fetchWithdrawals()
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '提现申请失败'
       set({ error: message, isLoading: false })
       return false
     }
