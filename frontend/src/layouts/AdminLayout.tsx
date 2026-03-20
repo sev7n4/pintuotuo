@@ -53,30 +53,38 @@ const AdminLayout = () => {
   const location = useLocation()
   const { user, logout, isAuthenticated, fetchUser } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [checkingAuth, setCheckingAuth] = useState(true)
 
   useEffect(() => {
-    const initAuth = async () => {
-      if (!isAuthenticated) {
+    const checkAuth = async () => {
+      const hasToken = !!localStorage.getItem('auth_token')
+      if (!hasToken) {
         navigate('/login', { state: { from: location.pathname } })
         return
       }
 
       if (!user) {
-        await fetchUser()
+        try {
+          await fetchUser()
+        } catch (error) {
+          localStorage.removeItem('auth_token')
+          navigate('/login', { state: { from: location.pathname } })
+          return
+        }
       }
-      setLoading(false)
+
+      setCheckingAuth(false)
     }
 
-    initAuth()
-  }, [isAuthenticated])
+    checkAuth()
+  }, [isAuthenticated, user, fetchUser, navigate, location.pathname])
 
   useEffect(() => {
-    if (!loading && user && user.role !== 'admin') {
+    if (!checkingAuth && user && user.role !== 'admin') {
       message.error('无权限访问管理后台')
       navigate('/')
     }
-  }, [loading, user, navigate])
+  }, [checkingAuth, user, navigate])
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
@@ -112,7 +120,7 @@ const AdminLayout = () => {
     return path
   }
 
-  if (loading) {
+  if (checkingAuth) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <Spin size="large" tip="加载中..." />
