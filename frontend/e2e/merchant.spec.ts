@@ -1,131 +1,112 @@
 import { test, expect } from '@playwright/test';
+import { LoginPage } from './pages';
 
 test.describe('Merchant Dashboard', () => {
+  let loginPage: LoginPage;
+
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    loginPage = new LoginPage(page);
   });
 
   test('should display merchant dashboard when logged in as merchant', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
-    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
-    await page.click('button:has-text("登录")');
-    
-    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
-    await expect(page).toHaveURL(/.*merchant/, { timeout: 10000 });
+    await loginPage.goto();
+    await loginPage.login('merchant@example.com', 'merchant123456');
+    await loginPage.expectLoginSuccess();
+    await expect(page).toHaveURL(/.*merchant/);
     
     await page.goto('/merchant');
-    await expect(page.locator('text=商家后台')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('商家后台')).toBeVisible();
   });
 
   test('should display merchant products', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
-    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
-    await page.click('button:has-text("登录")');
-    
-    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await loginPage.goto();
+    await loginPage.login('merchant@example.com', 'merchant123456');
+    await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/products');
-    await expect(page.locator('text=商品管理')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('商品管理')).toBeVisible();
   });
 
   test('should create new product', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
-    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
-    await page.click('button:has-text("登录")');
-    
-    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await loginPage.goto();
+    await loginPage.login('merchant@example.com', 'merchant123456');
+    await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/products');
     
-    const addButton = page.locator('button:has-text("添加商品")');
+    const addButton = page.getByRole('button', { name: '添加商品' });
     if (await addButton.isVisible()) {
       await addButton.click();
       
-      await page.fill('input[placeholder="请输入商品名称"]', '测试商品E2E');
-      await page.fill('textarea[placeholder="请输入商品描述"]', '这是一个E2E测试商品');
-      await page.fill('input[placeholder="请输入价格"]', '99.99');
-      await page.fill('input[placeholder="请输入库存"]', '100');
+      await page.getByPlaceholder('请输入商品名称').fill('测试商品E2E');
+      await page.getByPlaceholder('请输入商品描述').fill('这是一个E2E测试商品');
+      await page.getByPlaceholder('请输入价格').fill('99.99');
+      await page.getByPlaceholder('请输入库存').fill('100');
       
-      await page.click('button:has-text("提交")');
+      await page.getByRole('button', { name: '提交' }).click();
       await page.waitForTimeout(1000);
     }
   });
 
   test('should display merchant orders', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
-    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
-    await page.click('button:has-text("登录")');
-    
-    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await loginPage.goto();
+    await loginPage.login('merchant@example.com', 'merchant123456');
+    await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/orders');
-    await expect(page.locator('text=订单管理')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('订单管理')).toBeVisible();
   });
 
   test('should display merchant settlements', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
-    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
-    await page.click('button:has-text("登录")');
-    
-    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await loginPage.goto();
+    await loginPage.login('merchant@example.com', 'merchant123456');
+    await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/settlements');
-    await expect(page.locator('text=结算管理')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('结算管理')).toBeVisible();
   });
 });
 
 test.describe('Merchant API Keys', () => {
+  let loginPage: LoginPage;
+
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    loginPage = new LoginPage(page);
   });
 
   test('should display API keys page', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
-    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
-    await page.click('button:has-text("登录")');
-    
-    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await loginPage.goto();
+    await loginPage.login('merchant@example.com', 'merchant123456');
+    await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/api-keys');
-    await expect(page.locator('text=API密钥')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('API密钥')).toBeVisible();
   });
 
   test('should create new API key', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
-    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
-    await page.click('button:has-text("登录")');
-    
-    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await loginPage.goto();
+    await loginPage.login('merchant@example.com', 'merchant123456');
+    await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/api-keys');
     
-    const addButton = page.locator('button:has-text("添加密钥")');
+    const addButton = page.getByRole('button', { name: '添加密钥' });
     if (await addButton.isVisible()) {
       await addButton.click();
       
-      await page.fill('input[placeholder="请输入名称"]', '测试API密钥');
+      await page.getByPlaceholder('请输入名称').fill('测试API密钥');
       await page.selectOption('select', 'openai');
-      await page.fill('input[placeholder="请输入API Key"]', 'sk-test-key');
+      await page.getByPlaceholder('请输入API Key').fill('sk-test-key');
       
-      await page.click('button:has-text("提交")');
+      await page.getByRole('button', { name: '提交' }).click();
       await page.waitForTimeout(1000);
     }
   });
 
   test('should toggle API key status', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
-    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
-    await page.click('button:has-text("登录")');
-    
-    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await loginPage.goto();
+    await loginPage.login('merchant@example.com', 'merchant123456');
+    await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/api-keys');
     
@@ -137,20 +118,17 @@ test.describe('Merchant API Keys', () => {
   });
 
   test('should delete API key', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[placeholder="example@email.com"]', 'merchant@example.com');
-    await page.fill('input[placeholder="输入密码"]', 'merchant123456');
-    await page.click('button:has-text("登录")');
-    
-    await expect(page.locator('text=登录成功')).toBeVisible({ timeout: 10000 });
+    await loginPage.goto();
+    await loginPage.login('merchant@example.com', 'merchant123456');
+    await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/api-keys');
     
-    const deleteButton = page.locator('button:has-text("删除")').first();
+    const deleteButton = page.getByRole('button', { name: '删除' }).first();
     if (await deleteButton.isVisible()) {
       await deleteButton.click();
       
-      const confirmButton = page.locator('button:has-text("确定")');
+      const confirmButton = page.getByRole('button', { name: '确定' });
       if (await confirmButton.isVisible()) {
         await confirmButton.click();
         await page.waitForTimeout(500);
