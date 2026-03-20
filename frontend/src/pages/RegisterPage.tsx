@@ -26,11 +26,13 @@ export const RegisterPage: React.FC = () => {
     try {
       await register(values.email, values.name, values.password, values.role || 'user')
       message.success('注册成功')
-      if (values.role === 'merchant') {
-        navigate('/merchant/dashboard')
-      } else {
-        navigate('/')
-      }
+      setTimeout(() => {
+        if (values.role === 'merchant') {
+          navigate('/merchant/dashboard', { replace: true })
+        } else {
+          navigate('/', { replace: true })
+        }
+      }, 100)
     } catch (err) {
       message.error(error || '注册失败，请稍后重试')
     }
