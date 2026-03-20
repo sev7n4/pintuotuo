@@ -679,7 +679,6 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       const emailInput = screen.getByPlaceholderText('example@email.com')
       const passwordInput = screen.getByPlaceholderText('输入密码')
-      const checkbox = screen.getByLabelText('记住我')
       const loginButton = screen.getByText('登 录')
 
       await act(async () => {

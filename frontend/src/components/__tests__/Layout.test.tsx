@@ -1,8 +1,7 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import Layout from '../Layout'
 import { useAuthStore } from '@/stores/authStore'
-import { message } from 'antd'
 
 // 模拟 message
 jest.mock('antd', () => ({

@@ -132,7 +132,19 @@ describe('Integration Tests', () => {
     mockUseAuthStore.mockImplementation(() => mockStore)
     
     mockUseAuthStore.getState = jest.fn(() => ({
-      user: { id: 1, email: 'user@example.com', role: 'user' }
+      user: { id: 1, email: 'user@example.com', name: 'Test User', role: 'user', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+      token: 'test-token',
+      isLoading: false,
+      error: null,
+      isAuthenticated: true,
+      rememberMe: false,
+      login: jest.fn(),
+      register: jest.fn(),
+      logout: jest.fn(),
+      fetchUser: mockFetchUser,
+      setUser: jest.fn(),
+      clearError: jest.fn(),
+      setRememberMe: jest.fn(),
     }))
 
     mockUseReferralStore.mockReturnValue({
