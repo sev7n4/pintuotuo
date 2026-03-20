@@ -472,7 +472,6 @@ describe('TC-ORDER-001: 取消待支付订单', () => {
       updateOrder: jest.fn(),
       cancelOrder: mockCancelOrder,
       requestRefund: jest.fn(),
-      requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
     })
