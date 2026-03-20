@@ -9,7 +9,7 @@ const instance: AxiosInstance = axios.create({
 
 instance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token')
+    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -23,6 +23,8 @@ instance.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token')
+      localStorage.removeItem('remember_me')
+      sessionStorage.removeItem('auth_token')
       window.location.href = '/login'
     }
     return Promise.reject(error)
