@@ -3,6 +3,7 @@ import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import Layout from '@components/Layout'
 import MerchantLayout from '@layouts/MerchantLayout'
+import AdminLayout from '@layouts/AdminLayout'
 
 // Pages
 import LoginPage from '@pages/LoginPage'
@@ -27,6 +28,10 @@ import MerchantOrders from '@pages/merchant/MerchantOrders'
 import MerchantSettings from '@pages/merchant/MerchantSettings'
 import MerchantAPIKeys from '@pages/merchant/MerchantAPIKeys'
 import MerchantSettlements from '@pages/merchant/MerchantSettlements'
+
+// Admin Pages
+import AdminDashboard from '@pages/admin/AdminDashboard'
+import AdminUsers from '@pages/admin/AdminUsers'
 
 function App() {
   return (
@@ -80,6 +85,12 @@ function App() {
             <Route path="settlements" element={<MerchantSettlements />} />
             <Route path="api-keys" element={<MerchantAPIKeys />} />
             <Route path="settings" element={<MerchantSettings />} />
+          </Route>
+
+          {/* Admin routes */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -78,6 +78,7 @@ func main() {
 		routes.RegisterAPIRoutes(v1)
 		routes.RegisterConsumptionRoutes(v1)
 		routes.RegisterNotificationRoutes(v1)
+		routes.RegisterAdminRoutes(v1)
 	}
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

@@ -25,6 +25,7 @@ type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Name     string `json:"name" binding:"required,min=2"`
 	Password string `json:"password" binding:"required,min=6"`
+	Role     string `json:"role"`
 }
 
 // LoginRequest represents user login data
@@ -67,11 +68,17 @@ func RegisterUser(c *gin.Context) {
 	// Hash password
 	passwordHash := hashPassword(req.Password)
 
+	// Determine role (default to "user" if not specified or invalid)
+	role := "user"
+	if req.Role == "merchant" || req.Role == "admin" {
+		role = req.Role
+	}
+
 	// Create user
 	var user models.User
 	err = db.QueryRow(
 		"INSERT INTO users (email, name, password_hash, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, created_at, updated_at",
-		req.Email, req.Name, passwordHash, "user", "active",
+		req.Email, req.Name, passwordHash, role, "active",
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
@@ -99,12 +106,33 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 
+	// If user is a merchant, create merchant record
+	if role == "merchant" {
+		_, err = db.Exec(
+			"INSERT INTO merchants (user_id, company_name, status) VALUES ($1, $2, $3)",
+			user.ID, req.Name, "active",
+		)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"MERCHANT_CREATION_FAILED",
+				"Failed to create merchant record",
+				http.StatusInternalServerError,
+				err,
+			))
+			return
+		}
+	}
+
 	// Generate JWT token
 	token := generateToken(user.ID, user.Email)
 
 	c.JSON(http.StatusCreated, gin.H{
-		"user":  user,
-		"token": token,
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"user":  user,
+			"token": token,
+		},
 	})
 }
 
@@ -145,8 +173,12 @@ func LoginUser(c *gin.Context) {
 	token := generateToken(user.ID, user.Email)
 
 	c.JSON(http.StatusOK, gin.H{
-		"user":  user,
-		"token": token,
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"user":  user,
+			"token": token,
+		},
 	})
 }
 
@@ -177,7 +209,11 @@ func GetCurrentUser(c *gin.Context) {
 	if cachedUser, err := cache.Get(ctx, cacheKey); err == nil {
 		var user models.User
 		if err := json.Unmarshal([]byte(cachedUser), &user); err == nil {
-			c.JSON(http.StatusOK, user)
+			c.JSON(http.StatusOK, gin.H{
+				"code":    0,
+				"message": "success",
+				"data":    user,
+			})
 			return
 		}
 	}
@@ -200,7 +236,11 @@ func GetCurrentUser(c *gin.Context) {
 		cache.Set(ctx, cacheKey, string(userJSON), cache.UserCacheTTL)
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    user,
+	})
 }
 
 // UpdateCurrentUser updates current user profile

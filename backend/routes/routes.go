@@ -187,11 +187,18 @@ func RegisterNotificationRoutes(router *gin.RouterGroup) {
 		notifications.PUT("/:id/read", handlers.MarkNotificationRead)
 		notifications.PUT("/read-all", handlers.MarkAllNotificationsRead)
 
-		// Device tokens for push notifications
-		devices := notifications.Group("/devices")
-		{
-			devices.POST("", handlers.RegisterDeviceToken)
-			devices.DELETE("", handlers.UnregisterDeviceToken)
-		}
+		// Device Token
+		notifications.POST("/device-token", handlers.RegisterDeviceToken)
+		notifications.DELETE("/device-token", handlers.UnregisterDeviceToken)
+	}
+}
+
+// RegisterAdminRoutes registers admin routes
+func RegisterAdminRoutes(router *gin.RouterGroup) {
+	admin := router.Group("/admin")
+	{
+		admin.GET("/users", handlers.GetAdminUsers)
+		admin.POST("/users", handlers.CreateAdminUser)
+		admin.GET("/stats", handlers.GetAdminStats)
 	}
 }
