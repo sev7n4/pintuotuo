@@ -108,7 +108,7 @@ describe('Integration Tests', () => {
 
     // 初始未认证状态，登录后切换到认证状态
     let isAuthenticated = false
-    mockUseAuthStore.mockImplementation(() => ({
+    const mockStore = {
       user: isAuthenticated ? { id: 1, email: 'user@example.com', role: 'user' } : null,
       token: isAuthenticated ? 'test-token' : null,
       isLoading: false,
@@ -124,6 +124,12 @@ describe('Integration Tests', () => {
       fetchUser: mockFetchUser,
       setUser: jest.fn(),
       clearError: jest.fn(),
+    }
+    
+    mockUseAuthStore.mockImplementation(() => mockStore)
+    
+    mockUseAuthStore.getState = jest.fn(() => ({
+      user: { id: 1, email: 'user@example.com', role: 'user' }
     }))
 
     mockUseReferralStore.mockReturnValue({
