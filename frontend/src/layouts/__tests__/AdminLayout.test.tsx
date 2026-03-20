@@ -1,6 +1,6 @@
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import MerchantLayout from '../MerchantLayout'
+import AdminLayout from '../AdminLayout'
 import { useAuthStore } from '@/stores/authStore'
 import { message } from 'antd'
 
@@ -39,20 +39,20 @@ const mockSessionStorage = (() => {
 Object.defineProperty(window, 'localStorage', { value: mockLocalStorage })
 Object.defineProperty(window, 'sessionStorage', { value: mockSessionStorage })
 
-describe('MerchantLayout Component', () => {
+describe('AdminLayout Component', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockLocalStorage.clear()
     mockSessionStorage.clear()
   })
 
-  test('renders MerchantLayout with sidebar and content for merchant user', async () => {
+  test('renders AdminLayout with sidebar and content for admin user', async () => {
     mockLocalStorage.setItem('auth_token', 'test-token')
     
     const mockFetchUser = jest.fn().mockResolvedValue(undefined)
     
     mockUseAuthStore.mockReturnValue({
-      user: { id: 1, email: 'merchant@example.com', name: 'Test Merchant', role: 'merchant', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+      user: { id: 1, email: 'admin@example.com', name: 'Test Admin', role: 'admin', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
       token: 'test-token',
       isLoading: false,
       error: null,
@@ -70,13 +70,13 @@ describe('MerchantLayout Component', () => {
     await act(async () => {
       render(
         <MemoryRouter>
-          <MerchantLayout />
+          <AdminLayout />
         </MemoryRouter>
       )
     })
 
     await waitFor(() => {
-      expect(screen.getByText('商家后台')).toBeInTheDocument()
+      expect(screen.getByText('运营管理')).toBeInTheDocument()
     })
   })
 
@@ -100,17 +100,17 @@ describe('MerchantLayout Component', () => {
     await act(async () => {
       render(
         <MemoryRouter>
-          <MerchantLayout />
+          <AdminLayout />
         </MemoryRouter>
       )
     })
 
     await waitFor(() => {
-      expect(screen.queryByText('商家后台')).not.toBeInTheDocument()
+      expect(screen.queryByText('运营管理')).not.toBeInTheDocument()
     })
   })
 
-  test('redirects non-merchant user to home with error message', async () => {
+  test('redirects non-admin user to home with error message', async () => {
     mockLocalStorage.setItem('auth_token', 'test-token')
     
     const mockFetchUser = jest.fn().mockResolvedValue(undefined)
@@ -134,14 +134,14 @@ describe('MerchantLayout Component', () => {
     await act(async () => {
       render(
         <MemoryRouter>
-          <MerchantLayout />
+          <AdminLayout />
         </MemoryRouter>
       )
     })
 
     await waitFor(() => {
-      expect(message.error).toHaveBeenCalledWith('无权限访问商户后台')
-      expect(screen.queryByText('商家后台')).not.toBeInTheDocument()
+      expect(message.error).toHaveBeenCalledWith('无权限访问管理后台')
+      expect(screen.queryByText('运营管理')).not.toBeInTheDocument()
     })
   })
 
@@ -167,7 +167,7 @@ describe('MerchantLayout Component', () => {
     await act(async () => {
       render(
         <MemoryRouter>
-          <MerchantLayout />
+          <AdminLayout />
         </MemoryRouter>
       )
     })
@@ -199,7 +199,7 @@ describe('MerchantLayout Component', () => {
     await act(async () => {
       render(
         <MemoryRouter>
-          <MerchantLayout />
+          <AdminLayout />
         </MemoryRouter>
       )
     })
@@ -216,7 +216,7 @@ describe('MerchantLayout Component', () => {
     const mockFetchUser = jest.fn().mockResolvedValue(undefined)
     
     mockUseAuthStore.mockReturnValue({
-      user: { id: 1, email: 'merchant@example.com', name: 'Test Merchant', role: 'merchant', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+      user: { id: 1, email: 'admin@example.com', name: 'Test Admin', role: 'admin', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
       token: 'session-token',
       isLoading: false,
       error: null,
@@ -234,13 +234,13 @@ describe('MerchantLayout Component', () => {
     await act(async () => {
       render(
         <MemoryRouter>
-          <MerchantLayout />
+          <AdminLayout />
         </MemoryRouter>
       )
     })
 
     await waitFor(() => {
-      expect(screen.getByText('商家后台')).toBeInTheDocument()
+      expect(screen.getByText('运营管理')).toBeInTheDocument()
     })
   })
 
@@ -268,7 +268,7 @@ describe('MerchantLayout Component', () => {
     await act(async () => {
       render(
         <MemoryRouter>
-          <MerchantLayout />
+          <AdminLayout />
         </MemoryRouter>
       )
     })
@@ -303,17 +303,17 @@ describe('MerchantLayout Component', () => {
     await act(async () => {
       render(
         <MemoryRouter>
-          <MerchantLayout />
+          <AdminLayout />
         </MemoryRouter>
       )
     })
 
     await waitFor(() => {
-      expect(screen.queryByText('商家后台')).not.toBeInTheDocument()
+      expect(screen.queryByText('运营管理')).not.toBeInTheDocument()
     })
   })
 
-  test('handles menu click navigation', async () => {
+  test('redirects merchant user to home with error message', async () => {
     mockLocalStorage.setItem('auth_token', 'test-token')
     
     const mockFetchUser = jest.fn().mockResolvedValue(undefined)
@@ -336,19 +336,54 @@ describe('MerchantLayout Component', () => {
 
     await act(async () => {
       render(
-        <MemoryRouter initialEntries={['/merchant']}>
-          <MerchantLayout />
+        <MemoryRouter>
+          <AdminLayout />
         </MemoryRouter>
       )
     })
 
     await waitFor(() => {
-      expect(screen.getByText('商家后台')).toBeInTheDocument()
+      expect(message.error).toHaveBeenCalledWith('无权限访问管理后台')
+      expect(screen.queryByText('运营管理')).not.toBeInTheDocument()
+    })
+  })
+
+  test('handles menu click navigation', async () => {
+    mockLocalStorage.setItem('auth_token', 'test-token')
+    
+    const mockFetchUser = jest.fn().mockResolvedValue(undefined)
+    
+    mockUseAuthStore.mockReturnValue({
+      user: { id: 1, email: 'admin@example.com', name: 'Test Admin', role: 'admin', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+      token: 'test-token',
+      isLoading: false,
+      error: null,
+      isAuthenticated: true,
+      rememberMe: false,
+      login: jest.fn(),
+      register: jest.fn(),
+      logout: jest.fn(),
+      fetchUser: mockFetchUser,
+      setUser: jest.fn(),
+      clearError: jest.fn(),
+      setRememberMe: jest.fn(),
     })
 
-    const productMenuItem = screen.getByText('商品管理')
     await act(async () => {
-      fireEvent.click(productMenuItem)
+      render(
+        <MemoryRouter initialEntries={['/admin']}>
+          <AdminLayout />
+        </MemoryRouter>
+      )
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('运营管理')).toBeInTheDocument()
+    })
+
+    const userMenuItem = screen.getByText('用户管理')
+    await act(async () => {
+      fireEvent.click(userMenuItem)
     })
   })
 })
