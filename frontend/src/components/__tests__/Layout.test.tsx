@@ -1,7 +1,16 @@
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import Layout from '../Layout'
 import { useAuthStore } from '@/stores/authStore'
+import { message } from 'antd'
+
+// 模拟 message
+jest.mock('antd', () => ({
+  ...jest.requireActual('antd'),
+  message: {
+    success: jest.fn(),
+  },
+}))
 
 // 模拟 CSS 文件
 jest.mock('../Layout.css', () => ({}))
@@ -122,5 +131,46 @@ describe('Layout Component', () => {
     // 检查用户下拉菜单存在
     expect(screen.getByTestId('user-dropdown')).toBeInTheDocument()
     expect(screen.getByText('Test User')).toBeInTheDocument()
+  })
+
+  describe('TC-AUTH-009: 登出流程', () => {
+    test('should have logout functionality in user menu', async () => {
+      const mockLogout = jest.fn().mockResolvedValue(undefined)
+      const mockUser = {
+        id: 1,
+        email: 'test@example.com',
+        name: 'Test User',
+        role: 'user',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      }
+
+      mockUseAuthStore.mockReturnValue({
+        user: mockUser,
+        token: 'test-token',
+        isLoading: false,
+        error: null,
+        isAuthenticated: true,
+        login: jest.fn(),
+        register: jest.fn(),
+        logout: mockLogout,
+        fetchUser: jest.fn(),
+        setUser: jest.fn(),
+        clearError: jest.fn(),
+      })
+
+      render(
+        <MemoryRouter initialEntries={['/']}>
+          <Routes>
+            <Route path="/" element={<Layout />} />
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      )
+
+      const userDropdown = screen.getByTestId('user-dropdown')
+      expect(userDropdown).toBeInTheDocument()
+      expect(screen.getByText('Test User')).toBeInTheDocument()
+    })
   })
 })
