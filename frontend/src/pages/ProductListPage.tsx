@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Table,
   Input,
@@ -10,11 +10,26 @@ import {
   Pagination,
   Row,
   Col,
+  Select,
+  Slider,
+  Dropdown,
 } from 'antd'
-import { SearchOutlined, PlusOutlined } from '@ant-design/icons'
+import { SearchOutlined, PlusOutlined, FilterOutlined, SortAscendingOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useProductStore } from '@stores/productStore'
 import type { Product } from '@/types'
+
+const { Option } = Select
+
+type SortField = 'price' | 'stock' | 'created_at'
+type SortOrder = 'asc' | 'desc'
+
+interface ProductFilters {
+  minPrice?: number
+  maxPrice?: number
+  category?: string
+  status?: string
+}
 
 export const ProductListPage: React.FC = () => {
   const navigate = useNavigate()
@@ -28,6 +43,11 @@ export const ProductListPage: React.FC = () => {
     setFilters,
     searchProducts,
   } = useProductStore()
+
+  const [sortField, setSortField] = useState<SortField>('created_at')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const [productFilters, setProductFilters] = useState<ProductFilters>({})
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000])
 
   useEffect(() => {
     fetchProducts()
@@ -101,6 +121,123 @@ export const ProductListPage: React.FC = () => {
     fetchProducts({ page, per_page: pageSize })
   }
 
+  const handleSort = (field: SortField) => {
+    const newOrder = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc'
+    setSortField(field)
+    setSortOrder(newOrder)
+    
+    fetchProducts({
+      ...filters,
+      sort_field: field,
+      sort_order: newOrder,
+    } as any)
+  }
+
+  const handleFilterChange = (key: keyof ProductFilters, value: any) => {
+    setProductFilters(prev => ({ ...prev, [key]: value }))
+  }
+
+  const applyFilters = () => {
+    fetchProducts({
+      ...filters,
+      ...productFilters,
+      sort_field: sortField,
+      sort_order: sortOrder,
+    } as any)
+  }
+
+  const resetFilters = () => {
+    setProductFilters({})
+    setPriceRange([0, 10000])
+    setSortField('created_at')
+    setSortOrder('desc')
+    fetchProducts()
+  }
+
+  const filterDropdownItems = [
+    {
+      key: 'price',
+      label: (
+        <div style={{ padding: '8px', width: 250 }}>
+          <div style={{ marginBottom: 8 }}>价格区间</div>
+          <Slider
+            range
+            min={0}
+            max={10000}
+            value={priceRange}
+            onChange={(value) => setPriceRange(value as [number, number])}
+            onAfterChange={(value) => {
+              handleFilterChange('minPrice', value[0])
+              handleFilterChange('maxPrice', value[1])
+            }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>¥{priceRange[0]}</span>
+            <span>¥{priceRange[1]}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      label: (
+        <div style={{ padding: '8px' }}>
+          <div style={{ marginBottom: 8 }}>状态筛选</div>
+          <Select
+            style={{ width: '100%' }}
+            placeholder="选择状态"
+            allowClear
+            onChange={(value) => handleFilterChange('status', value)}
+          >
+            <Option value="active">上架</Option>
+            <Option value="inactive">下架</Option>
+          </Select>
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      label: (
+        <Space style={{ padding: '8px' }}>
+          <Button type="primary" size="small" onClick={applyFilters}>
+            应用筛选
+          </Button>
+          <Button size="small" onClick={resetFilters}>
+            重置
+          </Button>
+        </Space>
+      ),
+    },
+  ]
+
+  const sortDropdownItems = [
+    {
+      key: 'price_asc',
+      label: '价格从低到高',
+      onClick: () => handleSort('price'),
+    },
+    {
+      key: 'price_desc',
+      label: '价格从高到低',
+      onClick: () => { setSortField('price'); setSortOrder('desc'); },
+    },
+    {
+      key: 'stock_asc',
+      label: '库存从少到多',
+      onClick: () => handleSort('stock'),
+    },
+    {
+      key: 'stock_desc',
+      label: '库存从多到少',
+      onClick: () => { setSortField('stock'); setSortOrder('desc'); },
+    },
+    {
+      key: 'created_desc',
+      label: '最新发布',
+      onClick: () => { setSortField('created_at'); setSortOrder('desc'); },
+    },
+  ]
+
   if (error) {
     return <Empty description={`错误: ${error}`} />
   }
@@ -117,9 +254,21 @@ export const ProductListPage: React.FC = () => {
           />
         </Col>
         <Col>
-          <Button type="primary" icon={<PlusOutlined />}>
-            发布产品
-          </Button>
+          <Space>
+            <Dropdown menu={{ items: filterDropdownItems }} trigger={['click']}>
+              <Button icon={<FilterOutlined />}>
+                筛选
+              </Button>
+            </Dropdown>
+            <Dropdown menu={{ items: sortDropdownItems }} trigger={['click']}>
+              <Button icon={<SortAscendingOutlined />}>
+                排序
+              </Button>
+            </Dropdown>
+            <Button type="primary" icon={<PlusOutlined />}>
+              发布产品
+            </Button>
+          </Space>
         </Col>
       </Row>
 

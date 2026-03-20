@@ -7,6 +7,11 @@ interface ProductFilters {
   merchant_id?: number
   page: number
   per_page: number
+  minPrice?: number
+  maxPrice?: number
+  category?: string
+  sort_field?: string
+  sort_order?: string
 }
 
 interface ProductState {
