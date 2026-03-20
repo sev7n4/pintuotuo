@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, message } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, message, Spin } from 'antd'
 import {
   DashboardOutlined,
   UserOutlined,
@@ -51,19 +51,32 @@ const menuItems = [
 const AdminLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout, isAuthenticated } = useAuthStore()
+  const { user, logout, isAuthenticated, fetchUser } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login')
-      return
+    const initAuth = async () => {
+      if (!isAuthenticated) {
+        navigate('/login', { state: { from: location.pathname } })
+        return
+      }
+
+      if (!user) {
+        await fetchUser()
+      }
+      setLoading(false)
     }
-    if (user && user.role !== 'admin') {
+
+    initAuth()
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    if (!loading && user && user.role !== 'admin') {
       message.error('无权限访问管理后台')
       navigate('/')
     }
-  }, [isAuthenticated, user, navigate])
+  }, [loading, user, navigate])
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
@@ -97,6 +110,14 @@ const AdminLayout = () => {
     const path = location.pathname
     if (path === '/admin') return '/admin'
     return path
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" tip="加载中..." />
+      </div>
+    )
   }
 
   if (!isAuthenticated || (user && user.role !== 'admin')) {
