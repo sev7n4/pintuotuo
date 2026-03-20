@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, message } from 'antd'
 import { UserOutlined, GiftOutlined, WalletOutlined, LogoutOutlined, BarChartOutlined } from '@ant-design/icons'
@@ -9,7 +10,13 @@ const { Header, Content, Footer } = AntLayout
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout, isAuthenticated } = useAuthStore()
+  const { user, logout, isAuthenticated, fetchUser } = useAuthStore()
+
+  useEffect(() => {
+    if (isAuthenticated && !user) {
+      fetchUser()
+    }
+  }, [isAuthenticated, user, fetchUser])
 
   const menuItems = [
     { key: '/', label: <Link to="/">首页</Link> },

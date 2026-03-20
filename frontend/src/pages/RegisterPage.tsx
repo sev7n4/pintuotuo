@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Form, Input, Button, Card, message, Radio, Space } from 'antd'
 import { UserOutlined, ShopOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -10,13 +10,13 @@ export const RegisterPage: React.FC = () => {
   const navigate = useNavigate()
   const { register, isLoading, error } = useAuthStore()
   const [form] = Form.useForm()
-  const [role, setRole] = useState<UserRole>('user')
 
   const onFinish = async (values: {
     email: string
     name: string
     password: string
     confirmPassword: string
+    role: UserRole
   }) => {
     if (values.password !== values.confirmPassword) {
       message.error('两次输入的密码不一致')
@@ -24,12 +24,12 @@ export const RegisterPage: React.FC = () => {
     }
 
     try {
-      await register(values.email, values.name, values.password, role)
+      await register(values.email, values.name, values.password, values.role || 'user')
       message.success('注册成功')
-      if (role === 'merchant') {
+      if (values.role === 'merchant') {
         navigate('/merchant/dashboard')
       } else {
-        navigate('/products')
+        navigate('/')
       }
     } catch (err) {
       message.error(error || '注册失败，请稍后重试')
@@ -47,11 +47,7 @@ export const RegisterPage: React.FC = () => {
           initialValues={{ role: 'user' }}
         >
           <Form.Item label="选择角色" name="role">
-            <Radio.Group 
-              onChange={(e) => setRole(e.target.value)} 
-              value={role}
-              style={{ width: '100%' }}
-            >
+            <Radio.Group style={{ width: '100%' }}>
               <Space direction="vertical" style={{ width: '100%' }}>
                 <Radio.Button 
                   value="user" 
