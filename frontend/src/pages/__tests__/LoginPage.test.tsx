@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import LoginPage from '../LoginPage'
 import { useAuthStore } from '@/stores/authStore'
 
