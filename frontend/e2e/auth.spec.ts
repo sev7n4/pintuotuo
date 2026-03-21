@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage, RegisterPage } from './pages';
 
+test.beforeEach(async ({ page }) => {
+  page.on('console', msg => {
+    console.log('BROWSER:', msg.type(), msg.text());
+  });
+  page.on('pageerror', error => {
+    console.error('PAGE ERROR:', error.message);
+  });
+});
+
 test.describe('Authentication', () => {
   test('should display login page', async ({ page }) => {
     await page.goto('/login');
