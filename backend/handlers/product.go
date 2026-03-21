@@ -257,9 +257,9 @@ func CreateProduct(c *gin.Context) {
 	var req struct {
 		Name          string  `json:"name" binding:"required"`
 		Description   string  `json:"description"`
-		Price         float64 `json:"price" binding:"required,gt=0"`
+		Price         float64 `json:"price"`
 		OriginalPrice float64 `json:"original_price"`
-		Stock         int     `json:"stock" binding:"required,gte=0"`
+		Stock         int     `json:"stock"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -267,9 +267,28 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
+	if req.Price <= 0 {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_PRICE",
+			"价格必须大于0",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	if req.Stock < 0 {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_STOCK",
+			"库存不能为负数",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
 	db := config.GetDB()
 
-	// Verify user is a merchant
 	var role string
 	err := db.QueryRow("SELECT role FROM users WHERE id = $1", userID).Scan(&role)
 	if err != nil || role != "merchant" {
