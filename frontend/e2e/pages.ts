@@ -100,12 +100,18 @@ export class MerchantProductsPage {
     await this.page.getByPlaceholder('请输入商品描述').fill(data.description);
     
     const priceFormItem = this.page.locator('.ant-form-item').filter({ hasText: '价格' });
-    await priceFormItem.locator('.ant-input-number input').fill(data.price.toString());
-    await priceFormItem.locator('.ant-input-number input').blur();
+    const priceInput = priceFormItem.locator('.ant-input-number input');
+    await priceInput.click();
+    await priceInput.fill('');
+    await priceInput.type(data.price.toString());
+    await priceInput.press('Tab');
     
     const stockFormItem = this.page.locator('.ant-form-item').filter({ hasText: '库存' });
-    await stockFormItem.locator('.ant-input-number input').fill(data.stock.toString());
-    await stockFormItem.locator('.ant-input-number input').blur();
+    const stockInput = stockFormItem.locator('.ant-input-number input');
+    await stockInput.click();
+    await stockInput.fill('');
+    await stockInput.type(data.stock.toString());
+    await stockInput.press('Tab');
     
     if (data.category) {
       await this.page.locator('.ant-select').first().click();
