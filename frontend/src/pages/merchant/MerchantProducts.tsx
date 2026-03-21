@@ -231,7 +231,7 @@ const MerchantProducts = () => {
               {
                 validator: (_, value) => {
                   if (value !== undefined && value < 0) {
-                    return Promise.reject(new Error('库存不能为负数'))
+                    return Promise.reject(new Error('库存必须大于等于0'))
                   }
                   return Promise.resolve()
                 },
