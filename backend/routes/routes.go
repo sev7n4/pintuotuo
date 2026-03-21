@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/handlers"
+	"github.com/pintuotuo/backend/middleware"
 )
 
 func RegisterHealthRoutes(router *gin.RouterGroup) {
@@ -18,27 +19,29 @@ func RegisterHealthRoutes(router *gin.RouterGroup) {
 func RegisterUserRoutes(router *gin.RouterGroup) {
 	users := router.Group("/users")
 	{
-		// Auth endpoints
 		users.POST("/register", handlers.RegisterUser)
 		users.POST("/login", handlers.LoginUser)
 		users.POST("/logout", handlers.LogoutUser)
 		users.POST("/refresh", handlers.RefreshToken)
 
-		// Password reset endpoints (no auth required)
 		users.POST("/password/reset-request", handlers.RequestPasswordReset)
 		users.POST("/password/reset", handlers.ResetPassword)
 
-		// User management endpoints
-		users.GET("/me", handlers.GetCurrentUser)
-		users.PUT("/me", handlers.UpdateCurrentUser)
+		auth := users.Group("")
+		auth.Use(middleware.AuthMiddleware())
+		{
+			auth.GET("/me", handlers.GetCurrentUser)
+			auth.PUT("/me", handlers.UpdateCurrentUser)
+		}
+
 		users.GET("/:id", handlers.GetUserByID)
 		users.PUT("/:id", handlers.UpdateUser)
 	}
 }
 
-// RegisterAPIRoutes registers API proxy routes
 func RegisterAPIRoutes(router *gin.RouterGroup) {
 	api := router.Group("/proxy")
+	api.Use(middleware.AuthMiddleware())
 	{
 		api.POST("/chat", handlers.ProxyAPIRequest)
 		api.POST("/completions", handlers.ProxyAPIRequest)
@@ -47,20 +50,18 @@ func RegisterAPIRoutes(router *gin.RouterGroup) {
 	}
 }
 
-// RegisterConsumptionRoutes registers consumption routes
 func RegisterConsumptionRoutes(router *gin.RouterGroup) {
 	consumption := router.Group("/consumption")
+	consumption.Use(middleware.AuthMiddleware())
 	{
 		consumption.GET("/records", handlers.GetConsumptionRecords)
 		consumption.GET("/stats", handlers.GetConsumptionStats)
 	}
 }
 
-// RegisterProductRoutes registers product-related routes
 func RegisterProductRoutes(router *gin.RouterGroup) {
 	products := router.Group("/products")
 	{
-		// Read operations
 		products.GET("", handlers.ListProducts)
 		products.GET("/home", handlers.GetHomeData)
 		products.GET("/hot", handlers.GetHotProducts)
@@ -69,8 +70,8 @@ func RegisterProductRoutes(router *gin.RouterGroup) {
 		products.GET("/search", handlers.SearchProducts)
 		products.GET("/:id", handlers.GetProductByID)
 
-		// Merchant operations
 		merchants := products.Group("/merchants")
+		merchants.Use(middleware.AuthMiddleware())
 		{
 			merchants.POST("", handlers.CreateProduct)
 			merchants.PUT("/:id", handlers.UpdateProduct)
@@ -79,9 +80,9 @@ func RegisterProductRoutes(router *gin.RouterGroup) {
 	}
 }
 
-// RegisterOrderRoutes registers order-related routes
 func RegisterOrderRoutes(router *gin.RouterGroup) {
 	orders := router.Group("/orders")
+	orders.Use(middleware.AuthMiddleware())
 	{
 		orders.POST("", handlers.CreateOrder)
 		orders.GET("", handlers.ListOrders)
@@ -90,9 +91,9 @@ func RegisterOrderRoutes(router *gin.RouterGroup) {
 	}
 }
 
-// RegisterGroupRoutes registers group purchase routes
 func RegisterGroupRoutes(router *gin.RouterGroup) {
 	groups := router.Group("/groups")
+	groups.Use(middleware.AuthMiddleware())
 	{
 		groups.POST("", handlers.CreateGroup)
 		groups.GET("", handlers.ListGroups)
@@ -103,15 +104,14 @@ func RegisterGroupRoutes(router *gin.RouterGroup) {
 	}
 }
 
-// RegisterTokenRoutes registers token management routes
 func RegisterTokenRoutes(router *gin.RouterGroup) {
 	tokens := router.Group("/tokens")
+	tokens.Use(middleware.AuthMiddleware())
 	{
 		tokens.GET("/balance", handlers.GetTokenBalance)
 		tokens.GET("/consumption", handlers.GetTokenConsumption)
 		tokens.POST("/transfer", handlers.TransferTokens)
 
-		// API Key management
 		keys := tokens.Group("/keys")
 		{
 			keys.GET("", handlers.ListAPIKeys)
@@ -122,25 +122,24 @@ func RegisterTokenRoutes(router *gin.RouterGroup) {
 	}
 }
 
-// RegisterPaymentRoutes registers payment routes
 func RegisterPaymentRoutes(router *gin.RouterGroup) {
 	payments := router.Group("/payments")
+	payments.Use(middleware.AuthMiddleware())
 	{
 		payments.POST("", handlers.CreatePayment)
 		payments.GET("/:id", handlers.GetPaymentStatus)
+	}
 
-		// Webhooks
-		webhooks := payments.Group("/webhooks")
-		{
-			webhooks.POST("/alipay", handlers.AlipayNotify)
-			webhooks.POST("/wechat", handlers.WechatNotify)
-		}
+	webhooks := router.Group("/payments/webhooks")
+	{
+		webhooks.POST("/alipay", handlers.AlipayNotify)
+		webhooks.POST("/wechat", handlers.WechatNotify)
 	}
 }
 
-// RegisterReferralRoutes registers referral routes
 func RegisterReferralRoutes(router *gin.RouterGroup) {
 	referrals := router.Group("/referrals")
+	referrals.Use(middleware.AuthMiddleware())
 	{
 		referrals.GET("/code", handlers.GetMyReferralCode)
 		referrals.POST("/bind", handlers.BindReferralCode)
@@ -152,22 +151,25 @@ func RegisterReferralRoutes(router *gin.RouterGroup) {
 	}
 }
 
-// RegisterMerchantRoutes registers merchant routes
 func RegisterMerchantRoutes(router *gin.RouterGroup) {
 	merchants := router.Group("/merchants")
 	{
 		merchants.POST("/register", handlers.RegisterMerchant)
-		merchants.GET("/profile", handlers.GetMerchantProfile)
-		merchants.PUT("/profile", handlers.UpdateMerchantProfile)
-		merchants.GET("/stats", handlers.GetMerchantStats)
-		merchants.GET("/products", handlers.GetMerchantProducts)
-		merchants.GET("/orders", handlers.GetMerchantOrders)
-		merchants.GET("/settlements", handlers.GetMerchantSettlements)
-		merchants.POST("/settlements", handlers.RequestSettlement)
-		merchants.GET("/settlements/:id", handlers.GetSettlementDetail)
+	}
 
-		// API Key management
-		apiKeys := merchants.Group("/api-keys")
+	authMerchants := router.Group("/merchants")
+	authMerchants.Use(middleware.AuthMiddleware())
+	{
+		authMerchants.GET("/profile", handlers.GetMerchantProfile)
+		authMerchants.PUT("/profile", handlers.UpdateMerchantProfile)
+		authMerchants.GET("/stats", handlers.GetMerchantStats)
+		authMerchants.GET("/products", handlers.GetMerchantProducts)
+		authMerchants.GET("/orders", handlers.GetMerchantOrders)
+		authMerchants.GET("/settlements", handlers.GetMerchantSettlements)
+		authMerchants.POST("/settlements", handlers.RequestSettlement)
+		authMerchants.GET("/settlements/:id", handlers.GetSettlementDetail)
+
+		apiKeys := authMerchants.Group("/api-keys")
 		{
 			apiKeys.GET("", handlers.ListMerchantAPIKeys)
 			apiKeys.POST("", handlers.CreateMerchantAPIKey)
@@ -178,24 +180,23 @@ func RegisterMerchantRoutes(router *gin.RouterGroup) {
 	}
 }
 
-// RegisterNotificationRoutes registers notification routes
 func RegisterNotificationRoutes(router *gin.RouterGroup) {
 	notifications := router.Group("/notifications")
+	notifications.Use(middleware.AuthMiddleware())
 	{
 		notifications.GET("", handlers.GetNotifications)
 		notifications.GET("/unread-count", handlers.GetUnreadCount)
 		notifications.PUT("/:id/read", handlers.MarkNotificationRead)
 		notifications.PUT("/read-all", handlers.MarkAllNotificationsRead)
 
-		// Device Token
 		notifications.POST("/device-token", handlers.RegisterDeviceToken)
 		notifications.DELETE("/device-token", handlers.UnregisterDeviceToken)
 	}
 }
 
-// RegisterAdminRoutes registers admin routes
 func RegisterAdminRoutes(router *gin.RouterGroup) {
 	admin := router.Group("/admin")
+	admin.Use(middleware.AuthMiddleware())
 	{
 		admin.GET("/users", handlers.GetAdminUsers)
 		admin.POST("/users", handlers.CreateAdminUser)

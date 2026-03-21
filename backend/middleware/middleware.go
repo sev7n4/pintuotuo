@@ -57,7 +57,7 @@ func LoggingMiddleware() gin.HandlerFunc {
 		duration := time.Since(startTime)
 		statusCode := c.Writer.Status()
 
-		fmt.Printf("[%s] %s %s | Status: %d | Duration: %v | IP: %s\n",
+		logMsg := fmt.Sprintf("[%s] %s %s | Status: %d | Duration: %v | IP: %s\n",
 			time.Now().Format("2006-01-02 15:04:05"),
 			method,
 			path,
@@ -65,6 +65,8 @@ func LoggingMiddleware() gin.HandlerFunc {
 			duration,
 			c.ClientIP(),
 		)
+		fmt.Print(logMsg)
+		os.Stdout.Sync()
 	}
 }
 
