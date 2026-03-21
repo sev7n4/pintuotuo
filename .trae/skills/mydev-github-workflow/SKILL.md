@@ -1,305 +1,234 @@
 ---
 name: "mydev-github-workflow"
-description: "Automated development workflow integrated with GitHub CI/CD. Invoke when user reports a bug, requests a feature, describes a code change requirement, or provides structured issue input with type/title/description/priority/scope fields."
+description: |
+Automated development workflow for bug fixes, features, and code changes with GitHub CI/CD integration. 
+Use when user: (1) reports a bug ("登录失败", "返回401", "有个错误"), (2) requests a feature ("添加功能", "实现一个", "新增"), (3) describes improvements ("优化", "重构", "改进"), or (4) provides structured issue input (type/title/description fields).
 ---
 
 # MyDev GitHub Workflow
 
-## 触发条件
+## Overview
 
-当用户满足以下任一条件时**必须**触发：
+自动化开发工作流，实现从问题输入到代码合并的完整闭环。集成GitHub CI/CD，自动执行：问题解析 → 计划生成 → 分支创建 → 代码实现 → 测试编写 → 本地验证 → 提交推送 → CI监控 → 文档更新。
 
-1. 报告Bug："有个bug"、"登录失败"、"返回401错误"
-2. 请求新功能："需要添加"、"实现一个"、"新增功能"
-3. 代码改进："优化"、"重构"、"改进"
-4. 结构化输入：包含类型、标题、描述等字段
-
-## 资源引用指南
-
-**按需加载顺序**：
-
-| 时机 | 加载资源 | 用途 |
-|------|----------|------|
-| 问题解析后 | `assets/templates/plan_template.md` | 生成计划文档 |
-| 问题解析后 | `assets/templates/tasks_template.md` | 生成任务清单 |
-| 需要详细设计参考 | `references/design.md` | 查看完整设计方案 |
-| 需要命令参考 | `references/quick_reference.md` | 查看测试命令等 |
-| 需要决策帮助 | `references/decision_guide.md` | 查看决策指导 |
-| 遇到常见错误 | `references/error_reference.md` | 查看错误处理 |
-
-## 核心工作流程
+## Quick Start
 
 ```
-问题输入 → 解析 → 计划 → 分支 → 分析 → 实现 → 测试 → 验证 → 提交 → CI监控 → (失败循环) → 总结
+用户：登录功能返回401错误
+
+→ 自动执行完整流程，直到CI通过并创建PR
 ```
 
-### 步骤1：问题解析
+```
+用户：
+类型: feature
+标题: 添加商品收藏功能
+描述: 用户可以收藏喜欢的商品
+优先级: medium
+影响范围: both
 
-**目标**：解析用户输入，生成结构化对象
-
-**执行**：
-1. 分析用户输入内容
-2. 判断问题类型：
-   - 包含"bug"、"错误"、"失败" → `bug`
-   - 包含"添加"、"实现"、"新增" → `feature`
-   - 包含"优化"、"重构"、"改进" → `enhancement`
-3. 评估优先级：
-   - 影响核心功能、安全 → `high`
-   - 影响次要功能 → `medium`
-   - 优化改进 → `low`
-4. 确定影响范围：
-   - 涉及API、数据库 → `backend`
-   - 涉及UI、交互 → `frontend`
-   - 两者都有 → `both`
-5. 生成Issue ID：`ISSUE-{三位序号}`
-
-**状态更新**：更新 `scripts/workflow_state.json`：
-```json
-{
-  "currentIssue": { "id": "ISSUE-001", "type": "bug", ... },
-  "workflowState": { "stage": "parsing", ... }
-}
+→ 自动执行开发流程
 ```
 
-### 步骤2：计划生成
+## When to Use
 
-**目标**：生成计划文档和任务清单
+| 触发场景 | 用户可能说的话 |
+|----------|----------------|
+| Bug修复 | "有个bug"、"登录失败"、"返回401错误"、"出问题了" |
+| 新功能 | "添加功能"、"实现一个"、"新增"、"开发" |
+| 代码改进 | "优化"、"重构"、"改进"、"提升" |
+| 结构化输入 | 提供type/title/description字段 |
 
-**执行**：
-1. 读取模板：
-   - `assets/templates/plan_template.md`
-   - `assets/templates/tasks_template.md`
-2. 填充模板内容
-3. 生成文件：
-   - `assets/plans/{YYYY-MM-DD}_issue_{id}_plan.md`
-   - `assets/tasks/{YYYY-MM-DD}_issue_{id}_tasks.md`
+## Workflow Decision Tree
 
-**决策点**：
-- 如果问题复杂（涉及多个模块），先加载 `references/design.md` 参考
-- 如果不确定如何填写，参考 `references/decision_guide.md`
+```
+用户输入
+    ↓
+问题解析 ──→ 判断类型
+    ↓           ├─ bug → bugfix/issue-{id}-{desc}
+    ↓           ├─ feature → feature/issue-{id}-{desc}
+    ↓           └─ enhancement → enhancement/issue-{id}-{desc}
+    ↓
+计划生成 ──→ 读取模板 → 生成计划和任务文档
+    ↓
+分支创建 ──→ git checkout -b {branch}
+    ↓
+代码分析 ──→ SearchCodebase → Grep → Read
+    ↓           └─ 找不到? → 询问用户
+    ↓
+代码实现 ──→ SearchReplace / Write
+    ↓
+测试编写 ──→ 单元测试 + 集成测试 + E2E测试
+    ↓
+本地验证 ──→ 运行测试
+    ↓           └─ 失败? → 修复 → 重新验证
+    ↓
+代码提交 ──→ git commit -m "..."
+    ↓
+CI监控 ──→ gh run watch
+    ↓           ├─ 成功 → 文档更新 → 创建PR
+    ↓           └─ 失败 → 错误修复循环 (最多5次)
+    ↓
+完成
+```
 
-### 步骤3：分支创建
+## 核心步骤
 
-**目标**：创建符合规范的Git分支
+### Step 1: 问题解析
 
-**执行**：
+**判断类型**：
+- 含"bug"、"错误"、"失败"、"异常" → `bug`
+- 含"添加"、"实现"、"新增"、"开发" → `feature`  
+- 含"优化"、"重构"、"改进"、"提升" → `enhancement`
+
+**评估优先级**：
+- 影响核心功能/安全 → `high`
+- 影响次要功能 → `medium`
+- 优化改进 → `low`
+
+**确定范围**：
+- 涉及API/数据库 → `backend`
+- 涉及UI/交互 → `frontend`
+- 两者都有 → `both`
+
+**生成Issue ID**：读取 `scripts/workflow_state.json` 获取下一个序号
+
+### Step 2: 计划生成
+
+```
+读取: assets/templates/plan_template.md
+      assets/templates/tasks_template.md
+生成: assets/plans/{YYYY-MM-DD}_issue_{id}_plan.md
+      assets/tasks/{YYYY-MM-DD}_issue_{id}_tasks.md
+```
+
+**决策点**：问题复杂? → 先加载 `references/decision_guide.md`
+
+### Step 3: 分支创建
+
 ```bash
 git checkout main && git pull origin main
-git checkout -b {type}/issue-{id}-{desc}
-git push -u origin {branch}
+git checkout -b bugfix/issue-001-login-401  # 示例
+git push -u origin bugfix/issue-001-login-401
 ```
 
-**分支命名**：
-| 类型 | 格式 |
-|------|------|
-| bug | `bugfix/issue-{id}-{desc}` |
-| feature | `feature/issue-{id}-{desc}` |
-| enhancement | `enhancement/issue-{id}-{desc}` |
+### Step 4: 代码分析
 
-**状态更新**：`workflowState.stage = "branching"`
+```
+SearchCodebase: "登录认证逻辑"
+Grep: "func.*Login|auth.*handler"
+Read: backend/handlers/auth.go
+```
 
-### 步骤4：代码分析
+**决策点**：找不到代码? → 询问用户提供更多信息
 
-**目标**：定位需要修改的代码位置
+### Step 5: 代码实现
 
-**执行**：
-1. 使用 SearchCodebase 进行语义搜索
-2. 使用 Grep 进行关键词搜索
-3. 使用 Read 读取相关文件
-4. 分析代码依赖关系
-
-**决策点**：
-- 如果找不到相关代码，询问用户更多信息
-- 如果影响范围过大，评估是否需要拆分任务
-
-**状态更新**：`workflowState.stage = "analyzing"`
-
-### 步骤5：代码实现
-
-**目标**：实现代码修改
-
-**执行**：
 - SearchReplace: 精确修改现有文件
 - Write: 创建新文件
+- 原则：最小化修改，保持风格一致
 
-**原则**：
-- 最小化修改范围
-- 保持代码风格一致
-- 添加必要的错误处理
+### Step 6: 测试编写
 
-**状态更新**：`workflowState.stage = "implementing"`
-
-### 步骤6：测试编写
-
-**目标**：编写完整的测试用例
-
-**执行**：
-| 类型 | 位置 | 覆盖率要求 |
-|------|------|-----------|
+| 类型 | 位置 | 覆盖率 |
+|------|------|--------|
 | 单元测试 | `backend/{module}_test.go` | ≥85% |
 | 集成测试 | `backend/{module}_integration_test.go` | 核心流程 |
 | E2E测试 | `frontend/e2e/{feature}.spec.ts` | 用户场景 |
 
-**决策点**：
-- Bug修复：至少编写一个回归测试
-- 新功能：编写完整测试套件
+### Step 7: 本地验证
 
-**状态更新**：`workflowState.stage = "testing"`
-
-### 步骤7：本地验证
-
-**目标**：确保本地测试通过
-
-**执行**：
 ```bash
 # 后端
 cd backend && go test -v -race -coverprofile=coverage.out ./...
 
-# 前端
+# 前端  
 cd frontend && npm test -- --coverage --watchAll=false
-cd frontend && npm run test:e2e
 ```
 
-**决策点**：
-- 测试失败 → 分析日志，修复代码或测试，重新验证
-- 覆盖率不达标 → 补充测试用例
+**决策点**：失败? → 分析日志 → 修复 → 重新验证
 
-**状态更新**：`workflowState.stage = "verifying"`
+### Step 8: 代码提交
 
-### 步骤8：代码提交
-
-**目标**：提交代码并推送
-
-**执行**：
 ```bash
 git add .
-git commit -m "<type>(<scope>): <subject>
+git commit -m "fix(auth): resolve login 401 error
 
-<body>
+- Fix jwtSecret initialization
+- Add unit tests
 
-Closes #ISSUE-{id}"
-git push origin {branch}
+Closes #ISSUE-001"
+git push origin bugfix/issue-001-login-401
 ```
 
-**提交类型**：`feat` | `fix` | `docs` | `style` | `refactor` | `test` | `chore`
+### Step 9: CI监控
 
-**状态更新**：`workflowState.stage = "committing"`
-
-### 步骤9：CI监控
-
-**目标**：监控GitHub工作流执行状态
-
-**执行**：
 ```bash
-gh run list --branch={branch} --limit=1
+gh run list --branch=bugfix/issue-001-login-401 --limit=1
 gh run watch {run-id}
 ```
 
-**工作流链**：CI/CD → Integration Tests → E2E Tests
-
 **决策点**：
-- 成功 → 进入步骤11
-- 失败 → 进入步骤10
+- 成功 → Step 11
+- 失败 → Step 10
 
-**状态更新**：`workflowState.stage = "ci_monitoring"`
+### Step 10: 错误修复循环
 
-### 步骤10：错误修复循环
-
-**目标**：分析失败原因并修复
-
-**执行**：
-1. 获取失败日志：`gh run view {run-id} --log-failed`
-2. 分析错误原因（参考 `references/error_reference.md`）
+```
+1. gh run view {run-id} --log-failed
+2. 分析错误 (参考 references/error_reference.md)
 3. 定位问题代码
 4. 应用修复
 5. 本地验证
 6. 重新提交
-7. 返回步骤9
-
-**终止条件**：
-- 工作流成功
-- 达到最大重试次数（5次）→ 请求人工介入
-
-**状态更新**：`workflowState.stage = "fixing"`
-
-### 步骤11：文档更新
-
-**目标**：更新跟踪文档
-
-**执行**：
-1. 追加更新 `references/issue_tracking.md`
-2. 追加更新 `references/workflow_history.md`
-
-**状态更新**：`workflowState.stage = "documenting"`
-
-### 步骤12：创建PR
-
-**目标**：创建Pull Request
-
-**执行**：
-```bash
-gh pr create --title "{title}" --body-file {body}
+7. 返回 Step 9
 ```
 
-**状态更新**：`workflowState.stage = "completed"`
+**终止条件**：成功 或 重试5次 → 请求人工介入
+
+### Step 11: 文档更新
+
+追加更新：
+- `references/issue_tracking.md`
+- `references/workflow_history.md`
+
+### Step 12: 创建PR
+
+```bash
+gh pr create --title "fix(auth): resolve login 401 error" --body "..."
+```
 
 ## 状态管理
 
 **文件**：`scripts/workflow_state.json`
 
-**更新时机**：每个步骤完成后更新
-
-**字段说明**：
-```json
-{
-  "currentIssue": {        // 当前处理的问题
-    "id": "ISSUE-001",
-    "type": "bug",
-    "title": "...",
-    "branch": "bugfix/issue-001-..."
-  },
-  "workflowState": {       // 工作流状态
-    "stage": "analyzing",  // 当前阶段
-    "startedAt": "2026-03-21T10:00:00Z",
-    "retryCount": 0        // 重试次数
-  },
-  "statistics": { ... }    // 统计信息
-}
-```
-
-## 错误处理
-
-| 错误类型 | 处理方式 | 参考 |
-|----------|----------|------|
-| 编译错误 | 分析语法，修复代码 | `error_reference.md` |
-| 测试失败 | 分析日志，修复代码/测试 | `error_reference.md` |
-| Lint错误 | 按规范修复代码风格 | `quick_reference.md` |
-| CI失败 | 获取日志，定位修复 | `error_reference.md` |
+每个步骤完成后更新 `workflowState.stage`，详见 `references/design.md`
 
 ## 人工介入条件
 
-以下情况需要请求用户确认：
-1. 重试次数达到5次仍失败
-2. 无法定位问题代码
-3. 影响范围评估过大（>5个文件）
-4. 涉及数据库迁移
-5. 涉及安全敏感操作
+| 条件 | 原因 |
+|------|------|
+| 重试5次仍失败 | 可能存在AI无法解决的问题 |
+| 无法定位代码 | 需要用户提供更多信息 |
+| 影响>5个文件 | 影响范围过大需确认 |
+| 数据库迁移 | 数据安全风险 |
+| 安全敏感操作 | 需要权限确认 |
 
-## 文件结构
+## Reference Files
 
-```
-├── SKILL.md              # 本文件（第二层）
-├── references/           # 参考文档（第三层，按需加载）
-│   ├── design.md
-│   ├── decision_guide.md
-│   ├── error_reference.md
-│   ├── issue_tracking.md
-│   ├── quick_reference.md
-│   └── workflow_history.md
-├── assets/
-│   ├── templates/        # 模板资源
-│   ├── plans/            # 运行时生成
-│   └── tasks/            # 运行时生成
-└── scripts/
-    └── workflow_state.json
-```
+| 文件 | 用途 |
+|------|------|
+| `references/decision_guide.md` | 决策指导：类型判断、优先级评估 |
+| `references/error_reference.md` | 错误参考：常见错误及处理方式 |
+| `references/design.md` | 完整设计方案 |
+| `references/quick_reference.md` | 命令速查表 |
+
+## Error Handling
+
+| 错误类型 | 处理方式 |
+|----------|----------|
+| 编译错误 | 分析语法，修复代码 |
+| 测试失败 | 分析日志，修复代码/测试 |
+| CI失败 | 获取日志，定位修复 |
+
+详见 `references/error_reference.md`
