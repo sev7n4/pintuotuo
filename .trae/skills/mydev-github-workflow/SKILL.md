@@ -43,7 +43,8 @@ Step 14: 清理 → 输出PR链接
 ### Step 0: 初始化检查
 
 ```bash
-git status --porcelain  # 有输出? → 询问用户
+# 检查当前分支是否干净
+git status --porcelain  # 有输出? → 询问用户: 暂存/提交/忽略
 ```
 
 ### Step 1: 问题解析
@@ -59,7 +60,13 @@ git status --porcelain  # 有输出? → 询问用户
 ### Step 2-3: 计划与分支
 
 ```bash
-git checkout main && git pull
+# 1. 切换到main并拉取最新
+git checkout main && git pull origin main
+
+# 2. 再次验证main分支干净
+git status --porcelain  # 有输出? → 警告用户，不继续
+
+# 3. 创建新分支
 git checkout -b bugfix/issue-001-{description}
 ```
 

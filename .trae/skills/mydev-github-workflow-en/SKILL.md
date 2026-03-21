@@ -43,7 +43,8 @@ Step 14: Cleanup → Output PR link
 ### Step 0: Init Check
 
 ```bash
-git status --porcelain  # Has output? → Ask user
+# Check if current branch is clean
+git status --porcelain  # Has output? → Ask user: stash/commit/ignore
 ```
 
 ### Step 1: Issue Parsing
@@ -59,7 +60,13 @@ git status --porcelain  # Has output? → Ask user
 ### Step 2-3: Plan & Branch
 
 ```bash
-git checkout main && git pull
+# 1. Switch to main and pull latest
+git checkout main && git pull origin main
+
+# 2. Verify main branch is clean
+git status --porcelain  # Has output? → Warn user, do not continue
+
+# 3. Create new branch
 git checkout -b bugfix/issue-001-{description}
 ```
 
