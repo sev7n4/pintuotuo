@@ -31,8 +31,10 @@ Step 6: 最小实现 → TDD Green: 写最少代码
 Step 7: 重构优化 → TDD Refactor: 优化代码
 Step 8: 本地验证 → 运行测试 + 覆盖率检查
 Step 9: 代码提交 → git commit -m "..."
-Step 10: CI监控 → 监控完整工作流链
-Step 11: 错误修复 → 分析日志 → 修复 → 重试(最多5次)
+Step 10: 实时监控 → 每30秒分析日志 → 发现失败立即取消
+   ├─ 失败 → Step 11 (分析错误 → 返回Step 6)
+   └─ 成功 → Step 12
+Step 11: 错误修复 → 分析日志 → 返回Step 6继续最小实现
 Step 12: 文档更新 → 更新跟踪文档
 Step 13: 创建PR → gh pr create
 Step 14: 清理 → 输出PR链接
@@ -108,46 +110,70 @@ git commit -m "fix(auth): resolve login 401 error
 Closes #ISSUE-001"
 ```
 
-### Step 10: CI监控
+### Step 10: CI实时监控
 
 **工作流链**: CI/CD → Integration → E2E (顺序触发)
 
+**核心原则**: 实时监控，快速失败，及时止损
+
 ```bash
-# 检查所有工作流状态
-gh pr view {pr-number} --json statusCheckRollup
+# 实时获取工作流日志
+gh run view {run-id} --log 2>&1 | grep -E "FAIL|Error|error|✘|✗"
+
+# 取消正在运行的工作流
+gh run cancel {run-id}
 ```
 
-**监控流程**:
+**实时监控流程**:
 ```
-1. 等待 CI/CD Pipeline 完成
-   ├─ 成功 → 等待 Integration Tests
-   └─ 失败 → Step 11 (分析CI错误)
+1. 启动 CI/CD Pipeline 监控
+   ├─ 每30秒获取最新日志
+   ├─ 检测到编译/Lint错误 → 取消工作流 → Step 11
+   ├─ 检测到单元测试失败 → 取消工作流 → Step 11
+   └─ CI/CD成功 → 启动 Integration 监控
 
-2. 等待 Integration Tests 完成
-   ├─ 成功 → 等待 E2E Tests
-   └─ 失败 → Step 11 (分析集成错误)
+2. 启动 Integration Tests 监控
+   ├─ 每30秒获取最新日志
+   ├─ 检测到API错误 → 取消工作流 → Step 11
+   ├─ 检测到数据错误 → 取消工作流 → Step 11
+   └─ Integration成功 → 启动 E2E 监控
 
-3. 等待 E2E Tests 完成
-   ├─ 成功 → Step 12
-   └─ 失败 → Step 11 (分析E2E错误)
+3. 启动 E2E Tests 监控
+   ├─ 每30秒获取最新日志
+   ├─ 重点监控当前测试用例 (PROD-002, PROD-003等)
+   ├─ 检测到当前用例失败 → 取消工作流 → Step 11
+   ├─ 检测到其他用例失败 → 记录，继续监控
+   └─ E2E成功 → Step 12
+```
+
+**实时日志分析命令**:
+```bash
+# 获取当前运行中的工作流ID
+RUN_ID=$(gh run list --workflow="E2E Tests" --status=in_progress --json databaseId -q '.[0].databaseId')
+
+# 实时获取日志并分析
+gh run view $RUN_ID --log 2>&1 | grep -E "PROD-002|PROD-003|✘|FAIL"
+
+# 检查特定测试用例状态
+gh run view $RUN_ID --log 2>&1 | grep -A5 "PROD-002"
 ```
 
 **错误类型决策**:
 
 | 工作流 | 错误类型 | 错误特征 | 下一步 |
 |--------|----------|----------|--------|
-| CI/CD | 编译错误 | `undefined`, `type error` | 修复代码 |
-| CI/CD | Lint错误 | `errcheck`, `staticcheck` | 修复风格 |
-| CI/CD | 单元测试 | `FAIL`, `assertion` | 修复测试 |
-| Integration | API错误 | `connection refused`, `500` | 修复API/DB |
-| Integration | 数据错误 | `duplicate`, `foreign key` | 修复数据逻辑 |
-| E2E | UI错误 | `selector not found`, `timeout` | 修复UI/选择器 |
-| E2E | 流程错误 | `assertion failed` | 修复用户流程 |
-| 任意 | 环境问题 | `permission`, `OOM`, `timeout` | 重试1次 → 人工介入 |
+| CI/CD | 编译错误 | `undefined`, `type error` | 取消 → 修复代码 |
+| CI/CD | Lint错误 | `errcheck`, `staticcheck` | 取消 → 修复风格 |
+| CI/CD | 单元测试 | `FAIL`, `assertion` | 取消 → 修复测试 |
+| Integration | API错误 | `connection refused`, `500` | 取消 → 修复API/DB |
+| Integration | 数据错误 | `duplicate`, `foreign key` | 取消 → 修复数据逻辑 |
+| E2E | 当前用例失败 | `PROD-xxx ✘` | 取消 → Step 11 |
+| E2E | 其他用例失败 | `SETTLE-xxx ✘` | 记录，继续监控 |
+| 任意 | 环境问题 | `permission`, `OOM` | 重试1次 → 人工介入 |
 
 **成功?** → Step 12
 
-### Step 11: 错误修复
+### Step 11: 错误修复与快速迭代
 
 ```bash
 # 获取失败日志
@@ -157,16 +183,31 @@ gh run view {run-id} --log-failed
 grep -i "error\|fail\|panic" logs.txt
 ```
 
-**修复流程**:
+**快速迭代流程**:
 ```
-1. 识别错误类型 (编译/测试/Lint/安全/环境)
-2. 定位错误位置 (文件:行号)
-3. 分析错误原因
-4. 应用修复
-5. 本地验证
-6. 重新提交
-7. 返回 Step 10
+1. 取消当前工作流 (如果还在运行)
+   gh run cancel {run-id}
+
+2. 分析错误类型
+   ├─ 代码错误 → Step 6 (最小实现)
+   ├─ 测试错误 → Step 5 (测试设计) 或 Step 6 (最小实现)
+   └─ 环境问题 → 重试1次
+
+3. 应用修复 → 本地验证 → 重新提交
+
+4. 返回 Step 10 (实时监控)
 ```
+
+**错误类型与返回点**:
+
+| 错误类型 | 返回步骤 | 原因 |
+|----------|----------|------|
+| 编译错误 | Step 6 | 代码语法/类型问题 |
+| Lint错误 | Step 6 | 代码风格问题 |
+| 单元测试失败 | Step 6 | 实现不满足测试 |
+| 集成测试失败 | Step 6 | API/数据逻辑问题 |
+| E2E当前用例失败 | Step 6 | 前端实现/选择器问题 |
+| 测试设计问题 | Step 5 | 测试用例本身有问题 |
 
 **重试限制**: 最多5次 → 超过后请求人工介入
 
