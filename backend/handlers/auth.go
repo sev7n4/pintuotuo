@@ -18,7 +18,11 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
-var jwtSecret = []byte(getEnv("JWT_SECRET", "pintuotuo-secret-key-dev"))
+var jwtSecret []byte
+
+func init() {
+	jwtSecret = []byte(getEnv("JWT_SECRET", "pintuotuo-secret-key-dev"))
+}
 
 // RegisterRequest represents user registration data
 type RegisterRequest struct {
