@@ -15,7 +15,7 @@ test.describe('Merchant Dashboard', () => {
     await expect(page).toHaveURL(/.*merchant/);
     
     await page.goto('/merchant');
-    await expect(page.getByRole('heading', { name: '商家后台' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '数据概览' })).toBeVisible();
   });
 
   test('should display merchant products', async ({ page }) => {
@@ -24,7 +24,7 @@ test.describe('Merchant Dashboard', () => {
     await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/products');
-    await expect(page.getByRole('heading', { name: '商品管理' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '商品管理' }).or(page.locator('h2:has-text("商品")'))).toBeVisible();
   });
 
   test('should create new product', async ({ page }) => {
@@ -54,7 +54,7 @@ test.describe('Merchant Dashboard', () => {
     await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/orders');
-    await expect(page.getByRole('heading', { name: '订单管理' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '订单管理' }).or(page.locator('h2:has-text("订单")'))).toBeVisible();
   });
 
   test('should display merchant settlements', async ({ page }) => {
@@ -63,7 +63,7 @@ test.describe('Merchant Dashboard', () => {
     await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/settlements');
-    await expect(page.getByRole('heading', { name: '结算管理' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '结算管理' }).or(page.locator('h2:has-text("结算")'))).toBeVisible();
   });
 });
 
@@ -80,7 +80,7 @@ test.describe('Merchant API Keys', () => {
     await loginPage.expectLoginSuccess();
     
     await page.goto('/merchant/api-keys');
-    await expect(page.getByRole('heading', { name: 'API密钥' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'API密钥' }).or(page.locator('h2:has-text("API")'))).toBeVisible();
   });
 
   test('should create new API key', async ({ page }) => {

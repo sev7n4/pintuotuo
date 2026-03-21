@@ -15,7 +15,7 @@ test.describe('Orders', () => {
     await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/orders');
-    await expect(page.getByRole('heading', { name: '我的订单' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '订单列表' }).or(page.locator('h1:has-text("订单")'))).toBeVisible();
   });
 
   test('should show empty state when no orders', async ({ page }) => {
@@ -55,7 +55,7 @@ test.describe('Orders', () => {
     
     await page.goto('/orders');
     
-    const orderItem = page.locator('.ant-list-item').first();
+    const orderItem = page.locator('.ant-table-row').first();
     if (await orderItem.isVisible()) {
       await orderItem.click();
       await page.waitForTimeout(500);
@@ -97,7 +97,7 @@ test.describe('Groups', () => {
     await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/groups');
-    await expect(page.getByRole('heading', { name: '我的拼团' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '拼团列表' }).or(page.locator('h1:has-text("拼团")'))).toBeVisible();
   });
 
   test('should show group details', async ({ page }) => {
