@@ -307,10 +307,10 @@ export class MerchantSettingsPage {
       await this.page.getByPlaceholder('请输入联系邮箱').fill(data.contactEmail);
     }
     if (data.address) {
-      await this.page.getByPlaceholder('请输入地址').fill(data.address);
+      await this.page.getByPlaceholder('请输入公司地址').fill(data.address);
     }
     if (data.description) {
-      await this.page.getByPlaceholder('请输入简介').fill(data.description);
+      await this.page.getByPlaceholder('请输入店铺简介').fill(data.description);
     }
   }
 
