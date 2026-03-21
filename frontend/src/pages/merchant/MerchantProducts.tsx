@@ -42,6 +42,17 @@ const MerchantProducts = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
+      
+      if (values.price !== undefined && values.price <= 0) {
+        message.error('价格必须大于0')
+        return
+      }
+      
+      if (values.stock !== undefined && values.stock < 0) {
+        message.error('库存必须大于等于0')
+        return
+      }
+      
       if (editingProduct) {
         await productService.updateProduct(editingProduct.id, values)
         message.success('商品已更新')

@@ -100,27 +100,35 @@ export class MerchantProductsPage {
     await this.page.getByPlaceholder('请输入商品描述').fill(data.description);
     
     await this.page.evaluate(({ price, stock }) => {
+      const forms = document.querySelectorAll('form');
+      forms.forEach(form => {
+        const formInstance = (form as any).__REACT_FORM__ || (form as any)._reactInternals;
+        if (formInstance) {
+          console.log('Found form instance');
+        }
+      });
+      
       const priceInput = document.querySelector('input[placeholder="请输入价格"]') as HTMLInputElement;
       const stockInput = document.querySelector('input[placeholder="请输入库存"]') as HTMLInputElement;
       
-      if (priceInput) {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-        if (nativeInputValueSetter) {
-          nativeInputValueSetter.call(priceInput, price.toString());
-          priceInput.dispatchEvent(new Event('input', { bubbles: true }));
-          priceInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      
+      if (priceInput && nativeInputValueSetter) {
+        nativeInputValueSetter.call(priceInput, price.toString());
+        priceInput.dispatchEvent(new Event('input', { bubbles: true }));
+        priceInput.dispatchEvent(new Event('change', { bubbles: true }));
+        priceInput.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
       }
       
-      if (stockInput) {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-        if (nativeInputValueSetter) {
-          nativeInputValueSetter.call(stockInput, stock.toString());
-          stockInput.dispatchEvent(new Event('input', { bubbles: true }));
-          stockInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+      if (stockInput && nativeInputValueSetter) {
+        nativeInputValueSetter.call(stockInput, stock.toString());
+        stockInput.dispatchEvent(new Event('input', { bubbles: true }));
+        stockInput.dispatchEvent(new Event('change', { bubbles: true }));
+        stockInput.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
       }
     }, { price: data.price, stock: data.stock });
+    
+    await this.page.waitForTimeout(500);
     
     if (data.category) {
       await this.page.locator('.ant-select').first().click();
