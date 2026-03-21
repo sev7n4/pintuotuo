@@ -163,28 +163,107 @@ Read: backend/handlers/auth.go
 
 **Principle**: Write failing tests first to clarify expected behavior
 
+**Test Strategy Decision Tree**:
+```
+Feature Impact Scope
+    │
+    ├─ backend (API only)
+    │   └─ Unit Tests + Integration Tests
+    │
+    ├─ frontend (UI only)
+    │   └─ Unit Tests + E2E Tests
+    │
+    └─ both (Full-stack)
+        └─ Unit Tests + Integration Tests + E2E Tests
+```
+
 **Bug Fix Process**:
 ```
 1. Analyze bug symptoms
-2. Write test to reproduce bug (test should fail)
-3. Confirm test failure = bug is captured
+2. Write unit test to reproduce bug (test should fail)
+3. If involves API interaction → Write integration test
+4. If involves user flow → Write E2E test
+5. Confirm all tests fail = bug is captured
 ```
 
 **New Feature Process**:
 ```
 1. Define acceptance criteria
-2. Write acceptance tests (E2E/integration tests)
-3. Write unit tests to define behavior
+2. Determine test types based on impact scope:
+   - both → E2E Tests + Integration Tests + Unit Tests
+   - backend → Integration Tests + Unit Tests
+   - frontend → E2E Tests + Unit Tests
+3. Write tests in order:
+   a. E2E Tests (acceptance tests, define user perspective)
+   b. Integration Tests (API contract tests)
+   c. Unit Tests (function behavior definition)
 4. All tests should fail (feature not implemented)
 ```
 
+**Test File Locations**:
+| Test Type | Backend Location | Frontend Location |
+|-----------|------------------|-------------------|
+| Unit Tests | `backend/handlers/*_test.go` | `frontend/src/**/*.test.ts` |
+| Integration Tests | `backend/integration/*_test.go` | - |
+| E2E Tests | - | `frontend/e2e/*.spec.ts` |
+
 **Test Naming Convention**:
 ```
-Test{FunctionName}_{Scenario}_{ExpectedResult}
+Unit Tests: Test{FunctionName}_{Scenario}_{ExpectedResult}
+Integration Tests: Test{Feature}Integration_{Scenario}
+E2E Tests: {Feature} - {User Action} - {Expected Result}
 
 Examples:
-- TestLogin_ValidCredentials_ReturnsToken
-- TestLogin_InvalidPassword_ReturnsError
+- TestUploadAvatar_ValidImage_ReturnsURL
+- TestUserAuthIntegration_CompleteFlow
+- E2E: Avatar - User uploads image - Avatar displayed
+```
+
+**E2E Test Template**:
+```typescript
+// frontend/e2e/avatar.spec.ts
+import { test, expect } from '@playwright/test'
+
+test.describe('Avatar Upload', () => {
+  test.beforeEach(async ({ page }) => {
+    // Login
+    await page.goto('/login')
+    await page.fill('[name="email"]', 'test@example.com')
+    await page.fill('[name="password"]', 'password')
+    await page.click('button[type="submit"]')
+    await page.waitForURL('/products')
+  })
+
+  test('should upload avatar successfully', async ({ page }) => {
+    await page.goto('/profile')
+    
+    // Upload avatar
+    const fileInput = page.locator('input[type="file"]')
+    await fileInput.setInputFiles('test/fixtures/test-avatar.jpg')
+    
+    // Verify upload success
+    await expect(page.locator('.ant-message-success')).toBeVisible()
+    await expect(page.locator('.avatar img')).toHaveAttribute('src', /uploads\/avatars/)
+  })
+
+  test('should reject invalid file type', async ({ page }) => {
+    await page.goto('/profile')
+    
+    const fileInput = page.locator('input[type="file"]')
+    await fileInput.setInputFiles('test/fixtures/test.txt')
+    
+    await expect(page.locator('.ant-message-error')).toBeVisible()
+  })
+
+  test('should reject file larger than 2MB', async ({ page }) => {
+    await page.goto('/profile')
+    
+    const fileInput = page.locator('input[type="file"]')
+    await fileInput.setInputFiles('test/fixtures/large-image.jpg')
+    
+    await expect(page.locator('.ant-message-error')).toContainText('2MB')
+  })
+})
 ```
 
 **Reference**: `references/test_design_guide.md`
@@ -225,13 +304,28 @@ Examples:
 
 ### Step 8: Local Verification
 
+**Verification Steps** (execute in order):
+
 ```bash
-# Backend
+# 1. Backend unit tests
 cd backend && go test -v -race -coverprofile=coverage.out ./...
 
-# Frontend
+# 2. Backend integration tests (if any)
+cd backend && go test -v -run Integration -race ./...
+
+# 3. Frontend unit tests
 cd frontend && npm test -- --coverage --watchAll=false
+
+# 4. Frontend E2E tests (if feature involves UI)
+cd frontend && npm run test:e2e
 ```
+
+**Verification Checklist**:
+- [ ] Backend unit tests pass
+- [ ] Backend integration tests pass (if any)
+- [ ] Frontend unit tests pass
+- [ ] Frontend E2E tests pass (if any)
+- [ ] Coverage meets requirements
 
 **Coverage Requirements**:
 | Layer | Minimum Coverage |
@@ -239,6 +333,11 @@ cd frontend && npm test -- --coverage --watchAll=false
 | Backend Core | ≥85% |
 | Backend API | ≥80% |
 | Frontend | ≥80% |
+
+**E2E Test Prerequisites**:
+- Backend server running on localhost:8080
+- Frontend server running on localhost:5173
+- Test database initialized
 
 **Decision Point**: Failed? → Analyze logs → Fix → Re-verify
 
@@ -259,14 +358,53 @@ git push origin bugfix/issue-001-login-401
 
 ### Step 10: CI Monitoring
 
+**Workflow Trigger Chain**:
+```
+PR Created/Push
+    ↓
+┌─────────────────┐
+│ CI/CD Pipeline  │ ← First triggered
+└────────┬────────┘
+         │ workflow_run: completed (success)
+         ↓
+┌─────────────────┐
+│ Integration     │ ← Auto triggered
+│ Tests           │
+└────────┬────────┘
+         │ workflow_run: completed (success)
+         ↓
+┌─────────────────┐
+│ E2E Tests       │ ← Auto triggered
+└─────────────────┘
+```
+
+**Monitoring Steps**:
+
 ```bash
-gh run list --branch=bugfix/issue-001-login-401 --limit=1
+# 1. Monitor CI/CD Pipeline
+gh run list --workflow="CI/CD Pipeline" --branch=bugfix/issue-001-login-401 --limit=1
 gh run watch {run-id}
+
+# 2. Wait for Integration Tests to trigger and monitor
+sleep 10
+gh run list --workflow="Integration Tests" --limit=1
+gh run watch {integration-run-id}
+
+# 3. Wait for E2E Tests to trigger and monitor
+sleep 10
+gh run list --workflow="E2E Tests" --limit=1
+gh run watch {e2e-run-id}
 ```
 
 **Decision Point**:
-- Success → Step 12
-- Failed → Step 11
+- All workflows succeed → Step 12
+- Any workflow fails → Step 11
+
+**Complete Check Command**:
+```bash
+# Check all workflow statuses
+gh pr view {pr-number} --json statusCheckRollup
+```
 
 ### Step 11: Error Fix Loop
 

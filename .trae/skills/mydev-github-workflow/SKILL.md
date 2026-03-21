@@ -163,28 +163,107 @@ Read: backend/handlers/auth.go
 
 **原则**: 先写失败测试，明确预期行为
 
+**测试策略决策树**:
+```
+功能影响范围
+    │
+    ├─ backend (纯后端API)
+    │   └─ 单元测试 + 集成测试
+    │
+    ├─ frontend (纯前端UI)
+    │   └─ 单元测试 + E2E测试
+    │
+    └─ both (全栈功能)
+        └─ 单元测试 + 集成测试 + E2E测试
+```
+
 **Bug修复流程**:
 ```
 1. 分析Bug现象
-2. 写测试复现Bug (测试应失败)
-3. 确认测试失败 = Bug被捕获
+2. 写单元测试复现Bug (测试应失败)
+3. 如果涉及API交互 → 写集成测试
+4. 如果涉及用户流程 → 写E2E测试
+5. 确认所有测试失败 = Bug被捕获
 ```
 
 **新功能流程**:
 ```
 1. 定义验收标准
-2. 写验收测试 (E2E/集成测试)
-3. 写单元测试定义行为
+2. 根据影响范围确定测试类型:
+   - both → E2E测试 + 集成测试 + 单元测试
+   - backend → 集成测试 + 单元测试
+   - frontend → E2E测试 + 单元测试
+3. 按顺序编写测试:
+   a. E2E测试 (验收测试，定义用户视角的行为)
+   b. 集成测试 (API契约测试)
+   c. 单元测试 (函数行为定义)
 4. 所有测试应失败 (功能未实现)
 ```
 
+**测试文件位置**:
+| 测试类型 | 后端位置 | 前端位置 |
+|----------|----------|----------|
+| 单元测试 | `backend/handlers/*_test.go` | `frontend/src/**/*.test.ts` |
+| 集成测试 | `backend/integration/*_test.go` | - |
+| E2E测试 | - | `frontend/e2e/*.spec.ts` |
+
 **测试命名规范**:
 ```
-Test{FunctionName}_{Scenario}_{ExpectedResult}
+单元测试: Test{FunctionName}_{Scenario}_{ExpectedResult}
+集成测试: Test{Feature}Integration_{Scenario}
+E2E测试: {Feature} - {User Action} - {Expected Result}
 
 Examples:
-- TestLogin_ValidCredentials_ReturnsToken
-- TestLogin_InvalidPassword_ReturnsError
+- TestUploadAvatar_ValidImage_ReturnsURL
+- TestUserAuthIntegration_CompleteFlow
+- E2E: Avatar - User uploads image - Avatar displayed
+```
+
+**E2E测试模板**:
+```typescript
+// frontend/e2e/avatar.spec.ts
+import { test, expect } from '@playwright/test'
+
+test.describe('Avatar Upload', () => {
+  test.beforeEach(async ({ page }) => {
+    // 登录
+    await page.goto('/login')
+    await page.fill('[name="email"]', 'test@example.com')
+    await page.fill('[name="password"]', 'password')
+    await page.click('button[type="submit"]')
+    await page.waitForURL('/products')
+  })
+
+  test('should upload avatar successfully', async ({ page }) => {
+    await page.goto('/profile')
+    
+    // 上传头像
+    const fileInput = page.locator('input[type="file"]')
+    await fileInput.setInputFiles('test/fixtures/test-avatar.jpg')
+    
+    // 验证上传成功
+    await expect(page.locator('.ant-message-success')).toBeVisible()
+    await expect(page.locator('.avatar img')).toHaveAttribute('src', /uploads\/avatars/)
+  })
+
+  test('should reject invalid file type', async ({ page }) => {
+    await page.goto('/profile')
+    
+    const fileInput = page.locator('input[type="file"]')
+    await fileInput.setInputFiles('test/fixtures/test.txt')
+    
+    await expect(page.locator('.ant-message-error')).toBeVisible()
+  })
+
+  test('should reject file larger than 2MB', async ({ page }) => {
+    await page.goto('/profile')
+    
+    const fileInput = page.locator('input[type="file"]')
+    await fileInput.setInputFiles('test/fixtures/large-image.jpg')
+    
+    await expect(page.locator('.ant-message-error')).toContainText('2MB')
+  })
+})
 ```
 
 **参考**: `references/test_design_guide.md`
@@ -225,13 +304,28 @@ Examples:
 
 ### Step 8: 本地验证
 
+**验证步骤**（按顺序执行）：
+
 ```bash
-# 后端
+# 1. 后端单元测试
 cd backend && go test -v -race -coverprofile=coverage.out ./...
 
-# 前端  
+# 2. 后端集成测试（如果有）
+cd backend && go test -v -run Integration -race ./...
+
+# 3. 前端单元测试
 cd frontend && npm test -- --coverage --watchAll=false
+
+# 4. 前端E2E测试（如果功能涉及UI）
+cd frontend && npm run test:e2e
 ```
+
+**验证检查清单**：
+- [ ] 后端单元测试通过
+- [ ] 后端集成测试通过（如有）
+- [ ] 前端单元测试通过
+- [ ] 前端E2E测试通过（如有）
+- [ ] 覆盖率达标
 
 **覆盖率要求**:
 | 层级 | 最低覆盖率 |
@@ -239,6 +333,11 @@ cd frontend && npm test -- --coverage --watchAll=false
 | Backend Core | ≥85% |
 | Backend API | ≥80% |
 | Frontend | ≥80% |
+
+**E2E测试前置条件**：
+- 后端服务运行在 localhost:8080
+- 前端服务运行在 localhost:5173
+- 测试数据库已初始化
 
 **决策点**：失败? → 分析日志 → 修复 → 重新验证
 
@@ -259,14 +358,53 @@ git push origin bugfix/issue-001-login-401
 
 ### Step 10: CI监控
 
+**工作流触发链**：
+```
+PR创建/Push
+    ↓
+┌─────────────────┐
+│ CI/CD Pipeline  │ ← 第一个触发
+└────────┬────────┘
+         │ workflow_run: completed (success)
+         ↓
+┌─────────────────┐
+│ Integration     │ ← 自动触发
+│ Tests           │
+└────────┬────────┘
+         │ workflow_run: completed (success)
+         ↓
+┌─────────────────┐
+│ E2E Tests       │ ← 自动触发
+└─────────────────┘
+```
+
+**监控步骤**：
+
 ```bash
-gh run list --branch=bugfix/issue-001-login-401 --limit=1
+# 1. 监控 CI/CD Pipeline
+gh run list --workflow="CI/CD Pipeline" --branch=bugfix/issue-001-login-401 --limit=1
 gh run watch {run-id}
+
+# 2. 等待 Integration Tests 触发并监控
+sleep 10
+gh run list --workflow="Integration Tests" --limit=1
+gh run watch {integration-run-id}
+
+# 3. 等待 E2E Tests 触发并监控
+sleep 10
+gh run list --workflow="E2E Tests" --limit=1
+gh run watch {e2e-run-id}
 ```
 
 **决策点**：
-- 成功 → Step 12
-- 失败 → Step 11
+- 所有工作流成功 → Step 12
+- 任一工作流失败 → Step 11
+
+**完整检查命令**：
+```bash
+# 检查所有工作流状态
+gh pr view {pr-number} --json statusCheckRollup
+```
 
 ### Step 11: 错误修复循环
 

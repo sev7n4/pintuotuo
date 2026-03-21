@@ -77,6 +77,14 @@ Does the issue involve UI or interaction?
 
 ## Test Strategy Decision
 
+### Test Type Selection Matrix
+
+| Impact Scope | Unit Tests | Integration Tests | E2E Tests |
+|--------------|------------|-------------------|-----------|
+| backend | ✅ Required | ✅ Required | ❌ Not needed |
+| frontend | ✅ Required | ❌ Not needed | ✅ Required |
+| both | ✅ Required | ✅ Required | ✅ Required |
+
 ### TDD Process Decision
 
 ```
@@ -98,19 +106,21 @@ Does it involve API?
     ├── Yes → Write unit tests + integration tests
     └── No ↓
 Does it involve UI?
-    ├── Yes → Write E2E tests
+    ├── Yes → Write E2E tests + unit tests
     └── No → Write unit tests only
 ```
 
 **Bug Fix TDD Process**:
 ```
 1. Analyze bug symptoms, understand expected behavior
-2. Write test to reproduce bug (test should fail)
-3. Confirm test failure = bug is correctly captured
-4. Write minimal code to fix bug
-5. Confirm test passes
-6. Add boundary test cases
-7. Refactor and optimize (optional)
+2. Write unit test to reproduce bug (test should fail)
+3. If involves API interaction → Write integration test
+4. If involves user flow → Write E2E test
+5. Confirm all tests fail = bug is correctly captured
+6. Write minimal code to fix bug
+7. Confirm all tests pass
+8. Add boundary test cases
+9. Refactor and optimize (optional)
 ```
 
 ### New Feature Test Strategy
@@ -121,19 +131,42 @@ New Feature
 Impact Scope
 ├── backend → Unit tests + Integration tests
 ├── frontend → Unit tests + E2E tests
-└── both → All test types
+└── both → Unit tests + Integration tests + E2E tests
 ```
 
 **New Feature TDD Process**:
 ```
 1. Define acceptance criteria
-2. Write E2E/integration tests to define external behavior
-3. Write unit tests to define internal behavior
+2. Determine test types based on impact scope:
+   - both → E2E Tests + Integration Tests + Unit Tests
+   - backend → Integration Tests + Unit Tests
+   - frontend → E2E Tests + Unit Tests
+3. Write tests in order:
+   a. E2E Tests (acceptance tests, define user perspective)
+   b. Integration Tests (API contract tests)
+   c. Unit Tests (function behavior definition)
 4. All tests should fail (feature not implemented)
 5. Write minimal code to pass tests
 6. Refactor and optimize code
 7. Repeat to add more test cases
 ```
+
+### Test Case Design Principles
+
+**Unit Tests**:
+- Test single function/method behavior
+- Use mocks to isolate external dependencies
+- Cover normal paths and boundary conditions
+
+**Integration Tests**:
+- Test interactions between components
+- Use real database/services
+- Verify API contracts
+
+**E2E Tests**:
+- Test complete user flows
+- Simulate real user operations
+- Verify business value
 
 ### Test Type Selection
 
