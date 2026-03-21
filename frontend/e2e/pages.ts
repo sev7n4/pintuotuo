@@ -99,21 +99,28 @@ export class MerchantProductsPage {
     await this.page.getByPlaceholder('请输入商品名称').fill(data.name);
     await this.page.getByPlaceholder('请输入商品描述').fill(data.description);
     
-    const priceInput = this.page.getByPlaceholder('请输入价格');
-    await priceInput.evaluate((el: HTMLInputElement, value: string) => {
-      el.value = value;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-      el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-    }, data.price.toString());
-    
-    const stockInput = this.page.getByPlaceholder('请输入库存');
-    await stockInput.evaluate((el: HTMLInputElement, value: string) => {
-      el.value = value;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-      el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-    }, data.stock.toString());
+    await this.page.evaluate(({ price, stock }) => {
+      const priceInput = document.querySelector('input[placeholder="请输入价格"]') as HTMLInputElement;
+      const stockInput = document.querySelector('input[placeholder="请输入库存"]') as HTMLInputElement;
+      
+      if (priceInput) {
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        if (nativeInputValueSetter) {
+          nativeInputValueSetter.call(priceInput, price.toString());
+          priceInput.dispatchEvent(new Event('input', { bubbles: true }));
+          priceInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+      
+      if (stockInput) {
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        if (nativeInputValueSetter) {
+          nativeInputValueSetter.call(stockInput, stock.toString());
+          stockInput.dispatchEvent(new Event('input', { bubbles: true }));
+          stockInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+    }, { price: data.price, stock: data.stock });
     
     if (data.category) {
       await this.page.locator('.ant-select').first().click();
