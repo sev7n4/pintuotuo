@@ -30,8 +30,8 @@ description: "Automated development workflow integrated with GitHub CI/CD. Invok
 ### 步骤2：计划生成
 
 使用模板生成：
-- `assets/templates/plan_template.md`
-- `assets/templates/tasks_template.md`
+- `assets/plans/issue_{id}_plan.md`
+- `assets/tasks/issue_{id}_tasks.md`
 
 ### 步骤3：分支创建
 
@@ -140,12 +140,17 @@ gh pr create --title "{title}" --body-file {body}
 │   ├── issue_tracking.md
 │   ├── workflow_history.md
 │   └── quick_reference.md
-├── assets/templates/     # 模板资源
-│   ├── plan_template.md
-│   ├── tasks_template.md
-│   ├── pr_template.md
-│   ├── bug_report.md
-│   └── feature_request.md
+├── assets/
+│   ├── templates/        # 模板资源
+│   │   ├── plan_template.md
+│   │   ├── tasks_template.md
+│   │   ├── pr_template.md
+│   │   ├── bug_report.md
+│   │   └── feature_request.md
+│   ├── plans/            # 🆕 运行时生成
+│   │   └── issue_{id}_plan.md
+│   └── tasks/            # 🆕 运行时生成
+│       └── issue_{id}_tasks.md
 └── scripts/              # 状态管理
     └── workflow_state.json
 ```
