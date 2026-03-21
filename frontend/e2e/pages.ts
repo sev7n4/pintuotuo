@@ -100,22 +100,20 @@ export class MerchantProductsPage {
     await this.page.getByPlaceholder('请输入商品描述').fill(data.description);
     
     const priceInput = this.page.getByPlaceholder('请输入价格');
-    await priceInput.click();
     await priceInput.evaluate((el: HTMLInputElement, value: string) => {
       el.value = value;
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
     }, data.price.toString());
-    await priceInput.press('Tab');
     
     const stockInput = this.page.getByPlaceholder('请输入库存');
-    await stockInput.click();
     await stockInput.evaluate((el: HTMLInputElement, value: string) => {
       el.value = value;
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
     }, data.stock.toString());
-    await stockInput.press('Tab');
     
     if (data.category) {
       await this.page.locator('.ant-select').first().click();
