@@ -108,6 +108,8 @@ e2e-tests.yml (E2E测试)
 
 ## 文档位置
 
+所有文件相对于 `.trae/skills/mydev-github-workflow/` 目录：
+
 | 文档 | 路径 |
 |------|------|
 | 工作流设计 | `references/design.md` |
@@ -118,6 +120,7 @@ e2e-tests.yml (E2E测试)
 | 计划模板 | `assets/templates/plan_template.md` |
 | 任务模板 | `assets/templates/tasks_template.md` |
 | PR模板 | `assets/templates/pr_template.md` |
+| 状态管理 | `scripts/workflow_state.json` |
 
 ## 常见问题
 

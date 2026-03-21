@@ -47,7 +47,7 @@ test.describe('Merchant Dashboard', () => {
     await page.getByPlaceholder('请输入价格').fill('99.99');
     await page.getByPlaceholder('请输入库存').fill('100');
     
-    const saveButton = page.locator('.ant-modal .ant-btn-primary').filter({ hasText: '保存' });
+    const saveButton = modal.locator('button:has-text("保")');
     await saveButton.click();
     await page.waitForTimeout(1000);
   });

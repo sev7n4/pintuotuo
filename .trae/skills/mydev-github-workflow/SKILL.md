@@ -265,12 +265,33 @@ gh pr create --title "fix(auth): resolve login 401 error" --body "..."
 
 ## Reference Files
 
+### 参考文档 (references/)
+
 | 文件 | 用途 |
 |------|------|
-| `references/decision_guide.md` | 决策指导：类型判断、优先级评估 |
-| `references/error_reference.md` | 错误参考：常见错误及处理方式 |
-| `references/design.md` | 完整设计方案 |
-| `references/quick_reference.md` | 命令速查表 |
+| `decision_guide.md` | 决策指导：类型判断、优先级评估、测试策略 |
+| `error_reference.md` | 错误参考：常见错误及处理方式 |
+| `design.md` | 完整设计方案和技术架构 |
+| `quick_reference.md` | 命令速查表、分支规范、提交规范 |
+| `state_fields.md` | 状态字段说明：workflow_state.json各字段含义 |
+| `issue_tracking.md` | 问题跟踪文档（运行时更新） |
+| `workflow_history.md` | 工作流历史记录（运行时更新） |
+
+### 模板文件 (assets/templates/)
+
+| 文件 | 用途 |
+|------|------|
+| `plan_template.md` | 计划文档模板 |
+| `tasks_template.md` | 任务清单模板 |
+| `pr_template.md` | PR描述模板 |
+| `bug_report.md` | Bug报告模板 |
+| `feature_request.md` | 功能请求模板 |
+
+### 状态管理 (scripts/)
+
+| 文件 | 用途 |
+|------|------|
+| `workflow_state.json` | 工作流状态缓存，记录当前进度和统计 |
 
 ## Error Handling
 
