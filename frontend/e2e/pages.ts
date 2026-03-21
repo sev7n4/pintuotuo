@@ -20,7 +20,7 @@ export class LoginPage {
   }
 
   async expectLoginError() {
-    await expect(this.page.locator('.ant-message-error, text=登录失败')).toBeVisible();
+    await expect(this.page.locator('.ant-message-error')).toBeVisible();
   }
 }
 
