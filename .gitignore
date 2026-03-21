@@ -88,3 +88,9 @@ Thumbs.db
 
 # Claude Code
 .claude/worktrees/
+
+# Trae AI
+.trae/skill-config.json
+
+# Go Coverage
+backend/coverage.out
