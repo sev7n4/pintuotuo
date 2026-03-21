@@ -100,15 +100,11 @@ export class MerchantProductsPage {
     await this.page.getByPlaceholder('请输入商品描述').fill(data.description);
     
     const priceInput = this.page.getByPlaceholder('请输入价格');
-    await priceInput.click();
-    await priceInput.fill('');
-    await this.page.keyboard.type(data.price.toString());
+    await priceInput.fill(data.price.toString());
     await priceInput.press('Tab');
     
     const stockInput = this.page.getByPlaceholder('请输入库存');
-    await stockInput.click();
-    await stockInput.fill('');
-    await this.page.keyboard.type(data.stock.toString());
+    await stockInput.fill(data.stock.toString());
     await stockInput.press('Tab');
     
     await this.page.waitForTimeout(300);
