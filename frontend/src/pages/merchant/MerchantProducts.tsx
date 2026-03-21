@@ -231,6 +231,7 @@ const MerchantProducts = () => {
             validateTrigger="onBlur"
           >
             <InputNumber
+              min={-Infinity}
               precision={2}
               style={{ width: '100%' }}
               placeholder="请输入价格"
@@ -260,6 +261,7 @@ const MerchantProducts = () => {
             validateTrigger="onBlur"
           >
             <InputNumber
+              min={-Infinity}
               style={{ width: '100%' }}
               placeholder="请输入库存"
             />
