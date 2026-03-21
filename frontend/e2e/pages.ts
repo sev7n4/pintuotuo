@@ -245,7 +245,8 @@ export class MerchantAPIKeysPage {
     await this.page.getByPlaceholder('请输入API Key').fill(data.apiKey);
     
     if (data.quotaLimit !== undefined) {
-      await this.page.getByPlaceholder('请输入配额限制').fill(data.quotaLimit.toString());
+      const quotaInput = this.page.locator('.ant-input-number-input');
+      await quotaInput.fill(data.quotaLimit.toString());
     }
   }
 
