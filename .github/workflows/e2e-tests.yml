@@ -108,7 +108,7 @@ jobs:
         working-directory: ./backend
         env:
           DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
-          REDIS_URL: localhost:6379
+          REDIS_URL: redis://localhost:6379
           JWT_SECRET: pintuotuo-secret-key-dev
           ENCRYPTION_KEY: test-encryption-key-32-characters
           GIN_MODE: test
