@@ -77,6 +77,18 @@ Does the issue involve UI or interaction?
 
 ## Test Strategy Decision
 
+### TDD Process Decision
+
+```
+Issue Type
+    ↓
+├── Bug Fix
+│   └── Red: Write reproduction test → Green: Minimal fix → Refactor: Optimize
+│
+└── New Feature
+    └── Red: Write acceptance test → Green: Minimal implementation → Refactor: Optimize
+```
+
 ### Bug Fix Test Strategy
 
 ```
@@ -90,6 +102,17 @@ Does it involve UI?
     └── No → Write unit tests only
 ```
 
+**Bug Fix TDD Process**:
+```
+1. Analyze bug symptoms, understand expected behavior
+2. Write test to reproduce bug (test should fail)
+3. Confirm test failure = bug is correctly captured
+4. Write minimal code to fix bug
+5. Confirm test passes
+6. Add boundary test cases
+7. Refactor and optimize (optional)
+```
+
 ### New Feature Test Strategy
 
 ```
@@ -99,6 +122,46 @@ Impact Scope
 ├── backend → Unit tests + Integration tests
 ├── frontend → Unit tests + E2E tests
 └── both → All test types
+```
+
+**New Feature TDD Process**:
+```
+1. Define acceptance criteria
+2. Write E2E/integration tests to define external behavior
+3. Write unit tests to define internal behavior
+4. All tests should fail (feature not implemented)
+5. Write minimal code to pass tests
+6. Refactor and optimize code
+7. Repeat to add more test cases
+```
+
+### Test Type Selection
+
+| Scenario | Recommended Test Type | Reason |
+|----------|----------------------|--------|
+| Pure logic functions | Unit tests | Fast, precise |
+| API endpoints | Unit tests + Integration tests | Verify interface contracts |
+| Database operations | Integration tests | Need real DB environment |
+| User flows | E2E tests | Verify complete experience |
+| UI components | Unit tests | Isolate component behavior |
+
+### Test Naming Decision
+
+```
+Test function naming format:
+Test{FunctionName}_{Scenario}_{ExpectedResult}
+
+Scenario descriptions:
+- ValidInput / InvalidInput
+- EmptyInput / NilInput
+- BoundaryCondition
+- ConcurrentAccess
+- ErrorCondition
+
+Examples:
+- TestLogin_ValidCredentials_ReturnsToken
+- TestLogin_InvalidPassword_ReturnsError
+- TestLogin_EmptyEmail_ReturnsValidationError
 ```
 
 ## CI Failure Handling Decision

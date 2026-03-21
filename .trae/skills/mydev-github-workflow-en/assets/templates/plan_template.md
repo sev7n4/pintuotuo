@@ -44,28 +44,39 @@ Describe technical solution, including:
 - [ ] Locate issue code
 - [ ] Assess impact scope
 
-### Phase 2: Code Implementation
-- [ ] Modify backend code (if needed)
-- [ ] Modify frontend code (if needed)
-- [ ] Database migration (if needed)
+### Phase 2: Test Design (TDD - Red)
+- [ ] Design test cases
+- [ ] Write failing tests
+- [ ] Confirm test failure (bug captured / feature not implemented)
 
-### Phase 3: Test Writing
-- [ ] Write unit tests
-- [ ] Write integration tests
-- [ ] Write E2E tests
+**Test Case Design**:
+| Test Name | Scenario | Expected Result |
+|-----------|----------|-----------------|
+| Test{Function}_{Scenario} | Input/Condition | Expected output |
 
-### Phase 4: Local Verification
+### Phase 3: Minimal Implementation (TDD - Green)
+- [ ] Implement minimal code
+- [ ] Confirm tests pass
+- [ ] Do not add features not covered by tests
+
+### Phase 4: Refactor (TDD - Refactor)
+- [ ] Eliminate duplicate code
+- [ ] Improve code structure
+- [ ] Confirm tests still pass
+
+### Phase 5: Local Verification
 - [ ] Run unit tests
 - [ ] Run integration tests
 - [ ] Run E2E tests
+- [ ] Check code coverage (Backend ≥85%, Frontend ≥80%)
 - [ ] Check code style
 
-### Phase 5: Code Commit
+### Phase 6: Code Commit
 - [ ] Commit code
 - [ ] Push branch
 - [ ] Create PR
 
-### Phase 6: CI Verification
+### Phase 7: CI Verification
 - [ ] CI/CD passed
 - [ ] Integration tests passed
 - [ ] E2E tests passed
@@ -89,8 +100,9 @@ Describe expected results, such as:
 | Phase | Estimated Time |
 |-------|----------------|
 | Code Analysis | X minutes |
-| Code Implementation | X minutes |
-| Test Writing | X minutes |
+| Test Design | X minutes |
+| Minimal Implementation | X minutes |
+| Refactor | X minutes |
 | Local Verification | X minutes |
 | CI Verification | X minutes |
 | **Total** | **X minutes** |
@@ -141,8 +153,29 @@ Move jwtSecret initialization to the init() function to ensure it completes befo
 - [x] Locate issue code
 - [x] Assess impact scope
 
-### Phase 2: Code Implementation
-- [x] Modify backend code
+### Phase 2: Test Design (TDD - Red)
+- [x] Design test cases
+- [x] Write failing tests
+- [x] Confirm test failure
+
+**Test Case Design**:
+| Test Name | Scenario | Expected Result |
+|-----------|----------|-----------------|
+| TestLogin_ValidCredentials_ReturnsToken | Valid email/password | Returns valid token |
+| TestLogin_InvalidPassword_ReturnsError | Invalid password | Returns 401 error |
+| TestLogin_EmptyEmail_ReturnsError | Empty email | Returns validation error |
+
+### Phase 3: Minimal Implementation (TDD - Green)
+- [x] Implement minimal code
+- [x] Confirm tests pass
+
+### Phase 4: Refactor (TDD - Refactor)
+- [x] Code optimized
+- [x] Tests still pass
+
+### Phase 5: Local Verification
+- [x] Run unit tests
+- [x] Coverage 92%
 
 ...
 
@@ -161,8 +194,9 @@ When users log in with correct credentials, return 200 success response with val
 | Phase | Estimated Time |
 |-------|----------------|
 | Code Analysis | 5 minutes |
-| Code Implementation | 10 minutes |
-| Test Writing | 15 minutes |
+| Test Design | 10 minutes |
+| Minimal Implementation | 10 minutes |
+| Refactor | 5 minutes |
 | Local Verification | 5 minutes |
 | CI Verification | 10 minutes |
 | **Total** | **45 minutes** |
