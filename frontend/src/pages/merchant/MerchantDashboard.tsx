@@ -7,15 +7,19 @@ import {
   RiseOutlined,
 } from '@ant-design/icons'
 import { useMerchantStore } from '@/stores/merchantStore'
+import { useAuthStore } from '@/stores/authStore'
 import styles from './MerchantDashboard.module.css'
 
 const MerchantDashboard = () => {
   const { stats, orders, fetchStats, fetchOrders, isLoading } = useMerchantStore()
+  const { user } = useAuthStore()
 
   useEffect(() => {
-    fetchStats()
-    fetchOrders(1, 5)
-  }, [fetchStats, fetchOrders])
+    if (user && user.role === 'merchant') {
+      fetchStats()
+      fetchOrders(1, 5)
+    }
+  }, [fetchStats, fetchOrders, user])
 
   const orderColumns = [
     {
