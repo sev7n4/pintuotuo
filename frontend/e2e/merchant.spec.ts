@@ -34,7 +34,7 @@ test.describe('Merchant Dashboard', () => {
     
     await page.goto('/merchant/products');
     
-    const addButton = page.getByRole('button', { name: '添加商品' });
+    const addButton = page.locator('button:has-text("添加商品")');
     if (await addButton.isVisible()) {
       await addButton.click();
       
@@ -43,7 +43,7 @@ test.describe('Merchant Dashboard', () => {
       await page.getByPlaceholder('请输入价格').fill('99.99');
       await page.getByPlaceholder('请输入库存').fill('100');
       
-      await page.getByRole('button', { name: '提交' }).click();
+      await page.locator('button[type="submit"]').click();
       await page.waitForTimeout(1000);
     }
   });
@@ -90,7 +90,7 @@ test.describe('Merchant API Keys', () => {
     
     await page.goto('/merchant/api-keys');
     
-    const addButton = page.getByRole('button', { name: '添加密钥' });
+    const addButton = page.locator('button:has-text("添加密钥")');
     if (await addButton.isVisible()) {
       await addButton.click();
       
@@ -98,7 +98,7 @@ test.describe('Merchant API Keys', () => {
       await page.selectOption('select', 'openai');
       await page.getByPlaceholder('请输入API Key').fill('sk-test-key');
       
-      await page.getByRole('button', { name: '提交' }).click();
+      await page.locator('button[type="submit"]').click();
       await page.waitForTimeout(1000);
     }
   });
@@ -124,11 +124,11 @@ test.describe('Merchant API Keys', () => {
     
     await page.goto('/merchant/api-keys');
     
-    const deleteButton = page.getByRole('button', { name: '删除' }).first();
+    const deleteButton = page.locator('button:has-text("删除")').first();
     if (await deleteButton.isVisible()) {
       await deleteButton.click();
       
-      const confirmButton = page.getByRole('button', { name: '确定' });
+      const confirmButton = page.locator('button:has-text("确定")');
       if (await confirmButton.isVisible()) {
         await confirmButton.click();
         await page.waitForTimeout(500);

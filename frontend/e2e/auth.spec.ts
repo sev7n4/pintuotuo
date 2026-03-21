@@ -10,12 +10,13 @@ test.describe('Authentication', () => {
   test('should show validation error for empty fields', async ({ page }) => {
     const loginPage = new LoginPage(page);
     await loginPage.goto();
-    await page.getByRole('button', { name: '登录' }).click();
+    await page.locator('button[type="submit"]').click();
     await expect(page.getByText('请输入邮箱')).toBeVisible();
   });
 
   test('should navigate between login and register', async ({ page }) => {
     await page.goto('/login');
+    await page.waitForLoadState('networkidle');
     await page.getByText('创建新账户').click();
     await expect(page.getByText('拼脱脱 - 注册')).toBeVisible();
     
@@ -28,7 +29,7 @@ test.describe('Authentication', () => {
     await loginPage.goto();
     await page.getByPlaceholder('example@email.com').fill('invalid-email');
     await page.getByPlaceholder('输入密码').fill('somepassword');
-    await page.getByRole('button', { name: '登录' }).click();
+    await page.locator('button[type="submit"]').click();
     await expect(page.getByText('邮箱格式不正确')).toBeVisible();
   });
 });
@@ -123,7 +124,7 @@ test.describe('Registration', () => {
     await page.getByPlaceholder('输入你的名字').fill('testuser');
     await page.getByPlaceholder('设置密码').fill('Test123456!');
     await page.getByPlaceholder('再次输入密码').fill('DifferentPassword!');
-    await page.getByRole('button', { name: '创建账户' }).click();
+    await page.locator('button[type="submit"]').click();
     
     await expect(page.getByText('两次输入的密码不一致')).toBeVisible();
   });

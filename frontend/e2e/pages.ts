@@ -5,15 +5,14 @@ export class LoginPage {
 
   async goto() {
     await this.page.goto('/login');
-    await this.page.waitForSelector('text=拼脱脱 - 登录');
+    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForSelector('.auth-card');
   }
 
   async login(email: string, password: string) {
     await this.page.getByPlaceholder('example@email.com').fill(email);
     await this.page.getByPlaceholder('输入密码').fill(password);
-    const submitButton = this.page.getByRole('button', { name: '登录' });
-    await submitButton.waitFor({ state: 'visible' });
-    await submitButton.click();
+    await this.page.locator('button[type="submit"]').click();
   }
 
   async expectLoginSuccess() {
@@ -30,7 +29,8 @@ export class RegisterPage {
 
   async goto() {
     await this.page.goto('/register');
-    await this.page.waitForSelector('text=拼脱脱 - 注册');
+    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForSelector('.auth-card');
   }
 
   async register(email: string, name: string, password: string, role: 'user' | 'merchant' = 'user') {
@@ -41,8 +41,6 @@ export class RegisterPage {
     await this.page.getByPlaceholder('输入你的名字').fill(name);
     await this.page.getByPlaceholder('设置密码').fill(password);
     await this.page.getByPlaceholder('再次输入密码').fill(password);
-    const submitButton = this.page.getByRole('button', { name: '创建账户' });
-    await submitButton.waitFor({ state: 'visible' });
-    await submitButton.click();
+    await this.page.locator('button[type="submit"]').click();
   }
 }

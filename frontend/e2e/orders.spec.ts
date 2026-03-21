@@ -65,11 +65,11 @@ test.describe('Orders', () => {
     
     await page.goto('/orders');
     
-    const cancelButton = page.getByRole('button', { name: '取消订单' }).first();
+    const cancelButton = page.locator('button:has-text("取消订单")').first();
     if (await cancelButton.isVisible()) {
       await cancelButton.click();
       
-      const confirmButton = page.getByRole('button', { name: '确定' });
+      const confirmButton = page.locator('button:has-text("确定")');
       if (await confirmButton.isVisible()) {
         await confirmButton.click();
         await page.waitForTimeout(500);
