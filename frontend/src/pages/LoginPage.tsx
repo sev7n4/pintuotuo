@@ -1,25 +1,28 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Form, Input, Button, Card, message, Checkbox } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@stores/authStore'
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate()
-  const { login, isLoading, error, user, isAuthenticated } = useAuthStore()
+  const { login, isLoading, user, isAuthenticated } = useAuthStore()
   const [form] = Form.useForm()
+  const [loginError, setLoginError] = useState<string | null>(null)
 
   const onFinish = async (values: { email: string; password: string; rememberMe?: boolean }) => {
+    setLoginError(null)
     try {
       await login(values.email, values.password, values.rememberMe || false)
       message.success('登录成功')
     } catch (err) {
-      message.error(error || '登录失败，请检查邮箱和密码')
+      const errorMsg = err instanceof Error ? err.message : '登录失败，请检查邮箱和密码'
+      setLoginError(errorMsg)
+      message.error(errorMsg)
     }
   }
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      console.log('User authenticated, redirecting...', user.role)
       if (user.role === 'admin') {
         navigate('/admin', { replace: true })
       } else if (user.role === 'merchant') {

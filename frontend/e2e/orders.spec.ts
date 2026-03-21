@@ -12,15 +12,17 @@ test.describe('Orders', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
+    await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/orders');
-    await expect(page.getByText('我的订单')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '我的订单' })).toBeVisible();
   });
 
   test('should show empty state when no orders', async ({ page }) => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
+    await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/orders');
     
@@ -34,6 +36,7 @@ test.describe('Orders', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
+    await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/orders');
     
@@ -48,6 +51,7 @@ test.describe('Orders', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
+    await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/orders');
     
@@ -62,6 +66,7 @@ test.describe('Orders', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
+    await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/orders');
     
@@ -89,15 +94,17 @@ test.describe('Groups', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
+    await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/groups');
-    await expect(page.getByText('我的拼团')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '我的拼团' })).toBeVisible();
   });
 
   test('should show group details', async ({ page }) => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
+    await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/groups');
     

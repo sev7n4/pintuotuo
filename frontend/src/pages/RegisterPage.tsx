@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Form, Input, Button, Card, message, Radio, Space } from 'antd'
 import { UserOutlined, ShopOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -8,7 +8,7 @@ type UserRole = 'user' | 'merchant'
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate()
-  const { register, isLoading, error } = useAuthStore()
+  const { register, isLoading, error, user, isAuthenticated } = useAuthStore()
   const [form] = Form.useForm()
   const [selectedRole, setSelectedRole] = useState<UserRole>('user')
 
@@ -28,15 +28,20 @@ export const RegisterPage: React.FC = () => {
     try {
       await register(values.email, values.name, values.password, role)
       message.success('注册成功')
-      if (role === 'merchant') {
-        navigate('/merchant/dashboard', { replace: true })
-      } else {
-        navigate('/', { replace: true })
-      }
     } catch (err) {
       message.error(error || '注册失败，请稍后重试')
     }
   }
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'merchant') {
+        navigate('/merchant', { replace: true })
+      } else {
+        navigate('/products', { replace: true })
+      }
+    }
+  }, [isAuthenticated, user, navigate])
 
   return (
     <div className="auth-page">
