@@ -74,8 +74,8 @@ test.describe('Login Flow', () => {
 
   test('should show error for invalid credentials', async ({ page }) => {
     await loginPage.login('invalid@example.com', 'wrongpassword');
-    await page.waitForTimeout(3000);
-    const toastMessage = page.locator('.ant-message').first();
+    await page.waitForTimeout(2000);
+    const toastMessage = page.locator('.ant-message-notice-content').first();
     await expect(toastMessage).toBeVisible({ timeout: 10000 });
   });
 

@@ -35,7 +35,7 @@ test.describe('Merchant Dashboard', () => {
     await page.goto('/merchant/products');
     
     const addButton = page.locator('button:has-text("添加商品")');
-    if (await addButton.isVisible()) {
+    if (await addButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await addButton.click();
       
       await page.getByPlaceholder('请输入商品名称').fill('测试商品E2E');
