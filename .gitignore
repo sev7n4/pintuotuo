@@ -91,6 +91,52 @@ Thumbs.db
 
 # Trae AI
 .trae/skill-config.json
+.trae/documents/
+.trae/skills/
+.trae/specs/
 
 # Go Coverage
 backend/coverage.out
+
+# Project Planning Docs (keep local only)
+00_*.md
+01_*.md
+02_*.md
+03_*.md
+04_*.md
+05_*.md
+06_*.md
+07_*.md
+08_*.md
+09_*.md
+10_*.md
+11_*.md
+12_*.md
+13_*.md
+14_*.md
+15_*.md
+16_*.md
+17_*.md
+WEEK*.md
+*_REPORT.md
+*_SUMMARY.md
+*_COMPLETE.md
+CODE_REVIEW.md
+DEPLOYMENT_AUTOMATION.md
+DEPLOYMENT_SETUP_GUIDE.md
+CLAUDE.md
+Documentation_Naming_Convention_and_Index.md
+harness_engineering_learning.md
+
+# Deploy docs (keep local only)
+deploy/
+
+# Docs folder (keep local only)
+docs/
+
+# Backend temp docs
+backend/HANDLER_CACHING_GUIDE.md
+backend/IMPLEMENTATION_GUIDE.md
+backend/LOADTEST_RESULTS.md
+backend/PRIORITY2_CACHING_REPORT.md
+backend/WEEK2_*.md
