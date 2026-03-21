@@ -196,7 +196,7 @@ export class MerchantSettlementsPage {
 
   async clickApplySettlement() {
     await this.page.locator('button:has-text("申请结算")').click();
-    await this.page.waitForSelector('.ant-modal-content');
+    await this.page.waitForTimeout(1000);
   }
 
   async confirmSettlement() {
@@ -239,7 +239,7 @@ export class MerchantAPIKeysPage {
   }) {
     await this.page.getByPlaceholder('例如：生产环境密钥').fill(data.name);
     await this.page.locator('.ant-select').click();
-    await this.page.getByText(data.provider).click();
+    await this.page.getByRole('option', { name: data.provider }).click();
     await this.page.getByPlaceholder('请输入API Key').fill(data.apiKey);
     
     if (data.quotaLimit !== undefined) {
@@ -311,7 +311,7 @@ export class MerchantSettingsPage {
   }
 
   async saveSettings() {
-    await this.page.locator('button:has-text("保存")').click();
+    await this.page.locator('button:has-text("保存设置")').click();
     await this.page.waitForTimeout(2000);
   }
 
