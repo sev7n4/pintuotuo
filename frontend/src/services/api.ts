@@ -2,6 +2,8 @@ import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
+console.log('API Base URL:', BASE_URL)
+
 const instance: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
@@ -9,6 +11,7 @@ const instance: AxiosInstance = axios.create({
 
 instance.interceptors.request.use(
   (config) => {
+    console.log('API Request:', config.method?.toUpperCase(), config.url)
     const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -19,8 +22,12 @@ instance.interceptors.request.use(
 )
 
 instance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('API Response:', response.status, response.config.url)
+    return response
+  },
   (error: AxiosError) => {
+    console.error('API Error:', error.message, error.config?.url)
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token')
       localStorage.removeItem('remember_me')
