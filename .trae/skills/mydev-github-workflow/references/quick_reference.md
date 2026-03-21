@@ -110,12 +110,14 @@ e2e-tests.yml (E2E测试)
 
 | 文档 | 路径 |
 |------|------|
-| 工作流设计 | `.trae/documents/github_workflow_design.md` |
-| 问题跟踪 | `.trae/documents/issue_tracking.md` |
-| 工作流历史 | `.trae/documents/workflow_history.md` |
-| 测试质量跟踪 | `.trae/documents/test_quality_tracking.md` |
-| 计划模板 | `.trae/documents/templates/plan_template.md` |
-| 任务模板 | `.trae/documents/templates/tasks_template.md` |
+| 工作流设计 | `references/design.md` |
+| 决策指导 | `references/decision_guide.md` |
+| 错误参考 | `references/error_reference.md` |
+| 问题跟踪 | `references/issue_tracking.md` |
+| 工作流历史 | `references/workflow_history.md` |
+| 计划模板 | `assets/templates/plan_template.md` |
+| 任务模板 | `assets/templates/tasks_template.md` |
+| PR模板 | `assets/templates/pr_template.md` |
 
 ## 常见问题
 

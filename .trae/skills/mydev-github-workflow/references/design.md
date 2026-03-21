@@ -8,31 +8,31 @@
 
 ### 1.2 文档存放位置
 
-**重要**：所有工作流相关文件**必须**存放在项目根目录下的 `.trae/` 目录，确保不影响项目原有结构：
+**重要**：所有工作流相关文件存放在 `.trae/skills/mydev-github-workflow/` 目录下：
 
 ```
-.trae/
-├── skills/                                   # Skill目录
-│   └── mydev-github-workflow/                # 本工作流Skill
-│       └── SKILL.md                          # Skill定义文件
-├── documents/                                # 文档目录（持久化存储）
-│   ├── github_workflow_design.md             # 工作流设计方案（本文档）
-│   ├── issue_tracking.md                     # 问题跟踪文档
-│   ├── workflow_history.md                   # 工作流历史记录
-│   ├── test_quality_tracking.md              # 测试质量跟踪
-│   ├── quick_reference.md                    # 快速参考指南
-│   └── templates/                            # 模板目录
-│       ├── bug_report.md                     # Bug报告模板
-│       ├── feature_request.md                # 功能请求模板
-│       ├── plan_template.md                  # 计划模板
-│       ├── tasks_template.md                 # 任务清单模板
-│       └── pr_template.md                    # PR模板
-├── plans/                                    # 计划目录（运行时生成）
-│   └── issue_{id}_plan.md                    # 各问题的计划文档
-├── tasks/                                    # 任务目录（运行时生成）
-│   └── issue_{id}_tasks.md                   # 各问题的任务清单
-└── cache/                                    # 缓存目录（运行时状态）
-    └── workflow_state.json                   # 工作流状态缓存
+.trae/skills/mydev-github-workflow/
+├── SKILL.md                          # Skill定义文件（第二层）
+├── references/                       # 参考文档（第三层）
+│   ├── design.md                     # 本文档
+│   ├── decision_guide.md             # 决策指导
+│   ├── error_reference.md            # 错误参考
+│   ├── issue_tracking.md             # 问题跟踪
+│   ├── quick_reference.md            # 快速参考
+│   └── workflow_history.md           # 工作流历史
+├── assets/
+│   ├── templates/                    # 模板目录
+│   │   ├── bug_report.md
+│   │   ├── feature_request.md
+│   │   ├── plan_template.md
+│   │   ├── tasks_template.md
+│   │   └── pr_template.md
+│   ├── plans/                        # 计划目录（运行时生成）
+│   │   └── {YYYY-MM-DD}_issue_{id}_plan.md
+│   └── tasks/                        # 任务目录（运行时生成）
+│       └── {YYYY-MM-DD}_issue_{id}_tasks.md
+└── scripts/
+    └── workflow_state.json           # 工作流状态缓存
 ```
 
 **隔离性保证**：

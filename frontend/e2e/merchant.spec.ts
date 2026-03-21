@@ -51,7 +51,7 @@ test.describe('Merchant Dashboard', () => {
       await page.getByPlaceholder('请输入商品描述').fill('这是一个E2E测试商品');
       await page.getByPlaceholder('请输入价格').fill('99.99');
       await page.getByPlaceholder('请输入库存').fill('100');
-      await page.locator('button[type="submit"]').click();
+      await page.locator('button:has-text("保存")').click();
       await page.waitForTimeout(1000);
     }
   });
