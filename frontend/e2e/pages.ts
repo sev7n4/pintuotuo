@@ -99,18 +99,22 @@ export class MerchantProductsPage {
     await this.page.getByPlaceholder('请输入商品名称').fill(data.name);
     await this.page.getByPlaceholder('请输入商品描述').fill(data.description);
     
-    const priceFormItem = this.page.locator('.ant-form-item').filter({ hasText: '价格' });
-    const priceInput = priceFormItem.locator('.ant-input-number input');
+    const priceInput = this.page.getByPlaceholder('请输入价格');
     await priceInput.click();
-    await priceInput.fill('');
-    await priceInput.type(data.price.toString());
+    await priceInput.evaluate((el: HTMLInputElement, value: string) => {
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, data.price.toString());
     await priceInput.press('Tab');
     
-    const stockFormItem = this.page.locator('.ant-form-item').filter({ hasText: '库存' });
-    const stockInput = stockFormItem.locator('.ant-input-number input');
+    const stockInput = this.page.getByPlaceholder('请输入库存');
     await stockInput.click();
-    await stockInput.fill('');
-    await stockInput.type(data.stock.toString());
+    await stockInput.evaluate((el: HTMLInputElement, value: string) => {
+      el.value = value;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, data.stock.toString());
     await stockInput.press('Tab');
     
     if (data.category) {
