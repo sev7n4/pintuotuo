@@ -1,6 +1,6 @@
 ---
 name: "mydev-github-workflow"
-description: "Automated development workflow integrated with GitHub CI/CD. Invoke when user reports a bug (login fails, error occurs), requests a new feature (add payment, implement search), describes code improvements (optimize, refactor), or provides structured issue input with type/title/description/priority/scope fields."
+description: "Automated development workflow integrated with GitHub CI/CD. Invoke when user reports a bug, requests a feature, describes a code change requirement, or provides structured issue input with type/title/description/priority/scope fields."
 ---
 
 # MyDev GitHub Workflow
@@ -30,20 +30,23 @@ description: "Automated development workflow integrated with GitHub CI/CD. Invok
 ### 步骤2：计划生成
 
 使用模板生成：
-- `.trae/skills/mydev-github-workflow/assets/templates/plan_template.md`
-- `.trae/skills/mydev-github-workflow/assets/templates/tasks_template.md`
+- `assets/templates/plan_template.md`
+- `assets/templates/tasks_template.md`
 
 ### 步骤3：分支创建
 
+命名规范：
+- bugfix/issue-{id}-{desc}
+- feature/issue-{id}-{desc}
+
 ```bash
 git checkout main && git pull
-git checkout -b {type}/issue-{id}-{description}
+git checkout -b {type}/issue-{id}-{desc}
 git push -u origin {branch}
 ```
 
 ### 步骤4：代码分析
 
-使用工具定位代码：
 - SearchCodebase: 语义搜索
 - Grep: 关键词搜索
 - Read: 读取文件
@@ -123,17 +126,8 @@ gh pr create --title "{title}" --body-file {body}
 |----------|----------|
 | 编译错误 | 分析语法，修复代码 |
 | 测试失败 | 分析日志，修复代码/测试 |
-| Lint错误 | 修复代码风格 |
-| 安全漏洞 | 修复安全问题 |
-| 合并冲突 | 拉取最新，解决冲突 |
-
-## 质量标准
-
-- 代码风格检查通过
-- 静态分析通过
-- 安全扫描通过
-- 测试覆盖率达标
-- 所有测试通过
+| Lint错误 | 按规范修复代码风格 |
+| CI失败 | 获取日志，定位修复 |
 
 ## 文件位置
 
