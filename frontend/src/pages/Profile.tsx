@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Card, Form, Input, Button, Avatar, message, Descriptions, Tag, Space, Divider, Modal, Tabs, Row, Col, Statistic } from 'antd'
-import { UserOutlined, MailOutlined, PhoneOutlined, EditOutlined, SafetyOutlined, TrophyOutlined } from '@ant-design/icons'
+import { Card, Form, Input, Button, Avatar, message, Descriptions, Tag, Space, Divider, Modal, Tabs, Row, Col, Statistic, Upload } from 'antd'
+import { UserOutlined, MailOutlined, PhoneOutlined, EditOutlined, SafetyOutlined, TrophyOutlined, CameraOutlined, LoadingOutlined } from '@ant-design/icons'
+import type { UploadProps } from 'antd'
 import { useAuthStore } from '@/stores/authStore'
 import { userService } from '@/services/user'
 import styles from './Profile.module.css'
@@ -12,6 +13,7 @@ const Profile = () => {
   const [form] = Form.useForm()
   const [passwordForm] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [avatarLoading, setAvatarLoading] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -57,6 +59,41 @@ const Profile = () => {
     }
   }
 
+  const handleAvatarUpload = async (file: File) => {
+    const isImage = ['image/jpeg', 'image/png', 'image/gif'].includes(file.type)
+    if (!isImage) {
+      message.error('只能上传 JPG/PNG/GIF 格式的图片')
+      return false
+    }
+    const isLt2M = file.size / 1024 / 1024 < 2
+    if (!isLt2M) {
+      message.error('图片大小不能超过 2MB')
+      return false
+    }
+
+    setAvatarLoading(true)
+    try {
+      const response = await userService.uploadAvatar(file)
+      if (response.data?.data?.url) {
+        setUser({ ...user!, avatar_url: response.data.data.url })
+        message.success('头像上传成功')
+      }
+    } catch {
+      message.error('头像上传失败')
+    } finally {
+      setAvatarLoading(false)
+    }
+    return false
+  }
+
+  const uploadProps: UploadProps = {
+    showUploadList: false,
+    beforeUpload: (file) => {
+      handleAvatarUpload(file)
+      return false
+    },
+  }
+
   const getRoleTag = (role: string) => {
     const roleMap: Record<string, { color: string; text: string }> = {
       user: { color: 'blue', text: '普通用户' },
@@ -85,7 +122,19 @@ const Profile = () => {
         <Col xs={24} lg={8}>
           <Card className={styles.avatarCard}>
             <div className={styles.avatarSection}>
-              <Avatar size={100} icon={<UserOutlined />} className={styles.avatar} />
+              <Upload {...uploadProps}>
+                <div className={styles.avatarWrapper}>
+                  <Avatar 
+                    size={100} 
+                    src={user?.avatar_url} 
+                    icon={<UserOutlined />} 
+                    className={styles.avatar} 
+                  />
+                  <div className={styles.avatarOverlay}>
+                    {avatarLoading ? <LoadingOutlined /> : <CameraOutlined />}
+                  </div>
+                </div>
+              </Upload>
               <h3 className={styles.userName}>{user?.name || '用户'}</h3>
               {user && getRoleTag(user.role)}
               <div className={styles.levelSection}>

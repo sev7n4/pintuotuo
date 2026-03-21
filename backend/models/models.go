@@ -9,6 +9,7 @@ type User struct {
 	Name           string    `json:"name"`
 	Password       string    `json:"-"`
 	Role           string    `json:"role"` // user, merchant, admin
+	AvatarURL      string    `json:"avatar_url,omitempty"`
 	ReferralCode   string    `json:"referral_code,omitempty"`
 	ReferredBy     int       `json:"referred_by,omitempty"`
 	TotalReferrals int       `json:"total_referrals,omitempty"`

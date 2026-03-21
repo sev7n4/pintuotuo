@@ -4,6 +4,7 @@ export interface User {
   email: string
   name: string
   role: 'user' | 'merchant' | 'admin'
+  avatar_url?: string
   created_at: string
   updated_at: string
 }

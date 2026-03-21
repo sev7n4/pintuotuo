@@ -32,6 +32,7 @@ func RegisterUserRoutes(router *gin.RouterGroup) {
 		{
 			auth.GET("/me", handlers.GetCurrentUser)
 			auth.PUT("/me", handlers.UpdateCurrentUser)
+			auth.POST("/avatar", handlers.UploadAvatar)
 		}
 
 		users.GET("/:id", handlers.GetUserByID)
