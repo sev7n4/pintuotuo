@@ -10,7 +10,7 @@ export default defineConfig({
   expect: {
     timeout: 10000,
   },
-  reporter: 'html',
+  reporter: [['html'], ['list']],
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
@@ -22,7 +22,9 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { 
+        ...devices['Desktop Chrome'],
+      },
     },
   ],
   webServer: process.env.CI ? undefined : {
