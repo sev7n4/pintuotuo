@@ -5,25 +5,29 @@ import { useAuthStore } from '@stores/authStore'
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate()
-  const { login, isLoading, error } = useAuthStore()
+  const { login, isLoading, error, user } = useAuthStore()
   const [form] = Form.useForm()
 
   const onFinish = async (values: { email: string; password: string; rememberMe?: boolean }) => {
     try {
       await login(values.email, values.password, values.rememberMe || false)
       message.success('登录成功')
-      const currentUser = useAuthStore.getState().user
-      if (currentUser?.role === 'admin') {
-        navigate('/admin')
-      } else if (currentUser?.role === 'merchant') {
-        navigate('/merchant/dashboard')
-      } else {
-        navigate('/products')
-      }
     } catch (err) {
       message.error(error || '登录失败，请检查邮箱和密码')
     }
   }
+
+  React.useEffect(() => {
+    if (user) {
+      if (user.role === 'admin') {
+        navigate('/admin', { replace: true })
+      } else if (user.role === 'merchant') {
+        navigate('/merchant/dashboard', { replace: true })
+      } else {
+        navigate('/products', { replace: true })
+      }
+    }
+  }, [user, navigate])
 
   return (
     <div className="auth-page">
