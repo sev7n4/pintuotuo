@@ -42,37 +42,67 @@ Use when user: (1) reports a bug ("登录失败", "返回401", "有个错误"), 
 ## Workflow Decision Tree
 
 ```
-用户输入
+Step 0: 初始化检查
     ↓
-问题解析 ──→ 判断类型
-    ↓           ├─ bug → bugfix/issue-{id}-{desc}
-    ↓           ├─ feature → feature/issue-{id}-{desc}
-    ↓           └─ enhancement → enhancement/issue-{id}-{desc}
+    ├─ Git有未提交更改? → 询问用户: 暂存/提交/忽略
+    └─ 有未完成任务? → 询问用户: 继续/放弃
     ↓
-计划生成 ──→ 读取模板 → 生成计划和任务文档
+Step 1: 问题解析 ──→ 判断类型
+    ↓                   ├─ bug → bugfix/issue-{id}
+    ↓                   ├─ feature → feature/issue-{id}
+    ↓                   └─ enhancement → enhancement/issue-{id}
     ↓
-分支创建 ──→ git checkout -b {branch}
+Step 2: 计划生成 ──→ 读取模板 → 生成计划和任务文档
     ↓
-代码分析 ──→ SearchCodebase → Grep → Read
-    ↓           └─ 找不到? → 询问用户
+Step 3: 分支创建 ──→ git checkout -b {branch}
+    ↓                   └─ 推送失败? → git pull --rebase → 重试
     ↓
-代码实现 ──→ SearchReplace / Write
+Step 4: 代码分析 ──→ SearchCodebase → Grep → Read
+    ↓                   └─ 找不到? → 询问用户
     ↓
-测试编写 ──→ 单元测试 + 集成测试 + E2E测试
+Step 5: 代码实现 ──→ SearchReplace / Write
     ↓
-本地验证 ──→ 运行测试
-    ↓           └─ 失败? → 修复 → 重新验证
+Step 6: 测试编写 ──→ 单元测试 + 集成测试 + E2E测试
     ↓
-代码提交 ──→ git commit -m "..."
+Step 7: 本地验证 ──→ 运行测试
+    ↓                   └─ 失败? → 修复 → 重新验证
     ↓
-CI监控 ──→ gh run watch
-    ↓           ├─ 成功 → 文档更新 → 创建PR
-    ↓           └─ 失败 → 错误修复循环 (最多5次)
+Step 8: 代码提交 ──→ git commit -m "..."
+    ↓                   └─ 推送失败? → git pull --rebase → 重试
+    ↓
+Step 9: CI监控 ──→ gh run watch
+    ↓                   ├─ 成功 → Step 11
+    ↓                   └─ 失败 → Step 10 (最多5次)
+    ↓
+Step 10: 错误修复 ──→ 分析日志 → 修复 → 重新提交
+    ↓
+Step 11: 文档更新 ──→ 更新跟踪文档
+    ↓
+Step 12: 创建PR ──→ gh pr create
+    ↓
+Step 13: 清理 ──→ 更新状态 → 输出PR链接
     ↓
 完成
 ```
 
 ## 核心步骤
+
+### Step 0: 初始化检查
+
+**目的**: 确保环境干净，避免中途失败
+
+**检查项**:
+```bash
+# 检查Git状态
+git status --porcelain
+# 有输出? → 询问用户处理方式
+
+# 检查未完成任务
+# 读取 workflow_state.json
+# stage != "idle" && stage != "completed"? → 询问用户
+```
+
+**决策点**: 有问题? → 询问用户，不自动处理
 
 ### Step 1: 问题解析
 
@@ -102,15 +132,18 @@ CI监控 ──→ gh run watch
       assets/tasks/{YYYY-MM-DD}_issue_{id}_tasks.md
 ```
 
-**决策点**：问题复杂? → 先加载 `references/decision_guide.md`
-
 ### Step 3: 分支创建
 
 ```bash
 git checkout main && git pull origin main
-git checkout -b bugfix/issue-001-login-401  # 示例
+git fetch origin main
+git log HEAD..origin/main --oneline  # 检查新提交
+# 有新提交? → git rebase origin/main
+git checkout -b bugfix/issue-001-login-401
 git push -u origin bugfix/issue-001-login-401
 ```
+
+**失败处理**: 推送失败? → `git pull --rebase origin main` → 重试推送
 
 ### Step 4: 代码分析
 
@@ -161,6 +194,8 @@ Closes #ISSUE-001"
 git push origin bugfix/issue-001-login-401
 ```
 
+**失败处理**: 推送失败? → `git pull --rebase origin {branch}` → 解决冲突 → 重试推送
+
 ### Step 9: CI监控
 
 ```bash
@@ -198,11 +233,24 @@ gh run watch {run-id}
 gh pr create --title "fix(auth): resolve login 401 error" --body "..."
 ```
 
-## 状态管理
+### Step 13: 清理
 
-**文件**：`scripts/workflow_state.json`
+```
+1. 更新 workflow_state.json: stage="completed"
+2. 更新统计信息
+3. 输出PR链接给用户
+```
 
-每个步骤完成后更新 `workflowState.stage`，详见 `references/design.md`
+## 失败处理原则
+
+| 失败类型 | 处理方式 |
+|----------|----------|
+| Git操作失败 | 自动重试1次，失败后询问用户 |
+| 测试失败 | 分析日志，修复后重新验证 |
+| CI失败 | 最多重试5次，超过后请求人工介入 |
+| 无法定位代码 | 询问用户提供更多信息 |
+
+**核心原则**: 遇到无法自动解决的问题时，立即询问用户，不猜测
 
 ## 人工介入条件
 
@@ -213,6 +261,7 @@ gh pr create --title "fix(auth): resolve login 401 error" --body "..."
 | 影响>5个文件 | 影响范围过大需确认 |
 | 数据库迁移 | 数据安全风险 |
 | 安全敏感操作 | 需要权限确认 |
+| Git冲突 | 需要用户决定保留哪个版本 |
 
 ## Reference Files
 
@@ -224,11 +273,5 @@ gh pr create --title "fix(auth): resolve login 401 error" --body "..."
 | `references/quick_reference.md` | 命令速查表 |
 
 ## Error Handling
-
-| 错误类型 | 处理方式 |
-|----------|----------|
-| 编译错误 | 分析语法，修复代码 |
-| 测试失败 | 分析日志，修复代码/测试 |
-| CI失败 | 获取日志，定位修复 |
 
 详见 `references/error_reference.md`
