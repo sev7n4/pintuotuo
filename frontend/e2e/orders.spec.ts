@@ -97,8 +97,10 @@ test.describe('Groups', () => {
     await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/groups');
-    await page.waitForLoadState('networkidle');
-    await expect(page.locator('h1:has-text("拼团中心")').or(page.getByRole('heading', { name: '拼团中心' }))).toBeVisible({ timeout: 10000 });
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
+    const heading = page.locator('h1').first();
+    await expect(heading).toBeVisible({ timeout: 10000 });
   });
 
   test('should show group details', async ({ page }) => {

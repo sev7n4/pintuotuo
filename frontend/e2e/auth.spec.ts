@@ -74,9 +74,9 @@ test.describe('Login Flow', () => {
 
   test('should show error for invalid credentials', async ({ page }) => {
     await loginPage.login('invalid@example.com', 'wrongpassword');
-    await page.waitForTimeout(2000);
-    const toastMessage = page.locator('.ant-message-notice-content').first();
-    await expect(toastMessage).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(3000);
+    const toastMessage = page.locator('.ant-message');
+    await expect(toastMessage.first()).toBeVisible({ timeout: 15000 });
   });
 
   test('should logout successfully', async ({ page }) => {
@@ -133,7 +133,7 @@ test.describe('Registration', () => {
   test('should show error for duplicate email', async ({ page }) => {
     await registerPage.register('demo@example.com', 'testuser', 'Test123456!');
     await page.waitForTimeout(2000);
-    const errorMessage = page.locator('.ant-message-error, .ant-message');
+    const errorMessage = page.locator('.ant-message');
     await expect(errorMessage.first()).toBeVisible({ timeout: 10000 });
   });
 

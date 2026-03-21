@@ -1,60 +1,70 @@
 # Checklist
 
-## Skill核心文件
+## Skill目录结构（Anthropic规范）
 
-- [ ] mydev-github-workflow Skill目录已创建
-- [ ] SKILL.md文件已创建且格式正确
-- [ ] Skill元数据（name, description）完整
-- [ ] 触发条件定义清晰
-- [ ] 12个执行步骤指令完整
-- [ ] 错误处理机制定义完整
-- [ ] 质量标准定义完整
+- [x] `.trae/skills/mydev-github-workflow/` 目录已创建
+- [x] `references/` 子目录已创建
+- [x] `assets/templates/` 子目录已创建
+- [x] `scripts/` 子目录已创建
 
-## 模板文件
+## SKILL.md核心文件
 
-- [ ] plan_template.md 存在且结构完整
-- [ ] tasks_template.md 存在且结构完整
-- [ ] pr_template.md 存在且结构完整
-- [ ] bug_report.md 存在且结构完整
-- [ ] feature_request.md 存在且结构完整
+- [x] SKILL.md文件已创建
+- [x] YAML frontmatter格式正确
+- [x] name字段符合规范（小写字母和连字符）
+- [x] description字段包含触发条件（~100词）
+- [x] Markdown指令内容 < 500行
+- [x] 触发条件定义清晰
+- [x] 核心工作流程完整
+- [x] 错误处理机制定义
+- [x] 质量标准定义
 
-## 跟踪文档
+## 参考文档（references/）
 
-- [ ] issue_tracking.md 存在且结构完整
-- [ ] workflow_history.md 存在且结构完整
-- [ ] quick_reference.md 存在且内容完整
+- [x] design.md 已迁移
+- [x] issue_tracking.md 已迁移
+- [x] workflow_history.md 已迁移
+- [x] quick_reference.md 已迁移
 
-## 状态管理
+## 模板资源（assets/templates/）
 
-- [ ] workflow_state.json 存在且JSON格式正确
-- [ ] 包含 currentIssue 字段结构
-- [ ] 包含 workflowState 字段结构
-- [ ] 包含 tasks 字段结构
-- [ ] 包含 statistics 字段结构
+- [x] plan_template.md 已迁移
+- [x] tasks_template.md 已迁移
+- [x] pr_template.md 已迁移
+- [x] bug_report.md 已迁移
+- [x] feature_request.md 已迁移
 
-## 设计文档
+## 脚本文件（scripts/）
 
-- [ ] github_workflow_design.md 内容完整
-- [ ] 文档反映最终实现结构
-- [ ] 包含技术实现路线说明
-- [ ] 包含使用示例
+- [x] workflow_state.json 已迁移
+
+## 旧结构清理
+
+- [x] `.trae/tryskills/` 目录已删除
+- [x] `.trae/documents/templates/` 目录已删除
+- [x] `.trae/cache/` 目录已删除
 
 ## 隔离性验证
 
-- [ ] 所有文件均在 `.trae/` 目录下
-- [ ] 未修改项目原有文件
-- [ ] 目录结构符合设计规范
-- [ ] 文件命名符合规范
+- [x] 所有Skill文件在 `.trae/skills/` 目录下
+- [x] 未修改项目原有文件
+- [x] 目录结构符合Anthropic规范
+
+## 三层渐进式披露验证
+
+- [x] 第一层：Metadata（name + description）~100词
+- [x] 第二层：SKILL.md主体 < 500行
+- [x] 第三层：references/assets/scripts 按需加载
 
 ## 功能完整性
 
-- [ ] 问题解析流程定义完整
-- [ ] 分支管理流程定义完整
-- [ ] 代码分析流程定义完整
-- [ ] 代码修改流程定义完整
-- [ ] 测试生成流程定义完整
-- [ ] 本地验证流程定义完整
-- [ ] 代码提交流程定义完整
-- [ ] CI监控流程定义完整
-- [ ] 错误修复循环流程定义完整
-- [ ] 文档更新流程定义完整
+- [x] 问题解析流程定义完整
+- [x] 分支管理流程定义完整
+- [x] 代码分析流程定义完整
+- [x] 代码修改流程定义完整
+- [x] 测试生成流程定义完整
+- [x] 本地验证流程定义完整
+- [x] 代码提交流程定义完整
+- [x] CI监控流程定义完整
+- [x] 错误修复循环流程定义完整
+- [x] 文档更新流程定义完整

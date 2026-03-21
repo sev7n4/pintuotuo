@@ -7,14 +7,35 @@
 ## What Changes
 
 - 创建 `mydev-github-workflow` Skill，封装完整的自动化开发流程
-- 创建配套的文档模板和跟踪系统
+- 按Anthropic官方Skills规范组织目录结构（三层渐进式披露）
 - 实现与现有GitHub CI/CD工作流的完美集成
-- **BREAKING**: 无破坏性变更，所有文件隔离在 `.trae/` 目录下
+- **BREAKING**: 无破坏性变更，所有文件隔离在 `.trae/skills/` 目录下
 
 ## Impact
 
 - Affected specs: 无现有spec受影响（新增功能）
-- Affected code: 不影响项目原有代码，仅在 `.trae/` 目录下新增文件
+- Affected code: 不影响项目原有代码，仅在 `.trae/skills/` 目录下新增文件
+
+## 目录结构规范（Anthropic Skills标准）
+
+```
+.trae/skills/mydev-github-workflow/
+├── SKILL.md                    # 第一层+第二层：元数据 + 核心指令（<500行）
+├── references/                 # 第三层：参考文档（按需加载）
+│   ├── design.md               # 工作流设计文档
+│   ├── issue_tracking.md       # 问题跟踪模板
+│   ├── workflow_history.md     # 工作流历史模板
+│   └── quick_reference.md      # 快速参考指南
+├── assets/                     # 第三层：资源文件
+│   └── templates/              # 模板文件
+│       ├── plan_template.md
+│       ├── tasks_template.md
+│       ├── pr_template.md
+│       ├── bug_report.md
+│       └── feature_request.md
+└── scripts/                    # 第三层：可执行脚本
+    └── workflow_state.json     # 工作流状态管理
+```
 
 ## ADDED Requirements
 
