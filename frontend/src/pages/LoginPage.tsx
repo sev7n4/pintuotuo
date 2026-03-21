@@ -1,11 +1,11 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Form, Input, Button, Card, message, Checkbox } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@stores/authStore'
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate()
-  const { login, isLoading, error, user } = useAuthStore()
+  const { login, isLoading, error, user, isAuthenticated } = useAuthStore()
   const [form] = Form.useForm()
 
   const onFinish = async (values: { email: string; password: string; rememberMe?: boolean }) => {
@@ -17,8 +17,9 @@ export const LoginPage: React.FC = () => {
     }
   }
 
-  React.useEffect(() => {
-    if (user) {
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('User authenticated, redirecting...', user.role)
       if (user.role === 'admin') {
         navigate('/admin', { replace: true })
       } else if (user.role === 'merchant') {
@@ -27,7 +28,7 @@ export const LoginPage: React.FC = () => {
         navigate('/products', { replace: true })
       }
     }
-  }, [user, navigate])
+  }, [isAuthenticated, user, navigate])
 
   return (
     <div className="auth-page">
