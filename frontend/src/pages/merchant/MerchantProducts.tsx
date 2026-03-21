@@ -209,6 +209,7 @@ const MerchantProducts = () => {
                 },
               },
             ]}
+            validateTrigger="onBlur"
           >
             <InputNumber
               precision={2}
@@ -237,6 +238,7 @@ const MerchantProducts = () => {
                 },
               },
             ]}
+            validateTrigger="onBlur"
           >
             <InputNumber
               style={{ width: '100%' }}
