@@ -2,14 +2,21 @@ package middleware
 
 import (
 	"fmt"
-	"log"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pintuotuo/backend/errors"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/sev7n4/pintuotuo/backend/errors"
 )
 
-// CORSMiddleware handles CORS for API requests
+type RateLimitData struct {
+	Count     int
+	ResetTime time.Time
+}
+
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
@@ -26,65 +33,45 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
-// ErrorHandlingMiddleware handles errors globally
 func ErrorHandlingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Printf("Panic: %v", err)
-				c.JSON(500, gin.H{
-					"code":    "INTERNAL_SERVER_ERROR",
-					"message": "An unexpected error occurred",
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "Internal server error",
 				})
-				c.Abort()
 			}
 		}()
 		c.Next()
-
-		// Check if there are errors in the context
-		if len(c.Errors) > 0 {
-			lastErr := c.Errors.Last()
-			if appErr, ok := lastErr.Err.(*errors.AppError); ok {
-				c.JSON(appErr.Status, appErr)
-				return
-			}
-		}
 	}
 }
 
-// LoggingMiddleware logs all requests
 func LoggingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
+		path := c.Request.URL.Path
+		method := c.Request.Method
 
-		// Process request
 		c.Next()
 
-		// Calculate duration
 		duration := time.Since(startTime)
-
-		// Log request details
 		statusCode := c.Writer.Status()
-		method := c.Request.Method
-		path := c.Request.URL.Path
-		clientIP := c.ClientIP()
 
-		log.Printf(
-			"[%s] %s %s | Status: %d | Duration: %dms | IP: %s",
+		fmt.Printf("[%s] %s %s | Status: %d | Duration: %v | IP: %s\n",
 			time.Now().Format("2006-01-02 15:04:05"),
 			method,
 			path,
 			statusCode,
-			duration.Milliseconds(),
-			clientIP,
+			duration,
+			c.ClientIP(),
 		)
 	}
 }
 
-// AuthMiddleware validates JWT token
+var jwtSecret = []byte(getEnv("JWT_SECRET", "pintuotuo-secret-key-dev"))
+
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get token from Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.JSON(401, gin.H{"error": "unauthorized"})
@@ -92,38 +79,63 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Extract token from "Bearer <token>"
 		const bearerPrefix = "Bearer "
-		if len(authHeader) < len(bearerPrefix) {
+		if !strings.HasPrefix(authHeader, bearerPrefix) {
 			c.JSON(401, gin.H{"error": "unauthorized"})
 			c.Abort()
 			return
 		}
 
-		token := authHeader[len(bearerPrefix):]
-		if token == "" {
+		tokenString := strings.TrimPrefix(authHeader, bearerPrefix)
+		if tokenString == "" {
 			c.JSON(401, gin.H{"error": "unauthorized"})
 			c.Abort()
 			return
 		}
 
-		// Validate token and extract user info
-		// This would normally verify JWT signature
-		// For now, just log and continue
-		fmt.Printf("Authenticated with token: %s...\n", token[:min(20, len(token))])
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return jwtSecret, nil
+		})
 
-		c.Next()
+		if err != nil {
+			c.JSON(401, gin.H{"error": "invalid token"})
+			c.Abort()
+			return
+		}
+
+		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			userIDFloat, ok := claims["user_id"].(float64)
+			if !ok {
+				c.JSON(401, gin.H{"error": "invalid token claims"})
+				c.Abort()
+				return
+			}
+			userID := int(userIDFloat)
+			c.Set("user_id", userID)
+			
+			if email, ok := claims["email"].(string); ok {
+				c.Set("email", email)
+			}
+			
+			c.Next()
+		} else {
+			c.JSON(401, gin.H{"error": "invalid token"})
+			c.Abort()
+			return
+		}
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+func getEnv(key, defaultValue string) string {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		return value
 	}
-	return b
+	return defaultValue
 }
 
-// RespondWithError is a helper function to respond with an AppError
 func RespondWithError(c *gin.Context, appErr *errors.AppError) {
 	c.JSON(appErr.Status, gin.H{
 		"error":   appErr.Message,
@@ -132,11 +144,8 @@ func RespondWithError(c *gin.Context, appErr *errors.AppError) {
 	})
 }
 
-// RateLimitMiddleware limits request rate (to be implemented)
 func RateLimitMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Implement rate limiting using Redis or in-memory store
-		// For now, just pass through
 		c.Next()
 	}
 }
