@@ -60,27 +60,31 @@ Step 3: 分支创建 ──→ git checkout -b {branch}
 Step 4: 代码分析 ──→ SearchCodebase → Grep → Read
     ↓                   └─ 找不到? → 询问用户
     ↓
-Step 5: 代码实现 ──→ SearchReplace / Write
+Step 5: 测试设计 ──→ TDD: 先写失败测试 (Red)
+    ↓                   ├─ Bug: 写复现测试
+    ↓                   └─ Feature: 写验收测试
     ↓
-Step 6: 测试编写 ──→ 单元测试 + 集成测试 + E2E测试
+Step 6: 最小实现 ──→ 写最少代码通过测试 (Green)
     ↓
-Step 7: 本地验证 ──→ 运行测试
+Step 7: 重构优化 ──→ 测试保护下优化代码 (Refactor)
+    ↓
+Step 8: 本地验证 ──→ 运行测试 + 覆盖率检查
     ↓                   └─ 失败? → 修复 → 重新验证
     ↓
-Step 8: 代码提交 ──→ git commit -m "..."
+Step 9: 代码提交 ──→ git commit -m "..."
     ↓                   └─ 推送失败? → git pull --rebase → 重试
     ↓
-Step 9: CI监控 ──→ gh run watch
-    ↓                   ├─ 成功 → Step 11
-    ↓                   └─ 失败 → Step 10 (最多5次)
+Step 10: CI监控 ──→ gh run watch
+    ↓                   ├─ 成功 → Step 12
+    ↓                   └─ 失败 → Step 11 (最多5次)
     ↓
-Step 10: 错误修复 ──→ 分析日志 → 修复 → 重新提交
+Step 11: 错误修复 ──→ 分析日志 → 修复 → 重新提交
     ↓
-Step 11: 文档更新 ──→ 更新跟踪文档
+Step 12: 文档更新 ──→ 更新跟踪文档
     ↓
-Step 12: 创建PR ──→ gh pr create
+Step 13: 创建PR ──→ gh pr create
     ↓
-Step 13: 清理 ──→ 更新状态 → 输出PR链接
+Step 14: 清理 ──→ 更新状态 → 输出PR链接
     ↓
 完成
 ```
@@ -155,21 +159,71 @@ Read: backend/handlers/auth.go
 
 **决策点**：找不到代码? → 询问用户提供更多信息
 
-### Step 5: 代码实现
+### Step 5: 测试设计 (TDD - Red)
 
+**原则**: 先写失败测试，明确预期行为
+
+**Bug修复流程**:
+```
+1. 分析Bug现象
+2. 写测试复现Bug (测试应失败)
+3. 确认测试失败 = Bug被捕获
+```
+
+**新功能流程**:
+```
+1. 定义验收标准
+2. 写验收测试 (E2E/集成测试)
+3. 写单元测试定义行为
+4. 所有测试应失败 (功能未实现)
+```
+
+**测试命名规范**:
+```
+Test{FunctionName}_{Scenario}_{ExpectedResult}
+
+Examples:
+- TestLogin_ValidCredentials_ReturnsToken
+- TestLogin_InvalidPassword_ReturnsError
+```
+
+**参考**: `references/test_design_guide.md`
+
+### Step 6: 最小实现 (TDD - Green)
+
+**原则**: 写最少代码使测试通过
+
+```
+1. 实现最小功能满足测试
+2. 不添加测试未覆盖的功能
+3. 代码可以丑陋，但必须通过测试
+```
+
+**实现方式**:
 - SearchReplace: 精确修改现有文件
 - Write: 创建新文件
-- 原则：最小化修改，保持风格一致
+- 保持风格一致
 
-### Step 6: 测试编写
+### Step 7: 重构优化 (TDD - Refactor)
 
-| 类型 | 位置 | 覆盖率 |
-|------|------|--------|
-| 单元测试 | `backend/{module}_test.go` | ≥85% |
-| 集成测试 | `backend/{module}_integration_test.go` | 核心流程 |
-| E2E测试 | `frontend/e2e/{feature}.spec.ts` | 用户场景 |
+**原则**: 在测试保护下优化代码
 
-### Step 7: 本地验证
+```
+1. 确保所有测试通过
+2. 重构代码结构
+3. 运行测试确认未破坏功能
+4. 重复直到满意
+```
+
+**重构检查清单**:
+- [ ] 消除重复代码
+- [ ] 提取函数/方法
+- [ ] 改善命名
+- [ ] 简化条件逻辑
+
+**参考**: `references/code_quality_guide.md`
+
+### Step 8: 本地验证
 
 ```bash
 # 后端
@@ -179,9 +233,16 @@ cd backend && go test -v -race -coverprofile=coverage.out ./...
 cd frontend && npm test -- --coverage --watchAll=false
 ```
 
+**覆盖率要求**:
+| 层级 | 最低覆盖率 |
+|------|-----------|
+| Backend Core | ≥85% |
+| Backend API | ≥80% |
+| Frontend | ≥80% |
+
 **决策点**：失败? → 分析日志 → 修复 → 重新验证
 
-### Step 8: 代码提交
+### Step 9: 代码提交
 
 ```bash
 git add .
@@ -196,7 +257,7 @@ git push origin bugfix/issue-001-login-401
 
 **失败处理**: 推送失败? → `git pull --rebase origin {branch}` → 解决冲突 → 重试推送
 
-### Step 9: CI监控
+### Step 10: CI监控
 
 ```bash
 gh run list --branch=bugfix/issue-001-login-401 --limit=1
@@ -204,10 +265,10 @@ gh run watch {run-id}
 ```
 
 **决策点**：
-- 成功 → Step 11
-- 失败 → Step 10
+- 成功 → Step 12
+- 失败 → Step 11
 
-### Step 10: 错误修复循环
+### Step 11: 错误修复循环
 
 ```
 1. gh run view {run-id} --log-failed
@@ -216,24 +277,24 @@ gh run watch {run-id}
 4. 应用修复
 5. 本地验证
 6. 重新提交
-7. 返回 Step 9
+7. 返回 Step 10
 ```
 
 **终止条件**：成功 或 重试5次 → 请求人工介入
 
-### Step 11: 文档更新
+### Step 12: 文档更新
 
 追加更新：
 - `references/issue_tracking.md`
 - `references/workflow_history.md`
 
-### Step 12: 创建PR
+### Step 13: 创建PR
 
 ```bash
 gh pr create --title "fix(auth): resolve login 401 error" --body "..."
 ```
 
-### Step 13: 清理
+### Step 14: 清理
 
 ```
 1. 更新 workflow_state.json: stage="completed"
@@ -276,6 +337,8 @@ gh pr create --title "fix(auth): resolve login 401 error" --body "..."
 | `state_fields.md` | 状态字段说明：workflow_state.json各字段含义 |
 | `issue_tracking.md` | 问题跟踪文档（运行时更新） |
 | `workflow_history.md` | 工作流历史记录（运行时更新） |
+| `test_design_guide.md` | TDD测试设计指南：Red-Green-Refactor、测试模式 |
+| `code_quality_guide.md` | 代码质量指南：SOLID原则、命名规范、安全实践 |
 
 ### 模板文件 (assets/templates/)
 

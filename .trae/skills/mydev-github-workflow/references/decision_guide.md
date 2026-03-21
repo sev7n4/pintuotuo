@@ -77,6 +77,18 @@
 
 ## 测试策略决策
 
+### TDD流程决策
+
+```
+问题类型
+    ↓
+├── Bug修复
+│   └── Red: 写复现测试 → Green: 最小修复 → Refactor: 优化
+│
+└── 新功能
+    └── Red: 写验收测试 → Green: 最小实现 → Refactor: 优化
+```
+
 ### Bug修复测试策略
 
 ```
@@ -90,6 +102,17 @@ Bug修复
     └── 否 → 仅编写单元测试
 ```
 
+**Bug修复TDD流程**:
+```
+1. 分析Bug现象，理解预期行为
+2. 写测试复现Bug (测试应失败)
+3. 确认测试失败 = Bug被正确捕获
+4. 写最小代码修复Bug
+5. 确认测试通过
+6. 添加边界测试用例
+7. 重构优化 (可选)
+```
+
 ### 新功能测试策略
 
 ```
@@ -99,6 +122,46 @@ Bug修复
 ├── backend → 单元测试 + 集成测试
 ├── frontend → 单元测试 + E2E测试
 └── both → 全部测试类型
+```
+
+**新功能TDD流程**:
+```
+1. 定义验收标准
+2. 写E2E/集成测试定义外部行为
+3. 写单元测试定义内部行为
+4. 所有测试应失败 (功能未实现)
+5. 写最小代码使测试通过
+6. 重构优化代码
+7. 重复添加更多测试用例
+```
+
+### 测试类型选择
+
+| 场景 | 推荐测试类型 | 原因 |
+|------|-------------|------|
+| 纯逻辑函数 | 单元测试 | 快速、精确 |
+| API端点 | 单元测试 + 集成测试 | 验证接口契约 |
+| 数据库操作 | 集成测试 | 需要真实DB环境 |
+| 用户流程 | E2E测试 | 验证完整体验 |
+| UI组件 | 单元测试 | 隔离测试组件行为 |
+
+### 测试命名决策
+
+```
+测试函数命名格式:
+Test{FunctionName}_{Scenario}_{ExpectedResult}
+
+场景描述:
+- ValidInput / InvalidInput
+- EmptyInput / NilInput
+- BoundaryCondition
+- ConcurrentAccess
+- ErrorCondition
+
+示例:
+- TestLogin_ValidCredentials_ReturnsToken
+- TestLogin_InvalidPassword_ReturnsError
+- TestLogin_EmptyEmail_ReturnsValidationError
 ```
 
 ## CI失败处理决策

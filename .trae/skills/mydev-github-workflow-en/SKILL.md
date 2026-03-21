@@ -60,27 +60,31 @@ Step 3: Branch Creation ──→ git checkout -b {branch}
 Step 4: Code Analysis ──→ SearchCodebase → Grep → Read
     ↓                       └─ Not found? → Ask user
     ↓
-Step 5: Code Implementation ──→ SearchReplace / Write
+Step 5: Test Design (TDD - Red) ──→ Write failing tests first
+    ↓                                  ├─ Bug: Write reproduction test
+    ↓                                  └─ Feature: Write acceptance test
     ↓
-Step 6: Test Writing ──→ Unit Tests + Integration Tests + E2E Tests
+Step 6: Minimal Implementation (TDD - Green) ──→ Write minimal code to pass
     ↓
-Step 7: Local Verification ──→ Run tests
+Step 7: Refactor (TDD - Refactor) ──→ Optimize under test protection
+    ↓
+Step 8: Local Verification ──→ Run tests + coverage check
     ↓                            └─ Failed? → Fix → Re-verify
     ↓
-Step 8: Code Commit ──→ git commit -m "..."
+Step 9: Code Commit ──→ git commit -m "..."
     ↓                     └─ Push failed? → git pull --rebase → retry
     ↓
-Step 9: CI Monitoring ──→ gh run watch
-    ↓                       ├─ Success → Step 11
-    ↓                       └─ Failed → Step 10 (max 5 retries)
+Step 10: CI Monitoring ──→ gh run watch
+    ↓                        ├─ Success → Step 12
+    ↓                        └─ Failed → Step 11 (max 5 retries)
     ↓
-Step 10: Error Fix ──→ Analyze logs → Fix → Re-commit
+Step 11: Error Fix ──→ Analyze logs → Fix → Re-commit
     ↓
-Step 11: Documentation Update ──→ Update tracking docs
+Step 12: Documentation Update ──→ Update tracking docs
     ↓
-Step 12: Create PR ──→ gh pr create
+Step 13: Create PR ──→ gh pr create
     ↓
-Step 13: Cleanup ──→ Update state → Output PR link
+Step 14: Cleanup ──→ Update state → Output PR link
     ↓
 Complete
 ```
@@ -155,21 +159,71 @@ Read: backend/handlers/auth.go
 
 **Decision Point**: Cannot find code? → Ask user for more information
 
-### Step 5: Code Implementation
+### Step 5: Test Design (TDD - Red)
 
+**Principle**: Write failing tests first to clarify expected behavior
+
+**Bug Fix Process**:
+```
+1. Analyze bug symptoms
+2. Write test to reproduce bug (test should fail)
+3. Confirm test failure = bug is captured
+```
+
+**New Feature Process**:
+```
+1. Define acceptance criteria
+2. Write acceptance tests (E2E/integration tests)
+3. Write unit tests to define behavior
+4. All tests should fail (feature not implemented)
+```
+
+**Test Naming Convention**:
+```
+Test{FunctionName}_{Scenario}_{ExpectedResult}
+
+Examples:
+- TestLogin_ValidCredentials_ReturnsToken
+- TestLogin_InvalidPassword_ReturnsError
+```
+
+**Reference**: `references/test_design_guide.md`
+
+### Step 6: Minimal Implementation (TDD - Green)
+
+**Principle**: Write minimal code to pass tests
+
+```
+1. Implement minimal functionality to satisfy tests
+2. Do not add features not covered by tests
+3. Code can be ugly, but must pass tests
+```
+
+**Implementation Methods**:
 - SearchReplace: Precise modification of existing files
 - Write: Create new files
-- Principle: Minimize changes, maintain consistent style
+- Maintain consistent style
 
-### Step 6: Test Writing
+### Step 7: Refactor (TDD - Refactor)
 
-| Type | Location | Coverage |
-|------|----------|----------|
-| Unit Tests | `backend/{module}_test.go` | ≥85% |
-| Integration Tests | `backend/{module}_integration_test.go` | Core flows |
-| E2E Tests | `frontend/e2e/{feature}.spec.ts` | User scenarios |
+**Principle**: Optimize code under test protection
 
-### Step 7: Local Verification
+```
+1. Ensure all tests pass
+2. Refactor code structure
+3. Run tests to confirm no functionality broken
+4. Repeat until satisfied
+```
+
+**Refactoring Checklist**:
+- [ ] Eliminate duplicate code
+- [ ] Extract functions/methods
+- [ ] Improve naming
+- [ ] Simplify conditional logic
+
+**Reference**: `references/code_quality_guide.md`
+
+### Step 8: Local Verification
 
 ```bash
 # Backend
@@ -179,9 +233,16 @@ cd backend && go test -v -race -coverprofile=coverage.out ./...
 cd frontend && npm test -- --coverage --watchAll=false
 ```
 
+**Coverage Requirements**:
+| Layer | Minimum Coverage |
+|-------|------------------|
+| Backend Core | ≥85% |
+| Backend API | ≥80% |
+| Frontend | ≥80% |
+
 **Decision Point**: Failed? → Analyze logs → Fix → Re-verify
 
-### Step 8: Code Commit
+### Step 9: Code Commit
 
 ```bash
 git add .
@@ -196,7 +257,7 @@ git push origin bugfix/issue-001-login-401
 
 **Failure Handling**: Push failed? → `git pull --rebase origin {branch}` → Resolve conflicts → Retry push
 
-### Step 9: CI Monitoring
+### Step 10: CI Monitoring
 
 ```bash
 gh run list --branch=bugfix/issue-001-login-401 --limit=1
@@ -204,10 +265,10 @@ gh run watch {run-id}
 ```
 
 **Decision Point**:
-- Success → Step 11
-- Failed → Step 10
+- Success → Step 12
+- Failed → Step 11
 
-### Step 10: Error Fix Loop
+### Step 11: Error Fix Loop
 
 ```
 1. gh run view {run-id} --log-failed
@@ -216,24 +277,24 @@ gh run watch {run-id}
 4. Apply fix
 5. Local verification
 6. Re-commit
-7. Return to Step 9
+7. Return to Step 10
 ```
 
 **Termination Condition**: Success OR 5 retries → Request human intervention
 
-### Step 11: Documentation Update
+### Step 12: Documentation Update
 
 Append updates to:
 - `references/issue_tracking.md`
 - `references/workflow_history.md`
 
-### Step 12: Create PR
+### Step 13: Create PR
 
 ```bash
 gh pr create --title "fix(auth): resolve login 401 error" --body "..."
 ```
 
-### Step 13: Cleanup
+### Step 14: Cleanup
 
 ```
 1. Update workflow_state.json: stage="completed"
@@ -276,6 +337,8 @@ gh pr create --title "fix(auth): resolve login 401 error" --body "..."
 | `state_fields.md` | State field documentation: workflow_state.json field meanings |
 | `issue_tracking.md` | Issue tracking document (runtime update) |
 | `workflow_history.md` | Workflow history record (runtime update) |
+| `test_design_guide.md` | TDD test design guide: Red-Green-Refactor, test patterns |
+| `code_quality_guide.md` | Code quality guide: SOLID principles, naming conventions, security practices |
 
 ### Template Files (assets/templates/)
 
