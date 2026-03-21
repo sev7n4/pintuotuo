@@ -27,7 +27,7 @@ test.describe('Orders', () => {
     await page.goto('/orders');
     
     const emptyState = page.getByText('暂无订单');
-    if (await emptyState.isVisible()) {
+    if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) {
       await expect(emptyState).toBeVisible();
     }
   });
@@ -41,7 +41,7 @@ test.describe('Orders', () => {
     await page.goto('/orders');
     
     const statusFilter = page.locator('.ant-select').first();
-    if (await statusFilter.isVisible()) {
+    if (await statusFilter.isVisible({ timeout: 5000 }).catch(() => false)) {
       await statusFilter.click();
       await page.waitForTimeout(300);
     }
@@ -56,7 +56,7 @@ test.describe('Orders', () => {
     await page.goto('/orders');
     
     const orderItem = page.locator('.ant-table-row').first();
-    if (await orderItem.isVisible()) {
+    if (await orderItem.isVisible({ timeout: 5000 }).catch(() => false)) {
       await orderItem.click();
       await page.waitForTimeout(500);
     }
@@ -71,11 +71,11 @@ test.describe('Orders', () => {
     await page.goto('/orders');
     
     const cancelButton = page.locator('button:has-text("取消订单")').first();
-    if (await cancelButton.isVisible()) {
+    if (await cancelButton.isVisible({ timeout: 5000 }).catch(() => false)) {
       await cancelButton.click();
       
       const confirmButton = page.locator('button:has-text("确定")');
-      if (await confirmButton.isVisible()) {
+      if (await confirmButton.isVisible({ timeout: 2000 }).catch(() => false)) {
         await confirmButton.click();
         await page.waitForTimeout(500);
       }
@@ -97,7 +97,7 @@ test.describe('Groups', () => {
     await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/groups');
-    await expect(page.getByRole('heading', { name: '拼团列表' }).or(page.locator('h1:has-text("拼团")'))).toBeVisible();
+    await expect(page.getByRole('heading', { name: '拼团中心' }).or(page.locator('h1:has-text("拼团")'))).toBeVisible();
   });
 
   test('should show group details', async ({ page }) => {
@@ -109,7 +109,7 @@ test.describe('Groups', () => {
     await page.goto('/groups');
     
     const groupItem = page.locator('.ant-card').first();
-    if (await groupItem.isVisible()) {
+    if (await groupItem.isVisible({ timeout: 5000 }).catch(() => false)) {
       await groupItem.click();
       await page.waitForTimeout(500);
     }

@@ -178,15 +178,13 @@
 
 | 日期     | 覆盖的用户流程 | 未覆盖的用户流程 | 测试通过率  | 备注     |
 | ------ | ------- | -------- | ------ | ------ |
-| 2026-03-21 | 31个测试用例通过 | 10个测试用例失败 | 75.6% (31/41) | 首次E2E测试CI运行，详见下方测试结果详情 |
-| \[待填写] | \[待填写]  | \[待填写]   | \[待填写] | <br /> |
-| \[待填写] | \[待填写]  | \[待填写]   | \[待填写] | <br /> |
-| \[待填写] | \[待填写]  | \[待填写]   | \[待填写] | <br /> |
+| 2026-03-21 08:00 | 31个测试用例通过 | 10个测试用例失败 | 75.6% (31/41) | 首次E2E测试CI运行 |
+| 2026-03-21 13:50 | 38个测试用例通过 | 3个测试用例失败 | 92.7% (38/41) | 修复选择器问题后通过率提升17.1% |
 | \[待填写] | \[待填写]  | \[待填写]   | \[待填写] | <br /> |
 
-### 4.4 E2E测试结果详情 (2026-03-21)
+### 4.4 E2E测试结果详情 (2026-03-21 13:50 更新)
 
-#### 通过的测试用例 (31个) ✅
+#### 通过的测试用例 (38个) ✅
 
 | 测试文件 | 测试用例 | 状态 |
 | --- | --- | --- |
@@ -200,6 +198,8 @@
 | auth.spec.ts | should logout successfully | ✅ |
 | auth.spec.ts | should persist login state after page refresh | ✅ |
 | auth.spec.ts | should have role selection on register page | ✅ |
+| auth.spec.ts | should register new user and redirect to products | ✅ |
+| auth.spec.ts | should register as merchant and redirect to merchant dashboard | ✅ |
 | auth.spec.ts | should show error for duplicate email | ✅ |
 | auth.spec.ts | should show error for password mismatch | ✅ |
 | auth.spec.ts | should deny regular user access to merchant dashboard | ✅ |
@@ -207,9 +207,14 @@
 | auth.spec.ts | should deny merchant access to admin dashboard | ✅ |
 | auth.spec.ts | should display admin dashboard for admin user | ✅ |
 | merchant.spec.ts | should display merchant dashboard when logged in as merchant | ✅ |
-| merchant.spec.ts | should create new API key | ✅ |
+| merchant.spec.ts | should display merchant products | ✅ |
+| merchant.spec.ts | should create new product | ✅ |
+| merchant.spec.ts | should display merchant orders | ✅ |
+| merchant.spec.ts | should display merchant settlements | ✅ |
+| merchant.spec.ts | should display API keys page | ✅ |
 | merchant.spec.ts | should toggle API key status | ✅ |
 | merchant.spec.ts | should delete API key | ✅ |
+| orders.spec.ts | should display orders page when logged in | ✅ |
 | orders.spec.ts | should show empty state when no orders | ✅ |
 | orders.spec.ts | should filter orders by status | ✅ |
 | orders.spec.ts | should view order details | ✅ |
@@ -222,27 +227,19 @@
 | products.spec.ts | should sort products | ✅ |
 | products.spec.ts | should paginate products | ✅ |
 
-#### 失败的测试用例 (10个) ❌
+#### 失败的测试用例 (3个) ❌
 
 | 测试文件 | 测试用例 | 错误类型 | 根本原因 | 修复状态 |
 | --- | --- | --- | --- | --- |
 | auth.spec.ts | should show error for invalid credentials | toBeVisible失败 | 错误消息未显示 | 待修复 |
-| auth.spec.ts | should register new user and redirect to products | waitForURL超时 | 注册后重定向失败 | 待修复 |
-| auth.spec.ts | should register as merchant and redirect to merchant dashboard | toHaveURL失败 | 注册后重定向失败 | 待修复 |
-| merchant.spec.ts | should display merchant products | toBeVisible失败 | 元素重复(商品管理) | 待修复 |
-| merchant.spec.ts | should create new product | toBeVisible失败 | 表单元素未找到 | 待修复 |
-| merchant.spec.ts | should display merchant orders | toBeVisible失败 | 元素重复(订单管理) | 待修复 |
-| merchant.spec.ts | should display merchant settlements | toBeVisible失败 | 元素重复(结算管理) | 待修复 |
-| merchant.spec.ts | should display API keys page | toBeVisible失败 | 元素未找到 | 待修复 |
-| orders.spec.ts | should display orders page when logged in | waitForURL超时 | 页面加载问题 | 待修复 |
-| orders.spec.ts | should display groups page when logged in | waitForURL超时 | 页面加载问题 | 待修复 |
+| merchant.spec.ts | should create new API key | toBeVisible失败 | 表单元素未找到 | 待修复 |
+| orders.spec.ts | should display groups page when logged in | toBeVisible失败 | 拼团页面标题未找到 | 待修复 |
 
 #### 失败原因分析
 
-1. **商家路由404错误**: `/merchants/stats` 和 `/merchants/orders` 返回404
-2. **元素重复问题**: `getByText('商品管理')` 匹配到2个元素
-3. **重定向问题**: 注册后无法正确重定向到目标页面
-4. **错误消息显示问题**: 登录失败时错误消息未正确显示
+1. **错误消息显示问题**: 登录失败时，错误消息组件可能未正确渲染或选择器不正确
+2. **API密钥创建表单问题**: 表单元素可能不存在或选择器不正确
+3. **拼团页面标题问题**: 页面标题可能是其他文本，选择器需要调整
 
 ## 5. 进度记录和闭环机制
 
