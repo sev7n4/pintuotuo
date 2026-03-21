@@ -198,10 +198,19 @@ const MerchantProducts = () => {
           <Form.Item
             name="price"
             label="价格"
-            rules={[{ required: true, message: '请输入价格' }]}
+            rules={[
+              { required: true, message: '请输入价格' },
+              {
+                validator: (_, value) => {
+                  if (value !== undefined && value <= 0) {
+                    return Promise.reject(new Error('价格必须大于0'))
+                  }
+                  return Promise.resolve()
+                },
+              },
+            ]}
           >
             <InputNumber
-              min={0}
               precision={2}
               style={{ width: '100%' }}
               placeholder="请输入价格"
@@ -209,7 +218,6 @@ const MerchantProducts = () => {
           </Form.Item>
           <Form.Item name="original_price" label="原价">
             <InputNumber
-              min={0}
               precision={2}
               style={{ width: '100%' }}
               placeholder="请输入原价（可选）"
@@ -218,10 +226,19 @@ const MerchantProducts = () => {
           <Form.Item
             name="stock"
             label="库存"
-            rules={[{ required: true, message: '请输入库存' }]}
+            rules={[
+              { required: true, message: '请输入库存' },
+              {
+                validator: (_, value) => {
+                  if (value !== undefined && value < 0) {
+                    return Promise.reject(new Error('库存不能为负数'))
+                  }
+                  return Promise.resolve()
+                },
+              },
+            ]}
           >
             <InputNumber
-              min={0}
               style={{ width: '100%' }}
               placeholder="请输入库存"
             />
