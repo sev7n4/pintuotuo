@@ -10,7 +10,8 @@
     "planFile": null,
     "tasksFile": null,
     "startedAt": null,
-    "lastCheckpoint": null
+    "lastCheckpoint": null,
+    "retryCount": 0
   },
   "statistics": {
     "totalIssues": 0,
