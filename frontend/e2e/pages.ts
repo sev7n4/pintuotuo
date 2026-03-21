@@ -99,36 +99,19 @@ export class MerchantProductsPage {
     await this.page.getByPlaceholder('请输入商品名称').fill(data.name);
     await this.page.getByPlaceholder('请输入商品描述').fill(data.description);
     
-    await this.page.evaluate(({ price, stock }) => {
-      const forms = document.querySelectorAll('form');
-      forms.forEach(form => {
-        const formInstance = (form as any).__REACT_FORM__ || (form as any)._reactInternals;
-        if (formInstance) {
-          console.log('Found form instance');
-        }
-      });
-      
-      const priceInput = document.querySelector('input[placeholder="请输入价格"]') as HTMLInputElement;
-      const stockInput = document.querySelector('input[placeholder="请输入库存"]') as HTMLInputElement;
-      
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-      
-      if (priceInput && nativeInputValueSetter) {
-        nativeInputValueSetter.call(priceInput, price.toString());
-        priceInput.dispatchEvent(new Event('input', { bubbles: true }));
-        priceInput.dispatchEvent(new Event('change', { bubbles: true }));
-        priceInput.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-      }
-      
-      if (stockInput && nativeInputValueSetter) {
-        nativeInputValueSetter.call(stockInput, stock.toString());
-        stockInput.dispatchEvent(new Event('input', { bubbles: true }));
-        stockInput.dispatchEvent(new Event('change', { bubbles: true }));
-        stockInput.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
-      }
-    }, { price: data.price, stock: data.stock });
+    const priceInput = this.page.getByPlaceholder('请输入价格');
+    await priceInput.click();
+    await priceInput.fill('');
+    await this.page.keyboard.type(data.price.toString());
+    await priceInput.press('Tab');
     
-    await this.page.waitForTimeout(500);
+    const stockInput = this.page.getByPlaceholder('请输入库存');
+    await stockInput.click();
+    await stockInput.fill('');
+    await this.page.keyboard.type(data.stock.toString());
+    await stockInput.press('Tab');
+    
+    await this.page.waitForTimeout(300);
     
     if (data.category) {
       await this.page.locator('.ant-select').first().click();
