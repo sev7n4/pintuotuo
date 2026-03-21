@@ -113,18 +113,44 @@ Closes #ISSUE-001"
 **Workflow Chain**: CI/CD → Integration Tests → E2E Tests
 
 ```bash
+# Check all workflow statuses
 gh pr view {pr-number} --json statusCheckRollup
 ```
 
-**Failed?** → Step 11 | **Success?** → Step 12
+**Failure Type Decision**:
+
+| Failure Type | Error Patterns | Next Step |
+|--------------|----------------|-----------|
+| **Compile Error** | `undefined`, `type error`, `cannot find` | Step 11 → Fix code |
+| **Test Failure** | `FAIL`, `assertion failed`, `expected` | Step 11 → Fix test/code |
+| **Lint Error** | `errcheck`, `no-unused-vars`, `staticcheck` | Step 11 → Fix style |
+| **Security** | `CVE`, `vulnerability`, `exposed secret` | Step 11 → Update deps |
+| **Environment** | `permission`, `timeout`, `out of memory` | Retry once → Ask user |
+
+**Success?** → Step 12
 
 ### Step 11: Error Fix
 
 ```bash
+# Get failed logs
 gh run view {run-id} --log-failed
+
+# Analyze error location
+grep -i "error\|fail\|panic" logs.txt
 ```
 
-Max 5 retries → Request human intervention after
+**Fix Workflow**:
+```
+1. Identify error type (compile/test/lint/security/env)
+2. Locate error position (file:line)
+3. Analyze error cause
+4. Apply fix
+5. Local verify
+6. Re-commit
+7. Return to Step 10
+```
+
+**Max 5 retries** → Request human intervention after
 
 ### Step 12-14: Finalize
 

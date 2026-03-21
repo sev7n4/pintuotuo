@@ -113,18 +113,44 @@ Closes #ISSUE-001"
 **工作流链**: CI/CD → Integration Tests → E2E Tests
 
 ```bash
+# 检查所有工作流状态
 gh pr view {pr-number} --json statusCheckRollup
 ```
 
-**失败?** → Step 11 | **成功?** → Step 12
+**失败类型决策**:
+
+| 失败类型 | 错误特征 | 下一步 |
+|----------|----------|--------|
+| **编译错误** | `undefined`, `type error`, `cannot find` | Step 11 → 修复代码 |
+| **测试失败** | `FAIL`, `assertion failed`, `expected` | Step 11 → 修复测试/代码 |
+| **Lint错误** | `errcheck`, `no-unused-vars`, `staticcheck` | Step 11 → 修复代码风格 |
+| **安全漏洞** | `CVE`, `Critical`, `High` | Step 11 → 更新依赖 |
+| **环境问题** | `timeout`, `out of memory`, `permission` | 重试1次 → 失败则人工介入 |
+
+**成功?** → Step 12
 
 ### Step 11: 错误修复
 
 ```bash
+# 获取失败日志
 gh run view {run-id} --log-failed
+
+# 分析错误位置
+grep -i "error\|fail\|panic" logs.txt
 ```
 
-最多重试5次 → 超过后请求人工介入
+**修复流程**:
+```
+1. 识别错误类型 (编译/测试/Lint/安全/环境)
+2. 定位错误位置 (文件:行号)
+3. 分析错误原因
+4. 应用修复
+5. 本地验证
+6. 重新提交
+7. 返回 Step 10
+```
+
+**重试限制**: 最多5次 → 超过后请求人工介入
 
 ### Step 12-14: 收尾
 
