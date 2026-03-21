@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sev7n4/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/errors"
 )
 
 type RateLimitData struct {
