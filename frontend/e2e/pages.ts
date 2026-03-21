@@ -237,7 +237,7 @@ export class MerchantAPIKeysPage {
     apiKey: string;
     quotaLimit?: number;
   }) {
-    await this.page.getByPlaceholder('请输入名称').fill(data.name);
+    await this.page.getByPlaceholder('例如：生产环境密钥').fill(data.name);
     await this.page.locator('.ant-select').click();
     await this.page.getByText(data.provider).click();
     await this.page.getByPlaceholder('请输入API Key').fill(data.apiKey);
@@ -312,7 +312,7 @@ export class MerchantSettingsPage {
 
   async saveSettings() {
     await this.page.locator('button:has-text("保存")').click();
-    await this.page.waitForTimeout(1000);
+    await this.page.waitForTimeout(2000);
   }
 
   async getVerificationStatus() {

@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError, AxiosResponse } from 'axios'
+import { message } from 'antd'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
@@ -33,6 +34,10 @@ instance.interceptors.response.use(
       localStorage.removeItem('remember_me')
       sessionStorage.removeItem('auth_token')
       window.location.href = '/login'
+    } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+      message.error('网络连接失败，请检查网络')
+    } else if (error.response?.status && error.response.status >= 500) {
+      message.error('服务器错误，请稍后重试')
     }
     return Promise.reject(error)
   }
