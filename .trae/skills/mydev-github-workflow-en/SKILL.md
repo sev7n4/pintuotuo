@@ -110,22 +110,40 @@ Closes #ISSUE-001"
 
 ### Step 10: CI Monitoring
 
-**Workflow Chain**: CI/CD → Integration Tests → E2E Tests
+**Workflow Chain**: CI/CD → Integration → E2E (sequential trigger)
 
 ```bash
 # Check all workflow statuses
 gh pr view {pr-number} --json statusCheckRollup
 ```
 
-**Failure Type Decision**:
+**Monitoring Process**:
+```
+1. Wait for CI/CD Pipeline to complete
+   ├─ Success → Wait for Integration Tests
+   └─ Failure → Step 11 (analyze CI error)
 
-| Failure Type | Error Patterns | Next Step |
-|--------------|----------------|-----------|
-| **Compile Error** | `undefined`, `type error`, `cannot find` | Step 11 → Fix code |
-| **Test Failure** | `FAIL`, `assertion failed`, `expected` | Step 11 → Fix test/code |
-| **Lint Error** | `errcheck`, `no-unused-vars`, `staticcheck` | Step 11 → Fix style |
-| **Security** | `CVE`, `vulnerability`, `exposed secret` | Step 11 → Update deps |
-| **Environment** | `permission`, `timeout`, `out of memory` | Retry once → Ask user |
+2. Wait for Integration Tests to complete
+   ├─ Success → Wait for E2E Tests
+   └─ Failure → Step 11 (analyze integration error)
+
+3. Wait for E2E Tests to complete
+   ├─ Success → Step 12
+   └─ Failure → Step 11 (analyze E2E error)
+```
+
+**Error Type Decision**:
+
+| Workflow | Error Type | Error Patterns | Next Step |
+|----------|------------|----------------|-----------|
+| CI/CD | Compile Error | `undefined`, `type error` | Fix code |
+| CI/CD | Lint Error | `errcheck`, `staticcheck` | Fix style |
+| CI/CD | Unit Test | `FAIL`, `assertion` | Fix test |
+| Integration | API Error | `connection refused`, `500` | Fix API/DB |
+| Integration | Data Error | `duplicate`, `foreign key` | Fix data logic |
+| E2E | UI Error | `selector not found`, `timeout` | Fix UI/selector |
+| E2E | Flow Error | `assertion failed` | Fix user flow |
+| Any | Environment | `permission`, `OOM`, `timeout` | Retry once → Ask user |
 
 **Success?** → Step 12
 

@@ -110,22 +110,40 @@ Closes #ISSUE-001"
 
 ### Step 10: CI监控
 
-**工作流链**: CI/CD → Integration Tests → E2E Tests
+**工作流链**: CI/CD → Integration → E2E (顺序触发)
 
 ```bash
 # 检查所有工作流状态
 gh pr view {pr-number} --json statusCheckRollup
 ```
 
-**失败类型决策**:
+**监控流程**:
+```
+1. 等待 CI/CD Pipeline 完成
+   ├─ 成功 → 等待 Integration Tests
+   └─ 失败 → Step 11 (分析CI错误)
 
-| 失败类型 | 错误特征 | 下一步 |
-|----------|----------|--------|
-| **编译错误** | `undefined`, `type error`, `cannot find` | Step 11 → 修复代码 |
-| **测试失败** | `FAIL`, `assertion failed`, `expected` | Step 11 → 修复测试/代码 |
-| **Lint错误** | `errcheck`, `no-unused-vars`, `staticcheck` | Step 11 → 修复代码风格 |
-| **安全漏洞** | `CVE`, `Critical`, `High` | Step 11 → 更新依赖 |
-| **环境问题** | `timeout`, `out of memory`, `permission` | 重试1次 → 失败则人工介入 |
+2. 等待 Integration Tests 完成
+   ├─ 成功 → 等待 E2E Tests
+   └─ 失败 → Step 11 (分析集成错误)
+
+3. 等待 E2E Tests 完成
+   ├─ 成功 → Step 12
+   └─ 失败 → Step 11 (分析E2E错误)
+```
+
+**错误类型决策**:
+
+| 工作流 | 错误类型 | 错误特征 | 下一步 |
+|--------|----------|----------|--------|
+| CI/CD | 编译错误 | `undefined`, `type error` | 修复代码 |
+| CI/CD | Lint错误 | `errcheck`, `staticcheck` | 修复风格 |
+| CI/CD | 单元测试 | `FAIL`, `assertion` | 修复测试 |
+| Integration | API错误 | `connection refused`, `500` | 修复API/DB |
+| Integration | 数据错误 | `duplicate`, `foreign key` | 修复数据逻辑 |
+| E2E | UI错误 | `selector not found`, `timeout` | 修复UI/选择器 |
+| E2E | 流程错误 | `assertion failed` | 修复用户流程 |
+| 任意 | 环境问题 | `permission`, `OOM`, `timeout` | 重试1次 → 人工介入 |
 
 **成功?** → Step 12
 
