@@ -239,7 +239,9 @@ export class MerchantAPIKeysPage {
   }) {
     await this.page.getByPlaceholder('例如：生产环境密钥').fill(data.name);
     await this.page.locator('.ant-select').click();
-    await this.page.getByRole('option', { name: data.provider }).click();
+    await this.page.waitForTimeout(500);
+    await this.page.locator('.ant-select-dropdown').waitFor({ state: 'visible' });
+    await this.page.locator(`.ant-select-item-option:has-text("${data.provider}")`).click();
     await this.page.getByPlaceholder('请输入API Key').fill(data.apiKey);
     
     if (data.quotaLimit !== undefined) {
