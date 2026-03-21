@@ -51,8 +51,10 @@ const MerchantProducts = () => {
       }
       setModalVisible(false)
       fetchProducts(1, 20, statusFilter === 'all' ? undefined : statusFilter)
-    } catch (error) {
-      message.error(editingProduct ? '更新失败' : '创建失败')
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string } } }
+      const errorMessage = axiosError.response?.data?.message || (editingProduct ? '更新失败' : '创建失败')
+      message.error(errorMessage)
     }
   }
 
