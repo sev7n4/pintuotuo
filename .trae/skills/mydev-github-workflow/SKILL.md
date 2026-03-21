@@ -212,61 +212,11 @@ Read: backend/handlers/auth.go
 单元测试: Test{FunctionName}_{Scenario}_{ExpectedResult}
 集成测试: Test{Feature}Integration_{Scenario}
 E2E测试: {Feature} - {User Action} - {Expected Result}
-
-Examples:
-- TestUploadAvatar_ValidImage_ReturnsURL
-- TestUserAuthIntegration_CompleteFlow
-- E2E: Avatar - User uploads image - Avatar displayed
 ```
 
-**E2E测试模板**:
-```typescript
-// frontend/e2e/avatar.spec.ts
-import { test, expect } from '@playwright/test'
+**E2E测试模板**: 参考 `references/test_guide.md`
 
-test.describe('Avatar Upload', () => {
-  test.beforeEach(async ({ page }) => {
-    // 登录
-    await page.goto('/login')
-    await page.fill('[name="email"]', 'test@example.com')
-    await page.fill('[name="password"]', 'password')
-    await page.click('button[type="submit"]')
-    await page.waitForURL('/products')
-  })
-
-  test('should upload avatar successfully', async ({ page }) => {
-    await page.goto('/profile')
-    
-    // 上传头像
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles('test/fixtures/test-avatar.jpg')
-    
-    // 验证上传成功
-    await expect(page.locator('.ant-message-success')).toBeVisible()
-    await expect(page.locator('.avatar img')).toHaveAttribute('src', /uploads\/avatars/)
-  })
-
-  test('should reject invalid file type', async ({ page }) => {
-    await page.goto('/profile')
-    
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles('test/fixtures/test.txt')
-    
-    await expect(page.locator('.ant-message-error')).toBeVisible()
-  })
-
-  test('should reject file larger than 2MB', async ({ page }) => {
-    await page.goto('/profile')
-    
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles('test/fixtures/large-image.jpg')
-    
-    await expect(page.locator('.ant-message-error')).toContainText('2MB')
-  })
-})
-```
-
-**参考**: `references/test_design_guide.md`
+**详细测试指南**: `references/test_guide.md`
 
 ### Step 6: 最小实现 (TDD - Green)
 
@@ -475,8 +425,7 @@ gh pr create --title "fix(auth): resolve login 401 error" --body "..."
 | `state_fields.md` | 状态字段说明：workflow_state.json各字段含义 |
 | `issue_tracking.md` | 问题跟踪文档（运行时更新） |
 | `workflow_history.md` | 工作流历史记录（运行时更新） |
-| `test_design_guide.md` | TDD测试设计指南：Red-Green-Refactor、测试模式 |
-| `code_quality_guide.md` | 代码质量指南：SOLID原则、命名规范、安全实践 |
+| `test_guide.md` | TDD测试指南：Red-Green-Refactor、测试模板、覆盖率要求 |
 
 ### 模板文件 (assets/templates/)
 

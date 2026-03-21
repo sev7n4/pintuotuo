@@ -266,7 +266,7 @@ test.describe('Avatar Upload', () => {
 })
 ```
 
-**Reference**: `references/test_design_guide.md`
+**Reference**: `references/test_guide.md`
 
 ### Step 6: Minimal Implementation (TDD - Green)
 
@@ -475,8 +475,7 @@ gh pr create --title "fix(auth): resolve login 401 error" --body "..."
 | `state_fields.md` | State field documentation: workflow_state.json field meanings |
 | `issue_tracking.md` | Issue tracking document (runtime update) |
 | `workflow_history.md` | Workflow history record (runtime update) |
-| `test_design_guide.md` | TDD test design guide: Red-Green-Refactor, test patterns |
-| `code_quality_guide.md` | Code quality guide: SOLID principles, naming conventions, security practices |
+| `test_guide.md` | TDD test guide: Red-Green-Refactor, test templates, coverage requirements |
 
 ### Template Files (assets/templates/)
 
