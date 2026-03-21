@@ -200,73 +200,16 @@ Feature Impact Scope
 4. All tests should fail (feature not implemented)
 ```
 
-**Test File Locations**:
-| Test Type | Backend Location | Frontend Location |
-|-----------|------------------|-------------------|
-| Unit Tests | `backend/handlers/*_test.go` | `frontend/src/**/*.test.ts` |
-| Integration Tests | `backend/integration/*_test.go` | - |
-| E2E Tests | - | `frontend/e2e/*.spec.ts` |
-
 **Test Naming Convention**:
 ```
 Unit Tests: Test{FunctionName}_{Scenario}_{ExpectedResult}
 Integration Tests: Test{Feature}Integration_{Scenario}
 E2E Tests: {Feature} - {User Action} - {Expected Result}
-
-Examples:
-- TestUploadAvatar_ValidImage_ReturnsURL
-- TestUserAuthIntegration_CompleteFlow
-- E2E: Avatar - User uploads image - Avatar displayed
 ```
 
-**E2E Test Template**:
-```typescript
-// frontend/e2e/avatar.spec.ts
-import { test, expect } from '@playwright/test'
+**E2E Test Template**: See `references/test_guide.md`
 
-test.describe('Avatar Upload', () => {
-  test.beforeEach(async ({ page }) => {
-    // Login
-    await page.goto('/login')
-    await page.fill('[name="email"]', 'test@example.com')
-    await page.fill('[name="password"]', 'password')
-    await page.click('button[type="submit"]')
-    await page.waitForURL('/products')
-  })
-
-  test('should upload avatar successfully', async ({ page }) => {
-    await page.goto('/profile')
-    
-    // Upload avatar
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles('test/fixtures/test-avatar.jpg')
-    
-    // Verify upload success
-    await expect(page.locator('.ant-message-success')).toBeVisible()
-    await expect(page.locator('.avatar img')).toHaveAttribute('src', /uploads\/avatars/)
-  })
-
-  test('should reject invalid file type', async ({ page }) => {
-    await page.goto('/profile')
-    
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles('test/fixtures/test.txt')
-    
-    await expect(page.locator('.ant-message-error')).toBeVisible()
-  })
-
-  test('should reject file larger than 2MB', async ({ page }) => {
-    await page.goto('/profile')
-    
-    const fileInput = page.locator('input[type="file"]')
-    await fileInput.setInputFiles('test/fixtures/large-image.jpg')
-    
-    await expect(page.locator('.ant-message-error')).toContainText('2MB')
-  })
-})
-```
-
-**Reference**: `references/test_guide.md`
+**Detailed Test Guide**: `references/test_guide.md`
 
 ### Step 6: Minimal Implementation (TDD - Green)
 
