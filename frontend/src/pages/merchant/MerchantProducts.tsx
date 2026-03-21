@@ -42,6 +42,17 @@ const MerchantProducts = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
+      
+      if (values.price !== undefined && values.price <= 0) {
+        message.error('价格必须大于0')
+        return
+      }
+      
+      if (values.stock !== undefined && values.stock < 0) {
+        message.error('库存必须大于等于0')
+        return
+      }
+      
       if (editingProduct) {
         await productService.updateProduct(editingProduct.id, values)
         message.success('商品已更新')
@@ -51,8 +62,18 @@ const MerchantProducts = () => {
       }
       setModalVisible(false)
       fetchProducts(1, 20, statusFilter === 'all' ? undefined : statusFilter)
-    } catch (error) {
-      message.error(editingProduct ? '更新失败' : '创建失败')
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'errorFields' in error) {
+        const validationError = error as { errorFields: { errors: string[] }[] }
+        const firstError = validationError.errorFields[0]?.errors[0]
+        if (firstError) {
+          message.error(firstError)
+          return
+        }
+      }
+      const axiosError = error as { response?: { data?: { message?: string } } }
+      const errorMessage = axiosError.response?.data?.message || (editingProduct ? '更新失败' : '创建失败')
+      message.error(errorMessage)
     }
   }
 
@@ -196,10 +217,21 @@ const MerchantProducts = () => {
           <Form.Item
             name="price"
             label="价格"
-            rules={[{ required: true, message: '请输入价格' }]}
+            rules={[
+              { required: true, message: '请输入价格' },
+              {
+                validator: (_, value) => {
+                  if (value !== undefined && value <= 0) {
+                    return Promise.reject(new Error('价格必须大于0'))
+                  }
+                  return Promise.resolve()
+                },
+              },
+            ]}
+            validateTrigger="onBlur"
           >
             <InputNumber
-              min={0}
+              min={-Infinity}
               precision={2}
               style={{ width: '100%' }}
               placeholder="请输入价格"
@@ -207,7 +239,6 @@ const MerchantProducts = () => {
           </Form.Item>
           <Form.Item name="original_price" label="原价">
             <InputNumber
-              min={0}
               precision={2}
               style={{ width: '100%' }}
               placeholder="请输入原价（可选）"
@@ -216,10 +247,21 @@ const MerchantProducts = () => {
           <Form.Item
             name="stock"
             label="库存"
-            rules={[{ required: true, message: '请输入库存' }]}
+            rules={[
+              { required: true, message: '请输入库存' },
+              {
+                validator: (_, value) => {
+                  if (value !== undefined && value < 0) {
+                    return Promise.reject(new Error('库存必须大于等于0'))
+                  }
+                  return Promise.resolve()
+                },
+              },
+            ]}
+            validateTrigger="onBlur"
           >
             <InputNumber
-              min={0}
+              min={-Infinity}
               style={{ width: '100%' }}
               placeholder="请输入库存"
             />

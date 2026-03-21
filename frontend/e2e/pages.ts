@@ -98,8 +98,16 @@ export class MerchantProductsPage {
   }) {
     await this.page.getByPlaceholder('请输入商品名称').fill(data.name);
     await this.page.getByPlaceholder('请输入商品描述').fill(data.description);
-    await this.page.getByPlaceholder('请输入价格').fill(data.price.toString());
-    await this.page.getByPlaceholder('请输入库存').fill(data.stock.toString());
+    
+    const priceInput = this.page.getByPlaceholder('请输入价格');
+    await priceInput.fill(data.price.toString());
+    await priceInput.press('Tab');
+    
+    const stockInput = this.page.getByPlaceholder('请输入库存');
+    await stockInput.fill(data.stock.toString());
+    await stockInput.press('Tab');
+    
+    await this.page.waitForTimeout(300);
     
     if (data.category) {
       await this.page.locator('.ant-select').first().click();
@@ -295,10 +303,10 @@ export class MerchantSettingsPage {
       await this.page.getByPlaceholder('请输入联系邮箱').fill(data.contactEmail);
     }
     if (data.address) {
-      await this.page.getByPlaceholder('请输入地址').fill(data.address);
+      await this.page.getByPlaceholder('请输入公司地址').fill(data.address);
     }
     if (data.description) {
-      await this.page.getByPlaceholder('请输入简介').fill(data.description);
+      await this.page.getByPlaceholder('请输入店铺简介').fill(data.description);
     }
   }
 
