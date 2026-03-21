@@ -23,7 +23,7 @@ export const LoginPage: React.FC = () => {
       if (user.role === 'admin') {
         navigate('/admin', { replace: true })
       } else if (user.role === 'merchant') {
-        navigate('/merchant/dashboard', { replace: true })
+        navigate('/merchant', { replace: true })
       } else {
         navigate('/products', { replace: true })
       }

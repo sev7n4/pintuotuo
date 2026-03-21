@@ -78,7 +78,7 @@ test.describe('Login Flow', () => {
     await page.getByText('退出登录').click();
     
     await page.waitForURL(/.*login/, { timeout: 10000 });
-    await expect(page.getByRole('link', { name: '登录' })).toBeVisible();
+    await expect(page.locator('.auth-card')).toBeVisible();
   });
 
   test('should persist login state after page refresh', async ({ page }) => {
@@ -148,7 +148,7 @@ test.describe('Access Control', () => {
     await loginPage.login('demo@example.com', 'demo123456');
     await page.waitForURL(/.*products/, { timeout: 15000 });
     
-    await page.goto('/merchant/dashboard');
+    await page.goto('/merchant');
     await page.waitForTimeout(2000);
     await expect(page).not.toHaveURL(/.*merchant/);
   });
