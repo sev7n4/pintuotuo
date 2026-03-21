@@ -1,4 +1,9 @@
 ---
+name: mydev-github-workflow-en
+description: Automated development workflow for bug fixes, features, and code changes with GitHub CI/CD integration.
+---
+
+---
 name: "mydev-github-workflow-en"
 description: |
 Automated development workflow for bug fixes, features, and code changes with GitHub CI/CD integration. 

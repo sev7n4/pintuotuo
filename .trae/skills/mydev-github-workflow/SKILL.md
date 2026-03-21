@@ -1,4 +1,9 @@
 ---
+name: mydev-github-workflow
+description: 修复bug，新增特性，代码重构
+---
+
+---
 name: "mydev-github-workflow"
 description: |
 Automated development workflow for bug fixes, features, and code changes with GitHub CI/CD integration. 
