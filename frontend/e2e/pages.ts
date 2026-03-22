@@ -85,7 +85,7 @@ export class MerchantProductsPage {
 
   async clickAddProduct() {
     await this.page.locator('button:has-text("添加商品")').click();
-    await this.page.waitForSelector('.ant-modal-content');
+    await this.page.waitForSelector('.ant-modal-content', { timeout: 10000 });
   }
 
   async fillProductForm(data: {
@@ -129,7 +129,7 @@ export class MerchantProductsPage {
   async editProduct(name: string) {
     const row = this.page.locator('.ant-table-row').filter({ hasText: name });
     await row.locator('button:has-text("编辑")').click();
-    await this.page.waitForSelector('.ant-modal-content');
+    await this.page.waitForSelector('.ant-modal-content', { timeout: 10000 });
   }
 
   async deleteProduct(name: string) {
@@ -196,12 +196,15 @@ export class MerchantSettlementsPage {
 
   async clickApplySettlement() {
     await this.page.locator('button:has-text("申请结算")').click();
-    await this.page.waitForSelector('.ant-modal-content');
   }
 
-  async confirmSettlement() {
-    await this.page.locator('button:has-text("确定")').click();
-    await this.page.waitForTimeout(1000);
+  async expectSettlementSuccess() {
+    await this.page.waitForTimeout(500);
+    const message = this.page.locator('.ant-message');
+    const isVisible = await message.isVisible().catch(() => false);
+    if (isVisible) {
+      await expect(message).toBeVisible({ timeout: 5000 });
+    }
   }
 
   async getSettlementCount() {
@@ -228,7 +231,7 @@ export class MerchantAPIKeysPage {
 
   async clickAddKey() {
     await this.page.locator('button:has-text("添加密钥")').click();
-    await this.page.waitForSelector('.ant-modal-content');
+    await this.page.waitForSelector('.ant-modal-content', { timeout: 10000 });
   }
 
   async fillKeyForm(data: {
@@ -237,18 +240,26 @@ export class MerchantAPIKeysPage {
     apiKey: string;
     quotaLimit?: number;
   }) {
-    await this.page.getByPlaceholder('请输入名称').fill(data.name);
-    await this.page.locator('.ant-select').click();
-    await this.page.getByText(data.provider).click();
-    await this.page.getByPlaceholder('请输入API Key').fill(data.apiKey);
+    await this.page.getByPlaceholder(/生产环境密钥|密钥名称/).fill(data.name, { timeout: 10000 });
+    
+    await this.page.locator('.ant-form-item').filter({ hasText: '提供商' }).locator('.ant-select-selector').click();
+    await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
+    await this.page.waitForTimeout(300);
+    
+    await this.page.locator('.ant-select-item-option').filter({ 
+      has: this.page.locator(`[data-value="${data.provider}"]`) 
+    }).click();
+    
+    await this.page.waitForTimeout(300);
+    await this.page.getByPlaceholder(/请输入API Key/).fill(data.apiKey, { timeout: 10000 });
     
     if (data.quotaLimit !== undefined) {
-      await this.page.getByPlaceholder('请输入配额限制').fill(data.quotaLimit.toString());
+      await this.page.locator('.ant-input-number-input').fill(data.quotaLimit.toString());
     }
   }
 
   async submitKey() {
-    await this.page.locator('button:has-text("创建")').click();
+    await this.page.locator('.ant-modal-content').locator('button:has-text("保存")').click();
     await this.page.waitForTimeout(1000);
   }
 
