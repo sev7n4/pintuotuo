@@ -224,8 +224,7 @@ test.describe('商家管理界面 - 结算管理', () => {
     const applyButton = page.locator('button:has-text("申请结算")');
     if (await applyButton.isVisible({ timeout: 2000 }).catch(() => false)) {
       await settlementsPage.clickApplySettlement();
-      await settlementsPage.confirmSettlement();
-      await expect(page.locator('.ant-message')).toBeVisible({ timeout: 5000 });
+      await settlementsPage.expectSettlementSuccess();
     } else {
       test.skip();
     }
@@ -238,7 +237,6 @@ test.describe('商家管理界面 - 结算管理', () => {
     const applyButton = page.locator('button:has-text("申请结算")');
     if (await applyButton.isVisible({ timeout: 2000 }).catch(() => false)) {
       await settlementsPage.clickApplySettlement();
-      await settlementsPage.confirmSettlement();
       await page.waitForTimeout(1000);
     } else {
       test.skip();

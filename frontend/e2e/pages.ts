@@ -196,12 +196,10 @@ export class MerchantSettlementsPage {
 
   async clickApplySettlement() {
     await this.page.locator('button:has-text("申请结算")').click();
-    await this.page.waitForSelector('.ant-modal-content', { timeout: 10000 });
   }
 
-  async confirmSettlement() {
-    await this.page.locator('button:has-text("确定")').click();
-    await this.page.waitForTimeout(1000);
+  async expectSettlementSuccess() {
+    await expect(this.page.locator('.ant-message-success')).toBeVisible({ timeout: 10000 });
   }
 
   async getSettlementCount() {
@@ -237,13 +235,13 @@ export class MerchantAPIKeysPage {
     apiKey: string;
     quotaLimit?: number;
   }) {
-    await this.page.getByPlaceholder('请输入名称').fill(data.name, { timeout: 10000 });
-    await this.page.locator('.ant-select').click();
-    await this.page.getByText(data.provider).click();
-    await this.page.getByPlaceholder('请输入API Key').fill(data.apiKey, { timeout: 10000 });
+    await this.page.getByPlaceholder(/生产环境密钥|请输入密钥名称/).fill(data.name, { timeout: 10000 });
+    await this.page.locator('.ant-select').filter({ hasText: '请选择提供商' }).click();
+    await this.page.getByRole('option', { name: data.provider }).click();
+    await this.page.getByPlaceholder(/请输入API Key/).fill(data.apiKey, { timeout: 10000 });
     
     if (data.quotaLimit !== undefined) {
-      await this.page.getByPlaceholder('请输入配额限制').fill(data.quotaLimit.toString(), { timeout: 10000 });
+      await this.page.getByPlaceholder(/无限制|请输入配额/).fill(data.quotaLimit.toString(), { timeout: 10000 });
     }
   }
 
