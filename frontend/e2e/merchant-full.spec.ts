@@ -265,7 +265,7 @@ test.describe('商家管理界面 - API密钥管理', () => {
       await apiKeysPage.clickAddKey();
       await apiKeysPage.fillKeyForm({
         name: `测试密钥 ${Date.now()}`,
-        provider: 'OpenAI',
+        provider: 'openai',
         apiKey: 'sk-test-key-e2e',
         quotaLimit: 100,
       });
@@ -285,7 +285,7 @@ test.describe('商家管理界面 - API密钥管理', () => {
       await apiKeysPage.clickAddKey();
       await apiKeysPage.fillKeyForm({
         name: `测试密钥 Anthropic ${Date.now()}`,
-        provider: 'Anthropic',
+        provider: 'anthropic',
         apiKey: 'sk-ant-test-key-e2e',
       });
       await apiKeysPage.submitKey();
