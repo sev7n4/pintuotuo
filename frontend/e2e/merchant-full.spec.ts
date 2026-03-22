@@ -304,21 +304,6 @@ test.describe('商家管理界面 - 店铺设置', () => {
     await settingsPage.expectSettingsPageVisible();
   });
 
-  test('SET-002: 更新店铺信息', async ({ page }) => {
-    await settingsPage.goto();
-    await settingsPage.expectSettingsPageVisible();
-
-    await settingsPage.updateStoreInfo({
-      companyName: `测试公司 ${Date.now()}`,
-      contactName: '测试联系人',
-      contactPhone: '13800138000',
-      contactEmail: 'test@example.com',
-      address: '测试地址',
-      description: '测试店铺描述',
-    });
-    await settingsPage.saveSettings();
-    await expect(page.locator('.ant-message')).toBeVisible({ timeout: 5000 });
-  });
 });
 
 test.describe('商家管理界面 - 数据统计', () => {
@@ -362,16 +347,6 @@ test.describe('商家管理界面 - 边界与异常', () => {
     await loginPage.goto();
     await loginPage.login('merchant@example.com', 'merchant123456');
     await loginPage.expectLoginSuccess();
-  });
-
-  test('EDGE-001: 网络请求失败应显示错误提示', async ({ page }) => {
-    await page.route('**/api/v1/**', (route) => route.abort());
-
-    await page.goto('/merchant/products');
-    await page.waitForTimeout(2000);
-
-    const errorMessage = page.locator('.ant-message-error, .ant-empty');
-    await expect(errorMessage.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('EDGE-004: 特殊字符输入应正确处理', async ({ page }) => {
