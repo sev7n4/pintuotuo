@@ -96,7 +96,7 @@ test.describe('商家管理界面 - 商品管理', () => {
     });
     await productsPage.submitProduct();
 
-    await expect(page.getByText('价格必须大于0')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ant-form-item-explain-error').filter({ hasText: '价格必须大于0' }).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('PROD-003: 创建商品 - 库存为负数应验证失败', async ({ page }) => {
@@ -112,7 +112,7 @@ test.describe('商家管理界面 - 商品管理', () => {
     });
     await productsPage.submitProduct();
 
-    await expect(page.getByText('库存必须大于等于0')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ant-form-item-explain-error').filter({ hasText: '库存必须大于等于0' }).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('PROD-004: 编辑商品 - 修改所有字段', async ({ page }) => {
