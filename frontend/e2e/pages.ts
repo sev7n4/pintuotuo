@@ -244,7 +244,7 @@ export class MerchantAPIKeysPage {
     
     await this.page.locator('.ant-form-item').filter({ hasText: '提供商' }).locator('.ant-select-selector').click();
     await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
-    await this.page.locator('.ant-select-item-option-content').filter({ hasText: new RegExp(`^${data.provider}$`, 'i') }).click();
+    await this.page.locator('.ant-select-dropdown').getByText(data.provider, { exact: true }).click();
     
     await this.page.getByPlaceholder(/请输入API Key/).fill(data.apiKey, { timeout: 10000 });
     
