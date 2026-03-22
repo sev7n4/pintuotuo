@@ -1,6 +1,8 @@
 name: Integration Tests
 
 on:
+  pull_request:
+    branches: [main, master, develop]
   workflow_run:
     workflows: ["CI/CD Pipeline"]
     types:
@@ -19,7 +21,7 @@ jobs:
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     services:
       postgres:
