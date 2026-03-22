@@ -192,3 +192,227 @@ func GetAdminStats(c *gin.Context) {
 		"data":    stats,
 	})
 }
+
+func GetPendingMerchants(c *gin.Context) {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != "admin" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Admin access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	page := c.DefaultQuery("page", "1")
+	perPage := c.DefaultQuery("per_page", "20")
+
+	pageNum := 1
+	perPageNum := 20
+	if p, err := parseInt(page); err == nil && p > 0 {
+		pageNum = p
+	}
+	if pp, err := parseInt(perPage); err == nil && pp > 0 && pp <= 100 {
+		perPageNum = pp
+	}
+
+	offset := (pageNum - 1) * perPageNum
+
+	rows, err := db.Query(
+		`SELECT id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, created_at, updated_at 
+		 FROM merchants WHERE status = 'pending' ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+		perPageNum, offset,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer rows.Close()
+
+	var merchants []models.Merchant
+	for rows.Next() {
+		var m models.Merchant
+		if err := rows.Scan(&m.ID, &m.UserID, &m.CompanyName, &m.BusinessLicense, &m.ContactName,
+			&m.ContactPhone, &m.ContactEmail, &m.Address, &m.Description, &m.Status, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			continue
+		}
+		merchants = append(merchants, m)
+	}
+
+	if merchants == nil {
+		merchants = []models.Merchant{}
+	}
+
+	var total int
+	db.QueryRow("SELECT COUNT(*) FROM merchants WHERE status = 'pending'").Scan(&total)
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":     0,
+		"message":  "success",
+		"data":     merchants,
+		"total":    total,
+		"page":     pageNum,
+		"per_page": perPageNum,
+	})
+}
+
+func ApproveMerchant(c *gin.Context) {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != "admin" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Admin access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return
+	}
+
+	merchantID := c.Param("id")
+	if merchantID == "" {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var currentStatus string
+	err := db.QueryRow("SELECT status FROM merchants WHERE id = $1", merchantID).Scan(&currentStatus)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"Merchant not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+
+	if currentStatus != "pending" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_STATUS",
+			"Merchant is not in pending status",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	var merchant models.Merchant
+	err = db.QueryRow(
+		`UPDATE merchants SET status = 'active', verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+		 WHERE id = $1 
+		 RETURNING id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, created_at, updated_at`,
+		merchantID,
+	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense, &merchant.ContactName,
+		&merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address, &merchant.Description, &merchant.Status,
+		&merchant.CreatedAt, &merchant.UpdatedAt)
+
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"APPROVE_FAILED",
+			"Failed to approve merchant",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "Merchant approved successfully",
+		"data":    merchant,
+	})
+}
+
+func RejectMerchant(c *gin.Context) {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != "admin" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Admin access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return
+	}
+
+	merchantID := c.Param("id")
+	if merchantID == "" {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		req.Reason = ""
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var currentStatus string
+	err := db.QueryRow("SELECT status FROM merchants WHERE id = $1", merchantID).Scan(&currentStatus)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"Merchant not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+
+	if currentStatus != "pending" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_STATUS",
+			"Merchant is not in pending status",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	var merchant models.Merchant
+	err = db.QueryRow(
+		`UPDATE merchants SET status = 'rejected', updated_at = CURRENT_TIMESTAMP 
+		 WHERE id = $1 
+		 RETURNING id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, created_at, updated_at`,
+		merchantID,
+	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense, &merchant.ContactName,
+		&merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address, &merchant.Description, &merchant.Status,
+		&merchant.CreatedAt, &merchant.UpdatedAt)
+
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"REJECT_FAILED",
+			"Failed to reject merchant",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "Merchant rejected successfully",
+		"data":    merchant,
+		"reason":  req.Reason,
+	})
+}

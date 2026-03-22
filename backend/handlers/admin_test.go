@@ -329,3 +329,129 @@ func TestCreateAdminUser_TableDriven(t *testing.T) {
 		})
 	}
 }
+
+func TestGetPendingMerchants_MissingRole(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/admin/merchants/pending", nil)
+
+	GetPendingMerchants(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestGetPendingMerchants_NonAdminRole(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/admin/merchants/pending", nil)
+	c.Set("user_role", "user")
+
+	GetPendingMerchants(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestApproveMerchant_MissingRole(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/merchants/1/approve", nil)
+
+	ApproveMerchant(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestApproveMerchant_NonAdminRole(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/merchants/1/approve", nil)
+	c.Set("user_role", "merchant")
+
+	ApproveMerchant(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestRejectMerchant_MissingRole(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	reqBody := map[string]string{"reason": "资质不符"}
+	body, _ := json.Marshal(reqBody)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/merchants/1/reject", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	RejectMerchant(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestRejectMerchant_NonAdminRole(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	reqBody := map[string]string{"reason": "资质不符"}
+	body, _ := json.Marshal(reqBody)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/merchants/1/reject", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_role", "user")
+
+	RejectMerchant(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestGetPendingMerchants_WithDatabase(t *testing.T) {
+	if config.GetDB() == nil {
+		t.Skip("跳过需要数据库连接的测试")
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/admin/merchants/pending", nil)
+	c.Set("user_role", "admin")
+
+	GetPendingMerchants(c)
+
+	assert.NotEqual(t, http.StatusForbidden, w.Code)
+}
+
+func TestApproveMerchant_WithDatabase(t *testing.T) {
+	if config.GetDB() == nil {
+		t.Skip("跳过需要数据库连接的测试")
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/merchants/1/approve", nil)
+	c.Set("user_role", "admin")
+
+	ApproveMerchant(c)
+
+	assert.NotEqual(t, http.StatusForbidden, w.Code)
+}
+
+func TestRejectMerchant_WithDatabase(t *testing.T) {
+	if config.GetDB() == nil {
+		t.Skip("跳过需要数据库连接的测试")
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	reqBody := map[string]string{"reason": "资质不符"}
+	body, _ := json.Marshal(reqBody)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/merchants/1/reject", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_role", "admin")
+
+	RejectMerchant(c)
+
+	assert.NotEqual(t, http.StatusForbidden, w.Code)
+}
