@@ -124,6 +124,11 @@ func RegisterTokenRoutes(router *gin.RouterGroup) {
 		tokens.GET("/consumption", handlers.GetTokenConsumption)
 		tokens.POST("/transfer", handlers.TransferTokens)
 
+		tokens.GET("/recharge/packages", handlers.GetRechargePackages)
+		tokens.POST("/recharge", handlers.CreateRechargeOrder)
+		tokens.GET("/recharge/orders", handlers.GetRechargeOrders)
+		tokens.GET("/recharge/orders/:id", handlers.GetRechargeOrder)
+
 		keys := tokens.Group("/keys")
 		{
 			keys.GET("", handlers.ListAPIKeys)
@@ -132,6 +137,8 @@ func RegisterTokenRoutes(router *gin.RouterGroup) {
 			keys.DELETE("/:id", handlers.DeleteAPIKey)
 		}
 	}
+
+	router.POST("/tokens/recharge/callback", handlers.HandleRechargeCallback)
 }
 
 func RegisterPaymentRoutes(router *gin.RouterGroup) {
