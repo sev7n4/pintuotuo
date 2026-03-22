@@ -246,8 +246,9 @@ export class MerchantAPIKeysPage {
     await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
     await this.page.waitForTimeout(500);
     
+    const providerText = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
     const option = this.page.locator('.ant-select-item-option').filter({ 
-      has: this.page.locator(`text=${data.provider}`) 
+      hasText: providerText 
     }).first();
     
     await option.evaluate((el) => {
