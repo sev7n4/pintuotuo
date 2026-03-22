@@ -242,24 +242,16 @@ export class MerchantAPIKeysPage {
   }) {
     await this.page.getByPlaceholder(/生产环境密钥|密钥名称/).fill(data.name, { timeout: 10000 });
     
-    await this.page.evaluate((provider) => {
-      const form = document.querySelector('.ant-form') as any;
-      if (form) {
-        const select = form.querySelector('.ant-select') as any;
-        if (select) {
-          const mouseDownEvent = new MouseEvent('mousedown', { bubbles: true });
-          select.dispatchEvent(mouseDownEvent);
-        }
-      }
-    }, data.provider);
-    
+    await this.page.locator('.ant-form-item').filter({ hasText: '提供商' }).locator('.ant-select-selector').click();
     await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
     await this.page.waitForTimeout(300);
     
     await this.page.evaluate((provider) => {
       const options = document.querySelectorAll('.ant-select-item-option');
       for (const option of options) {
-        if (option.getAttribute('data-value') === provider || option.textContent?.toLowerCase() === provider.toLowerCase()) {
+        const text = option.textContent?.toLowerCase() || '';
+        const value = option.getAttribute('data-value') || '';
+        if (value === provider || text.includes(provider.toLowerCase())) {
           (option as HTMLElement).click();
           break;
         }
