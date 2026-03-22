@@ -240,16 +240,16 @@ export class MerchantAPIKeysPage {
     apiKey: string;
     quotaLimit?: number;
   }) {
-    await this.page.getByPlaceholder(/生产环境密钥|请输入密钥名称/).fill(data.name, { timeout: 10000 });
+    await this.page.getByPlaceholder(/生产环境密钥|密钥名称/).fill(data.name, { timeout: 10000 });
     
-    await this.page.locator('.ant-select-selector').click();
+    await this.page.locator('.ant-form-item').filter({ hasText: '提供商' }).locator('.ant-select-selector').click();
     await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
-    await this.page.locator('.ant-select-item-option').filter({ hasText: new RegExp(`^${data.provider}$`) }).click();
+    await this.page.getByRole('option', { name: data.provider, exact: true }).click();
     
     await this.page.getByPlaceholder(/请输入API Key/).fill(data.apiKey, { timeout: 10000 });
     
     if (data.quotaLimit !== undefined) {
-      await this.page.getByPlaceholder(/无限制|请输入配额/).fill(data.quotaLimit.toString(), { timeout: 10000 });
+      await this.page.locator('.ant-input-number-input').fill(data.quotaLimit.toString());
     }
   }
 
