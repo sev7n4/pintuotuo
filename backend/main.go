@@ -69,6 +69,7 @@ func main() {
 		routes.RegisterHealthRoutes(v1)
 		routes.RegisterUserRoutes(v1)
 		routes.RegisterProductRoutes(v1)
+		routes.RegisterCartRoutes(v1)
 		routes.RegisterOrderRoutes(v1)
 		routes.RegisterGroupRoutes(v1)
 		routes.RegisterTokenRoutes(v1)

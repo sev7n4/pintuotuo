@@ -91,6 +91,18 @@ func RegisterOrderRoutes(router *gin.RouterGroup) {
 	}
 }
 
+func RegisterCartRoutes(router *gin.RouterGroup) {
+	cart := router.Group("/cart")
+	cart.Use(middleware.AuthMiddleware())
+	{
+		cart.GET("", handlers.GetCart)
+		cart.POST("/items", handlers.AddToCart)
+		cart.PUT("/items/:id", handlers.UpdateCartItem)
+		cart.DELETE("/items/:id", handlers.RemoveFromCart)
+		cart.DELETE("", handlers.ClearCart)
+	}
+}
+
 func RegisterGroupRoutes(router *gin.RouterGroup) {
 	groups := router.Group("/groups")
 	groups.Use(middleware.AuthMiddleware())

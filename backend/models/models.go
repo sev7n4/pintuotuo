@@ -186,3 +186,30 @@ type MerchantStats struct {
 	NewCustomers    int       `json:"new_customers"`
 	CreatedAt       time.Time `json:"created_at"`
 }
+
+// CartItem represents an item in the shopping cart
+type CartItem struct {
+	ID        int       `json:"id"`
+	UserID    int       `json:"user_id"`
+	ProductID int       `json:"product_id"`
+	GroupID   int       `json:"group_id,omitempty"`
+	Quantity  int       `json:"quantity"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// CartResponse represents the cart response with product details
+type CartResponse struct {
+	ID        int     `json:"id"`
+	ProductID int     `json:"product_id"`
+	Product   Product `json:"product"`
+	GroupID   int     `json:"group_id,omitempty"`
+	Quantity  int     `json:"quantity"`
+}
+
+// CartSummary represents the cart summary
+type CartSummary struct {
+	Items      []CartResponse `json:"items"`
+	TotalItems int            `json:"total_items"`
+	TotalPrice float64        `json:"total_price"`
+}
