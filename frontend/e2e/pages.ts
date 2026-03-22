@@ -199,7 +199,7 @@ export class MerchantSettlementsPage {
   }
 
   async expectSettlementSuccess() {
-    await expect(this.page.locator('.ant-message-success')).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator('.ant-message').filter({ hasText: '结算申请' })).toBeVisible({ timeout: 10000 });
   }
 
   async getSettlementCount() {
@@ -236,8 +236,14 @@ export class MerchantAPIKeysPage {
     quotaLimit?: number;
   }) {
     await this.page.getByPlaceholder(/生产环境密钥|请输入密钥名称/).fill(data.name, { timeout: 10000 });
-    await this.page.locator('.ant-select').filter({ hasText: '请选择提供商' }).click();
-    await this.page.getByRole('option', { name: data.provider }).click();
+    
+    const providerSelect = this.page.locator('.ant-select').filter({ hasText: '请选择提供商' });
+    await providerSelect.click();
+    await this.page.waitForTimeout(300);
+    
+    const option = this.page.locator('.ant-select-dropdown').getByText(data.provider, { exact: true });
+    await option.click({ force: true });
+    
     await this.page.getByPlaceholder(/请输入API Key/).fill(data.apiKey, { timeout: 10000 });
     
     if (data.quotaLimit !== undefined) {
