@@ -1,0 +1,25 @@
+# 测试用例归档目录
+
+此目录用于存放测试用例归档文档。
+
+## 目录结构
+
+```
+test_cases/
+├── product/           # 产品模块
+│   └── price_cases.md
+├── user/              # 用户模块
+│   └── auth_cases.md
+└── order/             # 订单模块
+    └── order_cases.md
+```
+
+## 文档命名规范
+
+```
+{feature}_cases.md
+```
+
+## 生成时机
+
+Step 7 (TDD Refactor) 完成后自动生成。

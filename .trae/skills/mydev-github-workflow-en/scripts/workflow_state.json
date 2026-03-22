@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-03-21T00:00:00Z",
+  "currentIssue": null,
+  "activeBranch": null,
+  "workflowState": {
+    "stage": "idle",
+    "issueId": null,
+    "branchName": null,
+    "planFile": null,
+    "tasksFile": null,
+    "startedAt": null,
+    "lastCheckpoint": null,
+    "retryCount": 0
+  },
+  "statistics": {
+    "totalIssues": 0,
+    "resolvedIssues": 0,
+    "totalWorkflows": 0,
+    "successfulWorkflows": 0,
+    "failedWorkflows": 0
+  }
+}
