@@ -246,24 +246,11 @@ export class MerchantAPIKeysPage {
     await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
     await this.page.waitForTimeout(500);
     
-    await this.page.evaluate((provider) => {
-      const options = document.querySelectorAll('.ant-select-item-option');
-      for (const option of options) {
-        const text = option.textContent || '';
-        if (text.toLowerCase().includes(provider.toLowerCase())) {
-          const rect = option.getBoundingClientRect();
-          const clickEvent = new MouseEvent('click', {
-            bubbles: true,
-            cancelable: true,
-            view: window,
-            clientX: rect.left + rect.width / 2,
-            clientY: rect.top + rect.height / 2
-          });
-          option.dispatchEvent(clickEvent);
-          break;
-        }
-      }
-    }, data.provider);
+    const providerText = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
+    const option = this.page.locator('.ant-select-item-option').filter({ hasText: providerText }).first();
+    
+    await option.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    await option.dispatchEvent('click');
     
     await this.page.waitForTimeout(500);
     await this.page.getByPlaceholder(/请输入API Key/).fill(data.apiKey, { timeout: 10000 });
