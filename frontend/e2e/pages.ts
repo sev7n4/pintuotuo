@@ -244,19 +244,17 @@ export class MerchantAPIKeysPage {
     
     await this.page.locator('.ant-form-item').filter({ hasText: '提供商' }).locator('.ant-select-selector').click();
     await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
-    await this.page.waitForTimeout(300);
+    await this.page.waitForTimeout(500);
     
-    await this.page.evaluate((provider) => {
-      const options = document.querySelectorAll('.ant-select-item-option');
-      for (const option of options) {
-        const text = option.textContent?.toLowerCase() || '';
-        const value = option.getAttribute('data-value') || '';
-        if (value === provider || text.includes(provider.toLowerCase())) {
-          (option as HTMLElement).click();
-          break;
-        }
-      }
-    }, data.provider);
+    const option = this.page.locator('.ant-select-item-option').filter({ 
+      has: this.page.locator(`text=${data.provider}`) 
+    }).first();
+    
+    await option.evaluate((el) => {
+      el.scrollIntoView({ block: 'center' });
+    });
+    await this.page.waitForTimeout(200);
+    await option.click({ force: true });
     
     await this.page.getByPlaceholder(/请输入API Key/).fill(data.apiKey, { timeout: 10000 });
     
