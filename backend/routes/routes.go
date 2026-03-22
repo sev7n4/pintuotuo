@@ -220,5 +220,8 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.GET("/users", handlers.GetAdminUsers)
 		admin.POST("/users", handlers.CreateAdminUser)
 		admin.GET("/stats", handlers.GetAdminStats)
+		admin.GET("/merchants/pending", handlers.GetPendingMerchants)
+		admin.POST("/merchants/:id/approve", handlers.ApproveMerchant)
+		admin.POST("/merchants/:id/reject", handlers.RejectMerchant)
 	}
 }
