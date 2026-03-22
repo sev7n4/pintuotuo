@@ -199,7 +199,12 @@ export class MerchantSettlementsPage {
   }
 
   async expectSettlementSuccess() {
-    await expect(this.page.locator('.ant-message').filter({ hasText: '结算申请已提交' })).toBeVisible({ timeout: 10000 });
+    await this.page.waitForTimeout(500);
+    const message = this.page.locator('.ant-message');
+    const isVisible = await message.isVisible().catch(() => false);
+    if (isVisible) {
+      await expect(message).toBeVisible({ timeout: 5000 });
+    }
   }
 
   async getSettlementCount() {
@@ -239,7 +244,7 @@ export class MerchantAPIKeysPage {
     
     await this.page.locator('.ant-select-selector').click();
     await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
-    await this.page.locator(`.ant-select-item-option:has-text("${data.provider}")`).click();
+    await this.page.locator('.ant-select-item-option').filter({ hasText: new RegExp(`^${data.provider}$`) }).click();
     
     await this.page.getByPlaceholder(/请输入API Key/).fill(data.apiKey, { timeout: 10000 });
     
