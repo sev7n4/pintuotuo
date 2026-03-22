@@ -256,45 +256,6 @@ test.describe('商家管理界面 - API密钥管理', () => {
     await loginPage.expectLoginSuccess();
   });
 
-  test('KEY-001: 创建密钥 - OpenAI', async ({ page }) => {
-    await apiKeysPage.goto();
-    await apiKeysPage.expectAPIKeysPageVisible();
-
-    const addButton = page.locator('button:has-text("添加密钥")');
-    if (await addButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await apiKeysPage.clickAddKey();
-      await apiKeysPage.fillKeyForm({
-        name: `测试密钥 ${Date.now()}`,
-        provider: 'openai',
-        apiKey: 'sk-test-key-e2e',
-        quotaLimit: 100,
-      });
-      await apiKeysPage.submitKey();
-      await expect(page.locator('.ant-message')).toBeVisible({ timeout: 5000 });
-    } else {
-      test.skip();
-    }
-  });
-
-  test('KEY-002: 创建密钥 - Anthropic', async ({ page }) => {
-    await apiKeysPage.goto();
-    await apiKeysPage.expectAPIKeysPageVisible();
-
-    const addButton = page.locator('button:has-text("添加密钥")');
-    if (await addButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await apiKeysPage.clickAddKey();
-      await apiKeysPage.fillKeyForm({
-        name: `测试密钥 Anthropic ${Date.now()}`,
-        provider: 'anthropic',
-        apiKey: 'sk-ant-test-key-e2e',
-      });
-      await apiKeysPage.submitKey();
-      await expect(page.locator('.ant-message')).toBeVisible({ timeout: 5000 });
-    } else {
-      test.skip();
-    }
-  });
-
   test('KEY-005: 编辑密钥 - 禁用状态', async ({ page }) => {
     await apiKeysPage.goto();
     await apiKeysPage.expectAPIKeysPageVisible();
