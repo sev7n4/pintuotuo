@@ -242,13 +242,10 @@ export class MerchantAPIKeysPage {
   }) {
     await this.page.getByPlaceholder(/生产环境密钥|密钥名称/).fill(data.name, { timeout: 10000 });
     
-    const providerInput = this.page.locator('.ant-form-item').filter({ hasText: '提供商' }).locator('.ant-select-selector');
-    await providerInput.click();
+    const providerSelect = this.page.locator('.ant-form-item').filter({ hasText: '提供商' }).locator('.ant-select');
+    await providerSelect.click();
     await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
-    await this.page.waitForTimeout(300);
-    await this.page.keyboard.type(data.provider);
-    await this.page.waitForTimeout(300);
-    await this.page.keyboard.press('Enter');
+    await providerSelect.locator('select').selectOption(data.provider);
     
     await this.page.getByPlaceholder(/请输入API Key/).fill(data.apiKey, { timeout: 10000 });
     
