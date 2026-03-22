@@ -254,7 +254,7 @@ export class MerchantAPIKeysPage {
   }
 
   async submitKey() {
-    await this.page.locator('button:has-text("创建")').click();
+    await this.page.locator('.ant-modal-content').locator('button:has-text("保存")').click();
     await this.page.waitForTimeout(1000);
   }
 
