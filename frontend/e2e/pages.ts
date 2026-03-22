@@ -85,7 +85,7 @@ export class MerchantProductsPage {
 
   async clickAddProduct() {
     await this.page.locator('button:has-text("添加商品")').click();
-    await this.page.waitForSelector('.ant-modal-content');
+    await this.page.waitForSelector('.ant-modal-content', { timeout: 10000 });
   }
 
   async fillProductForm(data: {
@@ -129,7 +129,7 @@ export class MerchantProductsPage {
   async editProduct(name: string) {
     const row = this.page.locator('.ant-table-row').filter({ hasText: name });
     await row.locator('button:has-text("编辑")').click();
-    await this.page.waitForSelector('.ant-modal-content');
+    await this.page.waitForSelector('.ant-modal-content', { timeout: 10000 });
   }
 
   async deleteProduct(name: string) {
@@ -196,7 +196,7 @@ export class MerchantSettlementsPage {
 
   async clickApplySettlement() {
     await this.page.locator('button:has-text("申请结算")').click();
-    await this.page.waitForSelector('.ant-modal-content');
+    await this.page.waitForSelector('.ant-modal-content', { timeout: 10000 });
   }
 
   async confirmSettlement() {
@@ -228,7 +228,7 @@ export class MerchantAPIKeysPage {
 
   async clickAddKey() {
     await this.page.locator('button:has-text("添加密钥")').click();
-    await this.page.waitForSelector('.ant-modal-content');
+    await this.page.waitForSelector('.ant-modal-content', { timeout: 10000 });
   }
 
   async fillKeyForm(data: {
@@ -237,13 +237,13 @@ export class MerchantAPIKeysPage {
     apiKey: string;
     quotaLimit?: number;
   }) {
-    await this.page.getByPlaceholder('请输入名称').fill(data.name);
+    await this.page.getByPlaceholder('请输入名称').fill(data.name, { timeout: 10000 });
     await this.page.locator('.ant-select').click();
     await this.page.getByText(data.provider).click();
-    await this.page.getByPlaceholder('请输入API Key').fill(data.apiKey);
+    await this.page.getByPlaceholder('请输入API Key').fill(data.apiKey, { timeout: 10000 });
     
     if (data.quotaLimit !== undefined) {
-      await this.page.getByPlaceholder('请输入配额限制').fill(data.quotaLimit.toString());
+      await this.page.getByPlaceholder('请输入配额限制').fill(data.quotaLimit.toString(), { timeout: 10000 });
     }
   }
 
