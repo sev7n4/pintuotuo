@@ -249,8 +249,12 @@ export class MerchantAPIKeysPage {
     const providerText = data.provider.charAt(0).toUpperCase() + data.provider.slice(1);
     const option = this.page.locator('.ant-select-item-option').filter({ hasText: providerText }).first();
     
-    await option.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-    await option.dispatchEvent('click');
+    await option.evaluate((el) => {
+      el.scrollIntoView({ block: 'center', inline: 'center' });
+    });
+    await this.page.waitForTimeout(200);
+    
+    await option.click({ position: { x: 5, y: 5 } });
     
     await this.page.waitForTimeout(500);
     await this.page.getByPlaceholder(/请输入API Key/).fill(data.apiKey, { timeout: 10000 });
