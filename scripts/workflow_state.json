@@ -1,6 +1,6 @@
 {
-  "current_task": "frontend_consumption_tests",
-  "current_fix_cases": ["frontend_consumption_tests"],
+  "current_task": "frontend_mytoken_tests",
+  "current_fix_cases": ["frontend_mytoken_tests"],
   "branch": null,
   "pr_number": null,
   "ci_status": {
