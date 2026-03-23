@@ -33,4 +33,15 @@ module.exports = {
       },
     }],
   },
+  globals: {
+    'import.meta': {
+      env: {
+        VITE_API_BASE_URL: '/api/v1',
+        MODE: 'test',
+        DEV: false,
+        PROD: false,
+        SSR: false,
+      },
+    },
+  },
 }
