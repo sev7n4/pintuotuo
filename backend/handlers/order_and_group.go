@@ -156,7 +156,7 @@ func ListOrders(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		"SELECT id, user_id, product_id, group_id, quantity, total_price, status, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+		"SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
 		userID, perPageNum, offset,
 	)
 	if err != nil {
@@ -217,11 +217,9 @@ func GetOrderByID(c *gin.Context) {
 	}
 
 	var order models.Order
-	err := db.QueryRow(
-		"SELECT id, user_id, product_id, group_id, quantity, total_price, status, created_at, updated_at FROM orders WHERE id = $1 AND user_id = $2",
-		id, userID,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
-
+	err = db.QueryRow("SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at FROM orders WHERE id = $1 AND user_id = $2", id, userID).Scan(
+		&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt,
+	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
@@ -284,9 +282,9 @@ func CancelOrder(c *gin.Context) {
 
 	var order models.Order
 	err = tx.QueryRow(
-		"UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING id, user_id, product_id, group_id, quantity, total_price, status, created_at, updated_at",
+		"UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at",
 		"canceled", id, userID,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
