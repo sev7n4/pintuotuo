@@ -217,6 +217,7 @@ func GetOrderByID(c *gin.Context) {
 	}
 
 	var order models.Order
+	var err error
 	err = db.QueryRow("SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at FROM orders WHERE id = $1 AND user_id = $2", id, userID).Scan(
 		&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt,
 	)
