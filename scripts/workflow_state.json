@@ -1,6 +1,6 @@
 {
-  "current_task": "frontend_merchant_products_tests",
-  "current_fix_cases": ["frontend_merchant_products_tests"],
+  "current_task": "frontend_merchant_settlements_tests",
+  "current_fix_cases": ["frontend_merchant_settlements_tests"],
   "branch": null,
   "pr_number": null,
   "ci_status": {
