@@ -40,6 +40,7 @@ type Order struct {
 	ProductID  int       `json:"product_id"`
 	GroupID    int       `json:"group_id"`
 	Quantity   int       `json:"quantity"`
+	UnitPrice  float64   `json:"unit_price"`
 	TotalPrice float64   `json:"total_price"`
 	Status     string    `json:"status"` // pending, paid, completed, failed
 	CreatedAt  time.Time `json:"created_at"`
