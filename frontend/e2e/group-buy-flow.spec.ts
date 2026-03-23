@@ -1,6 +1,16 @@
 import { test, expect } from '@playwright/test';
+import { LoginPage } from './pages';
 
 test.describe('Group Buy Flow E2E Tests', () => {
+  let loginPage: LoginPage;
+
+  test.beforeEach(async ({ page }) => {
+    loginPage = new LoginPage(page);
+    await loginPage.goto();
+    await loginPage.login('demo@example.com', 'demo123456');
+    await page.waitForURL(/.*products/, { timeout: 15000 });
+  });
+
   test('should display group list page', async ({ page }) => {
     await page.goto('/groups');
     await expect(page).toHaveURL(/.*groups/, { timeout: 5000 });
