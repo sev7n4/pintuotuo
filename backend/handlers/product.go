@@ -128,7 +128,11 @@ func GetProductByID(c *gin.Context) {
 	if cachedProduct, err := cache.Get(ctx, cacheKey); err == nil {
 		var product models.Product
 		if err := json.Unmarshal([]byte(cachedProduct), &product); err == nil {
-			c.JSON(http.StatusOK, product)
+			c.JSON(http.StatusOK, gin.H{
+				"code":    0,
+				"message": "success",
+				"data":    product,
+			})
 			return
 		}
 	}
@@ -156,7 +160,11 @@ func GetProductByID(c *gin.Context) {
 		cache.Set(ctx, cacheKey, string(productJSON), cache.ProductCacheTTL)
 	}
 
-	c.JSON(http.StatusOK, product)
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    product,
+	})
 }
 
 // SearchProducts searches for products by query
