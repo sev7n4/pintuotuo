@@ -131,6 +131,11 @@ git checkout -b {type}/issue-{id}
 - 理解上下文
 - 确定修改范围
 
+**分析输出**:
+- 问题定位: `{文件路径}:{行号}`
+- 影响范围: `{影响的功能列表}`
+- 修改范围: `{需要修改的文件列表}`
+
 **详细指南**: `references/04_01_code_analysis.md`
 
 ---
@@ -172,7 +177,7 @@ cd backend && go test -v ./...
 ## Step 9: Push + 创建 PR
 
 ```bash
-# 提交代码
+# 提交代码 (格式见 references/09_01_pr_template.md)
 git add .
 git commit -m "{type}: {description}"
 
@@ -185,7 +190,7 @@ gh pr create --title "{title}" --body "{description}"
 
 **触发**: PR 创建触发完整 CI 链路 (CI/CD → Integration → E2E)
 
-**模板参考**: `references/09_01_pr_template.md`
+**PR 模板**: `references/09_01_pr_template.md`
 
 **状态写入**: 
 - `scripts/00_01_workflow_state.json.pr_number`
@@ -201,7 +206,7 @@ gh pr create --title "{title}" --body "{description}"
 |------|----------|----------|----------|
 | 10.1 CI/CD | PR | 全量通过 | Step 11 → Step 6 |
 | 10.2 Integration | PR (workflow_run) | 全量通过 | Step 11 → Step 4 |
-| 10.3 E2E | PR (workflow_run) | current_fix_cases 通过 | Step 11 → Step 4/6 |
+| 10.3 E2E | PR (workflow_run) | current_fix_cases 通过 | Step 11 → 判断标准见 11_01_error_reference.md |
 
 **详细脚本**: `references/10_01_monitor_scripts.md`
 
