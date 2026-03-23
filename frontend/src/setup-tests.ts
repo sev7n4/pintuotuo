@@ -1,5 +1,27 @@
 import '@testing-library/jest-dom'
 
+// Mock import.meta.env
+const mockEnv = {
+  VITE_API_BASE_URL: '/api/v1',
+  MODE: 'test',
+  DEV: false,
+  PROD: false,
+  SSR: false,
+}
+
+;(globalThis as any).importMeta = {
+  env: mockEnv,
+  glob: jest.fn(),
+}
+
+Object.defineProperty(globalThis, 'importMeta', {
+  value: {
+    env: mockEnv,
+    glob: jest.fn(),
+  },
+  writable: true,
+})
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
