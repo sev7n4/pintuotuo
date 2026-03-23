@@ -242,7 +242,7 @@ Step 11.4: 判断是否超过重试限制
 Step 11.5: 修复后重新 commit + push
 ```
 
-**详细判断逻辑**: `references/13_01_error_reference.md`
+**详细判断逻辑**: `references/11_01_error_reference.md`
 
 ---
 
@@ -269,7 +269,7 @@ gh pr merge {pr-number} --merge --delete-branch
 gh run list --workflow="deploy-tencent.yml" --limit 1
 ```
 
-**详细指南**: `references/12_01_deploy_guide.md`
+**详细指南**: `references/13_01_deploy_guide.md`
 
 **状态写入**: `scripts/00_01_workflow_state.json.ci_status.deploy = running`
 
