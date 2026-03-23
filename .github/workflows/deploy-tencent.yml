@@ -51,7 +51,14 @@ jobs:
       - name: Seed database
         run: |
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} "
-            docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -f /docker-entrypoint-initdb.d/seed_test_data.sql
+            docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c \"
+              INSERT INTO users (email, name, password_hash, role, status)
+              VALUES 
+                ('demo@example.com', 'Demo User', 'd5e40f73f3eb863d24cff64aa15877de65a52fcea56d29db3585b90988a51311', 'user', 'active'),
+                ('merchant@example.com', 'Test Merchant', 'f43af1330d72420b14e89d803373cc3f2db79b3d293aec9257f227b10588e5c9', 'merchant', 'active'),
+                ('admin@example.com', 'Test Admin', 'e1e80b6b77cc437cdfd1d183a7831b0a6b7c35c4b4d6a1c1d4b6932de9e75cc6', 'admin', 'active')
+              ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role, status = EXCLUDED.status;
+            \"
           "
 
       - name: Verify deployment
