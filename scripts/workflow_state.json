@@ -1,6 +1,6 @@
 {
-  "current_task": "notification_tests",
-  "current_fix_cases": ["notification_tests"],
+  "current_task": "health_tests",
+  "current_fix_cases": ["health_tests"],
   "branch": null,
   "pr_number": null,
   "ci_status": {
