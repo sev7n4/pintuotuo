@@ -48,6 +48,12 @@ jobs:
             docker-compose -f docker-compose.prod.yml up -d --build
           "
 
+      - name: Seed database
+        run: |
+          ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} "
+            docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -f /docker-entrypoint-initdb.d/seed_test_data.sql
+          "
+
       - name: Verify deployment
         run: |
           sleep 30
