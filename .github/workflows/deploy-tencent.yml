@@ -50,15 +50,17 @@ jobs:
 
       - name: Seed database
         run: |
-          ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} ' \
-            JWT_SECRET=$(docker-compose -f docker-compose.prod.yml config | grep JWT_SECRET | awk -F= "{print $2}") && \
-            PASSWORD="admin123456" && \
-            if command -v sha256sum >/dev/null 2>&1; then \
-              PASSWORD_HASH=$(echo -n "$PASSWORD$JWT_SECRET" | sha256sum | awk "{print $1}"); \
-            else \
-              PASSWORD_HASH=$(echo -n "$PASSWORD$JWT_SECRET" | shasum -a 256 | cut -d " " -f 1); \
-            fi && \
-            docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('\''admin@example.com'\'', '\''Test Admin'\'', '\''$PASSWORD_HASH'\'', '\''admin'\'', '\''active'\''') ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role, status = EXCLUDED.status;"' 
+          ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
+          cd /root/pintuotuo
+          JWT_SECRET=$(docker-compose -f docker-compose.prod.yml config | grep JWT_SECRET | awk -F= "{print $2}")
+          PASSWORD="admin123456"
+          if command -v sha256sum >/dev/null 2>&1; then
+            PASSWORD_HASH=$(echo -n "$PASSWORD$JWT_SECRET" | sha256sum | awk "{print $1}")
+          else
+            PASSWORD_HASH=$(echo -n "$PASSWORD$JWT_SECRET" | shasum -a 256 | cut -d " " -f 1)
+          fi
+          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('admin@example.com', 'Test Admin', '$PASSWORD_HASH', 'admin', 'active') ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = EXCLUDED.role, status = EXCLUDED.status;"
+          EOF
 
       - name: Verify deployment
         run: |
