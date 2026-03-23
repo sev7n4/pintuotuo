@@ -24,6 +24,8 @@ module.exports = {
     '^@hooks/(.*)$': '<rootDir>/src/hooks/$1',
     '^@types/(.*)$': '<rootDir>/src/types/$1',
     '^@utils/(.*)$': '<rootDir>/src/utils/$1',
+    '^.+\\.module\\.(css|sass|scss)$': 'identity-obj-proxy',
+    '^.+\\.(css|sass|scss)$': '<rootDir>/__mocks__/styleMock.js',
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
