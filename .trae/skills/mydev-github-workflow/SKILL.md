@@ -78,6 +78,8 @@ Step 11: 错误修复 ─────────────┘
 
 ## Step 0: 初始化检查
 
+**命名规范**: `references/00_00_naming_convention.md`
+
 ```bash
 git status --porcelain
 ```
