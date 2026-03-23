@@ -86,7 +86,9 @@ git status --porcelain
 - 工作区是否干净
 - 是否在 main 分支
 
-**状态写入**: 初始化 `scripts/workflow_state.json`
+**状态写入**: 初始化 `scripts/00_01_workflow_state.json`
+
+**详细字段**: `references/00_01_state_fields.md`
 
 ---
 
@@ -98,7 +100,9 @@ git status --porcelain
 - `current_fix_cases` - 本次修复的测试用例ID列表
 - 问题类型判断
 
-**状态写入**: `workflow_state.json.current_fix_cases`
+**状态写入**: `scripts/00_01_workflow_state.json.current_fix_cases`
+
+**详细规则**: `references/01_01_issue_parsing.md`
 
 ---
 
@@ -114,6 +118,8 @@ git checkout -b {type}/issue-{id}
 - type: bugfix / feature / enhancement
 - id: ISSUE-XXX
 
+**详细规范**: `references/03_01_branch_naming.md`
+
 ---
 
 ## Step 4: 代码分析
@@ -125,19 +131,21 @@ git checkout -b {type}/issue-{id}
 - 理解上下文
 - 确定修改范围
 
+**详细指南**: `references/04_01_code_analysis.md`
+
 ---
 
 ## Step 5-7: TDD 流程
 
-**详细指南**: `references/test_lifecycle.md`
-
 | 步骤 | TDD阶段 | 状态写入 |
 |------|---------|----------|
-| Step 5 | Red - 设计失败测试 | `test_cases_state.json` |
-| Step 6 | Green - 最小实现 | `test_cases_state.json` |
-| Step 7 | Refactor - 重构归档 | `test_cases_state.json` |
+| Step 5 | Red - 设计失败测试 | `scripts/05_01_test_cases_state.json` |
+| Step 6 | Green - 最小实现 | `scripts/05_01_test_cases_state.json` |
+| Step 7 | Refactor - 重构归档 | `scripts/05_01_test_cases_state.json` |
 
-**模版参考**: `references/test_case_templates.md`
+**详细指南**: `references/05_01_test_lifecycle.md`
+
+**模版参考**: `references/05_02_test_case_templates.md`
 
 **注意**: 如果是纯测试添加任务（不涉及代码逻辑修改），可跳过 TDD 流程直接进入 Step 8。
 
@@ -157,7 +165,7 @@ cd backend && go test -v ./...
 - 类型检查通过
 - 单元测试通过
 
-**状态写入**: `workflow_state.json.local_validation = passed`
+**状态写入**: `scripts/00_01_workflow_state.json.local_validation = passed`
 
 ---
 
@@ -177,9 +185,11 @@ gh pr create --title "{title}" --body "{description}"
 
 **触发**: PR 创建触发完整 CI 链路 (CI/CD → Integration → E2E)
 
+**模板参考**: `references/09_01_pr_template.md`
+
 **状态写入**: 
-- `workflow_state.json.pr_number`
-- `workflow_state.json.ci_status.cicd = running`
+- `scripts/00_01_workflow_state.json.pr_number`
+- `scripts/00_01_workflow_state.json.ci_status.cicd = running`
 
 ---
 
@@ -193,7 +203,7 @@ gh pr create --title "{title}" --body "{description}"
 | 10.2 Integration | PR (workflow_run) | 全量通过 | Step 11 → Step 4 |
 | 10.3 E2E | PR (workflow_run) | current_fix_cases 通过 | Step 11 → Step 4/6 |
 
-**详细脚本**: `references/monitor_scripts.md`
+**详细脚本**: `references/10_01_monitor_scripts.md`
 
 **监控命令**:
 ```bash
@@ -232,7 +242,7 @@ Step 11.4: 判断是否超过重试限制
 Step 11.5: 修复后重新 commit + push
 ```
 
-**详细判断逻辑**: `references/error_reference.md`
+**详细判断逻辑**: `references/13_01_error_reference.md`
 
 ---
 
@@ -247,7 +257,7 @@ Step 11.5: 修复后重新 commit + push
 gh pr merge {pr-number} --merge --delete-branch
 ```
 
-**状态写入**: `workflow_state.json.merged = true`
+**状态写入**: `scripts/00_01_workflow_state.json.merged = true`
 
 ---
 
@@ -259,7 +269,9 @@ gh pr merge {pr-number} --merge --delete-branch
 gh run list --workflow="deploy-tencent.yml" --limit 1
 ```
 
-**状态写入**: `workflow_state.json.ci_status.deploy = running`
+**详细指南**: `references/12_01_deploy_guide.md`
+
+**状态写入**: `scripts/00_01_workflow_state.json.ci_status.deploy = running`
 
 ---
 
