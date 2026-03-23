@@ -51,7 +51,7 @@ jobs:
       - name: Seed database
         run: |
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
-          cd /root/pintuotuo
+          cd /opt/pintuotuo
           JWT_SECRET=$(docker-compose -f docker-compose.prod.yml config | grep JWT_SECRET | awk -F= "{print $2}")
           PASSWORD="admin123456"
           if command -v sha256sum >/dev/null 2>&1; then

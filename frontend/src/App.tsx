@@ -32,6 +32,10 @@ import MerchantSettlements from '@pages/merchant/MerchantSettlements'
 // Admin Pages
 import AdminDashboard from '@pages/admin/AdminDashboard'
 import AdminUsers from '@pages/admin/AdminUsers'
+import AdminMerchants from '@pages/admin/AdminMerchants'
+import AdminProducts from '@pages/admin/AdminProducts'
+import AdminOrders from '@pages/admin/AdminOrders'
+import AdminSettings from '@pages/admin/AdminSettings'
 
 function App() {
   return (
@@ -91,6 +95,10 @@ function App() {
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
+            <Route path="merchants" element={<AdminMerchants />} />
+            <Route path="products" element={<AdminProducts />} />
+            <Route path="orders" element={<AdminOrders />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
         </Routes>
       </BrowserRouter>
