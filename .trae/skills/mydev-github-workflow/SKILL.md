@@ -37,36 +37,37 @@ Step 1: 问题解析 ⚠️ [约束2]
    ↓
 Step 2-3: 分支创建
    ↓
-Step 4: 代码分析
-   ↓
-Step 5-7: TDD流程 ⚠️ [约束6]
-   ↓
-Step 8: 本地验证 ⚠️ [约束3]
-   ↓
-Step 9: git push ──────────────────┐
-   ↓                               │ Push 触发
-Step 10: CI监控 ⚠️ [约束4] ── CI/CD + Integration
-   ├─ 失败 → Step 13 → Step 4/6    │
-   └─ 通过                         │
+Step 4: 代码分析 ←─────────────────┐
    ↓                               │
-Step 11: 创建 PR ──────────────────┤
-   ↓                               │ PR 触发
-Step 12: E2E监控 ⚠️ [约束1] ── current_fix_cases
-   ├─ 失败 → Step 13 → Step 4/6    │
-   └─ 通过                         │
-   ↓                               │
-Step 13: 错误修复 ⚠️ [约束2]        │
-   ↓                               │
-Step 14: 合并 PR ⚠️ [约束5]         │
-   ↓                               │
-Step 15: 部署监控 (main分支)        │
-   ↓                               │
-Step 16: 清理输出                  │
+Step 5-7: TDD流程 ⚠️ [约束6] ←─┐    │
+   ↓                          │    │
+Step 8: 本地验证 ⚠️ [约束3]    │    │
+   ↓                          │    │
+Step 9: Push + 创建 PR ───────┼────┤
+   ↓                          │    │ PR 触发
+Step 10: CI监控 ⚠️ [约束4]    │    │
+   ├─ CI/CD Pipeline          │    │
+   ├─ Integration Tests       │    │
+   ├─ E2E Tests               │    │
+   │                          │    │
+   ├─ 失败 → Step 11 ─────────┼────┘
+   └─ 通过                    │
+   ↓                          │
+Step 12: 合并 PR ⚠️ [约束5]    │
+   ↓                          │
+Step 13: 部署监控 (main分支)   │
+   ↓                          │
+Step 14: 清理输出             │
+                              │
+Step 11: 错误修复 ─────────────┘
+   ├─ 代码错误 → 返回 Step 6
+   ├─ 需求错误 → 返回 Step 4
+   └─ 环境问题 → 重试当前步骤
 ```
 
 **触发逻辑**：
-- Push 触发: CI/CD(全量) + Integration(全量)
-- PR 触发: E2E(current_fix_cases)
+- PR 创建触发完整 CI 链路: CI/CD → Integration → E2E
+- 注意: Push 到 feature 分支不会触发 CI，只有 PR 才会触发
 
 **合并条件**：
 - CI/CD Pipeline: 全量通过 ✅
@@ -138,79 +139,106 @@ git checkout -b {type}/issue-{id}
 
 **模版参考**: `references/test_case_templates.md`
 
+**注意**: 如果是纯测试添加任务（不涉及代码逻辑修改），可跳过 TDD 流程直接进入 Step 8。
+
 ---
 
-## Step 9: 代码推送
+## Step 8: 本地验证 ⚠️ [约束3]
 
 ```bash
-git add .
-git commit -m "{type}: {description}"
-git push -u origin {branch-name}
+# 前端
+cd frontend && npm run type-check && npm test
+
+# 后端
+cd backend && go test -v ./...
 ```
 
-**触发**: Push 到远程分支触发 CI/CD + Integration
+**验证项**：
+- 类型检查通过
+- 单元测试通过
 
-**状态写入**: `workflow_state.json.ci_status.cicd = running`
-
----
-
-## Step 10: CI监控 (Push触发)
-
-**监控顺序**: CI/CD → Integration
-
-| 阶段 | 触发方式 | 验证要求 | 失败处理 |
-|------|----------|----------|----------|
-| 10.1 CI/CD | Push | 全量通过 | Step 13 → Step 6 |
-| 10.2 Integration | Push | 全量通过 | Step 13 → Step 4 |
-
-**详细脚本**: `references/monitor_scripts.md`
+**状态写入**: `workflow_state.json.local_validation = passed`
 
 ---
 
-## Step 11: 创建PR
+## Step 9: Push + 创建 PR
 
 ```bash
+# 提交代码
+git add .
+git commit -m "{type}: {description}"
+
+# 推送到远程
+git push -u origin {branch-name}
+
+# 创建 PR
 gh pr create --title "{title}" --body "{description}"
 ```
 
-**触发**: PR 创建触发 E2E 测试
+**触发**: PR 创建触发完整 CI 链路 (CI/CD → Integration → E2E)
 
-**状态写入**: `workflow_state.json.pr_number`
+**状态写入**: 
+- `workflow_state.json.pr_number`
+- `workflow_state.json.ci_status.cicd = running`
 
 ---
 
-## Step 12: E2E监控 (PR触发)
+## Step 10: CI监控 (PR触发) ⚠️ [约束4]
 
-**触发方式**: PR 创建/更新
+**监控顺序**: CI/CD → Integration → E2E
 
-| 阶段 | 验证要求 | 失败处理 |
-|------|----------|----------|
-| E2E ⚠️ [约束1] | current_fix_cases 通过 | Step 13 → Step 4/6 |
-
-**注意**: 只监控 `current_fix_cases`，其他用例失败可忽略
+| 阶段 | 触发方式 | 验证要求 | 失败处理 |
+|------|----------|----------|----------|
+| 10.1 CI/CD | PR | 全量通过 | Step 11 → Step 6 |
+| 10.2 Integration | PR (workflow_run) | 全量通过 | Step 11 → Step 4 |
+| 10.3 E2E | PR (workflow_run) | current_fix_cases 通过 | Step 11 → Step 4/6 |
 
 **详细脚本**: `references/monitor_scripts.md`
 
+**监控命令**:
+```bash
+# 获取 PR 触发的 workflow runs
+gh run list --branch={branch-name} --limit 5 --json databaseId,name,status,conclusion
+
+# 查看失败日志
+gh run view {run-id} --log-failed
+```
+
 ---
 
-## Step 13: 错误修复
+## Step 11: 错误修复
 
 ```bash
 gh run view {run-id} --log-failed
 ```
 
-| 错误类型 | 返回步骤 |
-|----------|----------|
-| 代码错误（编译/Lint/单元测试） | Step 6 |
-| 需求理解错误（集成/E2E设计问题） | Step 4 |
-| 环境问题 | 重试当前 Step |
+### 错误类型判断
+
+| 错误类型 | 关键词 | 返回步骤 | 说明 |
+|----------|--------|----------|------|
+| **代码错误** | `undefined`, `type error`, `syntax error`, `Cannot find` | Step 6 | 实现层面问题 |
+| **需求理解错误** | `assertion failed`, `wrong result`, E2E 业务流程错误 | Step 4 | 需求理解偏差 |
+| **环境问题** | `timeout`, `ECONNREFUSED`, `service unavailable` | 重试 | 外部依赖问题 |
+
+### 修复流程
+
+```
+Step 11.1: 获取失败日志
+Step 11.2: 分析错误类型
+Step 11.3: 更新状态文件 (记录错误、重试次数)
+Step 11.4: 判断是否超过重试限制
+   ├─ 是 → 请求人工介入
+   └─ 否 → 返回对应步骤修复
+Step 11.5: 修复后重新 commit + push
+```
 
 **详细判断逻辑**: `references/error_reference.md`
 
 ---
 
-## Step 14: 合并条件
+## Step 12: 合并 PR ⚠️ [约束5]
 
+**合并条件**：
 - CI/CD Pipeline: 全量通过 ✅
 - Integration Tests: 全量通过 ✅
 - E2E Tests: current_fix_cases 通过 ✅
@@ -223,19 +251,19 @@ gh pr merge {pr-number} --merge --delete-branch
 
 ---
 
-## Step 15: 部署监控
+## Step 13: 部署监控
 
-**触发**: PR 合并后自动触发
+**触发**: PR 合并后自动触发 (workflow_run: E2E Tests completed)
 
 ```bash
-gh run list --workflow="deploy.yml" --limit 1
+gh run list --workflow="deploy-tencent.yml" --limit 1
 ```
 
 **状态写入**: `workflow_state.json.ci_status.deploy = running`
 
 ---
 
-## Step 16: 输出要求
+## Step 14: 输出要求
 
 ```
 ✅ 工作流完成 | PR: #{pr-number} | 分支: {branch} → main
