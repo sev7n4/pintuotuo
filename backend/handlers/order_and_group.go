@@ -119,7 +119,11 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, order)
+	c.JSON(http.StatusCreated, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    order,
+	})
 }
 
 // ListOrders lists all orders for current user
