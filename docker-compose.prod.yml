@@ -71,6 +71,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/migrations:/docker-entrypoint-initdb.d:ro
+      - ./scripts/db:/docker-entrypoint-initdb.d/seed:ro
     ports:
       - "5432:5432"
     networks:
