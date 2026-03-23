@@ -148,11 +148,24 @@ git checkout -b {type}/issue-{id}
 | Step 6 | Green - 最小实现 | `scripts/05_01_test_cases_state.json` |
 | Step 7 | Refactor - 重构归档 | `scripts/05_01_test_cases_state.json` |
 
+**Step 6 Green 阶段定义**:
+- 编写使测试通过的最小代码
+- 不做优化或重构
+- 只关注让测试从红变绿
+
 **详细指南**: `references/05_01_test_lifecycle.md`
 
 **模版参考**: `references/05_02_test_case_templates.md`
 
-**注意**: 如果是纯测试添加任务（不涉及代码逻辑修改），可跳过 TDD 流程直接进入 Step 8。
+**跳过条件** (满足任一即可跳过 TDD):
+- 纯测试添加: 只新增测试文件，不修改业务代码
+- 文档更新: 只修改 README、注释、文档
+- 配置变更: 只修改配置文件，不涉及代码逻辑
+
+**必须执行 TDD**:
+- 修改业务逻辑代码
+- 修改 API 接口
+- 修改数据模型
 
 ---
 
@@ -240,12 +253,22 @@ gh run view {run-id} --log-failed
 ```
 Step 11.1: 获取失败日志
 Step 11.2: 分析错误类型
-Step 11.3: 更新状态文件 (记录错误、重试次数)
+Step 11.3: 更新状态文件
 Step 11.4: 判断是否超过重试限制
    ├─ 是 → 请求人工介入
    └─ 否 → 返回对应步骤修复
 Step 11.5: 修复后重新 commit + push
 ```
+
+**状态更新字段**:
+- `retry_count`: 重试次数 +1
+- `error_history`: 追加 `{step, error_type, message, timestamp}`
+- `current_fix_cases`: 保留当前失败用例
+
+**重试策略**:
+- 第1-2次: 快速修复 + 重试 (间隔 30s)
+- 第3-4次: 深入分析原因 (间隔 5min)
+- 第5次: 请求人工介入
 
 **详细判断逻辑**: `references/11_01_error_reference.md`
 
@@ -280,8 +303,23 @@ gh run list --workflow="deploy-tencent.yml" --limit 1
 
 ---
 
-## Step 14: 输出要求
+## Step 14: 清理输出
 
+**清理范围**:
+- 删除本地 feature 分支
+- 清理临时文件 (node_modules, build, .cache)
+
+**保留内容**:
+- 工作流状态文件 (`scripts/00_01_workflow_state.json`)
+- 测试用例归档 (`assets/test_cases/`)
+- PR 记录 (GitHub)
+
+```bash
+git checkout main
+git branch -d {branch-name}
+```
+
+**输出要求**:
 ```
 ✅ 工作流完成 | PR: #{pr-number} | 分支: {branch} → main
 ```
