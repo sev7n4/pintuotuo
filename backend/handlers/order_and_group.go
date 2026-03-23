@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -98,6 +99,8 @@ func CreateOrder(c *gin.Context) {
 		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at",
 		userID, req.ProductID, req.GroupID, req.Quantity, product.Price, totalPrice, orderStatusPending,
 	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+
+	fmt.Printf("ORDER DEBUG: userID=%d, productID=%d, groupID=%d, quantity=%d, unit_price=%.2f, total=%.2f, err=%v\n", userID, req.ProductID, req.GroupID, req.Quantity, product.Price, totalPrice, err)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
