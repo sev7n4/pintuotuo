@@ -35,16 +35,16 @@ type Product struct {
 
 // Order represents a user's order
 type Order struct {
-	ID         int       `json:"id"`
-	UserID     int       `json:"user_id"`
-	ProductID  int       `json:"product_id"`
-	GroupID    int       `json:"group_id"`
-	Quantity   int       `json:"quantity"`
-	UnitPrice  float64   `json:"unit_price"`
-	TotalPrice float64   `json:"total_price"`
-	Status     string    `json:"status"` // pending, paid, completed, failed
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID         int         `json:"id"`
+	UserID     int         `json:"user_id"`
+	ProductID  int         `json:"product_id"`
+	GroupID    interface{} `json:"group_id"` // Can be NULL
+	Quantity   int         `json:"quantity"`
+	UnitPrice  float64     `json:"unit_price"`
+	TotalPrice float64     `json:"total_price"`
+	Status     string      `json:"status"` // pending, paid, completed, failed
+	CreatedAt  time.Time   `json:"created_at"`
+	UpdatedAt  time.Time   `json:"updated_at"`
 }
 
 // Group represents a group purchase
