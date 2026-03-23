@@ -95,12 +95,20 @@ func CreateOrder(c *gin.Context) {
 	var order models.Order
 	totalPrice := product.Price * float64(req.Quantity)
 
+	// Handle group_id - use NULL if it's 0 (no group)
+	var groupID interface{}
+	if req.GroupID > 0 {
+		groupID = req.GroupID
+	} else {
+		groupID = nil
+	}
+
 	err = tx.QueryRow(
 		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at",
-		userID, req.ProductID, req.GroupID, req.Quantity, product.Price, totalPrice, orderStatusPending,
+		userID, req.ProductID, groupID, req.Quantity, product.Price, totalPrice, orderStatusPending,
 	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
-	fmt.Printf("ORDER DEBUG: userID=%d, productID=%d, groupID=%d, quantity=%d, unit_price=%.2f, total=%.2f, err=%v\n", userID, req.ProductID, req.GroupID, req.Quantity, product.Price, totalPrice, err)
+	fmt.Printf("ORDER DEBUG: userID=%d, productID=%d, groupID=%v, quantity=%d, unit_price=%.2f, total=%.2f, err=%v\n", userID, req.ProductID, groupID, req.Quantity, product.Price, totalPrice, err)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
