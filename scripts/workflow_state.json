@@ -1,6 +1,6 @@
 {
-  "current_task": "merchant_tests",
-  "current_fix_cases": ["merchant_tests"],
+  "current_task": "merchant_apikey_tests",
+  "current_fix_cases": ["merchant_apikey_tests"],
   "branch": null,
   "pr_number": null,
   "ci_status": {
