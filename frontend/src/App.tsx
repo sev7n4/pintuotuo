@@ -29,6 +29,8 @@ import MerchantOrders from '@pages/merchant/MerchantOrders'
 import MerchantSettings from '@pages/merchant/MerchantSettings'
 import MerchantAPIKeys from '@pages/merchant/MerchantAPIKeys'
 import MerchantSettlements from '@pages/merchant/MerchantSettlements'
+import MerchantAnalytics from '@pages/merchant/MerchantAnalytics'
+import MerchantMarketing from '@pages/merchant/MerchantMarketing'
 
 // Admin Pages
 import AdminDashboard from '@pages/admin/AdminDashboard'
@@ -89,6 +91,8 @@ function App() {
             <Route path="products" element={<MerchantProducts />} />
             <Route path="orders" element={<MerchantOrders />} />
             <Route path="settlements" element={<MerchantSettlements />} />
+            <Route path="analytics" element={<MerchantAnalytics />} />
+            <Route path="marketing" element={<MerchantMarketing />} />
             <Route path="api-keys" element={<MerchantAPIKeys />} />
             <Route path="settings" element={<MerchantSettings />} />
           </Route>
