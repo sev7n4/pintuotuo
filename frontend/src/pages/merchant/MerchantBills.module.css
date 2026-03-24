@@ -1,0 +1,57 @@
+.bills {
+  padding: 0;
+}
+
+.tableCard {
+  margin-top: 16px;
+}
+
+.tableCard .ant-card-body {
+  padding: 16px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.actionBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.billSummary {
+  margin-bottom: 24px;
+}
+
+.detailTabs {
+  margin-top: 16px;
+}
+
+.amount {
+  font-size: 18px;
+  font-weight: 600;
+  color: #52c41a;
+}
+
+.statsRow {
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  margin-bottom: 24px !important;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .bills {
+    padding: 8px;
+  }
+
+  .pageTitle {
+    font-size: 18px;
+  }
+}

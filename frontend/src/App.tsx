@@ -37,6 +37,8 @@ import MerchantAPIKeys from '@pages/merchant/MerchantAPIKeys'
 import MerchantSettlements from '@pages/merchant/MerchantSettlements'
 import MerchantAnalytics from '@pages/merchant/MerchantAnalytics'
 import MerchantMarketing from '@pages/merchant/MerchantMarketing'
+import MerchantBills from '@pages/merchant/MerchantBills'
+import MerchantInvoices from '@pages/merchant/MerchantInvoices'
 
 // Admin Pages
 import AdminDashboard from '@pages/admin/AdminDashboard'
@@ -109,6 +111,8 @@ function App() {
             <Route path="products" element={<MerchantProducts />} />
             <Route path="orders" element={<MerchantOrders />} />
             <Route path="settlements" element={<MerchantSettlements />} />
+            <Route path="bills" element={<MerchantBills />} />
+            <Route path="invoices" element={<MerchantInvoices />} />
             <Route path="analytics" element={<MerchantAnalytics />} />
             <Route path="marketing" element={<MerchantMarketing />} />
             <Route path="api-keys" element={<MerchantAPIKeys />} />

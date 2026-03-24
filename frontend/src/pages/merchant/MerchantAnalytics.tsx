@@ -12,6 +12,8 @@ import {
   List,
   Avatar,
   Divider,
+  Tag,
+  Tabs,
 } from 'antd'
 import {
   UserOutlined,
@@ -20,6 +22,8 @@ import {
   EnvironmentOutlined,
   ShoppingCartOutlined,
   TrophyOutlined,
+  TagOutlined,
+  FireOutlined,
 } from '@ant-design/icons'
 import { useMerchantStore } from '@/stores/merchantStore'
 import styles from './Merchant.module.css'
@@ -84,12 +88,44 @@ const mockTopUsers: TopUser[] = [
   { id: 5, name: '钱七', total_spent: 2340, order_count: 10 },
 ]
 
+interface UserTag {
+  tag: string
+  count: number
+  percentage: number
+  color: string
+}
+
+interface UserSegment {
+  segment: string
+  description: string
+  count: number
+  percentage: number
+  tags: string[]
+}
+
+const mockUserTags: UserTag[] = [
+  { tag: '高频购买', count: 320, percentage: 32, color: 'red' },
+  { tag: '价格敏感', count: 280, percentage: 28, color: 'orange' },
+  { tag: '新品偏好', count: 180, percentage: 18, color: 'blue' },
+  { tag: '大额消费', count: 120, percentage: 12, color: 'green' },
+  { tag: '拼团达人', count: 100, percentage: 10, color: 'purple' },
+]
+
+const mockUserSegments: UserSegment[] = [
+  { segment: '高价值用户', description: '消费金额高、复购率高', count: 150, percentage: 15, tags: ['大额消费', '高频购买'] },
+  { segment: '活跃用户', description: '近期有购买行为', count: 350, percentage: 35, tags: ['新品偏好', '拼团达人'] },
+  { segment: '潜力用户', description: '有购买意向但未转化', count: 200, percentage: 20, tags: ['价格敏感'] },
+  { segment: '沉睡用户', description: '超过30天未活跃', count: 300, percentage: 30, tags: [] },
+]
+
 export const MerchantAnalytics: React.FC = () => {
   const { isLoading, error, fetchStats } = useMerchantStore()
   const [userStats] = useState<UserStats>(mockUserStats)
   const [regionData] = useState<RegionData[]>(mockRegionData)
   const [modelPreferences] = useState<ModelPreference[]>(mockModelPreferences)
   const [topUsers] = useState<TopUser[]>(mockTopUsers)
+  const [userTags] = useState<UserTag[]>(mockUserTags)
+  const [userSegments] = useState<UserSegment[]>(mockUserSegments)
 
   useEffect(() => {
     fetchStats()
@@ -268,6 +304,120 @@ export const MerchantAnalytics: React.FC = () => {
                 value={15.8}
                 suffix="%"
               />
+            </Col>
+          </Row>
+        </Card>
+
+        <Card style={{ marginTop: 24 }} title={<><TagOutlined style={{ marginRight: 8 }} />用户标签分析</>}>
+          <Tabs defaultActiveKey="tags">
+            <Tabs.TabPane tab="用户标签分布" key="tags">
+              <Row gutter={[16, 16]}>
+                {userTags.map((item) => (
+                  <Col xs={12} sm={8} md={4} key={item.tag}>
+                    <Card className={styles.tagCard}>
+                      <div className={styles.tagHeader}>
+                        <Tag color={item.color} style={{ fontSize: 14, padding: '4px 12px' }}>
+                          {item.tag}
+                        </Tag>
+                      </div>
+                      <Statistic
+                        value={item.count}
+                        suffix="人"
+                        valueStyle={{ fontSize: 24 }}
+                      />
+                      <Progress 
+                        percent={item.percentage} 
+                        size="small" 
+                        showInfo={false}
+                        strokeColor={item.color}
+                      />
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        占比 {item.percentage}%
+                      </Text>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </Tabs.TabPane>
+            <Tabs.TabPane tab="用户分群" key="segments">
+              <List
+                dataSource={userSegments}
+                renderItem={(item) => (
+                  <List.Item>
+                    <List.Item.Meta
+                      avatar={
+                        <Avatar 
+                          style={{ 
+                            backgroundColor: item.segment === '高价值用户' ? '#faad14' : 
+                                           item.segment === '活跃用户' ? '#52c41a' :
+                                           item.segment === '潜力用户' ? '#1890ff' : '#8c8c8c'
+                          }}
+                          icon={item.segment === '高价值用户' ? <TrophyOutlined /> : <UserOutlined />}
+                        />
+                      }
+                      title={
+                        <Space>
+                          <Text strong>{item.segment}</Text>
+                          {item.tags.map(tag => (
+                            <Tag key={tag} color="blue">{tag}</Tag>
+                          ))}
+                        </Space>
+                      }
+                      description={item.description}
+                    />
+                    <Space direction="vertical" align="end">
+                      <Text strong style={{ fontSize: 16 }}>{item.count} 人</Text>
+                      <Progress 
+                        percent={item.percentage} 
+                        size="small" 
+                        style={{ width: 100 }}
+                        showInfo={false}
+                      />
+                    </Space>
+                  </List.Item>
+                )}
+              />
+            </Tabs.TabPane>
+          </Tabs>
+        </Card>
+
+        <Card style={{ marginTop: 24 }} title={<><FireOutlined style={{ marginRight: 8, color: '#ff4d4f' }} />热门标签趋势</>}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={12}>
+              <Card type="inner" title="本周新增标签">
+                <List
+                  size="small"
+                  dataSource={[
+                    { tag: 'AI工具爱好者', count: 156 },
+                    { tag: '企业用户', count: 89 },
+                    { tag: 'API重度用户', count: 67 },
+                  ]}
+                  renderItem={(item) => (
+                    <List.Item>
+                      <Tag color="blue">{item.tag}</Tag>
+                      <Text type="secondary">+{item.count} 人</Text>
+                    </List.Item>
+                  )}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} md={12}>
+              <Card type="inner" title="标签转化率">
+                <List
+                  size="small"
+                  dataSource={[
+                    { tag: '高频购买', rate: 85 },
+                    { tag: '新品偏好', rate: 72 },
+                    { tag: '大额消费', rate: 68 },
+                  ]}
+                  renderItem={(item) => (
+                    <List.Item>
+                      <Tag color="green">{item.tag}</Tag>
+                      <Progress percent={item.rate} size="small" style={{ width: 120 }} />
+                    </List.Item>
+                  )}
+                />
+              </Card>
             </Col>
           </Row>
         </Card>
