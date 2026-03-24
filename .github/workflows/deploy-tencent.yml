@@ -64,23 +64,20 @@ jobs:
             fi
           }
           
-          # Update admin users
+          # Update seed users only (these are the only users injected by migrations)
+          # admin@example.com
           HASH=$(generate_hash "admin123456")
-          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = '$HASH' WHERE email IN ('admin@example.com', 'admin2@example.com');"
+          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = '$HASH' WHERE email = 'admin@example.com';"
           
-          # Update regular users with password 'user123'
-          HASH=$(generate_hash "user123")
-          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = '$HASH' WHERE email IN ('user01@163.com', 'user02@163.com', 'user06@163.com', 'user10@163.com', 'user11@163.com', 'user12@163.com', 'user13@163.com', 'user14@163.com', 'user15@163.com', 'user16@163.com', 'user17@163.com', 'user18@163.com', 'user19@163.com', 'user20@163.com');"
-          
-          # Update merchant users
-          HASH=$(generate_hash "merchant123456")
-          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = '$HASH' WHERE email LIKE 'merchant%';"
-          
-          # Update demo user
+          # demo@example.com
           HASH=$(generate_hash "demo123456")
           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = '$HASH' WHERE email = 'demo@example.com';"
           
-          echo "Password update completed"
+          # merchant@example.com
+          HASH=$(generate_hash "merchant123456")
+          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = '$HASH' WHERE email = 'merchant@example.com';"
+          
+          echo "Seed user password update completed"
           EOF
 
       - name: Verify deployment
