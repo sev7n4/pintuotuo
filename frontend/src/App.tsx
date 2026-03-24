@@ -16,6 +16,7 @@ import CheckoutPage from '@pages/CheckoutPage'
 import OrderListPage from '@pages/OrderListPage'
 import PaymentPage from '@pages/PaymentPage'
 import GroupListPage from '@pages/GroupListPage'
+import GroupProgressPage from '@pages/GroupProgressPage'
 import ReferralPage from '@pages/ReferralPage'
 import MyToken from '@pages/MyToken'
 import Profile from '@pages/Profile'
@@ -64,6 +65,7 @@ function App() {
 
             {/* Groups */}
             <Route path="/groups" element={<GroupListPage />} />
+            <Route path="/groups/:id" element={<GroupProgressPage />} />
 
             {/* Referral */}
             <Route path="/referral" element={<ReferralPage />} />
