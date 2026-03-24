@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, message, Spin } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, message, Spin, Drawer, Button } from 'antd'
 import {
   ShopOutlined,
   AppstoreOutlined,
@@ -14,6 +14,8 @@ import {
   GiftOutlined,
   FileTextOutlined,
   TeamOutlined,
+  MenuOutlined,
+  CloseOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import styles from './MerchantLayout.module.css'
@@ -79,6 +81,17 @@ const MerchantLayout = () => {
   const { user, logout, isAuthenticated, fetchUser } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
+  const [drawerVisible, setDrawerVisible] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 992)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -91,7 +104,7 @@ const MerchantLayout = () => {
       if (!user) {
         try {
           await fetchUser()
-        } catch (error) {
+        } catch {
           localStorage.removeItem('auth_token')
           sessionStorage.removeItem('auth_token')
           navigate('/login', { state: { from: location.pathname } })
@@ -126,6 +139,9 @@ const MerchantLayout = () => {
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
+    if (isMobile) {
+      setDrawerVisible(false)
+    }
   }
 
   const handleLogout = () => {
@@ -158,33 +174,80 @@ const MerchantLayout = () => {
     return path
   }
 
+  const toggleDrawer = () => {
+    setDrawerVisible(!drawerVisible)
+  }
+
+  const menuContent = (
+    <Menu
+      mode="inline"
+      selectedKeys={[getSelectedKey()]}
+      items={menuItems}
+      onClick={handleMenuClick}
+      style={{ borderRight: 0 }}
+    />
+  )
+
   return (
     <Layout className={styles.layout}>
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        className={styles.sider}
-        theme="light"
-      >
-        <div className={styles.logo}>
-          <ShopOutlined className={styles.logoIcon} />
-          {!collapsed && <span>商家后台</span>}
-        </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[getSelectedKey()]}
-          items={menuItems}
-          onClick={handleMenuClick}
-        />
-      </Sider>
+      {isMobile ? (
+        <>
+          <Drawer
+            placement="left"
+            closable={false}
+            onClose={() => setDrawerVisible(false)}
+            open={drawerVisible}
+            className={styles.drawer}
+            width={250}
+          >
+            <div className={styles.drawerHeader}>
+              <ShopOutlined className={styles.logoIcon} />
+              <span>商家后台</span>
+              <Button
+                type="text"
+                icon={<CloseOutlined />}
+                onClick={() => setDrawerVisible(false)}
+                className={styles.closeBtn}
+              />
+            </div>
+            {menuContent}
+          </Drawer>
+        </>
+      ) : (
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={setCollapsed}
+          className={styles.sider}
+          theme="light"
+          breakpoint="lg"
+          collapsedWidth={80}
+        >
+          <div className={styles.logo}>
+            <ShopOutlined className={styles.logoIcon} />
+            {!collapsed && <span>商家后台</span>}
+          </div>
+          {menuContent}
+        </Sider>
+      )}
       <Layout>
         <Header className={styles.header}>
+          {isMobile && (
+            <Button
+              type="text"
+              icon={<MenuOutlined />}
+              onClick={toggleDrawer}
+              className={styles.menuBtn}
+            />
+          )}
+          <div className={styles.headerTitle}>
+            {isMobile && <span>商家后台</span>}
+          </div>
           <div className={styles.headerRight}>
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <div className={styles.userInfo}>
-                <Avatar icon={<UserOutlined />} />
-                <span className={styles.userName}>{user?.name || '商家'}</span>
+                <Avatar icon={<UserOutlined />} size={isMobile ? 'small' : 'default'} />
+                {!isMobile && <span className={styles.userName}>{user?.name || '商家'}</span>}
               </div>
             </Dropdown>
           </div>
