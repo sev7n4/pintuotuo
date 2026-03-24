@@ -36,7 +36,6 @@ const mockUseParams = useParams as jest.MockedFunction<typeof useParams>
 const mockUseProductStore = useProductStore as jest.MockedFunction<typeof useProductStore>
 const mockUseCartStore = useCartStore as jest.MockedFunction<typeof useCartStore>
 const mockUseGroupStore = useGroupStore as jest.MockedFunction<typeof useGroupStore>
-const mockMessageSuccess = message.success as jest.MockedFunction<typeof message.success>
 
 describe('ProductDetailPage', () => {
   beforeEach(() => {
