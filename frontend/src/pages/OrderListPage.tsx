@@ -274,10 +274,10 @@ export const OrderListPage: React.FC = () => {
     <div style={{ padding: '20px', maxWidth: 1200, margin: '0 auto' }}>
       <Card>
         <Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
-          <Text strong style={{ fontSize: 18 }}>
+          <Typography.Title level={3} style={{ margin: 0 }}>
             <ShoppingOutlined style={{ marginRight: 8 }} />
             我的订单
-          </Text>
+          </Typography.Title>
         </Space>
 
         <Tabs
