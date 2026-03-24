@@ -1,7 +1,16 @@
 import { useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, message } from 'antd'
-import { UserOutlined, GiftOutlined, WalletOutlined, LogoutOutlined, BarChartOutlined } from '@ant-design/icons'
+import { 
+  UserOutlined, 
+  LogoutOutlined, 
+  HomeOutlined,
+  AppstoreOutlined,
+  ShoppingCartOutlined,
+  HeartOutlined,
+  HistoryOutlined,
+  SettingOutlined,
+} from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import './Layout.css'
 
@@ -18,31 +27,66 @@ export default function Layout() {
     }
   }, [isAuthenticated, user, fetchUser])
 
-  const menuItems = [
-    { key: '/', label: <Link to="/">首页</Link> },
-    { key: '/products', label: <Link to="/products">商品</Link> },
-    { key: '/orders', label: <Link to="/orders">订单</Link> },
-    { key: '/groups', label: <Link to="/groups">拼团</Link> },
-    { key: '/my-tokens', label: <Link to="/my-tokens">我的Token</Link>, icon: <WalletOutlined /> },
-    { key: '/consumption', label: <Link to="/consumption">消费明细</Link>, icon: <BarChartOutlined /> },
-    { key: '/referral', label: <Link to="/referral">邀请返利</Link>, icon: <GiftOutlined /> },
+  const getSelectedTab = () => {
+    const path = location.pathname
+    if (path === '/') return 'home'
+    if (path === '/categories' || path.startsWith('/products')) return 'category'
+    if (path.startsWith('/orders') || path.startsWith('/groups') || path.startsWith('/payment') || path === '/my-tokens' || path === '/consumption') return 'orders'
+    if (path === '/my' || path === '/profile' || path === '/referral' || path === '/favorites' || path === '/history') return 'my'
+    return 'home'
+  }
+
+  const tabItems = [
+    { 
+      key: 'home', 
+      label: <Link to="/">首页</Link>,
+      icon: <HomeOutlined />,
+    },
+    { 
+      key: 'category', 
+      label: <Link to="/categories">分类</Link>,
+      icon: <AppstoreOutlined />,
+    },
+    { 
+      key: 'orders', 
+      label: <Link to="/orders">订单</Link>,
+      icon: <ShoppingCartOutlined />,
+    },
+    { 
+      key: 'my', 
+      label: <Link to="/my">我的</Link>,
+      icon: <UserOutlined />,
+    },
   ]
 
   const userMenuItems = [
-    { key: 'profile', label: '个人中心' },
-    { key: 'consumption', label: '消费明细' },
+    { key: 'profile', label: '个人中心', icon: <UserOutlined /> },
+    { key: 'favorites', label: '我的收藏', icon: <HeartOutlined /> },
+    { key: 'history', label: '浏览历史', icon: <HistoryOutlined /> },
+    { key: 'settings', label: '账户设置', icon: <SettingOutlined /> },
+    { type: 'divider' as const },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
   ]
 
   const handleUserMenuClick = async ({ key }: { key: string }) => {
-    if (key === 'logout') {
-      await logout()
-      message.success('已退出登录')
-      navigate('/login')
-    } else if (key === 'profile') {
-      navigate('/profile')
-    } else if (key === 'consumption') {
-      navigate('/consumption')
+    switch (key) {
+      case 'logout':
+        await logout()
+        message.success('已退出登录')
+        navigate('/login')
+        break
+      case 'profile':
+        navigate('/profile')
+        break
+      case 'favorites':
+        navigate('/favorites')
+        break
+      case 'history':
+        navigate('/history')
+        break
+      case 'settings':
+        navigate('/my')
+        break
     }
   }
 
@@ -52,8 +96,8 @@ export default function Layout() {
         <div className="layout-logo">拼脱脱</div>
         <Menu
           mode="horizontal"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
+          selectedKeys={[getSelectedTab()]}
+          items={tabItems}
           className="layout-menu"
         />
         <div className="layout-user">
@@ -67,7 +111,7 @@ export default function Layout() {
                 data-testid="user-dropdown"
               >
                 <Avatar icon={<UserOutlined />} />
-                <span>{user.name || user.email}</span>
+                <span className="user-name">{user.name || user.email}</span>
               </Space>
             </Dropdown>
           ) : (

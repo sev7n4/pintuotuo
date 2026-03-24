@@ -1,0 +1,160 @@
+.myPage {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.userCard {
+  margin-bottom: 16px;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.avatar {
+  background: linear-gradient(135deg, #1890ff 0%, #722ed1 100%);
+}
+
+.userDetail {
+  flex: 1;
+}
+
+.userName {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.userEmail {
+  color: #666;
+  font-size: 14px;
+}
+
+.levelSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.levelIcon {
+  color: #faad14;
+  font-size: 16px;
+}
+
+.levelName {
+  color: #666;
+  font-size: 14px;
+}
+
+.levelBadge {
+  background: linear-gradient(135deg, #faad14 0%, #fa8c16 100%);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.menuCard {
+  margin-bottom: 16px;
+}
+
+.menuItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.menuItem:hover {
+  background: #f5f5f5;
+}
+
+.menuIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.menuTitle {
+  font-size: 14px;
+  color: #333;
+}
+
+.settingCard {
+  margin-bottom: 16px;
+}
+
+.settingItem {
+  cursor: pointer;
+  padding: 12px 0 !important;
+}
+
+.settingItem:hover {
+  background: #fafafa;
+}
+
+.settingLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settingIcon {
+  font-size: 18px;
+  color: #1890ff;
+}
+
+.settingArrow {
+  color: #999;
+}
+
+.loginCard {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.loginPrompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.loginIcon {
+  font-size: 48px;
+  color: #1890ff;
+}
+
+@media (max-width: 768px) {
+  .userInfo {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .userDetail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .menuItem {
+    padding: 12px;
+  }
+
+  .menuIcon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+}
