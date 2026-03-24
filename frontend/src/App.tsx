@@ -21,6 +21,10 @@ import ReferralPage from '@pages/ReferralPage'
 import MyToken from '@pages/MyToken'
 import Profile from '@pages/Profile'
 import Consumption from '@pages/Consumption'
+import HelpCenterPage from '@pages/HelpCenterPage'
+import AboutPage from '@pages/AboutPage'
+import UserAgreementPage from '@pages/UserAgreementPage'
+import PrivacyPolicyPage from '@pages/PrivacyPolicyPage'
 
 // Merchant Pages
 import MerchantDashboard from '@pages/merchant/MerchantDashboard'
@@ -80,6 +84,12 @@ function App() {
 
             {/* Profile */}
             <Route path="/profile" element={<Profile />} />
+
+            {/* Static Pages */}
+            <Route path="/help" element={<HelpCenterPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/agreement" element={<UserAgreementPage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
 
             {/* Catch all */}
             <Route path="*" element={<Navigate to="/" replace />} />
