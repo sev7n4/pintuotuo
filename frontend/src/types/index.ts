@@ -75,10 +75,11 @@ export interface Order {
   id: number
   user_id: number
   product_id: number
-  group_id: number
+  group_id: number | null
   quantity: number
   total_price: number
-  status: 'pending' | 'paid' | 'completed' | 'failed'
+  status: 'pending' | 'paid' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunding' | 'refunded'
+  group_status?: 'active' | 'completed' | 'failed'
   created_at: string
   updated_at: string
 }
