@@ -235,6 +235,13 @@ export interface MerchantStats {
   month_sales: number
   total_orders: number
   month_orders: number
+  group_success_rate?: number
+  success_groups?: number
+  pending_groups?: number
+  failed_groups?: number
+  week_sales?: number
+  week_growth?: number
+  new_customers?: number
 }
 
 export interface MerchantSettlement {

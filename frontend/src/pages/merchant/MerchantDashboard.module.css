@@ -8,25 +8,164 @@
   font-weight: 600;
 }
 
+.statCard {
+  height: 100%;
+}
+
+.groupRateContent {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.groupRateCircle {
+  flex-shrink: 0;
+}
+
+.groupRateStats {
+  flex: 1;
+}
+
+.groupRateItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.groupRateItem:last-child {
+  border-bottom: none;
+}
+
+.groupRateLabel {
+  color: #666;
+}
+
+.groupRateValue {
+  font-weight: 600;
+  color: #333;
+}
+
+.hotProductItem {
+  padding: 8px 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hotProductRank {
+  flex-shrink: 0;
+  width: 24px;
+}
+
+.rankNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+  color: #666;
+}
+
+.hotProductInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.hotProductName {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hotProductMeta {
+  font-size: 12px;
+  color: #666;
+  display: flex;
+  gap: 12px;
+}
+
+.hotProductTrend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.weeklyStats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.weeklyStat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.weeklyLabel {
+  color: #666;
+}
+
+.weeklyValue {
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .chartCard {
   margin-top: 24px;
 }
 
-.chartPlaceholder {
+.chartContainer {
+  padding: 16px 0;
+}
+
+.chartBars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
   height: 200px;
+  gap: 16px;
+}
+
+.chartBarWrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: #fafafa;
-  border-radius: 8px;
-  color: #999;
+  flex: 1;
+  height: 100%;
 }
 
-.hint {
+.chartBar {
+  width: 100%;
+  max-width: 60px;
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8px;
+  transition: all 0.3s;
+  position: relative;
+}
+
+.chartBar:hover {
+  opacity: 0.8;
+}
+
+.chartValue {
   font-size: 12px;
-  color: #bbb;
+  color: #fff;
+  font-weight: 500;
+}
+
+.chartLabel {
   margin-top: 8px;
+  font-size: 12px;
+  color: #666;
 }
 
 .orderCard {
@@ -36,5 +175,19 @@
 @media (max-width: 768px) {
   .pageTitle {
     font-size: 18px;
+  }
+
+  .groupRateContent {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .chartBars {
+    height: 150px;
+    gap: 8px;
+  }
+
+  .chartValue {
+    font-size: 10px;
   }
 }

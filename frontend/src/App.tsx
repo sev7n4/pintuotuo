@@ -25,6 +25,8 @@ import HelpCenterPage from '@pages/HelpCenterPage'
 import AboutPage from '@pages/AboutPage'
 import UserAgreementPage from '@pages/UserAgreementPage'
 import PrivacyPolicyPage from '@pages/PrivacyPolicyPage'
+import MyPage from '@pages/MyPage'
+import CategoryPage from '@pages/CategoryPage'
 
 // Merchant Pages
 import MerchantDashboard from '@pages/merchant/MerchantDashboard'
@@ -61,6 +63,9 @@ function App() {
             <Route path="/products" element={<ProductListPage />} />
             <Route path="/products/:id" element={<ProductDetailPage />} />
 
+            {/* Categories */}
+            <Route path="/categories" element={<CategoryPage />} />
+
             {/* Shopping */}
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
@@ -84,6 +89,9 @@ function App() {
 
             {/* Profile */}
             <Route path="/profile" element={<Profile />} />
+
+            {/* My Page */}
+            <Route path="/my" element={<MyPage />} />
 
             {/* Static Pages */}
             <Route path="/help" element={<HelpCenterPage />} />

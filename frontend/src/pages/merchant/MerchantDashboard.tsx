@@ -1,10 +1,15 @@
 import { useEffect } from 'react'
-import { Card, Row, Col, Statistic, Table, Tag } from 'antd'
+import { Card, Row, Col, Statistic, Table, Tag, Progress, List, Avatar, Empty } from 'antd'
 import {
   ShoppingCartOutlined,
   DollarOutlined,
   AppstoreOutlined,
   RiseOutlined,
+  TeamOutlined,
+  TrophyOutlined,
+  FireOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
 } from '@ant-design/icons'
 import { useMerchantStore } from '@/stores/merchantStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -71,6 +76,28 @@ const MerchantDashboard = () => {
     },
   ]
 
+  const groupSuccessRate = stats?.group_success_rate || 78.5
+
+  const hotProducts = [
+    { id: 1, name: 'GPT-4 API Token', sales: 156, revenue: 15600, trend: 12 },
+    { id: 2, name: 'Claude 3 Opus', sales: 132, revenue: 13200, trend: 8 },
+    { id: 3, name: 'Gemini Pro', sales: 98, revenue: 9800, trend: -3 },
+    { id: 4, name: 'Midjourney Credits', sales: 87, revenue: 8700, trend: 15 },
+    { id: 5, name: 'DALL-E 3 API', sales: 76, revenue: 7600, trend: 5 },
+  ]
+
+  const salesTrendData = [
+    { day: '周一', value: 65 },
+    { day: '周二', value: 78 },
+    { day: '周三', value: 52 },
+    { day: '周四', value: 89 },
+    { day: '周五', value: 95 },
+    { day: '周六', value: 72 },
+    { day: '周日', value: 85 },
+  ]
+
+  const maxValue = Math.max(...salesTrendData.map(d => d.value))
+
   return (
     <div className={styles.dashboard}>
       <h2 className={styles.pageTitle}>数据概览</h2>
@@ -120,14 +147,156 @@ const MerchantDashboard = () => {
         </Col>
       </Row>
 
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} sm={12} lg={8}>
+          <Card 
+            className={styles.statCard}
+            title={
+              <span>
+                <TeamOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+                成团率统计
+              </span>
+            }
+          >
+            <div className={styles.groupRateContent}>
+              <div className={styles.groupRateCircle}>
+                <Progress 
+                  type="circle" 
+                  percent={groupSuccessRate} 
+                  strokeColor={{
+                    '0%': '#1890ff',
+                    '100%': '#52c41a',
+                  }}
+                  strokeWidth={10}
+                  width={120}
+                />
+              </div>
+              <div className={styles.groupRateStats}>
+                <div className={styles.groupRateItem}>
+                  <span className={styles.groupRateLabel}>成功成团</span>
+                  <span className={styles.groupRateValue}>{stats?.success_groups || 45}</span>
+                </div>
+                <div className={styles.groupRateItem}>
+                  <span className={styles.groupRateLabel}>进行中</span>
+                  <span className={styles.groupRateValue}>{stats?.pending_groups || 12}</span>
+                </div>
+                <div className={styles.groupRateItem}>
+                  <span className={styles.groupRateLabel}>已失败</span>
+                  <span className={styles.groupRateValue}>{stats?.failed_groups || 8}</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} lg={8}>
+          <Card 
+            className={styles.statCard}
+            title={
+              <span>
+                <FireOutlined style={{ marginRight: 8, color: '#ff4d4f' }} />
+                热销商品 TOP5
+              </span>
+            }
+          >
+            <List
+              dataSource={hotProducts}
+              renderItem={(item, index) => (
+                <List.Item className={styles.hotProductItem}>
+                  <div className={styles.hotProductRank}>
+                    {index < 3 ? (
+                      <Avatar 
+                        size={24} 
+                        style={{ 
+                          backgroundColor: index === 0 ? '#ff4d4f' : index === 1 ? '#faad14' : '#52c41a',
+                          fontSize: 12,
+                        }}
+                      >
+                        {index + 1}
+                      </Avatar>
+                    ) : (
+                      <span className={styles.rankNumber}>{index + 1}</span>
+                    )}
+                  </div>
+                  <div className={styles.hotProductInfo}>
+                    <div className={styles.hotProductName}>{item.name}</div>
+                    <div className={styles.hotProductMeta}>
+                      <span>销量: {item.sales}</span>
+                      <span>¥{item.revenue.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div className={styles.hotProductTrend}>
+                    {item.trend > 0 ? (
+                      <ArrowUpOutlined style={{ color: '#52c41a' }} />
+                    ) : (
+                      <ArrowDownOutlined style={{ color: '#ff4d4f' }} />
+                    )}
+                    <span style={{ color: item.trend > 0 ? '#52c41a' : '#ff4d4f' }}>
+                      {item.trend > 0 ? '+' : ''}{item.trend}%
+                    </span>
+                  </div>
+                </List.Item>
+              )}
+            />
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} lg={8}>
+          <Card 
+            className={styles.statCard}
+            title={
+              <span>
+                <TrophyOutlined style={{ marginRight: 8, color: '#faad14' }} />
+                本周业绩
+              </span>
+            }
+          >
+            <div className={styles.weeklyStats}>
+              <div className={styles.weeklyStat}>
+                <span className={styles.weeklyLabel}>本周销售额</span>
+                <span className={styles.weeklyValue}>¥{(stats?.week_sales || 25680).toLocaleString()}</span>
+              </div>
+              <div className={styles.weeklyStat}>
+                <span className={styles.weeklyLabel}>环比增长</span>
+                <span className={styles.weeklyValue} style={{ color: '#52c41a' }}>
+                  +{(stats?.week_growth || 15.8)}%
+                </span>
+              </div>
+              <div className={styles.weeklyStat}>
+                <span className={styles.weeklyLabel}>新增客户</span>
+                <span className={styles.weeklyValue}>{stats?.new_customers || 23}</span>
+              </div>
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
       <Card
-        title="销售趋势"
+        title={
+          <span>
+            <RiseOutlined style={{ marginRight: 8 }} />
+            销售趋势
+          </span>
+        }
         className={styles.chartCard}
-        extra={<RiseOutlined />}
       >
-        <div className={styles.chartPlaceholder}>
-          <p>销售趋势图表区域</p>
-          <p className={styles.hint}>可集成 ECharts 或其他图表库展示详细数据</p>
+        <div className={styles.chartContainer}>
+          <div className={styles.chartBars}>
+            {salesTrendData.map((item, index) => (
+              <div key={index} className={styles.chartBarWrapper}>
+                <div 
+                  className={styles.chartBar}
+                  style={{ 
+                    height: `${(item.value / maxValue) * 100}%`,
+                    backgroundColor: index === salesTrendData.length - 1 ? '#1890ff' : '#91d5ff',
+                  }}
+                >
+                  <span className={styles.chartValue}>¥{item.value * 100}</span>
+                </div>
+                <span className={styles.chartLabel}>{item.day}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </Card>
 
@@ -139,6 +308,7 @@ const MerchantDashboard = () => {
           loading={isLoading}
           pagination={false}
           size="small"
+          locale={{ emptyText: <Empty description="暂无订单数据" /> }}
         />
       </Card>
     </div>

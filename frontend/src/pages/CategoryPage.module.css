@@ -1,0 +1,146 @@
+.categoryPage {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.searchInput {
+  max-width: 400px;
+}
+
+.categoryGrid {
+  margin-bottom: 24px;
+}
+
+.categoryCard {
+  text-align: center;
+  border-radius: 12px;
+  transition: all 0.3s;
+  border: 2px solid transparent;
+}
+
+.categoryCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.categoryCardActive {
+  border-color: #1890ff;
+  background: #e6f7ff;
+}
+
+.categoryContent {
+  padding: 8px 0;
+}
+
+.categoryIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin: 0 auto 12px;
+}
+
+.categoryName {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.categoryDesc {
+  font-size: 12px;
+  color: #666;
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.productSection {
+  margin-top: 24px;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.productCard {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.productImage {
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  overflow: hidden;
+}
+
+.productImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.productPlaceholder {
+  font-size: 48px;
+  color: #ccc;
+}
+
+.productInfo {
+  padding: 12px;
+}
+
+.productName {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.productPrice {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ff4d4f;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 20px;
+  }
+
+  .searchInput {
+    max-width: 100%;
+  }
+
+  .categoryIcon {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+
+  .categoryName {
+    font-size: 14px;
+  }
+
+  .categoryDesc {
+    display: none;
+  }
+}
