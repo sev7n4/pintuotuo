@@ -15,7 +15,7 @@ test.describe('Orders', () => {
     await page.waitForURL(/.*products/, { timeout: 15000 });
     
     await page.goto('/orders');
-    await expect(page.getByRole('heading', { name: '订单列表' }).or(page.locator('h1:has-text("订单")'))).toBeVisible();
+    await expect(page.getByRole('heading', { name: '我的订单' }).or(page.locator('h1:has-text("订单")'))).toBeVisible();
   });
 
   test('should show empty state when no orders', async ({ page }) => {
