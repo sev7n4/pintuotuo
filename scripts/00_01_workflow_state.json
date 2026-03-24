@@ -4,26 +4,21 @@
   "retry_count": 0,
   "pr_number": null,
   "merged": false,
-  "issue_id": "ISSUE-PAGE-002",
+  "issue_id": "ISSUE-PAGE-003",
   "issue_type": "enhancement",
-  "issue_title": "商品详情页优化",
-  "branch_name": "feature/issue-PAGE-002-product-detail-optimize",
+  "issue_title": "首页优化",
+  "branch_name": "feature/issue-PAGE-003-homepage-optimize",
   "analysis": {
-    "problem_location": "frontend/src/pages/ProductDetailPage.tsx",
-    "impact_scope": "商品详情页用户体验、转化率",
+    "problem_location": "frontend/src/pages/HomePage.tsx",
+    "impact_scope": "首页用户体验、转化率",
     "missing_features": [
-      "定价对比展示（单独买 vs 拼团买）",
-      "拼团规则展示（2人团/5人团价格）",
-      "节省金额计算",
-      "用户评价展示",
-      "商品详情和FAQ",
-      "拼团购买按钮",
-      "商品详细信息（Token数量、模型、有效期等）"
+      "限时秒杀入口（分类导航中缺少）",
+      "个性化推荐（第二屏以下）"
     ],
     "files_to_modify": [
-      "frontend/src/pages/ProductDetailPage.tsx (优化)",
-      "frontend/src/pages/__tests__/ProductDetailPage.test.tsx (更新测试)",
-      "frontend/src/types/index.ts (扩展Product类型)"
+      "frontend/src/pages/HomePage.tsx (优化)",
+      "frontend/src/pages/HomePage.module.css (样式优化)",
+      "frontend/src/pages/__tests__/HomePage.test.tsx (更新测试)"
     ]
   },
   "ci_status": {

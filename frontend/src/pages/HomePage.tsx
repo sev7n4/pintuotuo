@@ -1,13 +1,28 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Carousel, Card, Row, Col, Spin, Tag, Input, Typography, Space } from 'antd'
-import { FireOutlined, ClockCircleOutlined, SearchOutlined, RightOutlined } from '@ant-design/icons'
+import { FireOutlined, ClockCircleOutlined, SearchOutlined, RightOutlined, ThunderboltOutlined, GiftOutlined, StarOutlined } from '@ant-design/icons'
 import { useHomeStore } from '@/stores/homeStore'
 import { Product } from '@/types'
 import styles from './HomePage.module.css'
 
 const { Title, Text } = Typography
 const { Search } = Input
+
+interface QuickNav {
+  key: string
+  name: string
+  icon: React.ReactNode
+  color: string
+  link: string
+}
+
+const quickNavItems: QuickNav[] = [
+  { key: 'hot', name: '热销爆款', icon: <FireOutlined />, color: '#ff4d4f', link: '/products?sort=hot' },
+  { key: 'group', name: '超值拼团', icon: <GiftOutlined />, color: '#52c41a', link: '/groups' },
+  { key: 'flash', name: '限时秒杀', icon: <ThunderboltOutlined />, color: '#faad14', link: '/products?flash=true' },
+  { key: 'new', name: '新品上架', icon: <ClockCircleOutlined />, color: '#1890ff', link: '/products?sort=new' },
+]
 
 const HomePage = () => {
   const navigate = useNavigate()
@@ -21,9 +36,18 @@ const HomePage = () => {
     fetchHomeData 
   } = useHomeStore()
 
+  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([])
+
   useEffect(() => {
     fetchHomeData()
   }, [fetchHomeData])
+
+  useEffect(() => {
+    if (hotProducts.length > 0 && newProducts.length > 0) {
+      const mixed = [...hotProducts.slice(0, 2), ...newProducts.slice(0, 2)]
+      setRecommendedProducts(mixed)
+    }
+  }, [hotProducts, newProducts])
 
   const handleSearch = (value: string) => {
     if (value.trim()) {
@@ -39,11 +63,15 @@ const HomePage = () => {
     navigate(`/products?category=${encodeURIComponent(category)}`)
   }
 
+  const handleQuickNavClick = (link: string) => {
+    navigate(link)
+  }
+
   const formatPrice = (price: number) => {
     return `¥${price.toFixed(2)}`
   }
 
-  const renderProductCard = (product: Product) => {
+  const renderProductCard = (product: Product, showGroupTag = false) => {
     const discount = product.original_price && product.original_price > product.price
       ? Math.round((1 - product.price / product.original_price) * 100)
       : 0
@@ -60,6 +88,11 @@ const HomePage = () => {
             {discount > 0 && (
               <Tag color="#ff4d4f" className={styles.discountTag}>
                 -{discount}%
+              </Tag>
+            )}
+            {showGroupTag && (
+              <Tag color="#52c41a" className={styles.groupTag}>
+                拼团
               </Tag>
             )}
           </div>
@@ -95,7 +128,8 @@ const HomePage = () => {
     title: string, 
     icon: React.ReactNode, 
     products: Product[],
-    viewAllLink?: string
+    viewAllLink?: string,
+    showGroupTag = false
   ) => (
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
@@ -116,7 +150,7 @@ const HomePage = () => {
       <Row gutter={[16, 16]}>
         {products.map((product) => (
           <Col xs={12} sm={8} md={6} lg={4} key={product.id}>
-            {renderProductCard(product)}
+            {renderProductCard(product, showGroupTag)}
           </Col>
         ))}
       </Row>
@@ -135,13 +169,31 @@ const HomePage = () => {
     <div className={styles.container}>
       <div className={styles.searchSection}>
         <Search
-          placeholder="搜索商品"
+          placeholder="搜索模型或关键词"
           allowClear
           enterButton={<SearchOutlined />}
           size="large"
           onSearch={handleSearch}
           className={styles.searchInput}
         />
+      </div>
+
+      <div className={styles.quickNavSection}>
+        <Row gutter={[12, 12]}>
+          {quickNavItems.map((item) => (
+            <Col span={6} key={item.key}>
+              <div 
+                className={styles.quickNavItem}
+                onClick={() => handleQuickNavClick(item.link)}
+              >
+                <div className={styles.quickNavIcon} style={{ background: item.color }}>
+                  {item.icon}
+                </div>
+                <Text className={styles.quickNavName}>{item.name}</Text>
+              </div>
+            </Col>
+          ))}
+        </Row>
       </div>
 
       {banners.length > 0 && (
@@ -161,6 +213,9 @@ const HomePage = () => {
 
       {categories.length > 0 && (
         <div className={styles.categorySection}>
+          <div className={styles.categoryHeader}>
+            <Title level={5} className={styles.categoryTitle}>商品分类</Title>
+          </div>
           <Row gutter={[12, 12]}>
             {categories.slice(0, 8).map((category) => (
               <Col span={6} key={category.name}>
@@ -188,10 +243,36 @@ const HomePage = () => {
         )}
 
         {renderSection(
+          '超值拼团',
+          <GiftOutlined style={{ color: '#52c41a' }} />,
+          hotProducts.slice(0, 4),
+          '/groups',
+          true
+        )}
+
+        {renderSection(
           '新品上架',
           <ClockCircleOutlined style={{ color: '#1890ff' }} />,
           newProducts,
           '/products?sort=new'
+        )}
+
+        {recommendedProducts.length > 0 && (
+          <div className={styles.recommendedSection}>
+            <div className={styles.sectionHeader}>
+              <Space>
+                <StarOutlined style={{ color: '#faad14' }} />
+                <Title level={4} className={styles.sectionTitle}>猜你喜欢</Title>
+              </Space>
+            </div>
+            <Row gutter={[16, 16]}>
+              {recommendedProducts.map((product) => (
+                <Col xs={12} sm={8} md={6} lg={4} key={`rec-${product.id}`}>
+                  {renderProductCard(product)}
+                </Col>
+              ))}
+            </Row>
+          </div>
         )}
       </Spin>
     </div>
