@@ -33,21 +33,11 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.TENCENT_CLOUD_SSH_KEY }}
 
-      - name: Add server and GitHub to known hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.TENCENT_CLOUD_IP }} >> ~/.ssh/known_hosts 2>/dev/null
-          ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
-          chmod 644 ~/.ssh/known_hosts
-
       - name: Deploy to Tencent Cloud
         run: |
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} "
-            mkdir -p ~/.ssh && \
-            ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null && \
-            chmod 644 ~/.ssh/known_hosts && \
             cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }} && \
-            git remote set-url origin git@github.com:sev7n4/pintuotuo.git && \
+            git remote set-url origin https://github.com/sev7n4/pintuotuo.git && \
             git fetch origin main --depth=1 && \
             git reset --hard origin/main && \
             docker-compose -f docker-compose.prod.yml build --no-cache frontend backend && \

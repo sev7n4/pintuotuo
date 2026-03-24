@@ -17,6 +17,7 @@ import {
 import { SearchOutlined, PlusOutlined, FilterOutlined, SortAscendingOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useProductStore } from '@stores/productStore'
+import { useAuthStore } from '@stores/authStore'
 import type { Product } from '@/types'
 
 const { Option } = Select
@@ -43,6 +44,7 @@ export const ProductListPage: React.FC = () => {
     setFilters,
     searchProducts,
   } = useProductStore()
+  const { user } = useAuthStore()
 
   const [sortField, setSortField] = useState<SortField>('created_at')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
@@ -265,9 +267,11 @@ export const ProductListPage: React.FC = () => {
                 排序
               </Button>
             </Dropdown>
-            <Button type="primary" icon={<PlusOutlined />}>
-              发布产品
-            </Button>
+            {user?.role === 'merchant' && (
+              <Button type="primary" icon={<PlusOutlined />}>
+                发布产品
+              </Button>
+            )}
           </Space>
         </Col>
       </Row>

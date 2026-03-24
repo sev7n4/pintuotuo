@@ -2,9 +2,15 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import ProductListPage from '../ProductListPage'
 import { useProductStore } from '@/stores/productStore'
+import { useAuthStore } from '@/stores/authStore'
 
 // 模拟 useProductStore
 jest.mock('@/stores/productStore')
+
+// 模拟 useAuthStore
+jest.mock('@/stores/authStore')
+
+const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>
 
 // 模拟 useNavigate
 jest.mock('react-router-dom', () => ({
