@@ -22,7 +22,7 @@ import {
   TrophyOutlined,
 } from '@ant-design/icons'
 import { useMerchantStore } from '@/stores/merchantStore'
-import styles from './merchant/Merchant.module.css'
+import styles from './Merchant.module.css'
 
 const { Title, Text } = Typography
 
