@@ -11,8 +11,9 @@ import {
   LogoutOutlined,
   DashboardOutlined,
   KeyOutlined,
-  TeamOutlined,
   GiftOutlined,
+  FileTextOutlined,
+  TeamOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import styles from './MerchantLayout.module.css'
@@ -39,6 +40,16 @@ const menuItems = [
     key: '/merchant/settlements',
     icon: <WalletOutlined />,
     label: '结算管理',
+  },
+  {
+    key: '/merchant/bills',
+    icon: <FileTextOutlined />,
+    label: '月度账单',
+  },
+  {
+    key: '/merchant/invoices',
+    icon: <FileTextOutlined />,
+    label: '发票管理',
   },
   {
     key: '/merchant/analytics',
