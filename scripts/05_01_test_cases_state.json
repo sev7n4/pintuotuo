@@ -1,0 +1,79 @@
+{
+  "currentIssue": {
+    "id": "ISSUE-PAGE-001",
+    "type": "feature",
+    "title": "新建拼团进度页",
+    "branch": "feature/issue-PAGE-001-group-progress-page"
+  },
+  "testCases": {
+    "UT-GP-001": {
+      "id": "UT-GP-001",
+      "name": "renders group progress page with loading state",
+      "feature": "GroupProgressPage",
+      "status": "draft",
+      "designedAt": "2026-03-24T12:00:00Z",
+      "testedAt": null,
+      "file": "frontend/src/pages/__tests__/GroupProgressPage.test.tsx"
+    },
+    "UT-GP-002": {
+      "id": "UT-GP-002",
+      "name": "displays group info when loaded",
+      "feature": "GroupProgressPage",
+      "status": "draft",
+      "designedAt": "2026-03-24T12:00:00Z",
+      "testedAt": null,
+      "file": "frontend/src/pages/__tests__/GroupProgressPage.test.tsx"
+    },
+    "UT-GP-003": {
+      "id": "UT-GP-003",
+      "name": "displays member list correctly",
+      "feature": "GroupProgressPage",
+      "status": "draft",
+      "designedAt": "2026-03-24T12:00:00Z",
+      "testedAt": null,
+      "file": "frontend/src/pages/__tests__/GroupProgressPage.test.tsx"
+    },
+    "UT-GP-004": {
+      "id": "UT-GP-004",
+      "name": "displays countdown timer",
+      "feature": "GroupProgressPage",
+      "status": "draft",
+      "designedAt": "2026-03-24T12:00:00Z",
+      "testedAt": null,
+      "file": "frontend/src/pages/__tests__/GroupProgressPage.test.tsx"
+    },
+    "UT-GP-005": {
+      "id": "UT-GP-005",
+      "name": "handles share invite action",
+      "feature": "GroupProgressPage",
+      "status": "draft",
+      "designedAt": "2026-03-24T12:00:00Z",
+      "testedAt": null,
+      "file": "frontend/src/pages/__tests__/GroupProgressPage.test.tsx"
+    },
+    "UT-GP-006": {
+      "id": "UT-GP-006",
+      "name": "handles cancel group action",
+      "feature": "GroupProgressPage",
+      "status": "draft",
+      "designedAt": "2026-03-24T12:00:00Z",
+      "testedAt": null,
+      "file": "frontend/src/pages/__tests__/GroupProgressPage.test.tsx"
+    },
+    "UT-GP-007": {
+      "id": "UT-GP-007",
+      "name": "displays group status correctly",
+      "feature": "GroupProgressPage",
+      "status": "draft",
+      "designedAt": "2026-03-24T12:00:00Z",
+      "testedAt": null,
+      "file": "frontend/src/pages/__tests__/GroupProgressPage.test.tsx"
+    }
+  },
+  "statistics": {
+    "total": 7,
+    "passed": 0,
+    "failed": 0,
+    "pending": 7
+  }
+}
