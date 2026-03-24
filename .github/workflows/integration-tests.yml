@@ -70,6 +70,14 @@ jobs:
             psql "$DATABASE_URL" -f "$f" || echo "Migration $f completed with warnings"
           done
 
+      - name: Seed test data
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
+        run: |
+          echo "Seeding test data..."
+          psql "$DATABASE_URL" -f ../scripts/db/seed_test_data.sql || echo "Seed completed with warnings"
+
       - name: Run integration tests
         working-directory: ./backend
         env:
