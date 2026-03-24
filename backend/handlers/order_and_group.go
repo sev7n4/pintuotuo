@@ -179,7 +179,7 @@ func ListOrders(c *gin.Context) {
 	var orders []models.Order
 	for rows.Next() {
 		var o models.Order
-		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return

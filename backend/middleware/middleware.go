@@ -117,11 +117,11 @@ func AuthMiddleware() gin.HandlerFunc {
 			}
 			userID := int(userIDFloat)
 			c.Set("user_id", userID)
-			
+
 			if email, ok := claims["email"].(string); ok {
 				c.Set("email", email)
 			}
-			
+
 			c.Next()
 		} else {
 			c.JSON(401, gin.H{"error": "invalid token"})

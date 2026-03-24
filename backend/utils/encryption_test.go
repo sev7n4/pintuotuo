@@ -17,12 +17,12 @@ func TestInitEncryption(t *testing.T) {
 func TestEncryptDecrypt(t *testing.T) {
 	// 测试加密和解密功能
 	testPlaintext := "test plaintext for encryption"
-	
+
 	// 加密
 	ciphertext, err := Encrypt(testPlaintext)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, ciphertext)
-	
+
 	// 解密
 	decryptedText, err := Decrypt(ciphertext)
 	assert.NoError(t, err)
@@ -37,13 +37,13 @@ func TestEncryptDecryptMultiple(t *testing.T) {
 		"this is a longer test string for encryption",
 		"string with special characters: !@#$%^&*()",
 	}
-	
+
 	for _, testCase := range testCases {
 		// 加密
 		ciphertext, err := Encrypt(testCase)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, ciphertext)
-		
+
 		// 解密
 		decryptedText, err := Decrypt(ciphertext)
 		assert.NoError(t, err)
