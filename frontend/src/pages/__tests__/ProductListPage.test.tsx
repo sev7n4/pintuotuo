@@ -109,9 +109,24 @@ describe('ProductListPage Component', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockUseNavigate.mockReturnValue(mockNavigate)
+    // 默认模拟普通用户
+    mockUseAuthStore.mockReturnValue({
+      user: { id: 1, email: 'user@example.com', name: 'Test User', role: 'user' },
+      token: 'test-token',
+      isLoading: false,
+      error: null,
+      isAuthenticated: true,
+      login: jest.fn(),
+      register: jest.fn(),
+      logout: jest.fn(),
+      fetchUser: jest.fn(),
+      setUser: jest.fn(),
+      clearError: jest.fn(),
+      setRememberMe: jest.fn(),
+    })
   })
 
-  test('renders ProductListPage with search input and button', async () => {
+  test('renders ProductListPage with search input for regular user', async () => {
     const mockProducts = [
       {
         id: 1,
@@ -147,7 +162,64 @@ describe('ProductListPage Component', () => {
       )
     })
 
-    // 检查页面元素
+    // 检查页面元素 - 普通用户不应该看到发布产品按钮
+    expect(screen.getByPlaceholderText('搜索产品...')).toBeInTheDocument()
+    expect(screen.queryByText('发布产品')).not.toBeInTheDocument()
+  })
+
+  test('renders ProductListPage with publish button for merchant user', async () => {
+    const mockProducts = [
+      {
+        id: 1,
+        name: '测试产品1',
+        description: '测试描述1',
+        price: 100,
+        stock: 50,
+        status: 'active',
+      },
+    ]
+
+    // 模拟商家用户
+    mockUseAuthStore.mockReturnValue({
+      user: { id: 2, email: 'merchant@example.com', name: 'Merchant User', role: 'merchant' },
+      token: 'merchant-token',
+      isLoading: false,
+      error: null,
+      isAuthenticated: true,
+      login: jest.fn(),
+      register: jest.fn(),
+      logout: jest.fn(),
+      fetchUser: jest.fn(),
+      setUser: jest.fn(),
+      clearError: jest.fn(),
+      setRememberMe: jest.fn(),
+    })
+
+    // 模拟 store 状态
+    mockUseProductStore.mockReturnValue({
+      products: mockProducts,
+      total: 1,
+      filters: { page: 1, per_page: 10 },
+      isLoading: false,
+      error: null,
+      fetchProducts: jest.fn().mockResolvedValue(mockProducts),
+      setFilters: jest.fn(),
+      searchProducts: jest.fn().mockResolvedValue(mockProducts),
+      createProduct: jest.fn(),
+      updateProduct: jest.fn(),
+      deleteProduct: jest.fn(),
+      clearError: jest.fn(),
+    })
+
+    await act(async () => {
+      render(
+        <MemoryRouter>
+          <ProductListPage />
+        </MemoryRouter>
+      )
+    })
+
+    // 检查页面元素 - 商家用户应该看到发布产品按钮
     expect(screen.getByPlaceholderText('搜索产品...')).toBeInTheDocument()
     expect(screen.getByText('发布产品')).toBeInTheDocument()
   })

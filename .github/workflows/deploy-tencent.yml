@@ -33,6 +33,12 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.TENCENT_CLOUD_SSH_KEY }}
 
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.TENCENT_CLOUD_IP }} >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
       - name: Deploy to Tencent Cloud
         run: |
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} "
