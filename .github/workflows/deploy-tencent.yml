@@ -51,13 +51,8 @@ jobs:
       - name: Seed database and update passwords
         run: |
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
-          # Hard-coded password hashes for seed users
-           # admin@example.com / admin123456 -> d5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05
-           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = 'd5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05' WHERE email = 'admin@example.com';"
-           
-           # Seed demo and merchant users if they don't exist
-           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('demo@example.com', 'Demo User', 'ec1664a6a24a69e53526099556cc22af42137e63243d62d5771d54a9994c9912', 'user', 'active') ON CONFLICT (email) DO NOTHING;"
-           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('merchant@example.com', 'Merchant User', 'a3d9ad6cbd411e8eebb650178cdb3d23d1f86e9ac67ce12e4e35e10475153ca4', 'merchant', 'active') ON CONFLICT (email) DO NOTHING;"
+          # Seed admin user if not exists (first deployment), and update password (upgrades)
+           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('admin@example.com', 'Admin', 'd5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05', 'admin', 'active') ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;"
            
            echo "Seed user password update completed"
           EOF
