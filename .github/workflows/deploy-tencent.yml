@@ -40,12 +40,11 @@ jobs:
         run: |
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} "
             cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }} && \
-            git remote set-url origin https://github.com/sev7n4/pintuotuo.git && \
-            git fsck --full && \
-            git gc --prune=now && \
-            git fetch origin && \
+            git remote set-url origin git@github.com:sev7n4/pintuotuo.git && \
+            git fetch origin main --depth=1 && \
             git reset --hard origin/main && \
-            docker-compose -f docker-compose.prod.yml up -d --build
+            docker-compose -f docker-compose.prod.yml build --no-cache frontend backend && \
+            docker-compose -f docker-compose.prod.yml up -d frontend backend
           "
 
       - name: Seed database and update passwords
