@@ -51,32 +51,13 @@ jobs:
       - name: Seed database and update passwords
         run: |
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
-          cd /opt/pintuotuo
-          JWT_SECRET=$(docker-compose -f docker-compose.prod.yml config | grep JWT_SECRET | awk -F': ' '{print $2}')
-          
-          # Function to generate password hash
-          generate_hash() {
-            local password=$1
-            if command -v sha256sum >/dev/null 2>&1; then
-              echo -n "$password$JWT_SECRET" | sha256sum | awk "{print $1}"
-            else
-              echo -n "$password$JWT_SECRET" | shasum -a 256 | cut -d " " -f 1
-            fi
-          }
-          
-          # Update seed users only (these are the only users injected by migrations)
-          # admin@example.com
-          HASH=$(generate_hash "admin123456")
-          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = '$HASH' WHERE email = 'admin@example.com';"
-          
-          # demo@example.com
-          HASH=$(generate_hash "demo123456")
-          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = '$HASH' WHERE email = 'demo@example.com';"
-          
-          # merchant@example.com
-          HASH=$(generate_hash "merchant123456")
-          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = '$HASH' WHERE email = 'merchant@example.com';"
-          
+          # Hard-coded password hashes for seed users (computed from JWT_SECRET=pintuotuo-jwt-secret-key-2024-production-32)
+          # admin@example.com / admin123456
+          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = 'ba6e7097db156e54b0b765cc5a821b039e1a7f0b4affdc56d04a0c00316113a8' WHERE email = 'admin@example.com';"
+          # demo@example.com / demo123456  
+          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = 'e1fc705d72d78e4834c379ca508a99059f838e09fcc25e0c21a5526e7276026a' WHERE email = 'demo@example.com';"
+          # merchant@example.com / merchant123456
+          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = 'b8daa1e7dd6cc3ed421853463fdc072602b1c801dfb6b8a7db4ed3ec61ab1aaa' WHERE email = 'merchant@example.com';"
           echo "Seed user password update completed"
           EOF
 
