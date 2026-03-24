@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pintuotuo/backend/config"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/pintuotuo/backend/config"
 	"github.com/stretchr/testify/assert"
 )
 

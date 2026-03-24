@@ -333,12 +333,12 @@ func TestPaymentFlow(t *testing.T) {
 				return
 			}
 			c.JSON(http.StatusCreated, gin.H{
-				"id":           1,
-				"order_id":     req.OrderID,
-				"method":       req.Method,
-				"status":       "pending",
-				"payment_url":  "https://payment.example.com/pay/123",
-				"amount":       99.99,
+				"id":          1,
+				"order_id":    req.OrderID,
+				"method":      req.Method,
+				"status":      "pending",
+				"payment_url": "https://payment.example.com/pay/123",
+				"amount":      99.99,
 			})
 		})
 
@@ -366,10 +366,10 @@ func TestPaymentFlow(t *testing.T) {
 		router.GET("/payments/:id", func(c *gin.Context) {
 			paymentID := c.Param("id")
 			c.JSON(http.StatusOK, gin.H{
-				"id":          paymentID,
-				"status":      PaymentStatusSuccess,
-				"amount":      99.99,
-				"paid_at":     "2024-01-01T00:00:00Z",
+				"id":      paymentID,
+				"status":  PaymentStatusSuccess,
+				"amount":  99.99,
+				"paid_at": "2024-01-01T00:00:00Z",
 			})
 		})
 
@@ -389,9 +389,9 @@ func TestPaymentFlow(t *testing.T) {
 		router.POST("/payments/:id/refund", func(c *gin.Context) {
 			paymentID := c.Param("id")
 			c.JSON(http.StatusOK, gin.H{
-				"id":          paymentID,
-				"status":      "refunded",
-				"refund_id":   "refund-123",
+				"id":        paymentID,
+				"status":    "refunded",
+				"refund_id": "refund-123",
 			})
 		})
 
@@ -414,19 +414,19 @@ func TestGroupPurchaseFlow(t *testing.T) {
 	t.Run("Create group purchase", func(t *testing.T) {
 		router.POST("/groups", func(c *gin.Context) {
 			var req struct {
-				ProductID   int    `json:"product_id" binding:"required"`
-				TargetCount int    `json:"target_count" binding:"required,gt=1"`
+				ProductID   int `json:"product_id" binding:"required"`
+				TargetCount int `json:"target_count" binding:"required,gt=1"`
 			}
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 				return
 			}
 			c.JSON(http.StatusCreated, gin.H{
-				"id":           1,
-				"product_id":   req.ProductID,
-				"target_count": req.TargetCount,
+				"id":            1,
+				"product_id":    req.ProductID,
+				"target_count":  req.TargetCount,
 				"current_count": 1,
-				"status":       "active",
+				"status":        "active",
 			})
 		})
 
@@ -575,9 +575,9 @@ func TestTokenManagement(t *testing.T) {
 				return
 			}
 			c.JSON(http.StatusOK, gin.H{
-				"message":       "Transfer successful",
-				"amount":        req.Amount,
-				"recipient_id":  req.RecipientID,
+				"message":      "Transfer successful",
+				"amount":       req.Amount,
+				"recipient_id": req.RecipientID,
 			})
 		})
 
