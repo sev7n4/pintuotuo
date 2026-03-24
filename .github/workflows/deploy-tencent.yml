@@ -52,12 +52,12 @@ jobs:
         run: |
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
           # Hard-coded password hashes for seed users (computed from JWT_SECRET=pintuotuo-jwt-secret-key-2024-production-32)
-          # admin@example.com / admin123456
-          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = 'ba6e7097db156e54b0b765cc5a821b039e1a7f0b4affdc56d04a0c00316113a8' WHERE email = 'admin@example.com';"
-          # demo@example.com / demo123456  
-          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = 'e1fc705d72d78e4834c379ca508a99059f838e09fcc25e0c21a5526e7276026a' WHERE email = 'demo@example.com';"
-          # merchant@example.com / merchant123456
-          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = 'b8daa1e7dd6cc3ed421853463fdc072602b1c801dfb6b8a7db4ed3ec61ab1aaa' WHERE email = 'merchant@example.com';"
+           # admin@example.com / admin123456 -> d5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05
+           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = 'd5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05' WHERE email = 'admin@example.com';"
+           # demo@example.com / demo123456 -> ec1664a6a24a69e53526099556cc22af42137e63243d62d5771d54a9994c9912
+           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = 'ec1664a6a24a69e53526099556cc22af42137e63243d62d5771d54a9994c9912' WHERE email = 'demo@example.com';"
+           # merchant@example.com / merchant123456 -> a3d9ad6cbd411e8eebb650178cdb3d23d1f86e9ac67ce12e4e35e10475153ca4
+           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "UPDATE users SET password_hash = 'a3d9ad6cbd411e8eebb650178cdb3d23d1f86e9ac67ce12e4e35e10475153ca4' WHERE email = 'merchant@example.com';"
           echo "Seed user password update completed"
           EOF
 
