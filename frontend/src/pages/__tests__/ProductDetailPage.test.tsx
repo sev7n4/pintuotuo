@@ -1,6 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter, useParams } from 'react-router-dom'
-import { message } from 'antd'
 import ProductDetailPage from '../ProductDetailPage'
 import { useProductStore } from '@/stores/productStore'
 import { useCartStore } from '@/stores/cartStore'
