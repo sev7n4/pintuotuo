@@ -11,6 +11,8 @@ import {
   LogoutOutlined,
   DashboardOutlined,
   KeyOutlined,
+  TeamOutlined,
+  GiftOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import styles from './MerchantLayout.module.css'
@@ -37,6 +39,16 @@ const menuItems = [
     key: '/merchant/settlements',
     icon: <WalletOutlined />,
     label: '结算管理',
+  },
+  {
+    key: '/merchant/analytics',
+    icon: <TeamOutlined />,
+    label: '用户分析',
+  },
+  {
+    key: '/merchant/marketing',
+    icon: <GiftOutlined />,
+    label: '营销工具',
   },
   {
     key: '/merchant/api-keys',

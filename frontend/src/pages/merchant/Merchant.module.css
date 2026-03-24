@@ -1,0 +1,53 @@
+.container {
+  padding: 24px;
+  min-height: 100%;
+  background: #f0f2f5;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.statsCard {
+  margin-bottom: 24px;
+}
+
+.chartCard {
+  height: 400px;
+}
+
+.tableCard {
+  margin-top: 24px;
+}
+
+.actionBar {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filterBar {
+  margin-bottom: 16px;
+}
+
+.searchInput {
+  width: 200px;
+}
+
+.statusTag {
+  min-width: 60px;
+  text-align: center;
+}
+
+.emptyContainer {
+  padding: 40px;
+  text-align: center;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
