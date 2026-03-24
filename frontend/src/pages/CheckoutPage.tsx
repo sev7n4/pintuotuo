@@ -62,12 +62,18 @@ const CheckoutPage: React.FC = () => {
       const orderPromises = selectedCartItems.map((item) =>
         createOrder(item.product_id, item.quantity, item.group_id)
       )
-      await Promise.all(orderPromises)
-
+      const orderIds = await Promise.all(orderPromises)
+      
       clear()
-      message.success('订单创建成功，正在跳转到支付页面')
-
-      navigate('/orders')
+      
+      const firstOrderId = orderIds.find(id => id !== null)
+      if (firstOrderId) {
+        message.success('订单创建成功，正在跳转到支付页面')
+        navigate(`/payment/${firstOrderId}`)
+      } else {
+        message.success('订单创建成功')
+        navigate('/orders')
+      }
     } catch (error) {
       message.error('创建订单失败，请重试')
     }
