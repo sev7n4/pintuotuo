@@ -22,6 +22,30 @@ export interface Product {
   status: 'active' | 'inactive' | 'archived'
   created_at: string
   updated_at: string
+  token_count?: number
+  token_type?: string
+  models?: string[]
+  validity_period?: string
+  context_length?: string
+  rating?: number
+  review_count?: number
+  group_prices?: GroupPrice[]
+}
+
+export interface GroupPrice {
+  min_members: number
+  price_per_person: number
+  discount_percent: number
+}
+
+export interface ProductReview {
+  id: number
+  user_id: number
+  user_name: string
+  user_avatar?: string
+  rating: number
+  content: string
+  created_at: string
 }
 
 // Category type

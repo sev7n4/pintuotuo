@@ -11,7 +11,7 @@ interface GroupState {
 
   fetchGroups: (page?: number, perPage?: number) => Promise<Group[] | null>
   fetchGroupByID: (id: number) => Promise<void>
-  createGroup: (productId: number, targetCount: number, deadline: string) => Promise<void>
+  createGroup: (productId: number, targetCount: number, deadline: string) => Promise<Group | null>
   joinGroup: (id: number) => Promise<void>
   cancelGroup: (id: number) => Promise<void>
   getGroupProgress: (id: number) => Promise<void>
@@ -56,7 +56,7 @@ export const useGroupStore = create<GroupState>((set) => ({
     }
   },
 
-  createGroup: async (productId, targetCount, deadline) => {
+  createGroup: async (productId, targetCount, deadline): Promise<Group | null> => {
     set({ isLoading: true, error: null })
     try {
       const response = await groupService.createGroup({
@@ -72,7 +72,10 @@ export const useGroupStore = create<GroupState>((set) => ({
           currentGroup: newGroup,
           isLoading: false,
         }))
+        return newGroup
       }
+      set({ isLoading: false })
+      return null
     } catch (error) {
       const message = error instanceof Error ? error.message : '创建分组失败'
       set({ error: message, isLoading: false })
