@@ -52,7 +52,7 @@ jobs:
         run: |
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
           cd /opt/pintuotuo
-          JWT_SECRET=$(docker-compose -f docker-compose.prod.yml config | grep JWT_SECRET | awk -F= '{print $2}' | tr -d ' ')
+          JWT_SECRET=$(docker-compose -f docker-compose.prod.yml config | grep JWT_SECRET | awk -F': ' '{print $2}')
           
           # Function to generate password hash
           generate_hash() {
