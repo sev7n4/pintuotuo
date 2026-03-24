@@ -10,7 +10,7 @@ interface OrderState {
 
   fetchOrders: (page?: number, per_page?: number) => Promise<void>
   fetchOrderByID: (id: number) => Promise<void>
-  createOrder: (productId: number, quantity: number, groupId?: number) => Promise<void>
+  createOrder: (productId: number, quantity: number, groupId?: number) => Promise<number | null>
   cancelOrder: (id: number, reason?: string) => Promise<void>
   requestRefund: (id: number, reason: string) => Promise<void>
   clearError: () => void
