@@ -2,7 +2,10 @@ name: Integration Tests
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: [main]
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:

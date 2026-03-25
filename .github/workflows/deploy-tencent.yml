@@ -5,7 +5,7 @@ on:
     workflows: ["E2E Tests"]
     types:
       - completed
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
     inputs:
       branch:
