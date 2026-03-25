@@ -41,12 +41,10 @@ jobs:
         with:
           working-directory: ./backend
           args: --timeout=5m
-        continue-on-error: true
 
       - name: Run unit tests
         working-directory: ./backend
-        run: go test -v -short -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 || echo "Tests completed with some failures"
-        continue-on-error: true
+        run: go test -v -short -race -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -83,7 +81,6 @@ jobs:
       - name: Run ESLint
         working-directory: ./frontend
         run: npm run lint
-        continue-on-error: true
 
       - name: Run TypeScript type checking
         working-directory: ./frontend
@@ -120,7 +117,6 @@ jobs:
       - name: Run unit tests
         working-directory: ./frontend
         run: npm test -- --coverage --watchAll=false --passWithNoTests
-        continue-on-error: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -146,25 +142,21 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
-        continue-on-error: true
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
-        continue-on-error: true
 
       - name: Run npm audit (frontend)
         working-directory: ./frontend
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       - name: Run Go security check
         working-directory: ./backend
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec -severity high ./...
-        continue-on-error: true
+          $(go env GOPATH)/bin/gosec -severity high ./...
 
   docker-build:
     name: Docker Build

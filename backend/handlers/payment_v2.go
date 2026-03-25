@@ -85,7 +85,7 @@ func CreatePayment(c *gin.Context) {
 		return
 	}
 
-	if order.Status != "pending" {
+	if order.Status != paymentStatusPending {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"ORDER_NOT_PENDING",
 			"Order is not in pending status",

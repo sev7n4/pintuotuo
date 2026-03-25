@@ -129,7 +129,7 @@ func RegisterUser(c *gin.Context) {
 
 	// Generate JWT token
 	token := generateToken(user.ID, user.Email, user.Role)
-	
+
 	c.JSON(http.StatusCreated, gin.H{
 		"code":    0,
 		"message": "success",

@@ -351,7 +351,8 @@ func HandleRechargeCallback(c *gin.Context) {
 	}
 
 	if req.Status == "success" {
-		tx, err := db.Begin()
+		var tx *sql.Tx
+		tx, err = db.Begin()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    "DATABASE_ERROR",
