@@ -231,8 +231,7 @@ jobs:
           push: true
           tags: ${{ steps.meta-backend.outputs.tags }}
           labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
 
       - name: Build backend (no push)
         if: steps.check-docker.outputs.has-credentials != 'true'
@@ -242,8 +241,7 @@ jobs:
           file: ./backend/Dockerfile
           push: false
           tags: pintuotuo/backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
 
       - name: Extract metadata for frontend
         if: steps.check-docker.outputs.has-credentials == 'true'
