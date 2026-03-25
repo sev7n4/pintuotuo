@@ -128,8 +128,8 @@ func RegisterUser(c *gin.Context) {
 	}
 
 	// Generate JWT token
-	token := generateToken(user.ID, user.Email)
-
+	token := generateToken(user.ID, user.Email, user.Role)
+	
 	c.JSON(http.StatusCreated, gin.H{
 		"code":    0,
 		"message": "success",
@@ -174,7 +174,7 @@ func LoginUser(c *gin.Context) {
 	}
 
 	// Generate JWT token
-	token := generateToken(user.ID, user.Email)
+	token := generateToken(user.ID, user.Email, user.Role)
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
@@ -392,7 +392,7 @@ func RefreshToken(c *gin.Context) {
 	}
 
 	// Generate new JWT token
-	token := generateToken(user.ID, user.Email)
+	token := generateToken(user.ID, user.Email, user.Role)
 
 	c.JSON(http.StatusOK, gin.H{
 		"user":  user,
@@ -555,10 +555,11 @@ func verifyPassword(password, hash string) bool {
 	return hashPassword(password) == hash
 }
 
-func generateToken(userID int, email string) string {
+func generateToken(userID int, email string, role string) string {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID,
 		"email":   email,
+		"role":    role,
 		"exp":     time.Now().Add(time.Hour * 24).Unix(),
 	})
 

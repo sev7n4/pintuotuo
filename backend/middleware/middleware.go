@@ -122,6 +122,10 @@ func AuthMiddleware() gin.HandlerFunc {
 				c.Set("email", email)
 			}
 
+			if role, ok := claims["role"].(string); ok {
+				c.Set("user_role", role)
+			}
+
 			c.Next()
 		} else {
 			c.JSON(401, gin.H{"error": "invalid token"})
