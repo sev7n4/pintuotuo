@@ -172,9 +172,18 @@
   margin-top: 24px;
 }
 
-@media (max-width: 768px) {
+.orderCard :global(.ant-table) {
+  overflow-x: auto;
+}
+
+.orderCard :global(.ant-table-wrapper) {
+  overflow-x: auto;
+}
+
+@media (max-width: 992px) {
   .pageTitle {
     font-size: 18px;
+    margin-bottom: 16px !important;
   }
 
   .groupRateContent {
@@ -188,6 +197,50 @@
   }
 
   .chartValue {
+    font-size: 10px;
+  }
+
+  .chartLabel {
+    font-size: 10px;
+  }
+
+  .weeklyValue {
+    font-size: 16px;
+  }
+
+  .hotProductMeta {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 576px) {
+  .pageTitle {
+    font-size: 16px;
+  }
+
+  .chartBars {
+    height: 120px;
+    gap: 4px;
+  }
+
+  .chartBar {
+    max-width: 40px;
+  }
+
+  .chartValue {
+    display: none;
+  }
+
+  .groupRateCircle {
+    transform: scale(0.8);
+  }
+
+  .hotProductName {
+    font-size: 12px;
+  }
+
+  .hotProductMeta {
     font-size: 10px;
   }
 }

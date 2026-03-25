@@ -111,6 +111,7 @@ const MerchantOrders = () => {
           dataSource={orders}
           rowKey="id"
           loading={isLoading}
+          scroll={{ x: 900 }}
           pagination={{
             current: page,
             pageSize: 20,

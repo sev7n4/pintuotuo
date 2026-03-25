@@ -308,6 +308,7 @@ const MerchantDashboard = () => {
           loading={isLoading}
           pagination={false}
           size="small"
+          scroll={{ x: 800 }}
           locale={{ emptyText: <Empty description="暂无订单数据" /> }}
         />
       </Card>

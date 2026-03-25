@@ -251,6 +251,7 @@ const MerchantInvoices = () => {
           dataSource={invoices}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 900 }}
           pagination={{ pageSize: 10 }}
           locale={{ emptyText: <Empty description="暂无发票数据" /> }}
         />
