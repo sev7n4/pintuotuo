@@ -9,11 +9,11 @@ RUN apk add --no-cache git ca-certificates tzdata
 # Set working directory
 WORKDIR /app
 
-# Copy go mod files
-COPY go.mod go.sum ./
+# Copy go mod files (context is project root, so use backend/ prefix)
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
-COPY . .
+COPY backend/ ./
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o backend main.go
@@ -30,7 +30,7 @@ WORKDIR /root/
 # Copy binary from builder
 COPY --from=builder /app/backend .
 
-# Copy database schema
+# Copy database schema (context is project root)
 COPY scripts/db/ ./scripts/db/
 
 EXPOSE 8080
