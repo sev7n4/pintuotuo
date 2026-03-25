@@ -160,6 +160,17 @@ const AdminLayout = () => {
       items={menuItems}
       onClick={handleMenuClick}
       theme="dark"
+      style={{ borderRight: 0, background: 'transparent' }}
+    />
+  )
+
+  const siderMenuContent = (
+    <Menu
+      mode="inline"
+      selectedKeys={[getSelectedKey()]}
+      items={menuItems}
+      onClick={handleMenuClick}
+      theme="dark"
       style={{ borderRight: 0 }}
     />
   )
@@ -201,7 +212,7 @@ const AdminLayout = () => {
             <DashboardOutlined className={styles.logoIcon} />
             {!collapsed && <span>运营管理</span>}
           </div>
-          {menuContent}
+          {siderMenuContent}
         </Sider>
       )}
       <Layout>

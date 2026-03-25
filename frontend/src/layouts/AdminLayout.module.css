@@ -82,6 +82,31 @@
   background: #001529;
 }
 
+.drawer :global(.ant-menu) {
+  background: transparent;
+}
+
+.drawer :global(.ant-menu-item) {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.drawer :global(.ant-menu-item:hover) {
+  color: #fff;
+}
+
+.drawer :global(.ant-menu-item-selected) {
+  color: #fff;
+  background-color: #1890ff !important;
+}
+
+.drawer :global(.ant-menu-submenu-title) {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.drawer :global(.ant-menu-submenu-title:hover) {
+  color: #fff;
+}
+
 .drawerHeader {
   height: 64px;
   display: flex;
