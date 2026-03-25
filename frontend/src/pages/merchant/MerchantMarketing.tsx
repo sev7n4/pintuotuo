@@ -216,7 +216,7 @@ export const MerchantMarketing: React.FC = () => {
                 创建优惠券
               </Button>
             </div>
-            <Table columns={couponColumns} dataSource={coupons} rowKey="id" pagination={false} />
+            <Table columns={couponColumns} dataSource={coupons} rowKey="id" pagination={false} scroll={{ x: 'max-content' }} />
           </Card>
         </TabPane>
 
@@ -227,7 +227,7 @@ export const MerchantMarketing: React.FC = () => {
                 创建秒杀活动
               </Button>
             </div>
-            <Table columns={flashSaleColumns} dataSource={flashSales} rowKey="id" pagination={false} />
+            <Table columns={flashSaleColumns} dataSource={flashSales} rowKey="id" pagination={false} scroll={{ x: 'max-content' }} />
           </Card>
         </TabPane>
 

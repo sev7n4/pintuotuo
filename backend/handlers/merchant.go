@@ -259,6 +259,17 @@ func GetMerchantStats(c *gin.Context) {
 	var merchantID int
 	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusOK, gin.H{
+				"total_products":  0,
+				"active_products": 0,
+				"total_sales":     0,
+				"month_sales":     0,
+				"total_orders":    0,
+				"month_orders":    0,
+			})
+			return
+		}
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MERCHANT_NOT_FOUND",
 			"Merchant profile not found",
