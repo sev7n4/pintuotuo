@@ -41,12 +41,10 @@ jobs:
         with:
           working-directory: ./backend
           args: --timeout=5m
-        continue-on-error: true
 
       - name: Run unit tests
         working-directory: ./backend
-        run: go test -v -short -race -coverprofile=coverage.out -covermode=atomic ./... 2>&1 || echo "Tests completed with some failures"
-        continue-on-error: true
+        run: go test -v -short -race -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -83,7 +81,6 @@ jobs:
       - name: Run ESLint
         working-directory: ./frontend
         run: npm run lint
-        continue-on-error: true
 
       - name: Run TypeScript type checking
         working-directory: ./frontend
@@ -120,14 +117,15 @@ jobs:
       - name: Run unit tests
         working-directory: ./frontend
         run: npm test -- --coverage --watchAll=false --passWithNoTests
-        continue-on-error: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-        if: ${{secrets.DOCKER_USERNAME != ''}}
+          files: ./frontend/coverage/coverage-final.json
+          flags: frontend-unit
+          name: frontend-unit-coverage
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Build and push backend
         uses: docker/build-push-action@v4
