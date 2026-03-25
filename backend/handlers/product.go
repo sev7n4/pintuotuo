@@ -262,6 +262,12 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
 	var req struct {
 		Name          string  `json:"name" binding:"required"`
 		Description   string  `json:"description"`
@@ -297,17 +303,22 @@ func CreateProduct(c *gin.Context) {
 
 	db := config.GetDB()
 
-	var role string
-	err := db.QueryRow("SELECT role FROM users WHERE id = $1", userID).Scan(&role)
-	if err != nil || role != "merchant" {
-		middleware.RespondWithError(c, apperrors.ErrMerchantOnly)
+	var merchantID int
+	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"商户信息不存在，请先完成商户认证",
+			http.StatusNotFound,
+			err,
+		))
 		return
 	}
 
 	var product models.Product
 	err = db.QueryRow(
 		"INSERT INTO products (merchant_id, name, description, price, original_price, stock, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, merchant_id, name, description, price, stock, status, created_at, updated_at",
-		userID, req.Name, req.Description, req.Price, req.OriginalPrice, req.Stock, "active",
+		merchantID, req.Name, req.Description, req.Price, req.OriginalPrice, req.Stock, "active",
 	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
 
 	if err != nil {
