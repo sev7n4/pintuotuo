@@ -2,9 +2,12 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
-    branches: [main, master, develop]
+    branches: [main, master]
 
 permissions:
   contents: read
