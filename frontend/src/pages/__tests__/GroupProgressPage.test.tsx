@@ -35,7 +35,7 @@ describe('GroupProgressPage', () => {
 
   describe('UT-GP-001: renders group progress page with loading state', () => {
     it('should show loading spinner when loading', () => {
-      ;(useGroupStore as unknown as jest.Mock).mockReturnValue({
+      (useGroupStore as unknown as jest.Mock).mockReturnValue({
         currentGroup: null,
         isLoading: true,
         error: null,
@@ -56,7 +56,7 @@ describe('GroupProgressPage', () => {
 
   describe('UT-GP-002: displays group info when loaded', () => {
     it('should display group information', () => {
-      ;(useGroupStore as unknown as jest.Mock).mockReturnValue({
+      (useGroupStore as unknown as jest.Mock).mockReturnValue({
         currentGroup: mockGroup,
         isLoading: false,
         error: null,
@@ -77,7 +77,7 @@ describe('GroupProgressPage', () => {
 
   describe('UT-GP-003: displays member list correctly', () => {
     it('should show current and target member count', () => {
-      ;(useGroupStore as unknown as jest.Mock).mockReturnValue({
+      (useGroupStore as unknown as jest.Mock).mockReturnValue({
         currentGroup: mockGroup,
         isLoading: false,
         error: null,
@@ -97,7 +97,7 @@ describe('GroupProgressPage', () => {
 
   describe('UT-GP-004: displays countdown timer', () => {
     it('should show remaining time', () => {
-      ;(useGroupStore as unknown as jest.Mock).mockReturnValue({
+      (useGroupStore as unknown as jest.Mock).mockReturnValue({
         currentGroup: mockGroup,
         isLoading: false,
         error: null,
@@ -181,7 +181,7 @@ describe('GroupProgressPage', () => {
 
   describe('UT-GP-007: displays group status correctly', () => {
     it('should show active status for ongoing group', () => {
-      ;(useGroupStore as unknown as jest.Mock).mockReturnValue({
+      (useGroupStore as unknown as jest.Mock).mockReturnValue({
         currentGroup: mockGroup,
         isLoading: false,
         error: null,

@@ -92,7 +92,7 @@ describe('CheckoutPage', () => {
   })
 
   it('renders empty state when cart is empty', () => {
-    ;(useCartStore as unknown as jest.Mock).mockReturnValue({
+    (useCartStore as unknown as jest.Mock).mockReturnValue({
       items: [],
       clear: mockClear,
     })
@@ -117,7 +117,7 @@ describe('CheckoutPage', () => {
   })
 
   it('navigates to products page when clicking "去购物" button', () => {
-    ;(useCartStore as unknown as jest.Mock).mockReturnValue({
+    (useCartStore as unknown as jest.Mock).mockReturnValue({
       items: [],
       clear: mockClear,
     })
