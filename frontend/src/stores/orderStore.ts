@@ -10,7 +10,7 @@ interface OrderState {
 
   fetchOrders: (page?: number, per_page?: number) => Promise<void>
   fetchOrderByID: (id: number) => Promise<void>
-  createOrder: (productId: number, quantity: number, groupId?: number) => Promise<number | null>
+  createOrder: (productId: number, quantity: number, groupId?: number) => Promise<void>
   cancelOrder: (id: number, reason?: string) => Promise<void>
   requestRefund: (id: number, reason: string) => Promise<void>
   clearError: () => void
@@ -46,7 +46,7 @@ export const useOrderStore = create<OrderState>((set) => ({
     }
   },
 
-  createOrder: async (productId: number, quantity: number, groupId?: number): Promise<number | null> => {
+  createOrder: async (productId, quantity, groupId) => {
     set({ isLoading: true, error: null })
     try {
       const response = await orderService.createOrder({
@@ -62,9 +62,7 @@ export const useOrderStore = create<OrderState>((set) => ({
           currentOrder: newOrder,
           isLoading: false,
         }))
-        return newOrder.id
       }
-      return null
     } catch (error) {
       const message = error instanceof Error ? error.message : '创建订单失败'
       set({ error: message, isLoading: false })
