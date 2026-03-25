@@ -307,6 +307,7 @@ export const MerchantMarketing: React.FC = () => {
         onOk={handleCreateCoupon}
         okText="创建"
         cancelText="取消"
+        width={600}
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="优惠券名称" rules={[{ required: true }]}>
@@ -318,12 +319,18 @@ export const MerchantMarketing: React.FC = () => {
               <Option value="discount">折扣券</Option>
             </Select>
           </Form.Item>
-          <Form.Item name="value" label="优惠额度" rules={[{ required: true }]}>
-            <InputNumber style={{ width: '100%' }} min={1} placeholder="满减金额或折扣百分比" />
-          </Form.Item>
-          <Form.Item name="min_purchase" label="使用门槛">
-            <InputNumber style={{ width: '100%' }} min={0} placeholder="最低消费金额，0表示无门槛" />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="value" label="优惠额度" rules={[{ required: true }]}>
+                <InputNumber style={{ width: '100%' }} min={1} placeholder="满减金额或折扣百分比" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="min_purchase" label="使用门槛">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="最低消费金额，0表示无门槛" />
+              </Form.Item>
+            </Col>
+          </Row>
           <Form.Item name="total_count" label="发放数量" rules={[{ required: true }]}>
             <InputNumber style={{ width: '100%' }} min={1} placeholder="发放总数量" />
           </Form.Item>
@@ -340,6 +347,7 @@ export const MerchantMarketing: React.FC = () => {
         onOk={handleCreateFlashSale}
         okText="创建"
         cancelText="取消"
+        width={600}
       >
         <Form form={flashSaleForm} layout="vertical">
           <Form.Item name="product_id" label="商品ID" rules={[{ required: true }]}>
@@ -349,23 +357,29 @@ export const MerchantMarketing: React.FC = () => {
             <Input placeholder="请输入商品名称" />
           </Form.Item>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="original_price" label="原价" rules={[{ required: true }]}>
                 <InputNumber style={{ width: '100%' }} min={0} prefix="¥" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="flash_price" label="秒杀价" rules={[{ required: true }]}>
                 <InputNumber style={{ width: '100%' }} min={0} prefix="¥" />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="stock" label="秒杀库存" rules={[{ required: true }]}>
-            <InputNumber style={{ width: '100%' }} min={1} placeholder="秒杀库存数量" />
-          </Form.Item>
-          <Form.Item name="time_range" label="活动时间" rules={[{ required: true }]}>
-            <RangePicker showTime style={{ width: '100%' }} />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="stock" label="秒杀库存" rules={[{ required: true }]}>
+                <InputNumber style={{ width: '100%' }} min={1} placeholder="秒杀库存数量" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="time_range" label="活动时间" rules={[{ required: true }]}>
+                <RangePicker showTime style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </div>

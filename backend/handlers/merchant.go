@@ -270,36 +270,54 @@ func GetMerchantStats(c *gin.Context) {
 	var totalSales, monthSales float64
 	var totalOrders, monthOrders int
 
-	db.QueryRow("SELECT COUNT(*) FROM products WHERE merchant_id = $1", merchantID).Scan(&totalProducts)
-	db.QueryRow("SELECT COUNT(*) FROM products WHERE merchant_id = $1 AND status = 'active'", merchantID).Scan(&activeProducts)
+	if err := db.QueryRow("SELECT COUNT(*) FROM products WHERE merchant_id = $1", merchantID).Scan(&totalProducts); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get product count", http.StatusInternalServerError, err))
+		return
+	}
+	if err := db.QueryRow("SELECT COUNT(*) FROM products WHERE merchant_id = $1 AND status = 'active'", merchantID).Scan(&activeProducts); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get active product count", http.StatusInternalServerError, err))
+		return
+	}
 
-	db.QueryRow(
-		`SELECT COALESCE(SUM(total_price), 0) FROM orders o 
-		 JOIN products p ON o.product_id = p.id 
+	if err := db.QueryRow(
+		`SELECT COALESCE(SUM(total_price), 0) FROM orders o
+		 JOIN products p ON o.product_id = p.id
 		 WHERE p.merchant_id = $1 AND o.status IN ('paid', 'completed')`,
 		merchantID,
-	).Scan(&totalSales)
+	).Scan(&totalSales); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get total sales", http.StatusInternalServerError, err))
+		return
+	}
 
-	db.QueryRow(
-		`SELECT COALESCE(SUM(total_price), 0) FROM orders o 
-		 JOIN products p ON o.product_id = p.id 
+	if err := db.QueryRow(
+		`SELECT COALESCE(SUM(total_price), 0) FROM orders o
+		 JOIN products p ON o.product_id = p.id
 		 WHERE p.merchant_id = $1 AND o.status IN ('paid', 'completed') AND o.created_at >= $2`,
 		merchantID, time.Now().AddDate(0, -1, 0),
-	).Scan(&monthSales)
+	).Scan(&monthSales); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get month sales", http.StatusInternalServerError, err))
+		return
+	}
 
-	db.QueryRow(
-		`SELECT COUNT(*) FROM orders o 
-		 JOIN products p ON o.product_id = p.id 
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM orders o
+		 JOIN products p ON o.product_id = p.id
 		 WHERE p.merchant_id = $1 AND o.status IN ('paid', 'completed')`,
 		merchantID,
-	).Scan(&totalOrders)
+	).Scan(&totalOrders); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get order count", http.StatusInternalServerError, err))
+		return
+	}
 
-	db.QueryRow(
-		`SELECT COUNT(*) FROM orders o 
-		 JOIN products p ON o.product_id = p.id 
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM orders o
+		 JOIN products p ON o.product_id = p.id
 		 WHERE p.merchant_id = $1 AND o.status IN ('paid', 'completed') AND o.created_at >= $2`,
 		merchantID, time.Now().AddDate(0, -1, 0),
-	).Scan(&monthOrders)
+	).Scan(&monthOrders); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get month order count", http.StatusInternalServerError, err))
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"total_products":  totalProducts,
