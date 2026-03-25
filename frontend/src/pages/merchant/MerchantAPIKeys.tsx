@@ -174,7 +174,7 @@ const MerchantAPIKeys = () => {
         onCancel={() => setModalVisible(false)}
         okText="保存"
         cancelText="取消"
-        width={500}
+        width={600}
       >
         <Form form={form} layout="vertical">
           <Form.Item
