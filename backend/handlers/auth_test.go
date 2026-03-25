@@ -41,7 +41,8 @@ func TestGenerateToken(t *testing.T) {
 	// 测试令牌生成函数
 	userID := 1
 	email := "test@example.com"
-	token := generateToken(userID, email)
+	role := "user"
+	token := generateToken(userID, email, role)
 
 	// 生成的令牌应该不为空
 	assert.NotEmpty(t, token)
@@ -49,7 +50,8 @@ func TestGenerateToken(t *testing.T) {
 	// 不同用户应该生成不同的令牌
 	anotherUserID := 2
 	anotherEmail := "another@example.com"
-	anotherToken := generateToken(anotherUserID, anotherEmail)
+	anotherRole := "user"
+	anotherToken := generateToken(anotherUserID, anotherEmail, anotherRole)
 	assert.NotEqual(t, token, anotherToken)
 }
 

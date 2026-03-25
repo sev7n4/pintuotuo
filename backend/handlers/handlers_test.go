@@ -174,7 +174,8 @@ func BenchmarkHashPassword(b *testing.B) {
 func BenchmarkGenerateToken(b *testing.B) {
 	userID := 1
 	email := "test@example.com"
+	role := "user"
 	for i := 0; i < b.N; i++ {
-		generateToken(userID, email)
+		generateToken(userID, email, role)
 	}
 }
