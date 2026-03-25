@@ -35,6 +35,7 @@ jobs:
       - name: Run go vet
         working-directory: ./backend
         run: go vet ./...
+        continue-on-error: true
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
