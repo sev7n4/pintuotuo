@@ -164,6 +164,7 @@ const MerchantAPIKeys = () => {
           rowKey="id"
           loading={isLoading}
           pagination={false}
+          scroll={{ x: 'max-content' }}
         />
       </Card>
 
