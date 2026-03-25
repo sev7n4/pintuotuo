@@ -226,7 +226,7 @@ jobs:
         if: steps.check-docker.outputs.has-credentials == 'true'
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile
           push: true
           tags: ${{ steps.meta-backend.outputs.tags }}
@@ -238,7 +238,7 @@ jobs:
         if: steps.check-docker.outputs.has-credentials != 'true'
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile
           push: false
           tags: pintuotuo/backend:latest
