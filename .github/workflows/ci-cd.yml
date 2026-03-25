@@ -156,7 +156,7 @@ jobs:
         working-directory: ./backend
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec -severity high ./...
+          $(go env GOPATH)/bin/gosec -severity high ./...
 
   docker-build:
     name: Docker Build
