@@ -105,10 +105,12 @@ export const ProductDetailPage: React.FC = () => {
   }
 
   const handleGroupPurchase = async () => {
-    if (!product || !selectedGroupPrice) return
+    if (!product) return
+    const currentGroupPrice = selectedGroupPrice || groupPrices[0]
+    if (!currentGroupPrice) return
     try {
       const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      const group = await createGroup(product.id, selectedGroupPrice.min_members, deadline)
+      const group = await createGroup(product.id, currentGroupPrice.min_members, deadline)
       if (group) {
         message.success('拼团已创建，快去邀请好友吧！')
         navigate(`/groups/${group.id}`)
@@ -121,8 +123,33 @@ export const ProductDetailPage: React.FC = () => {
   const handleShare = () => {
     if (!product) return
     const shareUrl = `${window.location.origin}/products/${product.id}`
-    navigator.clipboard.writeText(shareUrl)
-    message.success('链接已复制到剪贴板')
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(shareUrl)
+        .then(() => {
+          message.success('链接已复制到剪贴板')
+        })
+        .catch(() => {
+          message.error('复制失败，请手动复制链接')
+        })
+    } else {
+      // 降级方案：创建一个临时输入框来复制
+      const textArea = document.createElement('textarea')
+      textArea.value = shareUrl
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      try {
+        document.execCommand('copy')
+        message.success('链接已复制到剪贴板')
+      } catch {
+        message.error('复制失败，请手动复制链接')
+      } finally {
+        document.body.removeChild(textArea)
+      }
+    }
   }
 
   const calculateDiscount = () => {
