@@ -110,11 +110,11 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 
-	// If user is a merchant, create merchant record
+	// If user is a merchant, create merchant record with pending status (requires admin approval)
 	if role == "merchant" {
 		_, err = db.Exec(
 			"INSERT INTO merchants (user_id, company_name, status) VALUES ($1, $2, $3)",
-			user.ID, req.Name, "active",
+			user.ID, req.Name, "pending",
 		)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.NewAppError(
