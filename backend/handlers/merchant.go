@@ -413,7 +413,7 @@ func GetMerchantProducts(c *gin.Context) {
 	}
 
 	var total int
-	if status != "" && status != "all" {
+	if status != "" && status != allProductStatus {
 		db.QueryRow("SELECT COUNT(*) FROM products WHERE merchant_id = $1 AND status = $2", merchantID, status).Scan(&total)
 	} else {
 		db.QueryRow("SELECT COUNT(*) FROM products WHERE merchant_id = $1", merchantID).Scan(&total)
@@ -476,7 +476,7 @@ func GetMerchantOrders(c *gin.Context) {
 	offset := (pageNum - 1) * perPageNum
 
 	var rows *sql.Rows
-	if status != "" && status != "all" {
+	if status != "" && status != allProductStatus {
 		rows, err = db.Query(
 			`SELECT o.id, o.user_id, o.product_id, o.group_id, o.quantity, o.total_price, o.status, o.created_at, o.updated_at, p.name as product_name
 			 FROM orders o 
@@ -520,7 +520,7 @@ func GetMerchantOrders(c *gin.Context) {
 	}
 
 	var total int
-	if status != "" && status != "all" {
+	if status != "" && status != allProductStatus {
 		db.QueryRow(
 			`SELECT COUNT(*) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.merchant_id = $1 AND o.status = $2`,
 			merchantID, status,

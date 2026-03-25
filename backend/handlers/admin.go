@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	roleAdmin           = "admin"
-	roleMerchant        = "merchant"
-	roleUser            = "user"
+	roleAdmin             = "admin"
+	roleMerchant          = "merchant"
+	roleUser              = "user"
 	merchantStatusPending = "pending"
 )
 
@@ -68,7 +68,7 @@ func GetAdminUsers(c *gin.Context) {
 // CreateAdminUser creates a new admin user (admin only)
 func CreateAdminUser(c *gin.Context) {
 	userRole, exists := c.Get("user_role")
-	if !exists || userRole != "admin" {
+	if !exists || userRole != roleAdmin {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FORBIDDEN",
 			"Admin access required",
@@ -158,7 +158,7 @@ func CreateAdminUser(c *gin.Context) {
 // GetAdminStats retrieves platform statistics (admin only)
 func GetAdminStats(c *gin.Context) {
 	userRole, exists := c.Get("user_role")
-	if !exists || userRole != "admin" {
+	if !exists || userRole != roleAdmin {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FORBIDDEN",
 			"Admin access required",
@@ -202,7 +202,7 @@ func GetAdminStats(c *gin.Context) {
 
 func GetPendingMerchants(c *gin.Context) {
 	userRole, exists := c.Get("user_role")
-	if !exists || userRole != "admin" {
+	if !exists || userRole != roleAdmin {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FORBIDDEN",
 			"Admin access required",
@@ -272,7 +272,7 @@ func GetPendingMerchants(c *gin.Context) {
 
 func ApproveMerchant(c *gin.Context) {
 	userRole, exists := c.Get("user_role")
-	if !exists || userRole != "admin" {
+	if !exists || userRole != roleAdmin {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FORBIDDEN",
 			"Admin access required",
@@ -345,7 +345,7 @@ func ApproveMerchant(c *gin.Context) {
 
 func RejectMerchant(c *gin.Context) {
 	userRole, exists := c.Get("user_role")
-	if !exists || userRole != "admin" {
+	if !exists || userRole != roleAdmin {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FORBIDDEN",
 			"Admin access required",
