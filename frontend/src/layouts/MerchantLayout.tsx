@@ -18,6 +18,7 @@ import {
   CloseOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
+import { useMerchantStore } from '@/stores/merchantStore'
 import styles from './MerchantLayout.module.css'
 
 const { Header, Sider, Content } = Layout
@@ -79,6 +80,7 @@ const MerchantLayout = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout, isAuthenticated, fetchUser } = useAuthStore()
+  const { profile: merchantProfile, fetchProfile } = useMerchantStore()
   const [collapsed, setCollapsed] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
@@ -113,10 +115,23 @@ const MerchantLayout = () => {
       }
 
       setCheckingAuth(false)
+      
+      if (user && user.role === 'merchant') {
+        try {
+          await fetchProfile()
+          const profile = merchantProfile
+          if (profile && profile.status === 'pending') {
+            message.warning('您的商户申请正在审核中，请先提交资料')
+            navigate('/merchant/settings')
+          }
+        } catch {
+          message.error('获取商户信息失败')
+        }
+      }
     }
 
     checkAuth()
-  }, [isAuthenticated, user, fetchUser, navigate, location.pathname])
+  }, [isAuthenticated, user, fetchUser, fetchProfile, merchantProfile, navigate, location.pathname])
 
   useEffect(() => {
     if (!checkingAuth && user && user.role !== 'merchant') {

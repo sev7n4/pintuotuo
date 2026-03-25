@@ -304,7 +304,8 @@ func CreateProduct(c *gin.Context) {
 	db := config.GetDB()
 
 	var merchantID int
-	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
+	var merchantStatus string
+	err := db.QueryRow("SELECT id, status FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID, &merchantStatus)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MERCHANT_NOT_FOUND",
@@ -312,6 +313,18 @@ func CreateProduct(c *gin.Context) {
 			http.StatusNotFound,
 			err,
 		))
+		return
+	}
+
+	if merchantStatus != "active" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"code":    "MERCHANT_NOT_APPROVED",
+			"message": "您的商户申请正在审核中，审核通过后即可创建商品",
+			"data": gin.H{
+				"merchant_status": merchantStatus,
+				"redirect":        "/merchant/apply",
+			},
+		})
 		return
 	}
 

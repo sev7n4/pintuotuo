@@ -71,8 +71,24 @@ const MerchantProducts = () => {
           return
         }
       }
-      const axiosError = error as { response?: { data?: { message?: string } } }
-      const errorMessage = axiosError.response?.data?.message || (editingProduct ? '更新失败' : '创建失败')
+      const axiosError = error as { response?: { data?: { code?: string; message?: string; data?: { redirect?: string } } } }
+      const responseData = axiosError.response?.data
+      
+      if (responseData?.code === 'MERCHANT_NOT_APPROVED') {
+        message.warning(responseData.message || '您的商户申请正在审核中')
+        Modal.confirm({
+          title: '提交商户资料',
+          content: '您需要提交商户资料才能创建商品，是否现在提交？',
+          okText: '去提交',
+          cancelText: '取消',
+          onOk: () => {
+            window.location.href = responseData?.data?.redirect || '/merchant/apply'
+          },
+        })
+        return
+      }
+      
+      const errorMessage = responseData?.message || (editingProduct ? '更新失败' : '创建失败')
       message.error(errorMessage)
     }
   }
