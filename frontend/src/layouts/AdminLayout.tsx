@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, message, Spin } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, message, Spin, Drawer, Button } from 'antd'
 import {
   DashboardOutlined,
   UserOutlined,
@@ -9,9 +9,11 @@ import {
   SettingOutlined,
   LogoutOutlined,
   AppstoreOutlined,
+  MenuOutlined,
+  CloseOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
-import styles from './MerchantLayout.module.css'
+import styles from './AdminLayout.module.css'
 
 const { Header, Sider, Content } = Layout
 
@@ -54,6 +56,17 @@ const AdminLayout = () => {
   const { user, logout, isAuthenticated, fetchUser } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
+  const [drawerVisible, setDrawerVisible] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 992)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -66,7 +79,7 @@ const AdminLayout = () => {
       if (!user) {
         try {
           await fetchUser()
-        } catch (error) {
+        } catch {
           localStorage.removeItem('auth_token')
           sessionStorage.removeItem('auth_token')
           navigate('/login', { state: { from: location.pathname } })
@@ -89,6 +102,9 @@ const AdminLayout = () => {
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
+    if (isMobile) {
+      setDrawerVisible(false)
+    }
   }
 
   const handleLogout = () => {
@@ -121,6 +137,10 @@ const AdminLayout = () => {
     return path
   }
 
+  const toggleDrawer = () => {
+    setDrawerVisible(!drawerVisible)
+  }
+
   if (checkingAuth) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -133,34 +153,75 @@ const AdminLayout = () => {
     return null
   }
 
+  const menuContent = (
+    <Menu
+      mode="inline"
+      selectedKeys={[getSelectedKey()]}
+      items={menuItems}
+      onClick={handleMenuClick}
+      theme="dark"
+      style={{ borderRight: 0 }}
+    />
+  )
+
   return (
     <Layout className={styles.layout}>
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        className={styles.sider}
-        theme="dark"
-      >
-        <div className={styles.logo}>
-          <DashboardOutlined className={styles.logoIcon} />
-          {!collapsed && <span>运营管理</span>}
-        </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[getSelectedKey()]}
-          items={menuItems}
-          onClick={handleMenuClick}
+      {isMobile ? (
+        <Drawer
+          placement="left"
+          closable={false}
+          onClose={() => setDrawerVisible(false)}
+          open={drawerVisible}
+          className={styles.drawer}
+          width={250}
+        >
+          <div className={styles.drawerHeader}>
+            <DashboardOutlined className={styles.logoIcon} />
+            <span>运营管理</span>
+            <Button
+              type="text"
+              icon={<CloseOutlined />}
+              onClick={() => setDrawerVisible(false)}
+              className={styles.closeBtn}
+            />
+          </div>
+          {menuContent}
+        </Drawer>
+      ) : (
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={setCollapsed}
+          className={styles.sider}
           theme="dark"
-        />
-      </Sider>
+          breakpoint="lg"
+          collapsedWidth={80}
+        >
+          <div className={styles.logo}>
+            <DashboardOutlined className={styles.logoIcon} />
+            {!collapsed && <span>运营管理</span>}
+          </div>
+          {menuContent}
+        </Sider>
+      )}
       <Layout>
         <Header className={styles.header}>
+          {isMobile && (
+            <Button
+              type="text"
+              icon={<MenuOutlined />}
+              onClick={toggleDrawer}
+              className={styles.menuBtn}
+            />
+          )}
+          <div className={styles.headerTitle}>
+            {isMobile && <span>运营管理</span>}
+          </div>
           <div className={styles.headerRight}>
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <div className={styles.userInfo}>
-                <Avatar icon={<UserOutlined />} />
-                <span className={styles.userName}>{user?.name || '管理员'}</span>
+                <Avatar icon={<UserOutlined />} size={isMobile ? 'small' : 'default'} />
+                {!isMobile && <span className={styles.userName}>{user?.name || '管理员'}</span>}
               </div>
             </Dropdown>
           </div>

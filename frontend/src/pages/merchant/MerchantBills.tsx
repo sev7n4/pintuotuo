@@ -269,6 +269,7 @@ const MerchantBills = () => {
           dataSource={filteredBills}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 900 }}
           pagination={{ pageSize: 10 }}
           locale={{ emptyText: <Empty description="暂无账单数据" /> }}
         />

@@ -3,7 +3,7 @@
 }
 
 .sider {
-  background: #001529;
+  min-height: 100vh;
 }
 
 .logo {
@@ -11,10 +11,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
   font-size: 18px;
-  font-weight: bold;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .logoIcon {
@@ -26,9 +26,19 @@
   background: #fff;
   padding: 0 24px;
   display: flex;
-  justify-content: flex-end;
   align-items: center;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.headerTitle {
+  flex: 1;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 500;
 }
 
 .headerRight {
@@ -41,7 +51,7 @@
   align-items: center;
   cursor: pointer;
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: 8px;
   transition: background-color 0.3s;
 }
 
@@ -59,5 +69,70 @@
   padding: 24px;
   background: #fff;
   border-radius: 8px;
-  min-height: calc(100vh - 64px - 48px);
+  min-height: calc(100vh - 112px);
+  overflow-x: auto;
+}
+
+.drawer {
+  padding: 0;
+}
+
+.drawer :global(.ant-drawer-body) {
+  padding: 0;
+  background: #001529;
+}
+
+.drawerHeader {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.closeBtn {
+  color: #fff;
+}
+
+.menuBtn {
+  font-size: 20px;
+  margin-right: 8px;
+}
+
+@media (max-width: 992px) {
+  .sider {
+    display: none;
+  }
+
+  .header {
+    padding: 0 16px;
+  }
+
+  .content {
+    margin: 12px;
+    padding: 16px;
+    min-height: calc(100vh - 88px);
+  }
+}
+
+@media (max-width: 576px) {
+  .content {
+    margin: 8px;
+    padding: 12px;
+    border-radius: 4px;
+    min-height: calc(100vh - 72px);
+  }
+
+  .headerTitle {
+    font-size: 14px;
+  }
+
+  .drawerHeader {
+    font-size: 16px;
+    padding: 0 12px;
+  }
 }

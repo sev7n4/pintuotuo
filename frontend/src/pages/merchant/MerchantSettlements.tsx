@@ -146,6 +146,7 @@ const MerchantSettlements = () => {
           dataSource={settlements}
           rowKey="id"
           loading={isLoading}
+          scroll={{ x: 800 }}
           pagination={false}
         />
       </Card>

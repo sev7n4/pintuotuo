@@ -77,6 +77,10 @@
   padding: 0;
 }
 
+.drawer :global(.ant-drawer-body) {
+  padding: 0;
+}
+
 .drawerHeader {
   height: 64px;
   display: flex;
@@ -87,6 +91,7 @@
   font-weight: 600;
   color: #1890ff;
   border-bottom: 1px solid #f0f0f0;
+  background: #fff;
 }
 
 .closeBtn {
