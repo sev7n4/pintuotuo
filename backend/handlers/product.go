@@ -374,15 +374,33 @@ func UpdateProduct(c *gin.Context) {
 	db := config.GetDB()
 
 	// Verify ownership
-	var merchantID int
-	err := db.QueryRow("SELECT merchant_id FROM products WHERE id = $1", id).Scan(&merchantID)
+	var productMerchantID int
+	err := db.QueryRow("SELECT merchant_id FROM products WHERE id = $1", id).Scan(&productMerchantID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
 	}
 
+	// Get user's merchant ID
 	userIDInt, ok := userID.(int)
-	if !ok || merchantID != userIDInt {
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	var userMerchantID int
+	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&userMerchantID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"商户信息不存在，请先完成商户认证",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+
+	if productMerchantID != userMerchantID {
 		middleware.RespondWithError(c, apperrors.ErrForbidden)
 		return
 	}
@@ -425,15 +443,33 @@ func DeleteProduct(c *gin.Context) {
 	db := config.GetDB()
 
 	// Verify ownership
-	var merchantID int
-	err := db.QueryRow("SELECT merchant_id FROM products WHERE id = $1", id).Scan(&merchantID)
+	var productMerchantID int
+	err := db.QueryRow("SELECT merchant_id FROM products WHERE id = $1", id).Scan(&productMerchantID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
 	}
 
+	// Get user's merchant ID
 	userIDInt, ok := userID.(int)
-	if !ok || merchantID != userIDInt {
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	var userMerchantID int
+	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&userMerchantID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"商户信息不存在，请先完成商户认证",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+
+	if productMerchantID != userMerchantID {
 		middleware.RespondWithError(c, apperrors.ErrForbidden)
 		return
 	}
