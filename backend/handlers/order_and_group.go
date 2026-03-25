@@ -179,10 +179,16 @@ func ListOrders(c *gin.Context) {
 	for rows.Next() {
 		var o models.Order
 		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
-		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 		orders = append(orders, o)
+	}
+
+	var total int
+	db.QueryRow("SELECT COUNT(*) FROM orders WHERE user_id = $1", userID).Scan(&total)
+
 	c.JSON(http.StatusOK, gin.H{
 		"total":    total,
 		"page":     pageNum,
