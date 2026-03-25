@@ -1,211 +1,118 @@
 package handlers
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
-	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/services/group"
+	"github.com/pintuotuo/backend/services/order"
 )
 
-const orderStatusPending = "pending"
+// Initialize services
+var (
+	orderService order.Service
+	groupService group.Service
+)
+
+func initOrderAndGroupServices() {
+	if orderService == nil {
+		logger := log.New(os.Stderr, "[OrderHandler] ", log.LstdFlags)
+		orderService = order.NewService(config.GetDB(), logger)
+	}
+	if groupService == nil {
+		logger := log.New(os.Stderr, "[GroupHandler] ", log.LstdFlags)
+		groupService = group.NewService(config.GetDB(), logger)
+	}
+}
 
 // CreateOrder creates a new order
 func CreateOrder(c *gin.Context) {
+	initOrderAndGroupServices()
+
 	userID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
-	var req struct {
-		ProductID int `json:"product_id" binding:"required"`
-		GroupID   int `json:"group_id"`
-		Quantity  int `json:"quantity" binding:"required,gt=0"`
-	}
+	userIDInt := userID.(int)
 
+	var req order.CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	// Get product info
-	var product models.Product
-	err := db.QueryRow(
-		"SELECT id, price, stock FROM products WHERE id = $1",
-		req.ProductID,
-	).Scan(&product.ID, &product.Price, &product.Stock)
-
+	// Call service
+	o, err := orderService.CreateOrder(c.Request.Context(), userIDInt, &req)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		}
 		return
 	}
 
-	if product.Stock < req.Quantity {
-		middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
-		return
-	}
-
-	tx, err := db.Begin()
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"TRANSACTION_START_FAILED",
-			"Failed to start transaction",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-	defer tx.Rollback()
-
-	result, err := tx.Exec(
-		"UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1",
-		req.Quantity, req.ProductID,
-	)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"STOCK_UPDATE_FAILED",
-			"Failed to update stock",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
-		return
-	}
-
-	var order models.Order
-	totalPrice := product.Price * float64(req.Quantity)
-
-	// Handle group_id - use NULL if it's 0 (no group)
-	var groupID interface{}
-	if req.GroupID > 0 {
-		groupID = req.GroupID
-	} else {
-		groupID = nil
-	}
-
-	err = tx.QueryRow(
-		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at",
-		userID, req.ProductID, groupID, req.Quantity, product.Price, totalPrice, orderStatusPending,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
-
-	fmt.Printf("ORDER DEBUG: userID=%d, productID=%d, groupID=%v, quantity=%d, unit_price=%.2f, total=%.2f, err=%v\n", userID, req.ProductID, groupID, req.Quantity, product.Price, totalPrice, err)
-
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"ORDER_CREATION_FAILED",
-			"Failed to create order",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"TRANSACTION_COMMIT_FAILED",
-			"Failed to commit transaction",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    order,
-	})
+	c.JSON(http.StatusCreated, o)
 }
 
 // ListOrders lists all orders for current user
 func ListOrders(c *gin.Context) {
+	initOrderAndGroupServices()
+
 	userID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
+	userIDInt := userID.(int)
+
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")
+	status := c.DefaultQuery("status", "all")
 
 	pageNum, _ := strconv.Atoi(page)
 	perPageNum, _ := strconv.Atoi(perPage)
 
-	if pageNum < 1 {
-		pageNum = 1
-	}
-	if perPageNum < 1 || perPageNum > 100 {
-		perPageNum = 20
-	}
-
-	offset := (pageNum - 1) * perPageNum
-
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
+	params := &order.ListOrdersParams{
+		Page:    pageNum,
+		PerPage: perPageNum,
+		Status:  status,
 	}
 
-	rows, err := db.Query(
-		"SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-		userID, perPageNum, offset,
-	)
+	result, err := orderService.ListOrders(c.Request.Context(), userIDInt, params)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		}
 		return
 	}
-	defer rows.Close()
 
-	var orders []models.Order
-	for rows.Next() {
-		var o models.Order
-		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
-		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-			return
-		}
-		orders = append(orders, o)
-	}
-
-	var total int
-	db.QueryRow("SELECT COUNT(*) FROM orders WHERE user_id = $1", userID).Scan(&total)
-
-	c.JSON(http.StatusOK, gin.H{
-		"total":    total,
-		"page":     pageNum,
-		"per_page": perPageNum,
-		"data":     orders,
-	})
+	c.JSON(http.StatusOK, result)
 }
 
 // GetOrderByID retrieves an order by ID
 func GetOrderByID(c *gin.Context) {
+	initOrderAndGroupServices()
+
 	userID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
+	userIDInt := userID.(int)
 	id := c.Param("id")
 	orderID, _ := strconv.Atoi(id)
 	ctx := context.Background()
@@ -221,182 +128,93 @@ func GetOrderByID(c *gin.Context) {
 		}
 	}
 
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	var order models.Order
-	var err error
-	err = db.QueryRow("SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at FROM orders WHERE id = $1 AND user_id = $2", id, userID).Scan(
-		&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt,
-	)
+	orderID, err := strconv.Atoi(id)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	if orderJSON, err := json.Marshal(order); err == nil {
-		cache.Set(ctx, cacheKey, string(orderJSON), cache.OrderCacheTTL)
+	o, err := orderService.GetOrderByID(c.Request.Context(), userIDInt, orderID)
+	if err != nil {
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
+		}
+		return
 	}
 
-	c.JSON(http.StatusOK, order)
+	c.JSON(http.StatusOK, o)
 }
 
 // CancelOrder cancels an order
 func CancelOrder(c *gin.Context) {
+	initOrderAndGroupServices()
+
 	userID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
+	userIDInt := userID.(int)
 	id := c.Param("id")
 
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	var orderInfo struct {
-		status    string
-		productID int
-		quantity  int
-	}
-	err := db.QueryRow(
-		"SELECT status, product_id, quantity FROM orders WHERE id = $1 AND user_id = $2",
-		id, userID,
-	).Scan(&orderInfo.status, &orderInfo.productID, &orderInfo.quantity)
-
+	orderID, err := strconv.Atoi(id)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	if orderInfo.status != orderStatusPending {
-		middleware.RespondWithError(c, apperrors.ErrCannotCancelOrder)
-		return
-	}
-
-	tx, err := db.Begin()
+	o, err := orderService.CancelOrder(c.Request.Context(), userIDInt, orderID)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"TRANSACTION_START_FAILED",
-			"Failed to start transaction",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-	defer tx.Rollback()
-
-	var order models.Order
-	err = tx.QueryRow(
-		"UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at",
-		"canceled", id, userID,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
-
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"ORDER_CANCEL_FAILED",
-			"Failed to cancel order",
-			http.StatusInternalServerError,
-			err,
-		))
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		}
 		return
 	}
 
-	_, err = tx.Exec(
-		"UPDATE products SET stock = stock + $1 WHERE id = $2",
-		orderInfo.quantity, orderInfo.productID,
-	)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"STOCK_RESTORE_FAILED",
-			"Failed to restore stock",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"TRANSACTION_COMMIT_FAILED",
-			"Failed to commit transaction",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	cache.Delete(context.Background(), cache.OrderKey(order.ID))
-
-	c.JSON(http.StatusOK, order)
+	c.JSON(http.StatusOK, o)
 }
 
 // CreateGroup creates a new group purchase
 func CreateGroup(c *gin.Context) {
+	initOrderAndGroupServices()
+
 	userID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
-	var req struct {
-		ProductID   int       `json:"product_id" binding:"required"`
-		TargetCount int       `json:"target_count" binding:"required,gt=0"`
-		Deadline    time.Time `json:"deadline" binding:"required"`
-	}
+	userIDInt := userID.(int)
 
+	var req group.CreateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	// Validate deadline is in future
-	if req.Deadline.Before(time.Now()) {
-		middleware.RespondWithError(c, apperrors.ErrInvalidGroupData)
-		return
-	}
-
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	// Verify product exists
-	var productID int
-	err := db.QueryRow("SELECT id FROM products WHERE id = $1", req.ProductID).Scan(&productID)
+	// Call service
+	grp, err := groupService.CreateGroup(c.Request.Context(), userIDInt, &req)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		}
 		return
 	}
 
-	var group models.Group
-	err = db.QueryRow(
-		"INSERT INTO groups (product_id, creator_id, target_count, current_count, status, deadline) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at",
-		req.ProductID, userID, req.TargetCount, 1, "active", req.Deadline,
-	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
-
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"GROUP_CREATION_FAILED",
-			"Failed to create group",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	c.JSON(http.StatusCreated, group)
+	c.JSON(http.StatusCreated, grp)
 }
 
 // ListGroups lists all active groups
 func ListGroups(c *gin.Context) {
+	initOrderAndGroupServices()
+
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")
 	status := c.DefaultQuery("status", "active")
@@ -404,55 +222,29 @@ func ListGroups(c *gin.Context) {
 	pageNum, _ := strconv.Atoi(page)
 	perPageNum, _ := strconv.Atoi(perPage)
 
-	if pageNum < 1 {
-		pageNum = 1
-	}
-	if perPageNum < 1 || perPageNum > 100 {
-		perPageNum = 20
-	}
-
-	offset := (pageNum - 1) * perPageNum
-
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
+	params := &group.ListGroupsParams{
+		Page:    pageNum,
+		PerPage: perPageNum,
+		Status:  status,
 	}
 
-	rows, err := db.Query(
-		"SELECT id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at FROM groups WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-		status, perPageNum, offset,
-	)
+	result, err := groupService.ListGroups(c.Request.Context(), params)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		}
 		return
 	}
-	defer rows.Close()
 
-	var groups []models.Group
-	for rows.Next() {
-		var g models.Group
-		err := rows.Scan(&g.ID, &g.ProductID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
-		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-			return
-		}
-		groups = append(groups, g)
-	}
-
-	var total int
-	db.QueryRow("SELECT COUNT(*) FROM groups WHERE status = $1", status).Scan(&total)
-
-	c.JSON(http.StatusOK, gin.H{
-		"total":    total,
-		"page":     pageNum,
-		"per_page": perPageNum,
-		"data":     groups,
-	})
+	c.JSON(http.StatusOK, result)
 }
 
 // GetGroupByID retrieves a group by ID
 func GetGroupByID(c *gin.Context) {
+	initOrderAndGroupServices()
+
 	id := c.Param("id")
 	groupID, _ := strconv.Atoi(id)
 	ctx := context.Background()
@@ -466,178 +258,85 @@ func GetGroupByID(c *gin.Context) {
 		}
 	}
 
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	var group models.Group
-	err := db.QueryRow(
-		"SELECT id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at FROM groups WHERE id = $1",
-		id,
-	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
-
+	groupID, err := strconv.Atoi(id)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	if groupJSON, err := json.Marshal(group); err == nil {
-		cache.Set(ctx, cacheKey, string(groupJSON), 5*time.Minute)
+	grp, err := groupService.GetGroupByID(c.Request.Context(), groupID)
+	if err != nil {
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+		}
+		return
 	}
 
-	c.JSON(http.StatusOK, group)
+	c.JSON(http.StatusOK, grp)
 }
 
 // JoinGroup adds current user to a group
 func JoinGroup(c *gin.Context) {
+	initOrderAndGroupServices()
+
 	userID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
-	groupID := c.Param("id")
+	userIDInt := userID.(int)
+	id := c.Param("id")
 
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	// Get group info
-	var group models.Group
-	err := db.QueryRow(
-		"SELECT id, product_id, target_count, current_count, status, deadline FROM groups WHERE id = $1",
-		groupID,
-	).Scan(&group.ID, &group.ProductID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline)
-
+	groupID, err := strconv.Atoi(id)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	if group.Status != "active" {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"GROUP_INACTIVE",
-			"Group is not active",
-			http.StatusConflict,
-			nil,
-		))
-		return
-	}
-
-	if group.CurrentCount >= group.TargetCount {
-		middleware.RespondWithError(c, apperrors.ErrGroupFull)
-		return
-	}
-
-	if time.Now().After(group.Deadline) {
-		middleware.RespondWithError(c, apperrors.ErrGroupExpired)
-		return
-	}
-
-	// Create order for group
-	var product models.Product
-	err = db.QueryRow("SELECT price FROM products WHERE id = $1", group.ProductID).Scan(&product.Price)
+	// Call service
+	grp, err := groupService.JoinGroup(c.Request.Context(), userIDInt, groupID)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		}
 		return
 	}
 
-	var orderID int
-	err = db.QueryRow(
-		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-		userID, group.ProductID, group.ID, 1, product.Price, product.Price, orderStatusPending,
-	).Scan(&orderID)
-
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"ORDER_CREATION_FAILED",
-			"Failed to create order",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	// Add to group members
-	_, err = db.Exec(
-		"INSERT INTO group_members (group_id, user_id, order_id) VALUES ($1, $2, $3)",
-		group.ID, userID, orderID,
-	)
-
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrAlreadyInGroup)
-		return
-	}
-
-	// Update group count
-	newCount := group.CurrentCount + 1
-	newStatus := group.Status
-	if newCount >= group.TargetCount {
-		newStatus = "completed"
-	}
-
-	err = db.QueryRow(
-		"UPDATE groups SET current_count = $1, status = $2 WHERE id = $3 RETURNING id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at",
-		newCount, newStatus, group.ID,
-	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
-
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"GROUP_UPDATE_FAILED",
-			"Failed to update group",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	cache.Delete(context.Background(), cache.GroupKey(group.ID))
-
-	c.JSON(http.StatusOK, group)
+	c.JSON(http.StatusOK, grp)
 }
 
 // CancelGroup cancels a group (creator only)
 func CancelGroup(c *gin.Context) {
+	initOrderAndGroupServices()
+
 	userID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
+	userIDInt := userID.(int)
 	id := c.Param("id")
 
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	// Verify creator
-	var creatorID int
-	err := db.QueryRow("SELECT creator_id FROM groups WHERE id = $1", id).Scan(&creatorID)
+	groupID, err := strconv.Atoi(id)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	userIDInt, ok := userID.(int)
-	if !ok || creatorID != userIDInt {
-		middleware.RespondWithError(c, apperrors.ErrForbidden)
-		return
-	}
-
-	_, err = db.Exec("DELETE FROM groups WHERE id = $1", id)
+	// Call service
+	err = groupService.CancelGroup(c.Request.Context(), userIDInt, groupID)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"GROUP_DELETE_FAILED",
-			"Failed to cancel group",
-			http.StatusInternalServerError,
-			err,
-		))
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		}
 		return
 	}
 
@@ -649,24 +348,36 @@ func CancelGroup(c *gin.Context) {
 
 // GetGroupProgress retrieves group progress
 func GetGroupProgress(c *gin.Context) {
+	initOrderAndGroupServices()
+
 	id := c.Param("id")
 
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	var group models.Group
-	err := db.QueryRow(
-		"SELECT id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at FROM groups WHERE id = $1",
-		id,
-	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
-
+	groupID, err := strconv.Atoi(id)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	c.JSON(http.StatusOK, group)
+	grp, err := groupService.GetGroupByID(c.Request.Context(), groupID)
+	if err != nil {
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+		}
+		return
+	}
+
+	// Return progress info
+	progress := gin.H{
+		"id":           grp.ID,
+		"product_id":   grp.ProductID,
+		"target_count": grp.TargetCount,
+		"current_count": grp.CurrentCount,
+		"percentage":   (float64(grp.CurrentCount) / float64(grp.TargetCount)) * 100,
+		"status":       grp.Status,
+		"deadline":     grp.Deadline,
+	}
+
+	c.JSON(http.StatusOK, progress)
 }

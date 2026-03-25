@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -12,16 +13,14 @@ import (
 var client *redis.Client
 
 const (
-	ProductCacheTTL  = 1 * time.Hour
-	ProductListTTL   = 5 * time.Minute
-	UserCacheTTL     = 30 * time.Minute
-	GroupCacheTTL    = time.Duration(0) // No caching for real-time groups
-	OrderCacheTTL    = 10 * time.Minute
-	TokenBalanceTTL  = 5 * time.Minute
-	SearchResultsTTL = 10 * time.Minute
-	ReferralCodeTTL  = 30 * time.Minute
-	ReferralStatsTTL = 5 * time.Minute
-	MerchantCacheTTL = 30 * time.Minute
+	ProductCacheTTL    = 1 * time.Hour
+	ProductListTTL     = 5 * time.Minute
+	UserCacheTTL       = 30 * time.Minute
+	GroupCacheTTL      = time.Duration(0) // No caching for real-time groups
+	OrderCacheTTL      = 10 * time.Minute
+	TokenBalanceTTL    = 5 * time.Minute
+	SearchResultsTTL   = 10 * time.Minute
+	PaymentTTL         = 15 * time.Minute
 )
 
 // Init initializes the Redis client
@@ -172,24 +171,12 @@ func SessionKey(userID int) string {
 	return fmt.Sprintf("session:%d", userID)
 }
 
-func ReferralCodeKey(userID int) string {
-	return fmt.Sprintf("referral:code:%d", userID)
+func PaymentKey(id int) string {
+	return fmt.Sprintf("payment:%d", id)
 }
 
-func ReferralStatsKey(userID int) string {
-	return fmt.Sprintf("referral:stats:%d", userID)
-}
-
-func MerchantKey(userID int) string {
-	return fmt.Sprintf("merchant:%d", userID)
-}
-
-func MerchantProductsKey(merchantID int) string {
-	return fmt.Sprintf("merchant:%d:products", merchantID)
-}
-
-func MerchantAPIKeysKey(merchantID int) string {
-	return fmt.Sprintf("merchant:%d:apikeys", merchantID)
+func PaymentListKey(userID, page, perPage int) string {
+	return fmt.Sprintf("payments:user:%d:page:%d:limit:%d", userID, page, perPage)
 }
 
 // InvalidatePatterns invalidates cache keys matching a pattern
@@ -215,41 +202,16 @@ func InvalidatePatterns(ctx context.Context, pattern string) error {
 	return nil
 }
 
-func DeletePattern(ctx context.Context, pattern string) error {
-	return InvalidatePatterns(ctx, pattern)
-}
-
-func HealthCheck(ctx context.Context) error {
-	if client == nil {
-		return fmt.Errorf("redis client not initialized")
+// MarshalCachedValue serializes a value to JSON string for caching
+func MarshalCachedValue(v interface{}) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return ""
 	}
-	return client.Ping(ctx).Err()
+	return string(data)
 }
 
-type RedisCache struct {
-	client *redis.Client
-}
-
-func NewRedisCache() *RedisCache {
-	return &RedisCache{client: client}
-}
-
-func (r *RedisCache) Get(ctx context.Context, key string) (string, error) {
-	return Get(ctx, key)
-}
-
-func (r *RedisCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
-	return Set(ctx, key, value, ttl)
-}
-
-func (r *RedisCache) Delete(ctx context.Context, key string) error {
-	return Delete(ctx, key)
-}
-
-func (r *RedisCache) DeletePattern(ctx context.Context, pattern string) error {
-	return DeletePattern(ctx, pattern)
-}
-
-func (r *RedisCache) Exists(ctx context.Context, key string) (bool, error) {
-	return Exists(ctx, key)
+// UnmarshalCachedValue deserializes a JSON string from cache
+func UnmarshalCachedValue(data string, v interface{}) error {
+	return json.Unmarshal([]byte(data), v)
 }

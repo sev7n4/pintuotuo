@@ -72,14 +72,12 @@ type Token struct {
 // Payment represents a payment transaction
 type Payment struct {
 	ID            int       `json:"id"`
-	OrderID       int       `json:"order_id"`
 	UserID        int       `json:"user_id"`
+	OrderID       int       `json:"order_id"`
 	Amount        float64   `json:"amount"`
-	PayMethod     string    `json:"pay_method"`
-	OutTradeNo    string    `json:"out_trade_no"`
+	Method        string    `json:"method"`       // alipay, wechat
+	Status        string    `json:"status"`       // pending, success, failed, refunded
 	TransactionID string    `json:"transaction_id,omitempty"`
-	Status        string    `json:"status"`
-	PaidAt        time.Time `json:"paid_at,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

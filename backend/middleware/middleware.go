@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/errors"
 )
 
@@ -150,8 +151,77 @@ func RespondWithError(c *gin.Context, appErr *errors.AppError) {
 	})
 }
 
+// RateLimitMiddleware limits request rate per IP address
+// Default: 100 requests per minute per IP
 func RateLimitMiddleware() gin.HandlerFunc {
+	return RateLimitMiddlewareWithConfig(RateLimitConfig{
+		RequestsPerMinute: 100,
+		KeyPrefix:        "ratelimit:ip",
+	})
+}
+
+// RateLimitConfig configures rate limiting behavior
+type RateLimitConfig struct {
+	RequestsPerMinute int
+	KeyPrefix        string
+}
+
+// RateLimitMiddlewareWithConfig limits request rate with custom config
+func RateLimitMiddlewareWithConfig(config RateLimitConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Get client IP address
+		clientIP := c.ClientIP()
+		if clientIP == "" {
+			clientIP = "unknown"
+		}
+
+		// Create rate limit key
+		key := fmt.Sprintf("%s:%s", config.KeyPrefix, clientIP)
+
+		// Try to increment counter
+		ctx := c.Request.Context()
+		count, err := incrementRateLimit(ctx, key, 60*time.Second)
+		if err != nil {
+			// On cache error, allow request to pass through (graceful degradation)
+			log.Printf("Rate limit check failed: %v", err)
+			c.Next()
+			return
+		}
+
+		// Check if limit exceeded
+		if count > int64(config.RequestsPerMinute) {
+			c.JSON(429, gin.H{
+				"code":    "RATE_LIMIT_EXCEEDED",
+				"message": fmt.Sprintf("Rate limit exceeded: %d requests per minute", config.RequestsPerMinute),
+			})
+			c.Abort()
+			return
+		}
+
+		// Continue to next handler
 		c.Next()
 	}
+}
+
+// incrementRateLimit increments the rate limit counter using sliding window
+func incrementRateLimit(ctx context.Context, key string, window time.Duration) (int64, error) {
+	client := cache.GetClient()
+	if client == nil {
+		return 1, nil // Allow if cache not initialized
+	}
+
+	// Increment counter and get new value
+	count, err := client.Incr(ctx, key).Result()
+	if err != nil {
+		return 0, err
+	}
+
+	// Set expiration on first request (TTL = window size)
+	if count == 1 {
+		if err := client.Expire(ctx, key, window).Err(); err != nil {
+			log.Printf("Failed to set rate limit expiration: %v", err)
+		}
+	}
+
+	return count, nil
 }

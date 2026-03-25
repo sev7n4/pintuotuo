@@ -73,13 +73,12 @@ func main() {
 		routes.RegisterOrderRoutes(v1)
 		routes.RegisterGroupRoutes(v1)
 		routes.RegisterTokenRoutes(v1)
+
+		// Payment routes (includes payments, webhooks, and merchants)
 		routes.RegisterPaymentRoutes(v1)
-		routes.RegisterReferralRoutes(v1)
-		routes.RegisterMerchantRoutes(v1)
-		routes.RegisterAPIRoutes(v1)
-		routes.RegisterConsumptionRoutes(v1)
-		routes.RegisterNotificationRoutes(v1)
-		routes.RegisterAdminRoutes(v1)
+
+		// Analytics routes
+		routes.RegisterAnalyticsRoutes(v1)
 	}
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

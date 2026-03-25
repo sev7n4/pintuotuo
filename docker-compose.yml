@@ -58,11 +58,7 @@ services:
       - POSTGRES_DB=pintuotuo_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d
-    ports:
-      - "5432:5432"
-    networks:
-      - pintuotuo-network
+      - ./scripts/db/full_schema.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pintuotuo -d pintuotuo_db"]
       interval: 10s

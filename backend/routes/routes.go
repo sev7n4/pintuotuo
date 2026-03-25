@@ -117,85 +117,61 @@ func RegisterGroupRoutes(router *gin.RouterGroup) {
 }
 
 func RegisterTokenRoutes(router *gin.RouterGroup) {
-	tokens := router.Group("/tokens")
-	tokens.Use(middleware.AuthMiddleware())
-	{
-		tokens.GET("/balance", handlers.GetTokenBalance)
-		tokens.GET("/consumption", handlers.GetTokenConsumption)
-		tokens.POST("/transfer", handlers.TransferTokens)
+  tokens := router.Group("/tokens")
+  {
+    tokens.GET("/balance", handlers.GetBalance)
+    tokens.GET("/consumption", handlers.GetConsumption)
+    tokens.GET("/total-balance", handlers.GetTotalBalance)
+    tokens.GET("/transactions", handlers.ListTransactions)
+    tokens.POST("/transfer", handlers.TransferTokens)
+    tokens.POST("/recharge", handlers.RechargeTokens)
+    tokens.POST("/consume", handlers.ConsumeTokens)
 
-		tokens.GET("/recharge/packages", handlers.GetRechargePackages)
-		tokens.POST("/recharge", handlers.CreateRechargeOrder)
-		tokens.GET("/recharge/orders", handlers.GetRechargeOrders)
-		tokens.GET("/recharge/orders/:id", handlers.GetRechargeOrder)
-
-		keys := tokens.Group("/keys")
-		{
-			keys.GET("", handlers.ListAPIKeys)
-			keys.POST("", handlers.CreateAPIKey)
-			keys.PUT("/:id", handlers.UpdateAPIKey)
-			keys.DELETE("/:id", handlers.DeleteAPIKey)
-		}
-	}
-
-	router.POST("/tokens/recharge/callback", handlers.HandleRechargeCallback)
+    // API Key management
+    keys := tokens.Group("/keys")
+    {
+      keys.GET("", handlers.ListAPIKeys)
+      keys.POST("", handlers.CreateAPIKey)
+      keys.PUT("/:id", handlers.UpdateAPIKey)
+      keys.DELETE("/:id", handlers.DeleteAPIKey)
+    }
+  }
 }
 
 func RegisterPaymentRoutes(router *gin.RouterGroup) {
 	payments := router.Group("/payments")
 	payments.Use(middleware.AuthMiddleware())
 	{
-		payments.POST("", handlers.CreatePayment)
-		payments.GET("/:id", handlers.GetPaymentStatus)
+		payments.POST("", handlers.InitiatePayment)
+		payments.GET("", handlers.ListPayments)
+		payments.GET("/:id", handlers.GetPaymentByID)
+		payments.POST("/:id/refund", handlers.RefundPayment)
 	}
 
-	webhooks := router.Group("/payments/webhooks")
+	// Webhook routes (without authentication)
+	webhooks := router.Group("/webhooks")
 	{
-		webhooks.POST("/alipay", handlers.AlipayNotify)
-		webhooks.POST("/wechat", handlers.WechatNotify)
+		webhooks.POST("/alipay", handlers.HandleAlipayCallback)
+		webhooks.POST("/wechat", handlers.HandleWechatCallback)
 	}
-}
 
-func RegisterReferralRoutes(router *gin.RouterGroup) {
-	referrals := router.Group("/referrals")
-	referrals.Use(middleware.AuthMiddleware())
-	{
-		referrals.GET("/code", handlers.GetMyReferralCode)
-		referrals.POST("/bind", handlers.BindReferralCode)
-		referrals.GET("/validate/:code", handlers.ValidateReferralCode)
-		referrals.GET("/stats", handlers.GetReferralStats)
-		referrals.GET("/list", handlers.GetReferralList)
-		referrals.GET("/rewards", handlers.GetReferralRewards)
-		referrals.POST("/rewards/pay", handlers.PayReferralRewards)
-	}
-}
-
-func RegisterMerchantRoutes(router *gin.RouterGroup) {
+	// Merchant routes
 	merchants := router.Group("/merchants")
 	{
-		merchants.POST("/register", handlers.RegisterMerchant)
+		merchants.GET("/:merchant_id/revenue", handlers.GetMerchantRevenue)
 	}
+}
 
-	authMerchants := router.Group("/merchants")
-	authMerchants.Use(middleware.AuthMiddleware())
+// RegisterAnalyticsRoutes registers analytics routes
+func RegisterAnalyticsRoutes(router *gin.RouterGroup) {
+	analytics := router.Group("/analytics")
 	{
-		authMerchants.GET("/profile", handlers.GetMerchantProfile)
-		authMerchants.PUT("/profile", handlers.UpdateMerchantProfile)
-		authMerchants.GET("/stats", handlers.GetMerchantStats)
-		authMerchants.GET("/products", handlers.GetMerchantProducts)
-		authMerchants.GET("/orders", handlers.GetMerchantOrders)
-		authMerchants.GET("/settlements", handlers.GetMerchantSettlements)
-		authMerchants.POST("/settlements", handlers.RequestSettlement)
-		authMerchants.GET("/settlements/:id", handlers.GetSettlementDetail)
-
-		apiKeys := authMerchants.Group("/api-keys")
-		{
-			apiKeys.GET("", handlers.ListMerchantAPIKeys)
-			apiKeys.POST("", handlers.CreateMerchantAPIKey)
-			apiKeys.PUT("/:id", handlers.UpdateMerchantAPIKey)
-			apiKeys.DELETE("/:id", handlers.DeleteMerchantAPIKey)
-			apiKeys.GET("/usage", handlers.GetMerchantAPIKeyUsage)
-		}
+		analytics.GET("/consumption", handlers.GetUserConsumption)
+		analytics.GET("/spending-pattern", handlers.GetUserSpendingPattern)
+		analytics.GET("/consumption-history", handlers.GetConsumptionHistory)
+		analytics.GET("/revenue", handlers.GetRevenueAnalytics)
+		analytics.GET("/top-spenders", handlers.GetTopSpenders)
+		analytics.GET("/metrics", handlers.GetPlatformMetrics)
 	}
 }
 

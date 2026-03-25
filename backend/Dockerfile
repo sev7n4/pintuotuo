@@ -1,37 +1,43 @@
+# Multi-stage build for Pintuotuo Backend
+
+# Stage 1: Build stage
 FROM golang:1.21-alpine AS builder
 
-ENV GOPROXY=https://goproxy.cn,direct
-ENV GO111MODULE=on
-
+# Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
 
+# Set working directory
 WORKDIR /app
 
+# Copy go mod files
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /app/server ./main.go
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o backend main.go
 
-FROM alpine:3.19
+# Stage 2: Runtime stage
+FROM alpine:latest
 
-RUN apk add --no-cache ca-certificates tzdata
+# Install runtime dependencies
+RUN apk --no-cache add ca-certificates tzdata
 
-RUN adduser -D -g '' appuser
+# Set working directory
+WORKDIR /root/
 
-WORKDIR /app
+# Copy binary from builder
+COPY --from=builder /app/backend .
 
-COPY --from=builder /app/server .
-COPY --from=builder /app/migrations ./migrations
-
-RUN chown -R appuser:appuser /app
-
-USER appuser
+# Copy database schema
+COPY scripts/db/ ./scripts/db/
 
 EXPOSE 8080
 
+# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/v1/health/ready || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
-ENTRYPOINT ["./server"]
+# Run the application
+CMD ["./backend"]

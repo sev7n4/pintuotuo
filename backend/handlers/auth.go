@@ -1,21 +1,20 @@
 package handlers
 
 import (
-	"context"
-	"crypto/sha256"
-	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/services/token"
+	"github.com/pintuotuo/backend/services/user"
 )
 
 var jwtSecret []byte
@@ -24,18 +23,13 @@ func init() {
 	jwtSecret = []byte(getEnv("JWT_SECRET", "pintuotuo-secret-key-dev"))
 }
 
-// RegisterRequest represents user registration data
-type RegisterRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Name     string `json:"name" binding:"required,min=2"`
-	Password string `json:"password" binding:"required,min=6"`
-	Role     string `json:"role"`
-}
+// Initialize user service
+var userService user.Service
 
-// LoginRequest represents user login data
-type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+func init() {
+	logger := log.New(os.Stderr, "[AuthHandler] ", log.LstdFlags)
+	tokenSvc := token.NewService(config.GetDB(), logger)
+	userService = user.NewService(config.GetDB(), logger, tokenSvc)
 }
 
 // AuthResponse represents authentication response
@@ -44,145 +38,82 @@ type AuthResponse struct {
 	Token string       `json:"token"`
 }
 
+// RefreshTokenResponse represents token refresh response
+type RefreshTokenResponse struct {
+	Token     string `json:"token"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
 // RegisterUser handles user registration
 func RegisterUser(c *gin.Context) {
-	var req RegisterRequest
+	var req user.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	// Check if user exists
-	var existingUser models.User
-	err := db.QueryRow(
-		"SELECT id FROM users WHERE email = $1",
-		req.Email,
-	).Scan(&existingUser.ID)
-	if err == nil {
-		middleware.RespondWithError(c, apperrors.ErrUserAlreadyExists)
-		return
-	}
-
-	// Hash password
-	passwordHash := hashPassword(req.Password)
-
-	// Determine role (default to "user" if not specified or invalid)
-	role := "user"
-	if req.Role == "merchant" || req.Role == "admin" {
-		role = req.Role
-	}
-
-	// Create user
-	var user models.User
-	err = db.QueryRow(
-		"INSERT INTO users (email, name, password_hash, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, created_at, updated_at",
-		req.Email, req.Name, passwordHash, role, "active",
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
-
+	// Call service
+	usr, err := userService.RegisterUser(c.Request.Context(), &req)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"USER_CREATION_FAILED",
-			"Failed to create user",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	// Create token balance
-	_, err = db.Exec(
-		"INSERT INTO tokens (user_id, balance) VALUES ($1, $2)",
-		user.ID, 0,
-	)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"TOKEN_INIT_FAILED",
-			"Failed to initialize token balance",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	// If user is a merchant, create merchant record with pending status (requires admin approval)
-	if role == "merchant" {
-		_, err = db.Exec(
-			"INSERT INTO merchants (user_id, company_name, status) VALUES ($1, $2, $3)",
-			user.ID, req.Name, "pending",
-		)
-		if err != nil {
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
 			middleware.RespondWithError(c, apperrors.NewAppError(
-				"MERCHANT_CREATION_FAILED",
-				"Failed to create merchant record",
+				"REGISTRATION_FAILED",
+				"Failed to register user",
 				http.StatusInternalServerError,
 				err,
 			))
-			return
 		}
+		return
 	}
+
+	// Map service user to model
+	userModel := mapServiceUserToModel(usr)
+
+	// Generate token
+	token := generateToken(usr.ID, usr.Email)
 
 	// Generate JWT token
 	token := generateToken(user.ID, user.Email, user.Role)
 	
 	c.JSON(http.StatusCreated, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"user":  user,
-			"token": token,
-		},
+		"user":  userModel,
+		"token": token,
 	})
 }
 
 // LoginUser handles user login
 func LoginUser(c *gin.Context) {
-	var req LoginRequest
+	var req struct {
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrInvalidCredentials)
-		return
-	}
-
-	// Find user by email
-	var user models.User
-	var passwordHash string
-	err := db.QueryRow(
-		"SELECT id, email, name, role, password_hash, created_at, updated_at FROM users WHERE email = $1",
-		req.Email,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &passwordHash, &user.CreatedAt, &user.UpdatedAt)
-
+	// Call service
+	usr, err := userService.AuthenticateUser(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrInvalidCredentials)
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrInvalidCredentials)
+		}
 		return
 	}
 
-	// Verify password
-	if !verifyPassword(req.Password, passwordHash) {
-		middleware.RespondWithError(c, apperrors.ErrInvalidCredentials)
-		return
-	}
+	// Map service user to model
+	userModel := mapServiceUserToModel(usr)
 
 	// Generate JWT token
-	token := generateToken(user.ID, user.Email, user.Role)
+	token := generateToken(usr.ID, usr.Email)
 
 	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data": gin.H{
-			"user":  user,
-			"token": token,
-		},
+		"user":  userModel,
+		"token": token,
 	})
 }
 
@@ -193,6 +124,93 @@ func LogoutUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
+// RefreshToken refreshes an expired JWT token
+func RefreshToken(c *gin.Context) {
+	var req struct {
+		Token string `json:"token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	// Call service
+	_, newToken, expiresAt, err := userService.RefreshToken(c.Request.Context(), req.Token)
+	if err != nil {
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":      newToken,
+		"expires_at": expiresAt,
+	})
+}
+
+// RequestPasswordReset initiates password reset
+func RequestPasswordReset(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	// Call service
+	err := userService.RequestPasswordReset(c.Request.Context(), req.Email)
+	if err != nil {
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			// Don't expose error details for security
+		}
+		// Always return success response
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "If the email exists, a password reset link has been sent",
+	})
+}
+
+// ResetPassword resets user password with reset token
+func ResetPassword(c *gin.Context) {
+	var req struct {
+		ResetToken  string `json:"reset_token" binding:"required"`
+		NewPassword string `json:"new_password" binding:"required,min=6"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	// Call service
+	err := userService.ResetPassword(c.Request.Context(), req.ResetToken, req.NewPassword)
+	if err != nil {
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"PASSWORD_RESET_FAILED",
+				"Failed to reset password",
+				http.StatusInternalServerError,
+				err,
+			))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Password reset successfully",
+	})
+}
+
 // GetCurrentUser retrieves current authenticated user
 func GetCurrentUser(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -201,50 +219,26 @@ func GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
 	userIDInt, ok := userID.(int)
 	if !ok {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
-	// Try cache first
-	cacheKey := cache.UserKey(userIDInt)
-	if cachedUser, err := cache.Get(ctx, cacheKey); err == nil {
-		var user models.User
-		if err := json.Unmarshal([]byte(cachedUser), &user); err == nil {
-			c.JSON(http.StatusOK, gin.H{
-				"code":    0,
-				"message": "success",
-				"data":    user,
-			})
-			return
-		}
-	}
-
-	db := config.GetDB()
-
-	var user models.User
-	err := db.QueryRow(
-		"SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1",
-		userIDInt,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
-
+	// Call service
+	usr, err := userService.GetCurrentUser(c.Request.Context(), userIDInt)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrUserNotFound)
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrUserNotFound)
+		}
 		return
 	}
 
-	// Cache the result
-	if userJSON, err := json.Marshal(user); err == nil {
-		cache.Set(ctx, cacheKey, string(userJSON), cache.UserCacheTTL)
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"code":    0,
-		"message": "success",
-		"data":    user,
-	})
+	// Map service user to model
+	userModel := mapServiceUserToModel(usr)
+	c.JSON(http.StatusOK, userModel)
 }
 
 // UpdateCurrentUser updates current user profile
@@ -255,114 +249,94 @@ func UpdateCurrentUser(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		Name string `json:"name"`
-	}
+	var req user.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	db := config.GetDB()
+	userIDInt, _ := userID.(int)
 
-	var user models.User
-	err := db.QueryRow(
-		"UPDATE users SET name = $1 WHERE id = $2 RETURNING id, email, name, role, created_at, updated_at",
-		req.Name, userID,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
-
+	// Call service
+	usr, err := userService.UpdateUserProfile(c.Request.Context(), userIDInt, &req)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"USER_UPDATE_FAILED",
-			"Failed to update user",
-			http.StatusInternalServerError,
-			err,
-		))
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"USER_UPDATE_FAILED",
+				"Failed to update user",
+				http.StatusInternalServerError,
+				err,
+			))
+		}
 		return
 	}
 
-	// Invalidate user cache
-	ctx := context.Background()
-	userIDInt, _ := userID.(int)
-	cache.Delete(ctx, cache.UserKey(userIDInt))
-
-	c.JSON(http.StatusOK, user)
+	// Map service user to model
+	userModel := mapServiceUserToModel(usr)
+	c.JSON(http.StatusOK, userModel)
 }
 
 // GetUserByID retrieves user by ID
 func GetUserByID(c *gin.Context) {
 	id := c.Param("id")
-
-	ctx := context.Background()
-	idInt := idToInt(id)
-
-	// Try cache first
-	cacheKey := cache.UserKey(idInt)
-	if cachedUser, err := cache.Get(ctx, cacheKey); err == nil {
-		var user models.User
-		if err := json.Unmarshal([]byte(cachedUser), &user); err == nil {
-			c.JSON(http.StatusOK, user)
-			return
-		}
-	}
-
-	db := config.GetDB()
-
-	var user models.User
-	err := db.QueryRow(
-		"SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1",
-		id,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
-
+	idInt, err := strconv.Atoi(id)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrUserNotFound)
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	// Cache the result
-	if userJSON, err := json.Marshal(user); err == nil {
-		cache.Set(ctx, cacheKey, string(userJSON), cache.UserCacheTTL)
+	// Call service
+	usr, err := userService.GetUserByID(c.Request.Context(), idInt)
+	if err != nil {
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrUserNotFound)
+		}
+		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	// Map service user to model
+	userModel := mapServiceUserToModel(usr)
+	c.JSON(http.StatusOK, userModel)
 }
 
 // UpdateUser updates user by ID (admin only)
 func UpdateUser(c *gin.Context) {
 	id := c.Param("id")
-
-	var req struct {
-		Name string `json:"name"`
-		Role string `json:"role"`
+	idInt, err := strconv.Atoi(id)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
 	}
+
+	var req user.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	db := config.GetDB()
-
-	var user models.User
-	err := db.QueryRow(
-		"UPDATE users SET name = $1, role = $2 WHERE id = $3 RETURNING id, email, name, role, created_at, updated_at",
-		req.Name, req.Role, id,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
-
+	// Call service
+	usr, err := userService.UpdateUserProfile(c.Request.Context(), idInt, &req)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"USER_UPDATE_FAILED",
-			"Failed to update user",
-			http.StatusInternalServerError,
-			err,
-		))
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, appErr)
+		} else {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"USER_UPDATE_FAILED",
+				"Failed to update user",
+				http.StatusInternalServerError,
+				err,
+			))
+		}
 		return
 	}
 
-	// Invalidate user cache
-	ctx := context.Background()
-	cache.Delete(ctx, cache.UserKey(idToInt(id)))
-
-	c.JSON(http.StatusOK, user)
+	// Map service user to model
+	userModel := mapServiceUserToModel(usr)
+	c.JSON(http.StatusOK, userModel)
 }
 
 // RefreshToken refreshes the JWT token for authenticated user
@@ -546,25 +520,26 @@ func generateResetToken(userID int) string {
 
 // Helper functions
 
-func hashPassword(password string) string {
-	hash := sha256.Sum256([]byte(password + string(jwtSecret)))
-	return fmt.Sprintf("%x", hash)
-}
-
-func verifyPassword(password, hash string) bool {
-	return hashPassword(password) == hash
-}
-
-func generateToken(userID int, email string, role string) string {
+func generateToken(userID int, email string) string {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID,
 		"email":   email,
-		"role":    role,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(),
+		"exp":     time.Now().Add(24 * time.Hour).Unix(),
 	})
 
 	tokenString, _ := token.SignedString(jwtSecret)
 	return tokenString
+}
+
+func mapServiceUserToModel(u *user.User) *models.User {
+	return &models.User{
+		ID:        u.ID,
+		Email:     u.Email,
+		Name:      u.Name,
+		Role:      u.Role,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+	}
 }
 
 func getEnv(key, defaultValue string) string {

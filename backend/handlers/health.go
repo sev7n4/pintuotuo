@@ -1,150 +1,160 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
-	"runtime"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/cache"
-	"github.com/pintuotuo/backend/db"
+	"github.com/pintuotuo/backend/config"
 )
 
-type HealthResponse struct {
-	Status    string             `json:"status"`
-	Timestamp string             `json:"timestamp"`
-	Version   string             `json:"version"`
-	Services  map[string]Service `json:"services"`
-	System    SystemInfo         `json:"system"`
+// HealthCheckResponse represents the health check response
+type HealthCheckResponse struct {
+	Status    string                 `json:"status"`
+	Timestamp string                 `json:"timestamp"`
+	Version   string                 `json:"version"`
+	Services  map[string]ServiceStatus `json:"services"`
+	Uptime    int64                  `json:"uptime_seconds"`
 }
 
-type Service struct {
-	Status  string `json:"status"`
-	Latency string `json:"latency,omitempty"`
-	Error   string `json:"error,omitempty"`
+// ServiceStatus represents the status of a single service
+type ServiceStatus struct {
+	Status   string `json:"status"`
+	Message  string `json:"message,omitempty"`
+	Duration int64  `json:"response_time_ms"`
 }
 
-type SystemInfo struct {
-	GoVersion    string `json:"go_version"`
-	NumGoroutine int    `json:"num_goroutine"`
-	NumCPU       int    `json:"num_cpu"`
-	MemAllocMB   uint64 `json:"mem_alloc_mb"`
-	MemTotalMB   uint64 `json:"mem_total_mb"`
-	MemSysMB     uint64 `json:"mem_sys_mb"`
-}
+var startTime = time.Now()
 
-type DBPoolStats struct {
-	MaxOpenConnections int    `json:"max_open_connections"`
-	OpenConnections    int    `json:"open_connections"`
-	InUse              int    `json:"in_use"`
-	Idle               int    `json:"idle"`
-	WaitCount          int64  `json:"wait_count"`
-	WaitDuration       string `json:"wait_duration"`
-	MaxIdleClosed      int64  `json:"max_idle_closed"`
-	MaxLifetimeClosed  int64  `json:"max_lifetime_closed"`
-}
-
+// HealthCheck returns overall health status (liveness probe)
+// Used by Kubernetes, load balancers, and monitoring systems
 func HealthCheck(c *gin.Context) {
-	services := make(map[string]Service)
-
-	start := time.Now()
-	err := db.HealthCheck(c.Request.Context())
-	latency := time.Since(start)
-
-	if err != nil {
-		services["database"] = Service{
-			Status: "unhealthy",
-			Error:  err.Error(),
-		}
-	} else {
-		services["database"] = Service{
-			Status:  "healthy",
-			Latency: latency.String(),
-		}
-	}
-
-	start = time.Now()
-	redisErr := cache.HealthCheck(c.Request.Context())
-	latency = time.Since(start)
-
-	if redisErr != nil {
-		services["redis"] = Service{
-			Status: "unhealthy",
-			Error:  redisErr.Error(),
-		}
-	} else {
-		services["redis"] = Service{
-			Status:  "healthy",
-			Latency: latency.String(),
-		}
-	}
-
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
-	system := SystemInfo{
-		GoVersion:    runtime.Version(),
-		NumGoroutine: runtime.NumGoroutine(),
-		NumCPU:       runtime.NumCPU(),
-		MemAllocMB:   m.Alloc / 1024 / 1024,
-		MemTotalMB:   m.TotalAlloc / 1024 / 1024,
-		MemSysMB:     m.Sys / 1024 / 1024,
-	}
-
-	overallStatus := "healthy"
-	for _, svc := range services {
-		if svc.Status != "healthy" {
-			overallStatus = "degraded"
-			break
-		}
-	}
-
-	c.JSON(http.StatusOK, HealthResponse{
-		Status:    overallStatus,
+	response := HealthCheckResponse{
+		Status:    "healthy",
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Version:   "1.0.0",
-		Services:  services,
-		System:    system,
-	})
-}
-
-func DBStats(c *gin.Context) {
-	stats := db.GetPoolStats()
-	if stats == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "database not initialized",
-		})
-		return
+		Services:  make(map[string]ServiceStatus),
+		Uptime:    int64(time.Since(startTime).Seconds()),
 	}
 
-	c.JSON(http.StatusOK, DBPoolStats{
-		MaxOpenConnections: stats.MaxOpenConnections,
-		OpenConnections:    stats.OpenConnections,
-		InUse:              stats.InUse,
-		Idle:               stats.Idle,
-		WaitCount:          stats.WaitCount,
-		WaitDuration:       stats.WaitDuration.String(),
-		MaxIdleClosed:      stats.MaxIdleClosed,
-		MaxLifetimeClosed:  stats.MaxLifetimeClosed,
-	})
-}
-
-func ReadyCheck(c *gin.Context) {
-	if err := db.HealthCheck(c.Request.Context()); err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "not ready",
-			"error":  err.Error(),
-		})
-		return
+	// Application is running
+	response.Services["application"] = ServiceStatus{
+		Status:   "up",
+		Duration: 1,
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status": "ready",
-	})
+	c.JSON(http.StatusOK, response)
 }
 
-func LiveCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"status": "alive",
-	})
+// ReadinessProbe checks if all critical dependencies are ready
+// Used by Kubernetes and deployment orchestration
+func ReadinessProbe(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	response := HealthCheckResponse{
+		Status:    "ready",
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Version:   "1.0.0",
+		Services:  make(map[string]ServiceStatus),
+		Uptime:    int64(time.Since(startTime).Seconds()),
+	}
+
+	allHealthy := true
+
+	// Check Database connectivity
+	start := time.Now()
+	db := config.GetDB()
+	dbDuration := time.Since(start).Milliseconds()
+
+	if db == nil {
+		response.Services["database"] = ServiceStatus{
+			Status:   "down",
+			Message:  "database not initialized",
+			Duration: dbDuration,
+		}
+		allHealthy = false
+	} else {
+		dbErr := db.PingContext(ctx)
+		if dbErr != nil {
+			response.Services["database"] = ServiceStatus{
+				Status:   "down",
+				Message:  dbErr.Error(),
+				Duration: dbDuration,
+			}
+			allHealthy = false
+		} else {
+			response.Services["database"] = ServiceStatus{
+				Status:   "healthy",
+				Duration: dbDuration,
+			}
+		}
+	}
+
+	// Check Redis connectivity
+	start = time.Now()
+	redisClient := cache.GetClient()
+	redisDuration := time.Since(start).Milliseconds()
+
+	if redisClient == nil {
+		response.Services["redis"] = ServiceStatus{
+			Status:   "down",
+			Message:  "redis client not initialized",
+			Duration: redisDuration,
+		}
+		allHealthy = false
+	} else {
+		redisCmd := redisClient.Ping(ctx)
+		if redisCmd.Err() != nil {
+			response.Services["redis"] = ServiceStatus{
+				Status:   "down",
+				Message:  redisCmd.Err().Error(),
+				Duration: redisDuration,
+			}
+			allHealthy = false
+		} else {
+			response.Services["redis"] = ServiceStatus{
+				Status:   "healthy",
+				Duration: redisDuration,
+			}
+		}
+	}
+
+	// Overall status
+	if allHealthy {
+		response.Status = "ready"
+		c.JSON(http.StatusOK, response)
+	} else {
+		response.Status = "not_ready"
+		c.JSON(http.StatusServiceUnavailable, response)
+	}
+}
+
+// LivenessProbe checks if application is still running
+// Kubernetes uses this to determine if pod should be restarted
+func LivenessProbe(c *gin.Context) {
+	response := HealthCheckResponse{
+		Status:    "alive",
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Version:   "1.0.0",
+		Services:  make(map[string]ServiceStatus),
+		Uptime:    int64(time.Since(startTime).Seconds()),
+	}
+
+	// Application is running if we can respond to this request
+	c.JSON(http.StatusOK, response)
+}
+
+// Metrics returns basic service metrics
+func Metrics(c *gin.Context) {
+	response := gin.H{
+		"uptime_seconds":   int64(time.Since(startTime).Seconds()),
+		"timestamp":        time.Now().UTC().Format(time.RFC3339),
+		"status":           "running",
+		"version":          "1.0.0",
+	}
+
+	c.JSON(http.StatusOK, response)
 }
