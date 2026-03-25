@@ -70,8 +70,9 @@ func (s *EmailService) Send(msg *EmailMessage) error {
 }
 
 func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, from string, to []string, msg []byte) error {
+	//nolint:gosec,G402
 	conn, err := tls.Dial("tcp", addr, &tls.Config{
-		InsecureSkipVerify: true, //nolint:gosec,G402
+		InsecureSkipVerify: true,
 		ServerName:         s.config.SMTPHost,
 	})
 	if err != nil {
@@ -444,7 +445,8 @@ func (s *NotificationService) Send(req *NotificationRequest) error {
 }
 
 func (s *NotificationService) getPushTitle(t NotificationType) string {
-	titles := map[NotificationType]string{ //nolint:gosec,G101
+	//nolint:gosec,G101
+	titles := map[NotificationType]string{
 		NotificationWelcome:        "欢迎加入拼脱脱！",
 		NotificationResetPassword:  "密码重置验证码",
 		NotificationOrderConfirm:   "订单创建成功",

@@ -22,7 +22,8 @@ func InitDB() error {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		// Default to development database
-		dbURL = "postgresql://pintuotuo:dev_password_123@localhost:5432/pintuotuo_db?sslmode=disable" //nolint:gosec,G101
+		//nolint:gosec,G101
+		dbURL = "postgresql://pintuotuo:dev_password_123@localhost:5432/pintuotuo_db?sslmode=disable"
 	}
 
 	db, err := sql.Open("postgres", dbURL)

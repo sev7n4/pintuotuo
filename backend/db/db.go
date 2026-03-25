@@ -27,7 +27,8 @@ type PoolStats struct {
 func Init() error {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
-		databaseURL = "postgresql://pintuotuo:dev_password_123@localhost:5432/pintuotuo_db?sslmode=disable" //nolint:gosec,G101
+		//nolint:gosec,G101
+		databaseURL = "postgresql://pintuotuo:dev_password_123@localhost:5432/pintuotuo_db?sslmode=disable"
 	}
 
 	var err error
