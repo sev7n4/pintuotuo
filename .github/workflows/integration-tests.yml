@@ -85,8 +85,7 @@ jobs:
           REDIS_URL: localhost:6379
           GIN_MODE: test
         run: |
-          go test -v -run Integration -race -coverprofile=integration-coverage.out -covermode=atomic ./... 2>&1 || echo "Integration tests completed with some failures"
-        continue-on-error: true
+          go test -v -run Integration -race -coverprofile=integration-coverage.out -covermode=atomic ./...
 
       - name: Upload integration coverage to Codecov
         uses: codecov/codecov-action@v4
