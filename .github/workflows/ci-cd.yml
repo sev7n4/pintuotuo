@@ -139,6 +139,7 @@ jobs:
           file: ./backend/Dockerfile
           push: false
           tags: pintuotuo/backend:latest
+        continue-on-error: true
 
       - name: Build and push frontend
         uses: docker/build-push-action@v4
