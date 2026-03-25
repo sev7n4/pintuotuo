@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -177,12 +178,18 @@ func TestConcurrentRequestHandling(t *testing.T) {
 	router := gin.Default()
 	router.Use(middleware.ErrorHandlingMiddleware())
 
-	requestCount := 0
+	var (
+		requestCount int
+		mu          sync.Mutex
+	)
 	router.GET("/concurrent", func(c *gin.Context) {
+		mu.Lock()
 		requestCount++
+		count := requestCount
+		mu.Unlock()
 		time.Sleep(10 * time.Millisecond) // Simulate processing
 		c.JSON(http.StatusOK, gin.H{
-			"request_number": requestCount,
+			"request_number": count,
 			"timestamp":      time.Now().Unix(),
 		})
 	})
