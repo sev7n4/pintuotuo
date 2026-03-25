@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -117,6 +118,7 @@ func GetMerchantProfile(c *gin.Context) {
 
 	db := config.GetDB()
 	if db == nil {
+		log.Printf("GetMerchantProfile: Database connection is nil for user %d", userIDInt)
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
@@ -132,6 +134,7 @@ func GetMerchantProfile(c *gin.Context) {
 		&merchant.Status, &verifiedAt, &merchant.CreatedAt, &merchant.UpdatedAt)
 
 	if err == sql.ErrNoRows {
+		log.Printf("GetMerchantProfile: Merchant not found for user_id %d", userIDInt)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MERCHANT_NOT_FOUND",
 			"Merchant profile not found",
@@ -140,6 +143,7 @@ func GetMerchantProfile(c *gin.Context) {
 		))
 		return
 	} else if err != nil {
+		log.Printf("GetMerchantProfile: Database query error for user_id %d: %v", userIDInt, err)
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
