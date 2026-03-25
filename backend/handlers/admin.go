@@ -10,10 +10,17 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
+const (
+	roleAdmin           = "admin"
+	roleMerchant        = "merchant"
+	roleUser            = "user"
+	merchantStatusPending = "pending"
+)
+
 // GetAdminUsers retrieves all users (admin only)
 func GetAdminUsers(c *gin.Context) {
 	userRole, exists := c.Get("user_role")
-	if !exists || userRole != "admin" {
+	if !exists || userRole != roleAdmin {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FORBIDDEN",
 			"Admin access required",
@@ -104,8 +111,8 @@ func CreateAdminUser(c *gin.Context) {
 	passwordHash := hashPassword(req.Password)
 
 	// Determine role (default to admin)
-	role := "admin"
-	if req.Role == "merchant" || req.Role == "user" {
+	role := roleAdmin
+	if req.Role == roleMerchant || req.Role == roleUser {
 		role = req.Role
 	}
 
@@ -299,7 +306,7 @@ func ApproveMerchant(c *gin.Context) {
 		return
 	}
 
-	if currentStatus != "pending" {
+	if currentStatus != merchantStatusPending {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"INVALID_STATUS",
 			"Merchant is not in pending status",
@@ -379,7 +386,7 @@ func RejectMerchant(c *gin.Context) {
 		return
 	}
 
-	if currentStatus != "pending" {
+	if currentStatus != merchantStatusPending {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"INVALID_STATUS",
 			"Merchant is not in pending status",

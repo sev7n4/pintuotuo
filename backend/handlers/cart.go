@@ -217,7 +217,7 @@ func UpdateCartItem(c *gin.Context) {
 		Quantity int `json:"quantity"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err = c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "INVALID_REQUEST",
 			"message": "Invalid request body",

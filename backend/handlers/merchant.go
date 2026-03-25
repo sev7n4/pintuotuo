@@ -17,6 +17,8 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
+const allProductStatus = "all"
+
 func RegisterMerchant(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -378,7 +380,7 @@ func GetMerchantProducts(c *gin.Context) {
 	offset := (pageNum - 1) * perPageNum
 
 	var rows *sql.Rows
-	if status != "" && status != "all" {
+	if status != "" && status != allProductStatus {
 		rows, err = db.Query(
 			`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price), stock, COALESCE(sold_count, 0), COALESCE(category, ''), status, created_at, updated_at 
 			 FROM products WHERE merchant_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
