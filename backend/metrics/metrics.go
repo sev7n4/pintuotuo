@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -278,10 +280,10 @@ var (
 
 // RecordHTTPRequest records an HTTP request
 func RecordHTTPRequest(method, endpoint string, status int, durationSeconds float64, requestSizeBytes, responseSizeBytes int64) {
-	HTTPRequestsTotal.WithLabelValues(method, endpoint, string(rune(status))).Inc()
+	HTTPRequestsTotal.WithLabelValues(method, endpoint, fmt.Sprintf("%d", status)).Inc()
 	HTTPRequestDuration.WithLabelValues(method, endpoint).Observe(durationSeconds)
 	HTTPRequestSize.WithLabelValues(method, endpoint).Observe(float64(requestSizeBytes))
-	HTTPResponseSize.WithLabelValues(method, endpoint, string(rune(status))).Observe(float64(responseSizeBytes))
+	HTTPResponseSize.WithLabelValues(method, endpoint, fmt.Sprintf("%d", status)).Observe(float64(responseSizeBytes))
 }
 
 // RecordDatabaseQuery records a database query
