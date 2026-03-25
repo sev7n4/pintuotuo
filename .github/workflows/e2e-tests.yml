@@ -2,7 +2,10 @@ name: E2E Tests
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: [main]
+  workflow_run:
+    workflows: ["Integration Tests"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       environment:
