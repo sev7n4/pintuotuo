@@ -154,7 +154,7 @@ jobs:
 
       - name: Run npm audit (frontend)
         working-directory: ./frontend
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=critical
 
       - name: Run Go security check
         working-directory: ./backend

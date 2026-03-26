@@ -105,15 +105,23 @@ export const ProductDetailPage: React.FC = () => {
   }
 
   const handleGroupPurchase = async () => {
-    if (!product) return
+    if (!product) {
+      message.error('商品信息加载失败')
+      return
+    }
     const currentGroupPrice = selectedGroupPrice || groupPrices[0]
-    if (!currentGroupPrice) return
+    if (!currentGroupPrice) {
+      message.error('请选择拼团规则')
+      return
+    }
     try {
       const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
       const group = await createGroup(product.id, currentGroupPrice.min_members, deadline)
       if (group) {
         message.success('拼团已创建，快去邀请好友吧！')
         navigate(`/groups/${group.id}`)
+      } else {
+        message.error('创建拼团失败，请重试')
       }
     } catch {
       message.error('创建拼团失败，请重试')
