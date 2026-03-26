@@ -52,15 +52,18 @@ jobs:
 
       - name: Verify deployment
         run: |
-          sleep 30
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.TENCENT_CLOUD_IP }}:8080/api/v1/products/1 2>/dev/null || echo "000")
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Backend API is healthy (HTTP $HTTP_CODE)"
-            exit 0
-          else
-            echo "❌ Backend API returned HTTP $HTTP_CODE"
-            exit 1
-          fi
+          echo "Waiting for backend to be ready..."
+          for i in {1..10}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.TENCENT_CLOUD_IP }}:8080/api/v1/products/1 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Backend API is healthy (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+            echo "Attempt $i: Backend not ready (HTTP $HTTP_CODE), waiting..."
+            sleep 10
+          done
+          echo "❌ Backend API did not become healthy after 100 seconds"
+          exit 1
 
       - name: Notify deployment status
         if: always()
