@@ -1,5 +1,5 @@
 import api from './api'
-import { Product, APIResponse, PaginatedResponse, HomeData, Category } from '@/types'
+import { Product, APIResponse, PaginatedResponse, HomeData, Category, Group } from '@/types'
 
 interface ProductFilters {
   page?: number
@@ -43,6 +43,10 @@ export const productService = {
   // Get product by ID
   getProductByID: (id: number) =>
     api.get<APIResponse<Product>>(`/products/${id}`),
+
+  // Get active groups for a product
+  getProductGroups: (productId: number) =>
+    api.get<APIResponse<Group[]>>(`/products/${productId}/groups`),
 
   // Search products
   searchProducts: (query: string, page?: number, perPage?: number) =>

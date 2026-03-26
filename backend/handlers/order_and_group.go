@@ -454,6 +454,49 @@ func ListGroups(c *gin.Context) {
 	})
 }
 
+// GetGroupsByProduct retrieves active groups for a specific product
+func GetGroupsByProduct(c *gin.Context) {
+	productID := c.Param("product_id")
+	productIDNum, err := strconv.Atoi(productID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	rows, err := db.Query(
+		"SELECT id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at FROM groups WHERE product_id = $1 AND status = $2 AND deadline > NOW() ORDER BY created_at DESC",
+		productIDNum, "active",
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer rows.Close()
+
+	var groups []models.Group
+	for rows.Next() {
+		var g models.Group
+		err := rows.Scan(&g.ID, &g.ProductID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		groups = append(groups, g)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    groups,
+	})
+}
+
 // GetGroupByID retrieves a group by ID
 func GetGroupByID(c *gin.Context) {
 	id := c.Param("id")
