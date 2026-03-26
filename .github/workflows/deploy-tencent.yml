@@ -24,44 +24,26 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch || github.ref }}
 
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.5.4
-        with:
-          ssh-private-key: ${{ secrets.TENCENT_CLOUD_SSH_KEY }}
-
-      - name: Add server to known hosts
-        run: ssh-keyscan -H ${{ secrets.TENCENT_CLOUD_IP }} >> ~/.ssh/known_hosts
-
       - name: Deploy to Tencent Cloud
         run: |
-          ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
-          set -e
+          rsync -az --delete \
+            -e "ssh -o StrictHostKeyChecking=no -i ${{ secrets.TENCENT_CLOUD_SSH_KEY }}" \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude '.github' \
+            ./ ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }}:${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}/
+          
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.TENCENT_CLOUD_SSH_KEY }} ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
           cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}
-          git config --global gc.auto 0
-          git remote set-url origin git@github.com:sev7n4/pintuotuo.git
-          echo 'Fetching latest main branch...'
-          git fetch origin main
-          LOCAL_COMMIT=$(git rev-parse HEAD)
-          REMOTE_COMMIT=$(git rev-parse origin/main)
-          echo "Local: $LOCAL_COMMIT"
-          echo "Remote: $REMOTE_COMMIT"
-          if [ "$LOCAL_COMMIT" != "$REMOTE_COMMIT" ]; then
-            echo 'Code changed, updating...'
-            git reset --hard origin/main
-            docker-compose -f docker-compose.prod.yml up -d --build --force-recreate
-            echo 'Deployment completed successfully'
-          else
-            echo 'No changes, skipping build'
-          fi
+          docker-compose -f docker-compose.prod.yml up -d --build --force-recreate
+          echo 'Deployment completed successfully'
           EOF
 
       - name: Seed database and update passwords
         run: |
-          ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
-          # Seed admin user if not exists (first deployment), and update password (upgrades)
-           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('admin@example.com', 'Admin', 'd5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05', 'admin', 'active') ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;"
-           
-           echo "Seed user password update completed"
+          ssh -o StrictHostKeyChecking=no -i ${{ secrets.TENCENT_CLOUD_SSH_KEY }} ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
+          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('admin@example.com', 'Admin', 'd5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05', 'admin', 'active') ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;"
+          echo "Seed user password update completed"
           EOF
 
       - name: Verify deployment
