@@ -39,12 +39,18 @@ jobs:
       - name: Deploy to Tencent Cloud
         run: |
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} "
-            cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }} && \
-            git remote set-url origin https://github.com/sev7n4/pintuotuo.git && \
-            git fsck --full && \
-            git gc --prune=now && \
-            git fetch origin && \
-            git reset --hard origin/main && \
+            cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }} && \\
+            git config --global http.version HTTP/1.1 && \\
+            git config --global http.postBuffer 524288000 && \\
+            git config --global http.lowSpeedLimit 1000 && \\
+            git config --global http.lowSpeedTime 60 && \\
+            git config --global gc.auto 0 && \\
+            git remote set-url origin git@github.com:sev7n4/pintuotuo.git && \\
+            git config --global core.compression 6 && \\
+            for i in 1 2 3; do \\
+              git fetch --depth=1 origin main && break || sleep 10; \\
+            done && \\
+            git reset --hard origin/main && \\
             docker-compose -f docker-compose.prod.yml up -d --build
           "
 
