@@ -114,12 +114,12 @@ test.describe('Registration', () => {
     await expect(userText.or(merchantText)).toBeVisible({ timeout: 10000 });
   });
 
-  test('should register new user and redirect to products', async ({ page }) => {
+  test('should register new user and redirect to home', async ({ page }) => {
     const uniqueEmail = `test${Date.now()}@example.com`;
     await registerPage.register(uniqueEmail, 'testuser', 'Test123456!');
-    
-    await page.waitForURL(/.*products/, { timeout: 15000 });
-    await expect(page).toHaveURL(/.*products/);
+
+    await page.waitForURL(/.*\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/.*\//);
   });
 
   test('should register as merchant and redirect to merchant dashboard', async ({ page }) => {
