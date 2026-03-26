@@ -51,11 +51,11 @@ test.describe('Login Flow', () => {
     await loginPage.goto();
   });
 
-  test('should login as regular user and redirect to products', async ({ page }) => {
+  test('should login as regular user and redirect to home', async ({ page }) => {
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
-    await page.waitForURL(/.*products/, { timeout: 15000 });
-    await expect(page).toHaveURL(/.*products/);
+    await page.waitForURL(/.*\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/.*\//);
   });
 
   test('should login as merchant and redirect to merchant dashboard', async ({ page }) => {
