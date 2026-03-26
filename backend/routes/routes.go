@@ -69,6 +69,7 @@ func RegisterProductRoutes(router *gin.RouterGroup) {
 		products.GET("/categories", handlers.GetCategories)
 		products.GET("/search", handlers.SearchProducts)
 		products.GET("/:id", handlers.GetProductByID)
+		products.GET("/:id/groups", handlers.GetGroupsByProduct)
 
 		merchants := products.Group("/merchants")
 		merchants.Use(middleware.AuthMiddleware())

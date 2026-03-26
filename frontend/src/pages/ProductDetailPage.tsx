@@ -17,6 +17,8 @@ import {
   Typography,
   Row,
   Col,
+  Modal,
+  Badge,
 } from 'antd'
 import {
   ShoppingCartOutlined,
@@ -24,12 +26,14 @@ import {
   ShareAltOutlined,
   TeamOutlined,
   UserOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useProductStore } from '@stores/productStore'
 import { useCartStore } from '@stores/cartStore'
 import { useGroupStore } from '@stores/groupStore'
-import type { Product, GroupPrice, ProductReview } from '@/types'
+import { productService } from '@services/product'
+import type { Product, GroupPrice, ProductReview, Group } from '@/types'
 
 const { Title, Text } = Typography
 const { TabPane } = Tabs
@@ -71,11 +75,15 @@ export const ProductDetailPage: React.FC = () => {
   const navigate = useNavigate()
   const { fetchProductByID, isLoading, error } = useProductStore()
   const { addItem } = useCartStore()
-  const { createGroup } = useGroupStore()
+  const { createGroup, joinGroup } = useGroupStore()
   const [product, setProduct] = useState<Product | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [purchaseMode, setPurchaseMode] = useState<'single' | 'group'>('group')
   const [selectedGroupPrice, setSelectedGroupPrice] = useState<GroupPrice | null>(null)
+  const [activeGroups, setActiveGroups] = useState<Group[]>([])
+  const [showGroupsModal, setShowGroupsModal] = useState(false)
+  const [groupsLoading, setGroupsLoading] = useState(false)
+  const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null)
 
   useEffect(() => {
     if (id) {
@@ -94,6 +102,34 @@ export const ProductDetailPage: React.FC = () => {
     const result = await fetchProductByID(parseInt(id))
     if (result) {
       setProduct(result)
+    }
+  }
+
+  const loadActiveGroups = async () => {
+    if (!id) return
+    setGroupsLoading(true)
+    try {
+      const response = await productService.getProductGroups(parseInt(id))
+      if (response.data.code === 0 && response.data.data) {
+        setActiveGroups(response.data.data)
+      }
+    } catch {
+      console.error('Failed to load active groups')
+    } finally {
+      setGroupsLoading(false)
+    }
+  }
+
+  const handleJoinGroup = async (group: Group) => {
+    setJoiningGroupId(group.id)
+    try {
+      await joinGroup(group.id)
+      message.success('加入拼团成功！')
+      navigate(`/groups/${group.id}`)
+    } catch {
+      message.error('加入拼团失败，请重试')
+    } finally {
+      setJoiningGroupId(null)
     }
   }
 
@@ -357,16 +393,33 @@ export const ProductDetailPage: React.FC = () => {
                 {product.stock === 0 ? '暂无库存' : '加入购物车'}
               </Button>
             ) : (
-              <Button
-                type="primary"
-                size="large"
-                icon={<TeamOutlined />}
-                onClick={handleGroupPurchase}
-                disabled={product.stock === 0}
-                style={{ flex: 1, background: '#52c41a', borderColor: '#52c41a' }}
-              >
-                {product.stock === 0 ? '暂无库存' : `立即拼团 (¥${selectedGroupPrice?.price_per_person || groupPrices[0].price_per_person}/人)`}
-              </Button>
+              <Space style={{ flex: 1, display: 'flex', gap: 8 }}>
+                <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<TeamOutlined />}
+                    onClick={() => {
+                      loadActiveGroups()
+                      setShowGroupsModal(true)
+                    }}
+                    disabled={product.stock === 0}
+                    style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                  >
+                    加入拼团
+                  </Button>
+                </Badge>
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<TeamOutlined />}
+                  onClick={handleGroupPurchase}
+                  disabled={product.stock === 0}
+                  style={{ flex: 1, background: '#1890ff', borderColor: '#1890ff' }}
+                >
+                  {product.stock === 0 ? '暂无库存' : `发起拼团 (¥${selectedGroupPrice?.price_per_person || groupPrices[0].price_per_person}/人)`}
+                </Button>
+              </Space>
             )}
             <Button
               size="large"
@@ -459,6 +512,70 @@ export const ProductDetailPage: React.FC = () => {
             </Space>
           </TabPane>
         </Tabs>
+
+        <Modal
+          title="加入现有拼团"
+          open={showGroupsModal}
+          onCancel={() => setShowGroupsModal(false)}
+          footer={null}
+          width={500}
+        >
+          <Spin spinning={groupsLoading}>
+            {activeGroups.length === 0 ? (
+              <Empty description="暂无进行中的拼团" style={{ margin: '40px 0' }}>
+                <Button type="primary" onClick={() => setShowGroupsModal(false)}>
+                  发起新拼团
+                </Button>
+              </Empty>
+            ) : (
+              <List
+                itemLayout="horizontal"
+                dataSource={activeGroups}
+                renderItem={(group) => {
+                  const remainingSlots = group.target_count - group.current_count
+                  const deadline = new Date(group.deadline)
+                  const now = new Date()
+                  const hoursLeft = Math.max(0, Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60)))
+
+                  return (
+                    <List.Item
+                      actions={[
+                        <Button
+                          type="primary"
+                          key="join"
+                          loading={joiningGroupId === group.id}
+                          onClick={() => handleJoinGroup(group)}
+                        >
+                          加入 ({remainingSlots}位)
+                        </Button>
+                      ]}
+                    >
+                      <List.Item.Meta
+                        avatar={<Avatar icon={<TeamOutlined />} style={{ background: '#1890ff' }} />}
+                        title={
+                          <Space>
+                            <Text strong>{group.target_count}人团</Text>
+                            <Tag color="green">进行中</Tag>
+                          </Space>
+                        }
+                        description={
+                          <Space direction="vertical" size="small">
+                            <Text type="secondary">
+                              <UserOutlined /> 已参与 {group.current_count} 人，还差 {remainingSlots} 人
+                            </Text>
+                            <Text type="secondary">
+                              <ClockCircleOutlined /> 剩余 {hoursLeft} 小时
+                            </Text>
+                          </Space>
+                        }
+                      />
+                    </List.Item>
+                  )
+                }}
+              />
+            )}
+          </Spin>
+        </Modal>
       </Card>
     </div>
   )
