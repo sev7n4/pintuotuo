@@ -34,33 +34,31 @@ jobs:
 
       - name: Deploy to Tencent Cloud
         run: |
-          ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} "
-            set -e
-            cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }} && \\
-            git config --global http.version HTTP/1.1 && \\
-            git config --global http.postBuffer 524288000 && \\
-            git config --global http.lowSpeedLimit 1000 && \\
-            git config --global http.lowSpeedTime 60 && \\
-            git config --global gc.auto 0 && \\
-            git remote set-url origin https://github.com/sev7n4/pintuotuo.git && \\
-            git config --global core.compression 6 && \\
-            echo 'Fetching latest main branch...' && \\
-            for i in 1 2 3; do \\
-              git fetch origin main && break || { echo \"Retry \$i failed\"; sleep 10; }; \\
-            done && \\
-            LOCAL_COMMIT=\$(git rev-parse HEAD) && \\
-            REMOTE_COMMIT=\$(git rev-parse origin/main) && \\
-            echo \"Local: \$LOCAL_COMMIT\" && \\
-            echo \"Remote: \$REMOTE_COMMIT\" && \\
-            if [ \"\$LOCAL_COMMIT\" != \"\$REMOTE_COMMIT\" ]; then \\
-              echo 'Code changed, updating...' && \\
-              git reset --hard origin/main && \\
-              docker-compose -f docker-compose.prod.yml up -d --build --force-recreate && \\
-              echo 'Deployment completed successfully' && \\
-            else \\
-              echo 'No changes, skipping build' && \\
-            fi
-          "
+          ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
+          set -e
+          cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}
+          git config --global http.version HTTP/1.1
+          git config --global http.postBuffer 524288000
+          git config --global http.lowSpeedLimit 1000
+          git config --global http.lowSpeedTime 60
+          git config --global gc.auto 0
+          git remote set-url origin https://github.com/sev7n4/pintuotuo.git
+          git config --global core.compression 6
+          echo 'Fetching latest main branch...'
+          git fetch origin main
+          LOCAL_COMMIT=$(git rev-parse HEAD)
+          REMOTE_COMMIT=$(git rev-parse origin/main)
+          echo "Local: $LOCAL_COMMIT"
+          echo "Remote: $REMOTE_COMMIT"
+          if [ "$LOCAL_COMMIT" != "$REMOTE_COMMIT" ]; then
+            echo 'Code changed, updating...'
+            git reset --hard origin/main
+            docker-compose -f docker-compose.prod.yml up -d --build --force-recreate
+            echo 'Deployment completed successfully'
+          else
+            echo 'No changes, skipping build'
+          fi
+          EOF
 
       - name: Seed database and update passwords
         run: |
