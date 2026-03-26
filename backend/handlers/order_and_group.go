@@ -490,7 +490,11 @@ func GetGroupByID(c *gin.Context) {
 		cache.Set(ctx, cacheKey, string(groupJSON), 5*time.Minute)
 	}
 
-	c.JSON(http.StatusOK, group)
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    group,
+	})
 }
 
 // JoinGroup adds current user to a group
@@ -600,7 +604,11 @@ func JoinGroup(c *gin.Context) {
 
 	cache.Delete(context.Background(), cache.GroupKey(group.ID))
 
-	c.JSON(http.StatusOK, group)
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    group,
+	})
 }
 
 // CancelGroup cancels a group (creator only)
@@ -671,5 +679,9 @@ func GetGroupProgress(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, group)
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    group,
+	})
 }
