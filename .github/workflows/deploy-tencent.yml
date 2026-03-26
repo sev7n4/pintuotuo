@@ -37,13 +37,8 @@ jobs:
           ssh ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
           set -e
           cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}
-          git config --global http.version HTTP/1.1
-          git config --global http.postBuffer 524288000
-          git config --global http.lowSpeedLimit 1000
-          git config --global http.lowSpeedTime 60
           git config --global gc.auto 0
-          git remote set-url origin https://github.com/sev7n4/pintuotuo.git
-          git config --global core.compression 6
+          git remote set-url origin git@github.com:sev7n4/pintuotuo.git
           echo 'Fetching latest main branch...'
           git fetch origin main
           LOCAL_COMMIT=$(git rev-parse HEAD)
