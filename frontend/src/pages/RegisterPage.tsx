@@ -38,7 +38,7 @@ export const RegisterPage: React.FC = () => {
       if (user.role === 'merchant') {
         navigate('/merchant', { replace: true })
       } else {
-        navigate('/products', { replace: true })
+        navigate('/', { replace: true })
       }
     }
   }, [isAuthenticated, user, navigate])
