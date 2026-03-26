@@ -30,7 +30,7 @@ jobs:
           echo "${{ secrets.TENCENT_CLOUD_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          rsync -az --delete \
+          rsync -az \
             -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key" \
             --exclude '.git' \
             --exclude 'node_modules' \
