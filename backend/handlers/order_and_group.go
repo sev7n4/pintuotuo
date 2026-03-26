@@ -391,7 +391,11 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, group)
+	c.JSON(http.StatusCreated, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    group,
+	})
 }
 
 // ListGroups lists all active groups
