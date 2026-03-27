@@ -215,7 +215,11 @@ func GetOrderByID(c *gin.Context) {
 		var order models.Order
 		if err := json.Unmarshal([]byte(cachedOrder), &order); err == nil {
 			if order.UserID == userID.(int) {
-				c.JSON(http.StatusOK, order)
+				c.JSON(http.StatusOK, gin.H{
+					"code":    0,
+					"message": "success",
+					"data":    order,
+				})
 				return
 			}
 		}
@@ -240,7 +244,11 @@ func GetOrderByID(c *gin.Context) {
 		cache.Set(ctx, cacheKey, string(orderJSON), cache.OrderCacheTTL)
 	}
 
-	c.JSON(http.StatusOK, order)
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    order,
+	})
 }
 
 // CancelOrder cancels an order
@@ -333,7 +341,11 @@ func CancelOrder(c *gin.Context) {
 
 	cache.Delete(context.Background(), cache.OrderKey(order.ID))
 
-	c.JSON(http.StatusOK, order)
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    order,
+	})
 }
 
 // CreateGroup creates a new group purchase
