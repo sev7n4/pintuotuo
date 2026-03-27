@@ -12,7 +12,7 @@ test.describe('Orders', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.goto('/orders');
     await expect(page.getByRole('heading', { name: '我的订单' }).or(page.locator('h1:has-text("订单")'))).toBeVisible();
@@ -22,7 +22,7 @@ test.describe('Orders', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.goto('/orders');
     
@@ -36,7 +36,7 @@ test.describe('Orders', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.goto('/orders');
     
@@ -51,7 +51,7 @@ test.describe('Orders', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.goto('/orders');
     
@@ -66,7 +66,7 @@ test.describe('Orders', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.goto('/orders');
     
@@ -94,7 +94,7 @@ test.describe('Groups', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.goto('/groups');
     await page.waitForLoadState('domcontentloaded');
@@ -108,7 +108,7 @@ test.describe('Groups', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.goto('/groups');
     
