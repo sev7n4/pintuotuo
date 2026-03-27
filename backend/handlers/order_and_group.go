@@ -191,10 +191,14 @@ func ListOrders(c *gin.Context) {
 	db.QueryRow("SELECT COUNT(*) FROM orders WHERE user_id = $1", userID).Scan(&total)
 
 	c.JSON(http.StatusOK, gin.H{
-		"total":    total,
-		"page":     pageNum,
-		"per_page": perPageNum,
-		"data":     orders,
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"total":    total,
+			"page":     pageNum,
+			"per_page": perPageNum,
+			"data":     orders,
+		},
 	})
 }
 

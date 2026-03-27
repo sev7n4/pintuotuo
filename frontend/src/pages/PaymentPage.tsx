@@ -1,70 +1,59 @@
-import React, { useEffect, useState } from 'react'
-import {
-  Card,
-  Button,
-  Radio,
-  Space,
-  Statistic,
-  Divider,
-  message,
-  Spin,
-  Empty,
-  Result,
-} from 'antd'
-import { AlipayCircleOutlined, WechatOutlined, CheckCircleOutlined } from '@ant-design/icons'
-import { useNavigate, useParams } from 'react-router-dom'
-import { useOrderStore } from '@stores/orderStore'
-import { paymentService } from '@services/payment'
-import type { Payment } from '@/types'
+import React, { useEffect, useState } from 'react';
+import { Card, Button, Radio, Space, Statistic, Divider, message, Spin, Empty, Result } from 'antd';
+import { AlipayCircleOutlined, WechatOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useOrderStore } from '@stores/orderStore';
+import { paymentService } from '@services/payment';
+import type { Payment } from '@/types';
 
-type PaymentMethod = 'alipay' | 'wechat'
+type PaymentMethod = 'alipay' | 'wechat';
 
 const PaymentPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const { currentOrder, fetchOrderByID, isLoading: orderLoading } = useOrderStore()
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('alipay')
-  const [isPaying, setIsPaying] = useState(false)
-  const [paymentResult, setPaymentResult] = useState<'success' | 'failed' | null>(null)
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { currentOrder, fetchOrderByID, isLoading: orderLoading } = useOrderStore();
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('alipay');
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentResult, setPaymentResult] = useState<'success' | 'failed' | null>(null);
 
   useEffect(() => {
     if (id) {
-      fetchOrderByID(parseInt(id))
+      fetchOrderByID(parseInt(id));
     }
-  }, [id])
+  }, [id]);
 
   const handlePayment = async () => {
-    if (!currentOrder) return
+    if (!currentOrder) return;
 
-    setIsPaying(true)
+    setIsPaying(true);
     try {
       const response = await paymentService.initiatePayment({
         order_id: currentOrder.id,
         method: paymentMethod,
-      })
-      const payment = response.data.data as Payment
+      });
+      const payment = response.data.data as Payment;
 
-      if (payment.status === 'success') {
-        setPaymentResult('success')
-        message.success('支付成功')
+      if (payment.status === 'success' || currentOrder.status === 'paid') {
+        setPaymentResult('success');
+        message.success('支付成功');
       } else {
-        setPaymentResult('failed')
-        message.error('支付失败，请重试')
+        setPaymentResult('failed');
+        message.error('支付失败，请重试');
       }
     } catch (error) {
-      setPaymentResult('failed')
-      message.error('支付失败，请稍后重试')
+      setPaymentResult('failed');
+      message.error('支付失败，请稍后重试');
     } finally {
-      setIsPaying(false)
+      setIsPaying(false);
     }
-  }
+  };
 
   if (orderLoading) {
-    return <Spin />
+    return <Spin />;
   }
 
   if (!currentOrder) {
-    return <Empty description="订单不存在" />
+    return <Empty description="订单不存在" />;
   }
 
   if (currentOrder.status === 'paid' || currentOrder.status === 'completed') {
@@ -82,7 +71,7 @@ const PaymentPage: React.FC = () => {
           </Button>,
         ]}
       />
-    )
+    );
   }
 
   if (paymentResult === 'success') {
@@ -101,7 +90,7 @@ const PaymentPage: React.FC = () => {
           </Button>,
         ]}
       />
-    )
+    );
   }
 
   if (paymentResult === 'failed') {
@@ -119,16 +108,22 @@ const PaymentPage: React.FC = () => {
           </Button>,
         ]}
       />
-    )
+    );
   }
 
   return (
     <div style={{ padding: '20px', maxWidth: 600, margin: '0 auto' }}>
       <Card title="订单支付">
         <div style={{ marginBottom: '20px' }}>
-          <p><strong>订单号:</strong> #{currentOrder.id}</p>
-          <p><strong>商品ID:</strong> {currentOrder.product_id}</p>
-          <p><strong>数量:</strong> {currentOrder.quantity}</p>
+          <p>
+            <strong>订单号:</strong> #{currentOrder.id}
+          </p>
+          <p>
+            <strong>商品ID:</strong> {currentOrder.product_id}
+          </p>
+          <p>
+            <strong>数量:</strong> {currentOrder.quantity}
+          </p>
         </div>
 
         <Divider />
@@ -200,7 +195,7 @@ const PaymentPage: React.FC = () => {
         </div>
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default PaymentPage
+export default PaymentPage;
