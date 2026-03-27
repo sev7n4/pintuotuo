@@ -74,7 +74,11 @@ func InitiatePayment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, payment)
+	c.JSON(http.StatusCreated, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    payment,
+	})
 }
 
 // GetPaymentByID retrieves a payment by ID
@@ -104,7 +108,11 @@ func GetPaymentByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, payment)
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    payment,
+	})
 }
 
 // RefundPayment processes a refund for a payment
@@ -156,7 +164,11 @@ func RefundPayment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, payment)
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    payment,
+	})
 }
 
 // HandleAlipayCallback handles Alipay payment callback
