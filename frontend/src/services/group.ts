@@ -1,13 +1,13 @@
 import api from './api'
 import { Group, APIResponse, PaginatedResponse } from '@/types'
 
-interface CreateGroupRequest {
+export interface CreateGroupRequest {
   product_id: number
   target_count: number
   deadline: string
 }
 
-interface JoinGroupResponse {
+export interface JoinGroupResponse {
   group: Group
   order_id: number
 }

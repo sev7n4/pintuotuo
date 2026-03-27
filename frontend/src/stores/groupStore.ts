@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { Group, APIResponse, PaginatedResponse } from '@/types'
-import { groupService } from '@/services/group'
+import { groupService, JoinGroupResponse } from '@/services/group'
 
 interface GroupState {
   groups: Group[]
@@ -87,8 +87,8 @@ export const useGroupStore = create<GroupState>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await groupService.joinGroup(id)
-      const apiResponse = response.data as APIResponse<Group>
-      const updatedGroup = apiResponse.data
+      const apiResponse = response.data as APIResponse<JoinGroupResponse>
+      const updatedGroup = apiResponse.data?.group
       if (updatedGroup) {
         set((state) => ({
           groups: state.groups.map((g) =>
