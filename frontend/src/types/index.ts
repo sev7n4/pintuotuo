@@ -77,6 +77,7 @@ export interface Order {
   product_id: number
   group_id: number | null
   quantity: number
+  unit_price: number
   total_price: number
   status: 'pending' | 'paid' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunding' | 'refunded'
   group_status?: 'active' | 'completed' | 'failed'

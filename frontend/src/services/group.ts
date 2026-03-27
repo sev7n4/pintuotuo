@@ -7,6 +7,11 @@ interface CreateGroupRequest {
   deadline: string
 }
 
+interface JoinGroupResponse {
+  group: Group
+  order_id: number
+}
+
 export const groupService = {
   // Create group
   createGroup: (data: CreateGroupRequest) =>
@@ -24,7 +29,7 @@ export const groupService = {
 
   // Join group
   joinGroup: (id: number) =>
-    api.post<APIResponse<Group>>(`/groups/${id}/join`, {}),
+    api.post<APIResponse<JoinGroupResponse>>(`/groups/${id}/join`, {}),
 
   // Cancel group
   cancelGroup: (id: number) =>
