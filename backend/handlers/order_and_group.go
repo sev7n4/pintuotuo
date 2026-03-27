@@ -456,7 +456,7 @@ func ListGroups(c *gin.Context) {
 
 // GetGroupsByProduct retrieves active groups for a specific product
 func GetGroupsByProduct(c *gin.Context) {
-	productID := c.Param("product_id")
+	productID := c.Param("id")
 	productIDNum, err := strconv.Atoi(productID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
