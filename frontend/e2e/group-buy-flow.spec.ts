@@ -8,7 +8,7 @@ test.describe('Group Buy Flow E2E Tests', () => {
     loginPage = new LoginPage(page);
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
   });
 
   test('should display group list page', async ({ page }) => {

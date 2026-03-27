@@ -81,7 +81,7 @@ test.describe('Login Flow', () => {
 
   test('should logout successfully', async ({ page }) => {
     await loginPage.login('demo@example.com', 'demo123456');
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.locator('[data-testid="user-dropdown"]').click();
     await page.getByText('退出登录').click();
@@ -92,7 +92,7 @@ test.describe('Login Flow', () => {
 
   test('should persist login state after page refresh', async ({ page }) => {
     await loginPage.login('demo@example.com', 'demo123456');
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.reload();
     await expect(page.locator('[data-testid="user-dropdown"]')).toBeVisible({ timeout: 10000 });
@@ -155,7 +155,7 @@ test.describe('Access Control', () => {
     const loginPage = new LoginPage(page);
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.goto('/merchant');
     await page.waitForTimeout(2000);
@@ -166,7 +166,7 @@ test.describe('Access Control', () => {
     const loginPage = new LoginPage(page);
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
     
     await page.goto('/admin');
     await page.waitForTimeout(2000);

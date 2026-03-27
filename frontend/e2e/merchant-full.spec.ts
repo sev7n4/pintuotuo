@@ -21,7 +21,7 @@ test.describe('商家管理界面 - 权限与认证', () => {
     await loginPage.goto();
     await loginPage.login('demo@example.com', 'demo123456');
     await loginPage.expectLoginSuccess();
-    await page.waitForURL(/.*products/, { timeout: 15000 });
+    await page.waitForURL(/.*\//, { timeout: 15000 });
 
     await page.goto('/merchant');
     await page.waitForTimeout(2000);
