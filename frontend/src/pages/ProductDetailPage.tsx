@@ -123,8 +123,7 @@ export const ProductDetailPage: React.FC = () => {
   const handleJoinGroup = async (group: Group) => {
     setJoiningGroupId(group.id)
     try {
-      const response = await joinGroup(group.id)
-      const orderId = response.data.data?.order_id
+      const orderId = await joinGroup(group.id)
       message.success('加入拼团成功！')
       if (orderId) {
         navigate(`/payment/${orderId}`)

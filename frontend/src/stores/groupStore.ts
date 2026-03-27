@@ -12,7 +12,7 @@ interface GroupState {
   fetchGroups: (page?: number, perPage?: number) => Promise<Group[] | null>
   fetchGroupByID: (id: number) => Promise<void>
   createGroup: (productId: number, targetCount: number, deadline: string) => Promise<Group | null>
-  joinGroup: (id: number) => Promise<void>
+  joinGroup: (id: number) => Promise<number | null>
   cancelGroup: (id: number) => Promise<void>
   getGroupProgress: (id: number) => Promise<void>
   clearError: () => void
@@ -89,6 +89,7 @@ export const useGroupStore = create<GroupState>((set) => ({
       const response = await groupService.joinGroup(id)
       const apiResponse = response.data as APIResponse<JoinGroupResponse>
       const updatedGroup = apiResponse.data?.group
+      const orderId = apiResponse.data?.order_id
       if (updatedGroup) {
         set((state) => ({
           groups: state.groups.map((g) =>
@@ -98,6 +99,7 @@ export const useGroupStore = create<GroupState>((set) => ({
           isLoading: false,
         }))
       }
+      return orderId ?? null
     } catch (error) {
       const message = error instanceof Error ? error.message : '加入分组失败'
       set({ error: message, isLoading: false })
