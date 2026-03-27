@@ -650,7 +650,10 @@ func JoinGroup(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "success",
-		"data":    group,
+		"data": gin.H{
+			"group":    group,
+			"order_id": orderID,
+		},
 	})
 }
 

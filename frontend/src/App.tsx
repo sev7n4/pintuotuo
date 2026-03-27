@@ -14,6 +14,7 @@ import ProductDetailPage from '@pages/ProductDetailPage'
 import CartPage from '@pages/CartPage'
 import CheckoutPage from '@pages/CheckoutPage'
 import OrderListPage from '@pages/OrderListPage'
+import OrderDetailPage from '@pages/OrderDetailPage'
 import PaymentPage from '@pages/PaymentPage'
 import GroupListPage from '@pages/GroupListPage'
 import GroupProgressPage from '@pages/GroupProgressPage'
@@ -74,6 +75,7 @@ function App() {
 
             {/* Orders */}
             <Route path="/orders" element={<OrderListPage />} />
+            <Route path="/orders/:id" element={<OrderDetailPage />} />
             <Route path="/payment/:id" element={<PaymentPage />} />
 
             {/* Groups */}

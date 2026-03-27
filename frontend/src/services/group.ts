@@ -1,10 +1,15 @@
 import api from './api'
 import { Group, APIResponse, PaginatedResponse } from '@/types'
 
-interface CreateGroupRequest {
+export interface CreateGroupRequest {
   product_id: number
   target_count: number
   deadline: string
+}
+
+export interface JoinGroupResponse {
+  group: Group
+  order_id: number
 }
 
 export const groupService = {
@@ -24,7 +29,7 @@ export const groupService = {
 
   // Join group
   joinGroup: (id: number) =>
-    api.post<APIResponse<Group>>(`/groups/${id}/join`, {}),
+    api.post<APIResponse<JoinGroupResponse>>(`/groups/${id}/join`, {}),
 
   // Cancel group
   cancelGroup: (id: number) =>
