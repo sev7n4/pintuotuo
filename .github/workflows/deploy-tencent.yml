@@ -33,11 +33,19 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
           set -e
           cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}
+          
+          # 确保使用 HTTPS 方式克隆
+          if git remote get-url origin | grep -q "git@github.com"; then
+            echo "Switching to HTTPS..."
+            git remote set-url origin https://github.com/sev7n4/pintuotuo.git
+          fi
+          
           echo "Fetching latest code from GitHub..."
           
           # Retry git fetch up to 3 times
           for i in 1 2 3; do
             if git fetch origin main; then
+              echo "Git fetch successful"
               break
             fi
             echo "Git fetch attempt $i failed, retrying in 10 seconds..."
