@@ -367,9 +367,9 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
-	// Verify product exists
-	var productID int
-	err := db.QueryRow("SELECT id FROM products WHERE id = $1", req.ProductID).Scan(&productID)
+	// Verify product exists and get price
+	var productPrice float64
+	err := db.QueryRow("SELECT id, price FROM products WHERE id = $1", req.ProductID).Scan(&req.ProductID, &productPrice)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
@@ -391,10 +391,41 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
+	// Create order for group creator
+	var orderID int
+	err = db.QueryRow(
+		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+		userID, group.ProductID, group.ID, 1, productPrice, productPrice, orderStatusPending,
+	).Scan(&orderID)
+
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"ORDER_CREATION_FAILED",
+			"Failed to create order for group creator",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	// Add creator to group members
+	_, err = db.Exec(
+		"INSERT INTO group_members (group_id, user_id, order_id) VALUES ($1, $2, $3)",
+		group.ID, userID, orderID,
+	)
+
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrAlreadyInGroup)
+		return
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"code":    0,
 		"message": "success",
-		"data":    group,
+		"data": gin.H{
+			"group":    group,
+			"order_id": orderID,
+		},
 	})
 }
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { Group, APIResponse, PaginatedResponse } from '@/types'
-import { groupService, JoinGroupResponse } from '@/services/group'
+import { groupService, JoinGroupResponse, CreateGroupResponse } from '@/services/group'
 
 interface GroupState {
   groups: Group[]
@@ -11,7 +11,7 @@ interface GroupState {
 
   fetchGroups: (page?: number, perPage?: number) => Promise<Group[] | null>
   fetchGroupByID: (id: number) => Promise<void>
-  createGroup: (productId: number, targetCount: number, deadline: string) => Promise<Group | null>
+  createGroup: (productId: number, targetCount: number, deadline: string) => Promise<number | null>
   joinGroup: (id: number) => Promise<number | null>
   cancelGroup: (id: number) => Promise<void>
   getGroupProgress: (id: number) => Promise<void>
@@ -56,7 +56,7 @@ export const useGroupStore = create<GroupState>((set) => ({
     }
   },
 
-  createGroup: async (productId, targetCount, deadline): Promise<Group | null> => {
+  createGroup: async (productId, targetCount, deadline): Promise<number | null> => {
     set({ isLoading: true, error: null })
     try {
       const response = await groupService.createGroup({
@@ -64,18 +64,17 @@ export const useGroupStore = create<GroupState>((set) => ({
         target_count: targetCount,
         deadline: new Date(deadline).toISOString(),
       })
-      const apiResponse = response.data as APIResponse<Group>
-      const newGroup = apiResponse.data
+      const apiResponse = response.data as APIResponse<CreateGroupResponse>
+      const newGroup = apiResponse.data?.group
+      const orderId = apiResponse.data?.order_id
       if (newGroup) {
         set((state) => ({
           groups: [newGroup, ...state.groups],
           currentGroup: newGroup,
           isLoading: false,
         }))
-        return newGroup
       }
-      set({ isLoading: false })
-      return null
+      return orderId ?? null
     } catch (error) {
       const message = error instanceof Error ? error.message : '创建分组失败'
       set({ error: message, isLoading: false })

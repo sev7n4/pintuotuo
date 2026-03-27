@@ -156,10 +156,10 @@ export const ProductDetailPage: React.FC = () => {
     }
     try {
       const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      const group = await createGroup(product.id, currentGroupPrice.min_members, deadline)
-      if (group) {
-        message.success('拼团已创建，快去邀请好友吧！')
-        navigate(`/groups/${group.id}`)
+      const orderId = await createGroup(product.id, currentGroupPrice.min_members, deadline)
+      if (orderId) {
+        message.success('拼团已创建，请完成支付！')
+        navigate(`/payment/${orderId}`)
       } else {
         message.error('创建拼团失败，请重试')
       }
