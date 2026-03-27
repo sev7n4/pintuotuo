@@ -7,6 +7,11 @@ export interface CreateGroupRequest {
   deadline: string
 }
 
+export interface CreateGroupResponse {
+  group: Group
+  order_id: number
+}
+
 export interface JoinGroupResponse {
   group: Group
   order_id: number
@@ -15,7 +20,7 @@ export interface JoinGroupResponse {
 export const groupService = {
   // Create group
   createGroup: (data: CreateGroupRequest) =>
-    api.post<APIResponse<Group>>('/groups', data),
+    api.post<APIResponse<CreateGroupResponse>>('/groups', data),
 
   // List groups
   listGroups: (page?: number, per_page?: number) =>
