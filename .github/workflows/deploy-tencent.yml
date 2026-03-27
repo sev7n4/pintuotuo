@@ -34,7 +34,16 @@ jobs:
           set -e
           cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}
           echo "Fetching latest code from GitHub..."
-          git fetch origin main
+          
+          # Retry git fetch up to 3 times
+          for i in 1 2 3; do
+            if git fetch origin main; then
+              break
+            fi
+            echo "Git fetch attempt $i failed, retrying in 10 seconds..."
+            sleep 10
+          done
+          
           git reset --hard origin/main
           echo "Building and starting containers..."
           docker-compose -f docker-compose.prod.yml up -d --build --force-recreate
