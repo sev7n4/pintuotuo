@@ -50,8 +50,14 @@ export interface ProductReview {
 
 // Category type
 export interface Category {
+  id: number;
   name: string;
-  count: number;
+  level?: number;
+  description?: string;
+  icon?: string;
+  sort_order?: number;
+  is_active?: boolean;
+  count?: number;
 }
 
 // Banner type

@@ -28,9 +28,24 @@ type Product struct {
 	Stock         int       `json:"stock"`
 	SoldCount     int       `json:"sold_count"`
 	Category      string    `json:"category,omitempty"`
+	ModelID       *int      `json:"model_id,omitempty"`
+	PackageID     *int      `json:"package_id,omitempty"`
 	Status        string    `json:"status"` // active, inactive, archived
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// Category represents a product category
+type Category struct {
+	ID          int       `json:"id"`
+	Name        string    `json:"name"`
+	Level       int       `json:"level"` // 1=模型类型, 2=计费类型
+	Description string    `json:"description,omitempty"`
+	Icon        string    `json:"icon,omitempty"`
+	SortOrder   int       `json:"sort_order"`
+	IsActive    bool      `json:"is_active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Order represents a user's order
