@@ -100,11 +100,12 @@ export class MerchantProductsPage {
   }) {
     await this.page.waitForTimeout(500);
     
-    const selects = this.page.locator('.ant-select');
+    const modal = this.page.locator('.ant-modal-content');
+    const selects = modal.locator('.ant-select');
     const selectCount = await selects.count();
     
     if (selectCount >= 1) {
-      await selects.first().click();
+      await selects.first().click({ force: true });
       await this.page.waitForTimeout(500);
       const modelOption = data.modelId || 'GPT 系列';
       const dropdown = this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
@@ -113,7 +114,7 @@ export class MerchantProductsPage {
     }
     
     if (selectCount >= 2) {
-      await selects.nth(1).click();
+      await selects.nth(1).click({ force: true });
       await this.page.waitForTimeout(500);
       const packageOption = data.packageId || '月度标准版';
       const dropdown = this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
@@ -121,18 +122,18 @@ export class MerchantProductsPage {
       await this.page.waitForTimeout(500);
     }
     
-    const priceInput = this.page.getByPlaceholder('请输入价格');
+    const priceInput = modal.getByPlaceholder('请输入价格');
     await priceInput.fill(data.price.toString());
     await priceInput.press('Tab');
     
-    const stockInput = this.page.getByPlaceholder('请输入库存');
+    const stockInput = modal.getByPlaceholder('请输入库存');
     await stockInput.fill(data.stock.toString());
     await stockInput.press('Tab');
     
     await this.page.waitForTimeout(300);
     
     if (data.status && selectCount >= 3) {
-      await selects.nth(2).click();
+      await selects.nth(2).click({ force: true });
       await this.page.waitForTimeout(500);
       const dropdown = this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
       await dropdown.getByText(data.status).click();
