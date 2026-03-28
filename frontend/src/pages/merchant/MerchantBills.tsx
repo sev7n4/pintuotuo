@@ -1,57 +1,77 @@
-import { useState, useEffect } from 'react'
-import { Card, Table, Tag, Button, Modal, Descriptions, Row, Col, Statistic, DatePicker, Tabs, Empty, message } from 'antd'
-import { DollarOutlined, ClockCircleOutlined, DownloadOutlined, FileTextOutlined, CalendarOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
-import styles from './MerchantBills.module.css'
+import { useState, useEffect } from 'react';
+import {
+  Card,
+  Table,
+  Tag,
+  Button,
+  Modal,
+  Descriptions,
+  Row,
+  Col,
+  Statistic,
+  DatePicker,
+  Tabs,
+  Empty,
+  message,
+} from 'antd';
+import {
+  DollarOutlined,
+  ClockCircleOutlined,
+  DownloadOutlined,
+  FileTextOutlined,
+  CalendarOutlined,
+} from '@ant-design/icons';
+import dayjs from 'dayjs';
+import styles from './MerchantBills.module.css';
 
-const { RangePicker } = DatePicker
+const { RangePicker } = DatePicker;
 
 interface BillDetail {
-  date: string
-  orders: number
-  sales: number
-  refund: number
-  net_sales: number
+  date: string;
+  orders: number;
+  sales: number;
+  refund: number;
+  net_sales: number;
 }
 
 interface MonthlyBill {
-  id: string
-  period: string
-  year: number
-  month: number
-  total_sales: number
-  total_orders: number
-  platform_fee: number
-  settlement_amount: number
-  status: 'pending' | 'confirmed' | 'settled'
-  created_at: string
-  details: BillDetail[]
+  id: string;
+  period: string;
+  year: number;
+  month: number;
+  total_sales: number;
+  total_orders: number;
+  platform_fee: number;
+  settlement_amount: number;
+  status: 'pending' | 'confirmed' | 'settled';
+  created_at: string;
+  details: BillDetail[];
 }
 
 const MerchantBills = () => {
-  const [bills, setBills] = useState<MonthlyBill[]>([])
-  const [loading, setLoading] = useState(false)
-  const [detailVisible, setDetailVisible] = useState(false)
-  const [selectedBill, setSelectedBill] = useState<MonthlyBill | null>(null)
-  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
+  const [bills, setBills] = useState<MonthlyBill[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [selectedBill, setSelectedBill] = useState<MonthlyBill | null>(null);
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
 
   useEffect(() => {
-    fetchBills()
-  }, [])
+    fetchBills();
+  }, []);
 
   const fetchBills = async () => {
-    setLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 500))
+    setLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 500));
     const mockBills: MonthlyBill[] = [
       {
         id: 'BILL-2026-03',
         period: '2026年3月',
         year: 2026,
         month: 3,
-        total_sales: 25680.00,
+        total_sales: 25680.0,
         total_orders: 156,
-        platform_fee: 1284.00,
-        settlement_amount: 24396.00,
+        platform_fee: 1284.0,
+        settlement_amount: 24396.0,
         status: 'settled',
         created_at: '2026-04-01T00:00:00Z',
         details: generateBillDetails(2026, 3),
@@ -61,10 +81,10 @@ const MerchantBills = () => {
         period: '2026年2月',
         year: 2026,
         month: 2,
-        total_sales: 22350.00,
+        total_sales: 22350.0,
         total_orders: 132,
-        platform_fee: 1117.50,
-        settlement_amount: 21232.50,
+        platform_fee: 1117.5,
+        settlement_amount: 21232.5,
         status: 'settled',
         created_at: '2026-03-01T00:00:00Z',
         details: generateBillDetails(2026, 2),
@@ -74,68 +94,68 @@ const MerchantBills = () => {
         period: '2026年1月',
         year: 2026,
         month: 1,
-        total_sales: 18920.00,
+        total_sales: 18920.0,
         total_orders: 98,
-        platform_fee: 946.00,
-        settlement_amount: 17974.00,
+        platform_fee: 946.0,
+        settlement_amount: 17974.0,
         status: 'settled',
         created_at: '2026-02-01T00:00:00Z',
         details: generateBillDetails(2026, 1),
       },
-    ]
-    setBills(mockBills)
-    setLoading(false)
-  }
+    ];
+    setBills(mockBills);
+    setLoading(false);
+  };
 
   const generateBillDetails = (year: number, month: number): BillDetail[] => {
-    const daysInMonth = new Date(year, month, 0).getDate()
-    const details: BillDetail[] = []
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const details: BillDetail[] = [];
     for (let i = 1; i <= daysInMonth; i++) {
-      const orders = Math.floor(Math.random() * 10) + 1
-      const sales = Math.random() * 2000 + 500
-      const refund = Math.random() * 100
+      const orders = Math.floor(Math.random() * 10) + 1;
+      const sales = Math.random() * 2000 + 500;
+      const refund = Math.random() * 100;
       details.push({
         date: `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
         orders,
         sales: Math.round(sales * 100) / 100,
         refund: Math.round(refund * 100) / 100,
         net_sales: Math.round((sales - refund) * 100) / 100,
-      })
+      });
     }
-    return details
-  }
+    return details;
+  };
 
   const handleViewDetail = (bill: MonthlyBill) => {
-    setSelectedBill(bill)
-    setDetailVisible(true)
-  }
+    setSelectedBill(bill);
+    setDetailVisible(true);
+  };
 
   const handleExport = (bill: MonthlyBill) => {
-    const content = generateBillCSV(bill)
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `账单_${bill.period}.csv`
-    link.click()
-    message.success('账单导出成功')
-  }
+    const content = generateBillCSV(bill);
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `账单_${bill.period}.csv`;
+    link.click();
+    message.success('账单导出成功');
+  };
 
   const generateBillCSV = (bill: MonthlyBill): string => {
-    let csv = '日期,订单数,销售额,退款,净销售额\n'
-    bill.details.forEach(d => {
-      csv += `${d.date},${d.orders},${d.sales.toFixed(2)},${d.refund.toFixed(2)},${d.net_sales.toFixed(2)}\n`
-    })
-    csv += `\n合计,,${bill.total_sales.toFixed(2)},,${bill.total_sales.toFixed(2)}\n`
-    csv += `平台费用(5%),,,${bill.platform_fee.toFixed(2)}\n`
-    csv += `结算金额,,,${bill.settlement_amount.toFixed(2)}\n`
-    return csv
-  }
+    let csv = '日期,订单数,销售额,退款,净销售额\n';
+    bill.details.forEach((d) => {
+      csv += `${d.date},${d.orders},${d.sales.toFixed(2)},${d.refund.toFixed(2)},${d.net_sales.toFixed(2)}\n`;
+    });
+    csv += `\n合计,,${bill.total_sales.toFixed(2)},,${bill.total_sales.toFixed(2)}\n`;
+    csv += `平台费用(5%),,,${bill.platform_fee.toFixed(2)}\n`;
+    csv += `结算金额,,,${bill.settlement_amount.toFixed(2)}\n`;
+    return csv;
+  };
 
   const statusMap: Record<string, { color: string; text: string; icon: React.ReactNode }> = {
     pending: { color: 'default', text: '待确认', icon: <ClockCircleOutlined /> },
     confirmed: { color: 'processing', text: '已确认', icon: <FileTextOutlined /> },
     settled: { color: 'success', text: '已结算', icon: <DollarOutlined /> },
-  }
+  };
 
   const columns = [
     {
@@ -186,8 +206,16 @@ const MerchantBills = () => {
       key: 'status',
       width: 100,
       render: (status: string) => {
-        const { color, text, icon } = statusMap[status] || { color: 'default', text: status, icon: null }
-        return <Tag color={color} icon={icon}>{text}</Tag>
+        const { color, text, icon } = statusMap[status] || {
+          color: 'default',
+          text: status,
+          icon: null,
+        };
+        return (
+          <Tag color={color} icon={icon}>
+            {text}
+          </Tag>
+        );
       },
     },
     {
@@ -199,31 +227,64 @@ const MerchantBills = () => {
           <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
             详情
           </Button>
-          <Button type="link" size="small" icon={<DownloadOutlined />} onClick={() => handleExport(record)}>
+          <Button
+            type="link"
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={() => handleExport(record)}
+          >
             导出
           </Button>
         </div>
       ),
     },
-  ]
+  ];
 
   const detailColumns = [
     { title: '日期', dataIndex: 'date', key: 'date', width: 120 },
-    { title: '订单数', dataIndex: 'orders', key: 'orders', width: 80, render: (v: number) => `${v} 笔` },
-    { title: '销售额', dataIndex: 'sales', key: 'sales', render: (v: number) => `¥${v.toFixed(2)}` },
-    { title: '退款', dataIndex: 'refund', key: 'refund', render: (v: number) => v > 0 ? `-¥${v.toFixed(2)}` : '-' },
-    { title: '净销售额', dataIndex: 'net_sales', key: 'net_sales', render: (v: number) => `¥${v.toFixed(2)}` },
-  ]
+    {
+      title: '订单数',
+      dataIndex: 'orders',
+      key: 'orders',
+      width: 80,
+      render: (v: number) => `${v} 笔`,
+    },
+    {
+      title: '销售额',
+      dataIndex: 'sales',
+      key: 'sales',
+      render: (v: number) => `¥${v.toFixed(2)}`,
+    },
+    {
+      title: '退款',
+      dataIndex: 'refund',
+      key: 'refund',
+      render: (v: number) => (v > 0 ? `-¥${v.toFixed(2)}` : '-'),
+    },
+    {
+      title: '净销售额',
+      dataIndex: 'net_sales',
+      key: 'net_sales',
+      render: (v: number) => `¥${v.toFixed(2)}`,
+    },
+  ];
 
-  const totalSettled = bills.filter(b => b.status === 'settled').reduce((sum, b) => sum + b.settlement_amount, 0)
-  const totalPending = bills.filter(b => b.status !== 'settled').reduce((sum, b) => sum + b.settlement_amount, 0)
+  const totalSettled = bills
+    .filter((b) => b.status === 'settled')
+    .reduce((sum, b) => sum + b.settlement_amount, 0);
+  const totalPending = bills
+    .filter((b) => b.status !== 'settled')
+    .reduce((sum, b) => sum + b.settlement_amount, 0);
 
   const filteredBills = dateRange
-    ? bills.filter(b => {
-        const billDate = dayjs(`${b.year}-${b.month}-01`)
-        return billDate.isAfter(dateRange[0].startOf('month')) && billDate.isBefore(dateRange[1].endOf('month'))
+    ? bills.filter((b) => {
+        const billDate = dayjs(`${b.year}-${b.month}-01`);
+        return (
+          billDate.isAfter(dateRange[0].startOf('month')) &&
+          billDate.isBefore(dateRange[1].endOf('month'))
+        );
       })
-    : bills
+    : bills;
 
   return (
     <div className={styles.bills}>
@@ -293,7 +354,9 @@ const MerchantBills = () => {
                   {statusMap[selectedBill.status]?.text}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="销售总额">¥{selectedBill.total_sales.toFixed(2)}</Descriptions.Item>
+              <Descriptions.Item label="销售总额">
+                ¥{selectedBill.total_sales.toFixed(2)}
+              </Descriptions.Item>
               <Descriptions.Item label="平台费用(5%)">
                 <span style={{ color: '#ff4d4f' }}>-¥{selectedBill.platform_fee.toFixed(2)}</span>
               </Descriptions.Item>
@@ -338,7 +401,7 @@ const MerchantBills = () => {
                     <Card>
                       <Statistic
                         title="最高日销售"
-                        value={Math.max(...selectedBill.details.map(d => d.net_sales))}
+                        value={Math.max(...selectedBill.details.map((d) => d.net_sales))}
                         precision={2}
                         prefix="¥"
                       />
@@ -351,7 +414,7 @@ const MerchantBills = () => {
         )}
       </Modal>
     </div>
-  )
-}
+  );
+};
 
-export default MerchantBills
+export default MerchantBills;

@@ -1,58 +1,77 @@
-import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
-import MerchantLayout from '../MerchantLayout'
-import { useAuthStore } from '@/stores/authStore'
-import { message } from 'antd'
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import MerchantLayout from '../MerchantLayout';
+import { useAuthStore } from '@/stores/authStore';
+import { message } from 'antd';
 
-jest.mock('@/stores/authStore')
-jest.mock('../MerchantLayout.module.css', () => ({}))
+jest.mock('@/stores/authStore');
+jest.mock('../MerchantLayout.module.css', () => ({}));
 jest.mock('antd', () => ({
   ...jest.requireActual('antd'),
   message: {
     error: jest.fn(),
     success: jest.fn(),
   },
-}))
+}));
 
-const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>
+const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>;
 
 const mockLocalStorage = (() => {
-  let store: Record<string, string> = {}
+  let store: Record<string, string> = {};
   return {
     getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => { store[key] = value },
-    removeItem: (key: string) => { delete store[key] },
-    clear: () => { store = {} },
-  }
-})()
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
 
 const mockSessionStorage = (() => {
-  let store: Record<string, string> = {}
+  let store: Record<string, string> = {};
   return {
     getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => { store[key] = value },
-    removeItem: (key: string) => { delete store[key] },
-    clear: () => { store = {} },
-  }
-})()
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
 
-Object.defineProperty(window, 'localStorage', { value: mockLocalStorage })
-Object.defineProperty(window, 'sessionStorage', { value: mockSessionStorage })
+Object.defineProperty(window, 'localStorage', { value: mockLocalStorage });
+Object.defineProperty(window, 'sessionStorage', { value: mockSessionStorage });
 
 describe('MerchantLayout Component', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    mockLocalStorage.clear()
-    mockSessionStorage.clear()
-  })
+    jest.clearAllMocks();
+    mockLocalStorage.clear();
+    mockSessionStorage.clear();
+  });
 
   test('renders MerchantLayout with sidebar and content for merchant user', async () => {
-    mockLocalStorage.setItem('auth_token', 'test-token')
-    
-    const mockFetchUser = jest.fn().mockResolvedValue(undefined)
-    
+    mockLocalStorage.setItem('auth_token', 'test-token');
+
+    const mockFetchUser = jest.fn().mockResolvedValue(undefined);
+
     mockUseAuthStore.mockReturnValue({
-      user: { id: 1, email: 'merchant@example.com', name: 'Test Merchant', role: 'merchant', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+      user: {
+        id: 1,
+        email: 'merchant@example.com',
+        name: 'Test Merchant',
+        role: 'merchant',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
       token: 'test-token',
       isLoading: false,
       error: null,
@@ -65,20 +84,20 @@ describe('MerchantLayout Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <MerchantLayout />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     await waitFor(() => {
-      expect(screen.getByText('商家后台')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('商家后台')).toBeInTheDocument();
+    });
+  });
 
   test('redirects to login when no token', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -95,28 +114,35 @@ describe('MerchantLayout Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <MerchantLayout />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     await waitFor(() => {
-      expect(screen.queryByText('商家后台')).not.toBeInTheDocument()
-    })
-  })
+      expect(screen.queryByText('商家后台')).not.toBeInTheDocument();
+    });
+  });
 
   test('redirects non-merchant user to home with error message', async () => {
-    mockLocalStorage.setItem('auth_token', 'test-token')
-    
-    const mockFetchUser = jest.fn().mockResolvedValue(undefined)
-    
+    mockLocalStorage.setItem('auth_token', 'test-token');
+
+    const mockFetchUser = jest.fn().mockResolvedValue(undefined);
+
     mockUseAuthStore.mockReturnValue({
-      user: { id: 1, email: 'user@example.com', name: 'Test User', role: 'user', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+      user: {
+        id: 1,
+        email: 'user@example.com',
+        name: 'Test User',
+        role: 'user',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
       token: 'test-token',
       isLoading: false,
       error: null,
@@ -129,25 +155,25 @@ describe('MerchantLayout Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <MerchantLayout />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     await waitFor(() => {
-      expect(message.error).toHaveBeenCalledWith('无权限访问商户后台')
-      expect(screen.queryByText('商家后台')).not.toBeInTheDocument()
-    })
-  })
+      expect(message.error).toHaveBeenCalledWith('无权限访问商户后台');
+      expect(screen.queryByText('商家后台')).not.toBeInTheDocument();
+    });
+  });
 
   test('shows loading state while checking auth', async () => {
-    mockLocalStorage.setItem('auth_token', 'test-token')
-    
+    mockLocalStorage.setItem('auth_token', 'test-token');
+
     mockUseAuthStore.mockReturnValue({
       user: null,
       token: 'test-token',
@@ -162,24 +188,24 @@ describe('MerchantLayout Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <MerchantLayout />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(document.querySelector('.ant-spin-spinning')).toBeInTheDocument()
-  })
+    expect(document.querySelector('.ant-spin-spinning')).toBeInTheDocument();
+  });
 
   test('redirects to login when fetchUser fails', async () => {
-    mockLocalStorage.setItem('auth_token', 'test-token')
-    
-    const mockFetchUser = jest.fn().mockRejectedValue(new Error('Token expired'))
-    
+    mockLocalStorage.setItem('auth_token', 'test-token');
+
+    const mockFetchUser = jest.fn().mockRejectedValue(new Error('Token expired'));
+
     mockUseAuthStore.mockReturnValue({
       user: null,
       token: 'test-token',
@@ -194,29 +220,36 @@ describe('MerchantLayout Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <MerchantLayout />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     await waitFor(() => {
-      expect(mockFetchUser).toHaveBeenCalled()
-      expect(mockLocalStorage.getItem('auth_token')).toBeNull()
-    })
-  })
+      expect(mockFetchUser).toHaveBeenCalled();
+      expect(mockLocalStorage.getItem('auth_token')).toBeNull();
+    });
+  });
 
   test('uses sessionStorage token when localStorage token is not present', async () => {
-    mockSessionStorage.setItem('auth_token', 'session-token')
-    
-    const mockFetchUser = jest.fn().mockResolvedValue(undefined)
-    
+    mockSessionStorage.setItem('auth_token', 'session-token');
+
+    const mockFetchUser = jest.fn().mockResolvedValue(undefined);
+
     mockUseAuthStore.mockReturnValue({
-      user: { id: 1, email: 'merchant@example.com', name: 'Test Merchant', role: 'merchant', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+      user: {
+        id: 1,
+        email: 'merchant@example.com',
+        name: 'Test Merchant',
+        role: 'merchant',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
       token: 'session-token',
       isLoading: false,
       error: null,
@@ -229,26 +262,26 @@ describe('MerchantLayout Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <MerchantLayout />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     await waitFor(() => {
-      expect(screen.getByText('商家后台')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('商家后台')).toBeInTheDocument();
+    });
+  });
 
   test('clears sessionStorage token when fetchUser fails', async () => {
-    mockSessionStorage.setItem('auth_token', 'session-token')
-    
-    const mockFetchUser = jest.fn().mockRejectedValue(new Error('Token expired'))
-    
+    mockSessionStorage.setItem('auth_token', 'session-token');
+
+    const mockFetchUser = jest.fn().mockRejectedValue(new Error('Token expired'));
+
     mockUseAuthStore.mockReturnValue({
       user: null,
       token: 'session-token',
@@ -263,27 +296,27 @@ describe('MerchantLayout Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <MerchantLayout />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     await waitFor(() => {
-      expect(mockFetchUser).toHaveBeenCalled()
-      expect(mockSessionStorage.getItem('auth_token')).toBeNull()
-    })
-  })
+      expect(mockFetchUser).toHaveBeenCalled();
+      expect(mockSessionStorage.getItem('auth_token')).toBeNull();
+    });
+  });
 
   test('returns null when user is not authenticated after auth check', async () => {
-    mockLocalStorage.setItem('auth_token', 'test-token')
-    
-    const mockFetchUser = jest.fn().mockResolvedValue(undefined)
-    
+    mockLocalStorage.setItem('auth_token', 'test-token');
+
+    const mockFetchUser = jest.fn().mockResolvedValue(undefined);
+
     mockUseAuthStore.mockReturnValue({
       user: null,
       token: 'test-token',
@@ -298,28 +331,35 @@ describe('MerchantLayout Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <MerchantLayout />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     await waitFor(() => {
-      expect(screen.queryByText('商家后台')).not.toBeInTheDocument()
-    })
-  })
+      expect(screen.queryByText('商家后台')).not.toBeInTheDocument();
+    });
+  });
 
   test('handles menu click navigation', async () => {
-    mockLocalStorage.setItem('auth_token', 'test-token')
-    
-    const mockFetchUser = jest.fn().mockResolvedValue(undefined)
-    
+    mockLocalStorage.setItem('auth_token', 'test-token');
+
+    const mockFetchUser = jest.fn().mockResolvedValue(undefined);
+
     mockUseAuthStore.mockReturnValue({
-      user: { id: 1, email: 'merchant@example.com', name: 'Test Merchant', role: 'merchant', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+      user: {
+        id: 1,
+        email: 'merchant@example.com',
+        name: 'Test Merchant',
+        role: 'merchant',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
       token: 'test-token',
       isLoading: false,
       error: null,
@@ -332,23 +372,23 @@ describe('MerchantLayout Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter initialEntries={['/merchant']}>
           <MerchantLayout />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     await waitFor(() => {
-      expect(screen.getByText('商家后台')).toBeInTheDocument()
-    })
+      expect(screen.getByText('商家后台')).toBeInTheDocument();
+    });
 
-    const productMenuItem = screen.getByText('商品管理')
+    const productMenuItem = screen.getByText('商品管理');
     await act(async () => {
-      fireEvent.click(productMenuItem)
-    })
-  })
-})
+      fireEvent.click(productMenuItem);
+    });
+  });
+});

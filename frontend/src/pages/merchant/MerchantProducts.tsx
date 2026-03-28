@@ -1,97 +1,112 @@
-import { useEffect, useState } from 'react'
-import { Card, Table, Button, Tag, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import { useMerchantStore } from '@/stores/merchantStore'
-import { productService } from '@/services/product'
-import { Product } from '@/types'
-import styles from './MerchantProducts.module.css'
+import { useEffect, useState } from 'react';
+import {
+  Card,
+  Table,
+  Button,
+  Tag,
+  Space,
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  Select,
+  message,
+  Popconfirm,
+} from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useMerchantStore } from '@/stores/merchantStore';
+import { productService } from '@/services/product';
+import { Product } from '@/types';
+import styles from './MerchantProducts.module.css';
 
 const MerchantProducts = () => {
-  const { products, fetchProducts, isLoading } = useMerchantStore()
-  const [modalVisible, setModalVisible] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [form] = Form.useForm()
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const { products, fetchProducts, isLoading } = useMerchantStore();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [form] = Form.useForm();
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
-    fetchProducts(1, 20, statusFilter === 'all' ? undefined : statusFilter)
-  }, [fetchProducts, statusFilter])
+    fetchProducts(1, 20, statusFilter === 'all' ? undefined : statusFilter);
+  }, [fetchProducts, statusFilter]);
 
   const handleAdd = () => {
-    setEditingProduct(null)
-    form.resetFields()
-    setModalVisible(true)
-  }
+    setEditingProduct(null);
+    form.resetFields();
+    setModalVisible(true);
+  };
 
   const handleEdit = (record: Product) => {
-    setEditingProduct(record)
-    form.setFieldsValue(record)
-    setModalVisible(true)
-  }
+    setEditingProduct(record);
+    form.setFieldsValue(record);
+    setModalVisible(true);
+  };
 
   const handleDelete = async (id: number) => {
     try {
-      await productService.deleteProduct(id)
-      message.success('商品已删除')
-      fetchProducts(1, 20, statusFilter === 'all' ? undefined : statusFilter)
+      await productService.deleteProduct(id);
+      message.success('商品已删除');
+      fetchProducts(1, 20, statusFilter === 'all' ? undefined : statusFilter);
     } catch (error) {
-      message.error('删除失败')
+      message.error('删除失败');
     }
-  }
+  };
 
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields()
-      
+      const values = await form.validateFields();
+
       if (values.price !== undefined && values.price <= 0) {
-        message.error('价格必须大于0')
-        return
+        message.error('价格必须大于0');
+        return;
       }
-      
+
       if (values.stock !== undefined && values.stock < 0) {
-        message.error('库存必须大于等于0')
-        return
+        message.error('库存必须大于等于0');
+        return;
       }
-      
+
       if (editingProduct) {
-        await productService.updateProduct(editingProduct.id, values)
-        message.success('商品已更新')
+        await productService.updateProduct(editingProduct.id, values);
+        message.success('商品已更新');
       } else {
-        await productService.createProduct(values)
-        message.success('商品已创建')
+        await productService.createProduct(values);
+        message.success('商品已创建');
       }
-      setModalVisible(false)
-      fetchProducts(1, 20, statusFilter === 'all' ? undefined : statusFilter)
+      setModalVisible(false);
+      fetchProducts(1, 20, statusFilter === 'all' ? undefined : statusFilter);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'errorFields' in error) {
-        const validationError = error as { errorFields: { errors: string[] }[] }
-        const firstError = validationError.errorFields[0]?.errors[0]
+        const validationError = error as { errorFields: { errors: string[] }[] };
+        const firstError = validationError.errorFields[0]?.errors[0];
         if (firstError) {
-          message.error(firstError)
-          return
+          message.error(firstError);
+          return;
         }
       }
-      const axiosError = error as { response?: { data?: { code?: string; message?: string; data?: { redirect?: string } } } }
-      const responseData = axiosError.response?.data
-      
+      const axiosError = error as {
+        response?: { data?: { code?: string; message?: string; data?: { redirect?: string } } };
+      };
+      const responseData = axiosError.response?.data;
+
       if (responseData?.code === 'MERCHANT_NOT_APPROVED') {
-        message.warning(responseData.message || '您的商户申请正在审核中')
+        message.warning(responseData.message || '您的商户申请正在审核中');
         Modal.confirm({
           title: '提交商户资料',
           content: '您需要提交商户资料才能创建商品，是否现在提交？',
           okText: '去提交',
           cancelText: '取消',
           onOk: () => {
-            window.location.href = responseData?.data?.redirect || '/merchant/apply'
+            window.location.href = responseData?.data?.redirect || '/merchant/apply';
           },
-        })
-        return
+        });
+        return;
       }
-      
-      const errorMessage = responseData?.message || (editingProduct ? '更新失败' : '创建失败')
-      message.error(errorMessage)
+
+      const errorMessage = responseData?.message || (editingProduct ? '更新失败' : '创建失败');
+      message.error(errorMessage);
     }
-  }
+  };
 
   const columns = [
     {
@@ -140,9 +155,9 @@ const MerchantProducts = () => {
           active: { color: 'success', text: '在售' },
           inactive: { color: 'warning', text: '下架' },
           archived: { color: 'default', text: '归档' },
-        }
-        const { color, text } = statusMap[status] || { color: 'default', text: status }
-        return <Tag color={color}>{text}</Tag>
+        };
+        const { color, text } = statusMap[status] || { color: 'default', text: status };
+        return <Tag color={color}>{text}</Tag>;
       },
     },
     {
@@ -172,7 +187,7 @@ const MerchantProducts = () => {
         </Space>
       ),
     },
-  ]
+  ];
 
   return (
     <div className={styles.products}>
@@ -239,9 +254,9 @@ const MerchantProducts = () => {
               {
                 validator: (_, value) => {
                   if (value !== undefined && value <= 0) {
-                    return Promise.reject(new Error('价格必须大于0'))
+                    return Promise.reject(new Error('价格必须大于0'));
                   }
-                  return Promise.resolve()
+                  return Promise.resolve();
                 },
               },
             ]}
@@ -255,11 +270,7 @@ const MerchantProducts = () => {
             />
           </Form.Item>
           <Form.Item name="original_price" label="原价">
-            <InputNumber
-              precision={2}
-              style={{ width: '100%' }}
-              placeholder="请输入原价（可选）"
-            />
+            <InputNumber precision={2} style={{ width: '100%' }} placeholder="请输入原价（可选）" />
           </Form.Item>
           <Form.Item
             name="stock"
@@ -269,28 +280,20 @@ const MerchantProducts = () => {
               {
                 validator: (_, value) => {
                   if (value !== undefined && value < 0) {
-                    return Promise.reject(new Error('库存必须大于等于0'))
+                    return Promise.reject(new Error('库存必须大于等于0'));
                   }
-                  return Promise.resolve()
+                  return Promise.resolve();
                 },
               },
             ]}
             validateTrigger="onBlur"
           >
-            <InputNumber
-              min={-Infinity}
-              style={{ width: '100%' }}
-              placeholder="请输入库存"
-            />
+            <InputNumber min={-Infinity} style={{ width: '100%' }} placeholder="请输入库存" />
           </Form.Item>
           <Form.Item name="category" label="分类">
             <Input placeholder="请输入分类" />
           </Form.Item>
-          <Form.Item
-            name="status"
-            label="状态"
-            rules={[{ required: true, message: '请选择状态' }]}
-          >
+          <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
             <Select
               placeholder="请选择状态"
               options={[
@@ -302,7 +305,7 @@ const MerchantProducts = () => {
         </Form>
       </Modal>
     </div>
-  )
-}
+  );
+};
 
-export default MerchantProducts
+export default MerchantProducts;

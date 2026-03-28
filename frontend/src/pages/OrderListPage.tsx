@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Table,
   Button,
@@ -16,19 +16,19 @@ import {
   Tabs,
   Card,
   Grid,
-} from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { FundOutlined, ReloadOutlined, TeamOutlined, ShoppingOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
-import { useOrderStore } from '@stores/orderStore'
-import { useCartStore } from '@stores/cartStore'
-import { useProductStore } from '@stores/productStore'
-import type { Order } from '@/types'
+} from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { FundOutlined, ReloadOutlined, TeamOutlined, ShoppingOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useOrderStore } from '@stores/orderStore';
+import { useCartStore } from '@stores/cartStore';
+import { useProductStore } from '@stores/productStore';
+import type { Order } from '@/types';
 
-const { useBreakpoint } = Grid
-const { Option } = Select
-const { TextArea } = Input
-const { Text } = Typography
+const { useBreakpoint } = Grid;
+const { Option } = Select;
+const { TextArea } = Input;
+const { Text } = Typography;
 
 const statusMap: Record<string, { color: string; label: string }> = {
   pending: { color: 'orange', label: '待支付' },
@@ -39,20 +39,20 @@ const statusMap: Record<string, { color: string; label: string }> = {
   cancelled: { color: 'gray', label: '已取消' },
   refunding: { color: 'purple', label: '退款中' },
   refunded: { color: 'cyan', label: '已退款' },
-}
+};
 
 const groupStatusMap: Record<string, { color: string; label: string }> = {
   active: { color: 'processing', label: '拼团中' },
   completed: { color: 'success', label: '已成团' },
   failed: { color: 'error', label: '拼团失败' },
-}
+};
 
 const cancelReasons = [
   { value: 'changed_mind', label: '不想买了' },
   { value: 'found_better_price', label: '找到更便宜的了' },
   { value: 'wrong_item', label: '拍错商品' },
   { value: 'other', label: '其他原因' },
-]
+];
 
 const statusTabs = [
   { key: 'all', label: '全部订单' },
@@ -60,213 +60,238 @@ const statusTabs = [
   { key: 'processing', label: '进行中' },
   { key: 'completed', label: '已完成' },
   { key: 'cancelled', label: '已取消' },
-]
+];
 
 export const OrderListPage: React.FC = () => {
-  const navigate = useNavigate()
-  const { orders, isLoading, error, fetchOrders, cancelOrder, requestRefund } = useOrderStore()
-  const { addItem } = useCartStore()
-  const { fetchProductByID } = useProductStore()
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [cancelModalVisible, setCancelModalVisible] = useState(false)
-  const [refundModalVisible, setRefundModalVisible] = useState(false)
-  const [cancelReason, setCancelReason] = useState<string>('')
-  const [cancelReasonText, setCancelReasonText] = useState<string>('')
-  const [refundReason, setRefundReason] = useState<string>('')
-  const [activeTab, setActiveTab] = useState<string>('all')
-  const screens = useBreakpoint()
+  const navigate = useNavigate();
+  const { orders, isLoading, error, fetchOrders, cancelOrder, requestRefund } = useOrderStore();
+  const { addItem } = useCartStore();
+  const { fetchProductByID } = useProductStore();
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [refundModalVisible, setRefundModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState<string>('');
+  const [cancelReasonText, setCancelReasonText] = useState<string>('');
+  const [refundReason, setRefundReason] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<string>('all');
+  const screens = useBreakpoint();
 
-  const isMobile = screens.xs || (screens.sm && !screens.md)
+  const isMobile = screens.xs || (screens.sm && !screens.md);
 
   useEffect(() => {
-    fetchOrders()
-  }, [fetchOrders])
+    fetchOrders();
+  }, [fetchOrders]);
 
   const filteredOrders = orders.filter((order) => {
-    if (activeTab === 'all') return true
+    if (activeTab === 'all') return true;
     if (activeTab === 'processing') {
-      return ['pending', 'paid', 'processing'].includes(order.status)
+      return ['pending', 'paid', 'processing'].includes(order.status);
     }
-    return order.status === activeTab
-  })
+    return order.status === activeTab;
+  });
 
   const handleCancelOrder = async () => {
-    if (!selectedOrder) return
-    
+    if (!selectedOrder) return;
+
     if (!cancelReason) {
-      message.warning('请选择取消原因')
-      return
+      message.warning('请选择取消原因');
+      return;
     }
 
     try {
-      await cancelOrder(selectedOrder.id, cancelReason === 'other' ? cancelReasonText : cancelReason)
-      message.success('订单已取消')
-      setCancelModalVisible(false)
-      setCancelReason('')
-      setCancelReasonText('')
-      fetchOrders()
+      await cancelOrder(
+        selectedOrder.id,
+        cancelReason === 'other' ? cancelReasonText : cancelReason
+      );
+      message.success('订单已取消');
+      setCancelModalVisible(false);
+      setCancelReason('');
+      setCancelReasonText('');
+      fetchOrders();
     } catch {
-      message.error('取消订单失败')
+      message.error('取消订单失败');
     }
-  }
+  };
 
   const handleRefundRequest = async () => {
-    if (!selectedOrder) return
-    
+    if (!selectedOrder) return;
+
     if (!refundReason) {
-      message.warning('请输入退款原因')
-      return
+      message.warning('请输入退款原因');
+      return;
     }
 
     try {
-      await requestRefund(selectedOrder.id, refundReason)
-      message.success('退款申请已提交')
-      setRefundModalVisible(false)
-      setRefundReason('')
-      fetchOrders()
+      await requestRefund(selectedOrder.id, refundReason);
+      message.success('退款申请已提交');
+      setRefundModalVisible(false);
+      setRefundReason('');
+      fetchOrders();
     } catch {
-      message.error('退款申请失败')
+      message.error('退款申请失败');
     }
-  }
+  };
 
   const handleBuyAgain = async (order: Order) => {
     try {
-      const product = await fetchProductByID(order.product_id)
+      const product = await fetchProductByID(order.product_id);
       if (product) {
-        addItem(product, order.quantity)
-        message.success('已添加到购物车')
-        navigate('/cart')
+        addItem(product, order.quantity);
+        message.success('已添加到购物车');
+        navigate('/cart');
       }
     } catch {
-      message.error('商品不存在或已下架')
+      message.error('商品不存在或已下架');
     }
-  }
+  };
 
   const openCancelModal = (order: Order) => {
-    setSelectedOrder(order)
-    setCancelModalVisible(true)
-  }
+    setSelectedOrder(order);
+    setCancelModalVisible(true);
+  };
 
   const openRefundModal = (order: Order) => {
-    setSelectedOrder(order)
-    setRefundModalVisible(true)
-  }
+    setSelectedOrder(order);
+    setRefundModalVisible(true);
+  };
 
-  const columns: ColumnsType<Order> = useMemo(() => [
-    {
-      title: '订单号',
-      dataIndex: 'id',
-      key: 'id',
-      width: 100,
-      fixed: 'left',
-      render: (id: number) => <Text strong>#{id}</Text>,
-    },
-    ...(screens.md ? [{
-      title: '产品ID',
-      dataIndex: 'product_id',
-      key: 'product_id',
-      width: 100,
-    }] : []),
-    ...(screens.sm ? [{
-      title: '数量',
-      dataIndex: 'quantity',
-      key: 'quantity',
-      width: 80,
-    }] : []),
-    {
-      title: '总价',
-      dataIndex: 'total_price',
-      key: 'total_price',
-      width: 100,
-      render: (price: number) => <Text type="danger">¥{price.toFixed(2)}</Text>,
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (status: string, record: Order) => {
-        const s = statusMap[status] || { color: 'default', label: status }
-        const groupStatus = record.group_id ? groupStatusMap[record.group_status || 'active'] : null
-        return (
-          <Space direction="vertical" size="small">
-            <Tag color={s.color}>{s.label}</Tag>
-            {groupStatus && (
-              <Tag color={groupStatus.color} icon={<TeamOutlined />}>
-                {groupStatus.label}
-              </Tag>
+  const columns: ColumnsType<Order> = useMemo(
+    () => [
+      {
+        title: '订单号',
+        dataIndex: 'id',
+        key: 'id',
+        width: 100,
+        fixed: 'left',
+        render: (id: number) => <Text strong>#{id}</Text>,
+      },
+      ...(screens.md
+        ? [
+            {
+              title: '产品ID',
+              dataIndex: 'product_id',
+              key: 'product_id',
+              width: 100,
+            },
+          ]
+        : []),
+      ...(screens.sm
+        ? [
+            {
+              title: '数量',
+              dataIndex: 'quantity',
+              key: 'quantity',
+              width: 80,
+            },
+          ]
+        : []),
+      {
+        title: '总价',
+        dataIndex: 'total_price',
+        key: 'total_price',
+        width: 100,
+        render: (price: number) => <Text type="danger">¥{price.toFixed(2)}</Text>,
+      },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        key: 'status',
+        width: 120,
+        render: (status: string, record: Order) => {
+          const s = statusMap[status] || { color: 'default', label: status };
+          const groupStatus = record.group_id
+            ? groupStatusMap[record.group_status || 'active']
+            : null;
+          return (
+            <Space direction="vertical" size="small">
+              <Tag color={s.color}>{s.label}</Tag>
+              {groupStatus && (
+                <Tag color={groupStatus.color} icon={<TeamOutlined />}>
+                  {groupStatus.label}
+                </Tag>
+              )}
+            </Space>
+          );
+        },
+      },
+      ...(screens.lg
+        ? [
+            {
+              title: '创建时间',
+              dataIndex: 'created_at',
+              key: 'created_at',
+              width: 120,
+              render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
+            },
+          ]
+        : []),
+      {
+        title: '操作',
+        key: 'action',
+        width: isMobile ? 80 : 200,
+        fixed: 'right',
+        render: (_: unknown, record: Order) => (
+          <Space size="small" wrap>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => {
+                setSelectedOrder(record);
+                setModalVisible(true);
+              }}
+            >
+              详情
+            </Button>
+            {record.status === 'completed' && (
+              <Button
+                type="link"
+                size="small"
+                icon={<ReloadOutlined />}
+                onClick={() => handleBuyAgain(record)}
+              >
+                {!isMobile && '再次购买'}
+              </Button>
+            )}
+            {record.status === 'pending' && (
+              <>
+                <Button type="link" size="small" onClick={() => navigate(`/payment/${record.id}`)}>
+                  支付
+                </Button>
+                <Button type="link" size="small" danger onClick={() => openCancelModal(record)}>
+                  取消
+                </Button>
+              </>
+            )}
+            {record.status === 'paid' && (
+              <Button
+                type="link"
+                size="small"
+                icon={<FundOutlined />}
+                onClick={() => openRefundModal(record)}
+              >
+                {!isMobile && '退款'}
+              </Button>
+            )}
+            {record.group_id && record.group_status === 'active' && (
+              <Button
+                type="link"
+                size="small"
+                icon={<TeamOutlined />}
+                onClick={() => navigate(`/groups/${record.group_id}`)}
+              >
+                {!isMobile && '拼团'}
+              </Button>
             )}
           </Space>
-        )
+        ),
       },
-    },
-    ...(screens.lg ? [{
-      title: '创建时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      width: 120,
-      render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
-    }] : []),
-    {
-      title: '操作',
-      key: 'action',
-      width: isMobile ? 80 : 200,
-      fixed: 'right',
-      render: (_: unknown, record: Order) => (
-        <Space size="small" wrap>
-          <Button
-            type="link"
-            size="small"
-            onClick={() => {
-              setSelectedOrder(record)
-              setModalVisible(true)
-            }}
-          >
-            详情
-          </Button>
-          {record.status === 'completed' && (
-            <Button 
-              type="link" 
-              size="small"
-              icon={<ReloadOutlined />} 
-              onClick={() => handleBuyAgain(record)}
-            >
-              {!isMobile && '再次购买'}
-            </Button>
-          )}
-          {record.status === 'pending' && (
-            <>
-              <Button type="link" size="small" onClick={() => navigate(`/payment/${record.id}`)}>
-                支付
-              </Button>
-              <Button type="link" size="small" danger onClick={() => openCancelModal(record)}>
-                取消
-              </Button>
-            </>
-          )}
-          {record.status === 'paid' && (
-            <Button type="link" size="small" icon={<FundOutlined />} onClick={() => openRefundModal(record)}>
-              {!isMobile && '退款'}
-            </Button>
-          )}
-          {record.group_id && record.group_status === 'active' && (
-            <Button 
-              type="link" 
-              size="small"
-              icon={<TeamOutlined />} 
-              onClick={() => navigate(`/groups/${record.group_id}`)}
-            >
-              {!isMobile && '拼团'}
-            </Button>
-          )}
-        </Space>
-      ),
-    },
-  ], [screens, isMobile, navigate])
+    ],
+    [screens, isMobile, navigate]
+  );
 
   if (error) {
-    return <Empty description={`错误: ${error}`} />
+    return <Empty description={`错误: ${error}`} />;
   }
 
   const tabItems = statusTabs.map((tab) => ({
@@ -277,16 +302,18 @@ export const OrderListPage: React.FC = () => {
         {tab.key === 'all' && <Tag style={{ marginLeft: 8 }}>{orders.length}</Tag>}
         {tab.key !== 'all' && (
           <Tag style={{ marginLeft: 8 }}>
-            {orders.filter((o) => 
-              tab.key === 'processing' 
-                ? ['pending', 'paid', 'processing'].includes(o.status)
-                : o.status === tab.key
-            ).length}
+            {
+              orders.filter((o) =>
+                tab.key === 'processing'
+                  ? ['pending', 'paid', 'processing'].includes(o.status)
+                  : o.status === tab.key
+              ).length
+            }
           </Tag>
         )}
       </span>
     ),
-  }))
+  }));
 
   return (
     <div style={{ padding: isMobile ? '12px' : '20px', maxWidth: 1200, margin: '0 auto' }}>
@@ -311,7 +338,7 @@ export const OrderListPage: React.FC = () => {
             dataSource={filteredOrders}
             rowKey="id"
             scroll={{ x: 600 }}
-            pagination={{ 
+            pagination={{
               pageSize: 10,
               size: isMobile ? 'small' : 'default',
             }}
@@ -348,12 +375,12 @@ export const OrderListPage: React.FC = () => {
             {selectedOrder.group_id && (
               <>
                 <Descriptions.Item label="拼团ID">
-                  <Button 
-                    type="link" 
+                  <Button
+                    type="link"
                     size="small"
                     onClick={() => {
-                      setModalVisible(false)
-                      navigate(`/groups/${selectedOrder.group_id}`)
+                      setModalVisible(false);
+                      navigate(`/groups/${selectedOrder.group_id}`);
                     }}
                   >
                     #{selectedOrder.group_id}
@@ -372,9 +399,9 @@ export const OrderListPage: React.FC = () => {
         title="取消订单"
         open={cancelModalVisible}
         onCancel={() => {
-          setCancelModalVisible(false)
-          setCancelReason('')
-          setCancelReasonText('')
+          setCancelModalVisible(false);
+          setCancelReason('');
+          setCancelReasonText('');
         }}
         onOk={handleCancelOrder}
         okText="确认取消"
@@ -420,8 +447,8 @@ export const OrderListPage: React.FC = () => {
         title="申请退款"
         open={refundModalVisible}
         onCancel={() => {
-          setRefundModalVisible(false)
-          setRefundReason('')
+          setRefundModalVisible(false);
+          setRefundReason('');
         }}
         onOk={handleRefundRequest}
         okText="提交申请"
@@ -454,7 +481,7 @@ export const OrderListPage: React.FC = () => {
         )}
       </Modal>
     </div>
-  )
-}
+  );
+};
 
-export default OrderListPage
+export default OrderListPage;

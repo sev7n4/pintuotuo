@@ -1,18 +1,18 @@
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom'
-import ReferralPage from '../pages/ReferralPage'
-import LoginPage from '../pages/LoginPage'
-import CartPage from '../pages/CartPage'
-import RegisterPage from '../pages/RegisterPage'
-import { useAuthStore } from '@/stores/authStore'
-import { useReferralStore } from '@/stores/referralStore'
-import { useCartStore } from '@/stores/cartStore'
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
+import ReferralPage from '../pages/ReferralPage';
+import LoginPage from '../pages/LoginPage';
+import CartPage from '../pages/CartPage';
+import RegisterPage from '../pages/RegisterPage';
+import { useAuthStore } from '@/stores/authStore';
+import { useReferralStore } from '@/stores/referralStore';
+import { useCartStore } from '@/stores/cartStore';
 
-jest.mock('@/stores/authStore')
-jest.mock('@/stores/referralStore')
-jest.mock('@/stores/cartStore')
+jest.mock('@/stores/authStore');
+jest.mock('@/stores/referralStore');
+jest.mock('@/stores/cartStore');
 
-jest.mock('../pages/ReferralPage.module.css', () => ({}))
+jest.mock('../pages/ReferralPage.module.css', () => ({}));
 
 jest.mock('antd', () => {
   const antd = jest.requireActual('antd');
@@ -38,9 +38,9 @@ jest.mock('antd', () => {
   };
 });
 
-const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>
-const mockUseReferralStore = useReferralStore as jest.MockedFunction<typeof useReferralStore>
-const mockUseCartStore = useCartStore as jest.MockedFunction<typeof useCartStore>
+const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>;
+const mockUseReferralStore = useReferralStore as jest.MockedFunction<typeof useReferralStore>;
+const mockUseCartStore = useCartStore as jest.MockedFunction<typeof useCartStore>;
 
 // 模拟 clipboard API
 Object.defineProperty(navigator, 'clipboard', {
@@ -48,12 +48,12 @@ Object.defineProperty(navigator, 'clipboard', {
     writeText: jest.fn().mockResolvedValue(undefined),
   },
   writable: true,
-})
+});
 
 describe('Integration Tests', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
   test('should render referral page for unauthenticated users', async () => {
     // 模拟未认证状态
@@ -69,7 +69,7 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -87,7 +87,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -97,20 +97,22 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     // 检查推荐页面是否渲染
     await waitFor(() => {
-      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument();
+    });
+  });
 
   test('should access referral page after login', async () => {
-    const mockLogin = jest.fn().mockResolvedValue({ token: 'test-token' })
-    const mockFetchUser = jest.fn().mockResolvedValue({ id: 1, email: 'user@example.com', role: 'user' })
+    const mockLogin = jest.fn().mockResolvedValue({ token: 'test-token' });
+    const mockFetchUser = jest
+      .fn()
+      .mockResolvedValue({ id: 1, email: 'user@example.com', role: 'user' });
 
     // 初始未认证状态，登录后切换到认证状态
-    let isAuthenticated = false
+    let isAuthenticated = false;
     const mockStore = {
       user: isAuthenticated ? { id: 1, email: 'user@example.com', role: 'user' } : null,
       token: isAuthenticated ? 'test-token' : null,
@@ -118,21 +120,28 @@ describe('Integration Tests', () => {
       error: null,
       isAuthenticated,
       login: async (email: string, password: string) => {
-        const result = await mockLogin(email, password)
-        isAuthenticated = true
-        return result
+        const result = await mockLogin(email, password);
+        isAuthenticated = true;
+        return result;
       },
       register: jest.fn(),
       logout: jest.fn(),
       fetchUser: mockFetchUser,
       setUser: jest.fn(),
       clearError: jest.fn(),
-    }
-    
-    mockUseAuthStore.mockImplementation(() => mockStore)
-    
+    };
+
+    mockUseAuthStore.mockImplementation(() => mockStore);
+
     mockUseAuthStore.getState = jest.fn(() => ({
-      user: { id: 1, email: 'user@example.com', name: 'Test User', role: 'user', created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' },
+      user: {
+        id: 1,
+        email: 'user@example.com',
+        name: 'Test User',
+        role: 'user',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
       token: 'test-token',
       isLoading: false,
       error: null,
@@ -145,11 +154,17 @@ describe('Integration Tests', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    }))
+    }));
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
+      stats: {
+        totalReferrals: 10,
+        totalRewards: 100,
+        pendingRewards: 20,
+        paidRewards: 80,
+        availableRewards: 60,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -163,7 +178,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/login']}>
@@ -174,28 +189,28 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/login" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     // 输入登录信息
-    const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement
-    const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement
-    const loginButton = screen.getByText('登 录')
+    const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
+    const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
+    const loginButton = screen.getByText('登 录');
 
     await act(async () => {
-      fireEvent.change(emailInput, { target: { value: 'user@example.com' } })
-      fireEvent.change(passwordInput, { target: { value: 'password123' } })
-      fireEvent.click(loginButton)
-    })
+      fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
+      fireEvent.change(passwordInput, { target: { value: 'password123' } });
+      fireEvent.click(loginButton);
+    });
 
     // 检查是否跳转到产品页面（根据LoginPage组件的逻辑）
     await waitFor(() => {
-      expect(screen.getByText('Products Page')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('Products Page')).toBeInTheDocument();
+    });
+  });
 
   test('should bind referral code during registration', async () => {
-    const mockRegister = jest.fn().mockResolvedValue({ token: 'test-token' })
-    const mockBindReferralCode = jest.fn().mockResolvedValue(undefined)
+    const mockRegister = jest.fn().mockResolvedValue({ token: 'test-token' });
+    const mockBindReferralCode = jest.fn().mockResolvedValue(undefined);
 
     // 初始未认证状态
     mockUseAuthStore.mockReturnValue({
@@ -210,7 +225,7 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -228,7 +243,7 @@ describe('Integration Tests', () => {
       bindReferralCode: mockBindReferralCode,
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/register?code=FRIEND12']}>
@@ -239,28 +254,33 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/register" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     // 输入注册信息
-    const nameInput = screen.getByPlaceholderText('输入你的名字') as HTMLInputElement
-    const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement
-    const passwordInput = screen.getByPlaceholderText('设置密码') as HTMLInputElement
-    const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码') as HTMLInputElement
-    const registerButton = screen.getByText('创建账户')
+    const nameInput = screen.getByPlaceholderText('输入你的名字') as HTMLInputElement;
+    const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
+    const passwordInput = screen.getByPlaceholderText('设置密码') as HTMLInputElement;
+    const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码') as HTMLInputElement;
+    const registerButton = screen.getByText('创建账户');
 
     await act(async () => {
-      fireEvent.change(nameInput, { target: { value: 'Test User' } })
-      fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } })
-      fireEvent.change(passwordInput, { target: { value: 'password123' } })
-      fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } })
-      fireEvent.click(registerButton)
-    })
+      fireEvent.change(nameInput, { target: { value: 'Test User' } });
+      fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } });
+      fireEvent.change(passwordInput, { target: { value: 'password123' } });
+      fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
+      fireEvent.click(registerButton);
+    });
 
     // 检查是否调用了注册函数
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledWith('newuser@example.com', 'Test User', 'password123', 'user')
-    })
-  })
+      expect(mockRegister).toHaveBeenCalledWith(
+        'newuser@example.com',
+        'Test User',
+        'password123',
+        'user'
+      );
+    });
+  });
 
   test('should integrate referral system with cart and orders', async () => {
     // 模拟认证状态
@@ -276,11 +296,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
+      stats: {
+        totalReferrals: 10,
+        totalRewards: 100,
+        pendingRewards: 20,
+        paidRewards: 80,
+        availableRewards: 60,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -294,7 +320,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseCartStore.mockReturnValue({
       items: [
@@ -319,7 +345,7 @@ describe('Integration Tests', () => {
       clearCart: jest.fn(),
       fetchCart: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/cart']}>
@@ -329,17 +355,17 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/cart" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     // 检查购物车页面
     await waitFor(() => {
-      expect(screen.getByText('购物车')).toBeInTheDocument()
-      expect(screen.getByText('Test Product')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('购物车')).toBeInTheDocument();
+      expect(screen.getByText('Test Product')).toBeInTheDocument();
+    });
+  });
 
   test('should handle referral code binding error', async () => {
-    const mockBindReferralCode = jest.fn().mockRejectedValue(new Error('Invalid referral code'))
+    const mockBindReferralCode = jest.fn().mockRejectedValue(new Error('Invalid referral code'));
 
     // 模拟认证状态
     mockUseAuthStore.mockReturnValue({
@@ -354,11 +380,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
+      stats: {
+        totalReferrals: 10,
+        totalRewards: 100,
+        pendingRewards: 20,
+        paidRewards: 80,
+        availableRewards: 60,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -372,7 +404,7 @@ describe('Integration Tests', () => {
       bindReferralCode: mockBindReferralCode,
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -381,17 +413,17 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     // 检查推荐页面是否渲染
     await waitFor(() => {
-      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument()
-    })
+      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument();
+    });
 
     // 验证绑定邀请码功能存在
-    const input = screen.getByPlaceholderText('输入好友的邀请码')
-    expect(input).toBeInTheDocument()
-  })
+    const input = screen.getByPlaceholderText('输入好友的邀请码');
+    expect(input).toBeInTheDocument();
+  });
 
   test('should handle concurrent operations between referral and other features', async () => {
     // 模拟认证状态
@@ -407,14 +439,27 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
-    const mockFetchReferralCode = jest.fn().mockResolvedValue('TESTCODE')
-    const mockFetchStats = jest.fn().mockResolvedValue({ totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80 })
+    const mockFetchReferralCode = jest.fn().mockResolvedValue('TESTCODE');
+    const mockFetchStats = jest
+      .fn()
+      .mockResolvedValue({
+        totalReferrals: 10,
+        totalRewards: 100,
+        pendingRewards: 20,
+        paidRewards: 80,
+      });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
+      stats: {
+        totalReferrals: 10,
+        totalRewards: 100,
+        pendingRewards: 20,
+        paidRewards: 80,
+        availableRewards: 60,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -428,7 +473,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     // 测试推荐页面
     render(
@@ -438,18 +483,18 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     // 检查推荐页面
     await waitFor(() => {
-      expect(screen.getByText('邀请好友')).toBeInTheDocument()
-      expect(screen.getByText('TESTCODE')).toBeInTheDocument()
-    })
+      expect(screen.getByText('邀请好友')).toBeInTheDocument();
+      expect(screen.getByText('TESTCODE')).toBeInTheDocument();
+    });
 
     // 验证获取推荐码和统计信息的函数被调用
-    expect(mockFetchReferralCode).toHaveBeenCalled()
-    expect(mockFetchStats).toHaveBeenCalled()
-  })
+    expect(mockFetchReferralCode).toHaveBeenCalled();
+    expect(mockFetchStats).toHaveBeenCalled();
+  });
 
   test('should integrate referral system with user profile', async () => {
     // 模拟认证状态
@@ -465,11 +510,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 5, totalRewards: 50, pendingRewards: 10, paidRewards: 40, availableRewards: 30 },
+      stats: {
+        totalReferrals: 5,
+        totalRewards: 50,
+        pendingRewards: 10,
+        paidRewards: 40,
+        availableRewards: 30,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -483,7 +534,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     // 测试推荐页面
     render(
@@ -493,14 +544,14 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     // 检查推荐页面是否显示用户相关信息
     await waitFor(() => {
-      expect(screen.getByText('邀请好友')).toBeInTheDocument()
-      expect(screen.getByText('TESTCODE')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('邀请好友')).toBeInTheDocument();
+      expect(screen.getByText('TESTCODE')).toBeInTheDocument();
+    });
+  });
 
   test('should test referral code sharing functionality', async () => {
     // 模拟认证状态
@@ -516,11 +567,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'SHARE123',
-      stats: { totalReferrals: 0, totalRewards: 0, pendingRewards: 0, paidRewards: 0, availableRewards: 0 },
+      stats: {
+        totalReferrals: 0,
+        totalRewards: 0,
+        pendingRewards: 0,
+        paidRewards: 0,
+        availableRewards: 0,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -534,7 +591,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     // 测试推荐页面
     render(
@@ -544,21 +601,21 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     // 检查推荐码是否显示
     await waitFor(() => {
-      expect(screen.getByText('SHARE123')).toBeInTheDocument()
-    })
+      expect(screen.getByText('SHARE123')).toBeInTheDocument();
+    });
 
     // 验证复制到剪贴板功能
-    const copyButton = screen.getByRole('button', { name: /复制邀请码/i })
+    const copyButton = screen.getByRole('button', { name: /复制邀请码/i });
     await act(async () => {
-      fireEvent.click(copyButton)
-    })
+      fireEvent.click(copyButton);
+    });
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('SHARE123')
-  })
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('SHARE123');
+  });
 
   test('should test referral rewards withdrawal', async () => {
     // 模拟认证状态
@@ -574,11 +631,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
+      stats: {
+        totalReferrals: 10,
+        totalRewards: 100,
+        pendingRewards: 20,
+        paidRewards: 80,
+        availableRewards: 60,
+      },
       referrals: [],
       rewards: [
         {
@@ -605,7 +668,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     // 测试推荐页面
     render(
@@ -615,13 +678,13 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     // 检查推荐页面
     await waitFor(() => {
-      expect(screen.getByText('邀请好友')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('邀请好友')).toBeInTheDocument();
+    });
+  });
 
   test('should test referral statistics display', async () => {
     // 模拟认证状态
@@ -637,11 +700,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 25, totalRewards: 250, pendingRewards: 50, paidRewards: 200, availableRewards: 150 },
+      stats: {
+        totalReferrals: 25,
+        totalRewards: 250,
+        pendingRewards: 50,
+        paidRewards: 200,
+        availableRewards: 150,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -655,7 +724,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     // 测试推荐页面
     render(
@@ -665,16 +734,16 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     // 检查推荐页面
     await waitFor(() => {
-      expect(screen.getByText('邀请好友')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('邀请好友')).toBeInTheDocument();
+    });
+  });
 
   test('should handle user logout and clear all states', async () => {
-    const mockLogout = jest.fn().mockResolvedValue(undefined)
+    const mockLogout = jest.fn().mockResolvedValue(undefined);
 
     // 模拟认证状态
     mockUseAuthStore.mockReturnValue({
@@ -689,11 +758,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
+      stats: {
+        totalReferrals: 10,
+        totalRewards: 100,
+        pendingRewards: 20,
+        paidRewards: 80,
+        availableRewards: 60,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -707,7 +782,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseCartStore.mockReturnValue({
       items: [],
@@ -720,7 +795,7 @@ describe('Integration Tests', () => {
       clearCart: jest.fn(),
       fetchCart: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -730,12 +805,12 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('邀请好友')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('邀请好友')).toBeInTheDocument();
+    });
+  });
 
   test('should handle loading states across multiple components', async () => {
     // 模拟加载状态
@@ -751,7 +826,7 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -769,7 +844,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -778,12 +853,12 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument();
+    });
+  });
 
   test('should handle form validation integration', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -798,7 +873,7 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/login']}>
@@ -807,33 +882,33 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/login" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
-    const loginButton = screen.getByText('登 录')
-    expect(loginButton).toBeInTheDocument()
+    const loginButton = screen.getByText('登 录');
+    expect(loginButton).toBeInTheDocument();
 
-    const emailInput = screen.getByPlaceholderText('example@email.com')
-    expect(emailInput).toBeInTheDocument()
+    const emailInput = screen.getByPlaceholderText('example@email.com');
+    expect(emailInput).toBeInTheDocument();
 
-    const passwordInput = screen.getByPlaceholderText('输入密码')
-    expect(passwordInput).toBeInTheDocument()
-  })
+    const passwordInput = screen.getByPlaceholderText('输入密码');
+    expect(passwordInput).toBeInTheDocument();
+  });
 
   test('should handle authentication state changes', async () => {
     let authState = {
       user: null as { id: number; email: string; role: string } | null,
       token: null as string | null,
       isAuthenticated: false,
-    }
+    };
 
     const mockLogin = jest.fn().mockImplementation(async () => {
       authState = {
         user: { id: 1, email: 'test@example.com', role: 'user' },
         token: 'new-token',
         isAuthenticated: true,
-      }
-      return { token: 'new-token' }
-    })
+      };
+      return { token: 'new-token' };
+    });
 
     mockUseAuthStore.mockImplementation(() => ({
       user: authState.user,
@@ -847,11 +922,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    }))
+    }));
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
-      stats: { totalReferrals: 5, totalRewards: 50, pendingRewards: 10, paidRewards: 40, availableRewards: 30 },
+      stats: {
+        totalReferrals: 5,
+        totalRewards: 50,
+        pendingRewards: 10,
+        paidRewards: 40,
+        availableRewards: 30,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -865,7 +946,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/login']}>
@@ -875,22 +956,22 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/login" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
-    const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement
-    const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement
-    const loginButton = screen.getByText('登 录')
+    const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
+    const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
+    const loginButton = screen.getByText('登 录');
 
     await act(async () => {
-      fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
-      fireEvent.change(passwordInput, { target: { value: 'password123' } })
-      fireEvent.click(loginButton)
-    })
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+      fireEvent.change(passwordInput, { target: { value: 'password123' } });
+      fireEvent.click(loginButton);
+    });
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123', true)
-    })
-  })
+      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123', true);
+    });
+  });
 
   test('should handle error recovery across components', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -905,7 +986,7 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -923,7 +1004,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -932,12 +1013,12 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument();
+    });
+  });
 
   test('should handle cart and referral integration for discounts', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -952,11 +1033,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'DISCOUNT10',
-      stats: { totalReferrals: 15, totalRewards: 150, pendingRewards: 30, paidRewards: 120, availableRewards: 90 },
+      stats: {
+        totalReferrals: 15,
+        totalRewards: 150,
+        pendingRewards: 30,
+        paidRewards: 120,
+        availableRewards: 90,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -970,7 +1057,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseCartStore.mockReturnValue({
       items: [
@@ -995,7 +1082,7 @@ describe('Integration Tests', () => {
       clearCart: jest.fn(),
       fetchCart: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/cart']}>
@@ -1005,18 +1092,19 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/cart" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('购物车')).toBeInTheDocument()
-      expect(screen.getByText('Discounted Product')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('购物车')).toBeInTheDocument();
+      expect(screen.getByText('Discounted Product')).toBeInTheDocument();
+    });
+  });
 
   test('should handle multiple referral code operations', async () => {
-    const mockBindReferralCode = jest.fn()
+    const mockBindReferralCode = jest
+      .fn()
       .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
 
     mockUseAuthStore.mockReturnValue({
       user: { id: 1, email: 'user@example.com', role: 'user' },
@@ -1030,11 +1118,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'FIRSTCODE',
-      stats: { totalReferrals: 0, totalRewards: 0, pendingRewards: 0, paidRewards: 0, availableRewards: 0 },
+      stats: {
+        totalReferrals: 0,
+        totalRewards: 0,
+        pendingRewards: 0,
+        paidRewards: 0,
+        availableRewards: 0,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -1048,7 +1142,7 @@ describe('Integration Tests', () => {
       bindReferralCode: mockBindReferralCode,
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1057,32 +1151,32 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('FIRSTCODE')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('FIRSTCODE')).toBeInTheDocument();
+    });
+  });
 
   test('should handle session expiration and re-authentication', async () => {
     let authState: {
-      user: { id: number; email: string; role: string } | null
-      token: string | null
-      isAuthenticated: boolean
+      user: { id: number; email: string; role: string } | null;
+      token: string | null;
+      isAuthenticated: boolean;
     } = {
       user: { id: 1, email: 'user@example.com', role: 'user' },
       token: 'expired-token',
       isAuthenticated: true,
-    }
+    };
 
     const mockFetchUser = jest.fn().mockImplementation(async () => {
       authState = {
         user: null,
         token: null,
         isAuthenticated: false,
-      }
-      throw new Error('Session expired')
-    })
+      };
+      throw new Error('Session expired');
+    });
 
     mockUseAuthStore.mockImplementation(() => ({
       user: authState.user,
@@ -1096,7 +1190,7 @@ describe('Integration Tests', () => {
       fetchUser: mockFetchUser,
       setUser: jest.fn(),
       clearError: jest.fn(),
-    }))
+    }));
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -1114,7 +1208,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1124,12 +1218,12 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument();
+    });
+  });
 
   test('should handle data synchronization between cart and order', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -1144,9 +1238,9 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
-    const mockClearCart = jest.fn()
+    const mockClearCart = jest.fn();
 
     mockUseCartStore.mockReturnValue({
       items: [
@@ -1171,7 +1265,7 @@ describe('Integration Tests', () => {
       clearCart: mockClearCart,
       fetchCart: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/cart']}>
@@ -1180,13 +1274,13 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/cart" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('购物车')).toBeInTheDocument()
-      expect(screen.getByText('Order Product')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('购物车')).toBeInTheDocument();
+      expect(screen.getByText('Order Product')).toBeInTheDocument();
+    });
+  });
 
   test('should handle user role-based access control', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -1201,11 +1295,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'MERCHANT1',
-      stats: { totalReferrals: 50, totalRewards: 500, pendingRewards: 100, paidRewards: 400, availableRewards: 300 },
+      stats: {
+        totalReferrals: 50,
+        totalRewards: 500,
+        pendingRewards: 100,
+        paidRewards: 400,
+        availableRewards: 300,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -1219,7 +1319,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1228,13 +1328,13 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('邀请好友')).toBeInTheDocument()
-      expect(screen.getByText('MERCHANT1')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('邀请好友')).toBeInTheDocument();
+      expect(screen.getByText('MERCHANT1')).toBeInTheDocument();
+    });
+  });
 
   test('should handle network timeout and retry', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -1249,7 +1349,7 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TIMEOUT1',
@@ -1267,7 +1367,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1276,16 +1376,23 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument();
+    });
+  });
 
   test('should handle concurrent user actions', async () => {
-    const mockBindReferralCode = jest.fn().mockResolvedValue(undefined)
-    const mockFetchStats = jest.fn().mockResolvedValue({ totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80 })
+    const mockBindReferralCode = jest.fn().mockResolvedValue(undefined);
+    const mockFetchStats = jest
+      .fn()
+      .mockResolvedValue({
+        totalReferrals: 10,
+        totalRewards: 100,
+        pendingRewards: 20,
+        paidRewards: 80,
+      });
 
     mockUseAuthStore.mockReturnValue({
       user: { id: 1, email: 'user@example.com', role: 'user' },
@@ -1299,11 +1406,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'CONCURRENT',
-      stats: { totalReferrals: 10, totalRewards: 100, pendingRewards: 20, paidRewards: 80, availableRewards: 60 },
+      stats: {
+        totalReferrals: 10,
+        totalRewards: 100,
+        pendingRewards: 20,
+        paidRewards: 80,
+        availableRewards: 60,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -1317,7 +1430,7 @@ describe('Integration Tests', () => {
       bindReferralCode: mockBindReferralCode,
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1326,19 +1439,19 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('CONCURRENT')).toBeInTheDocument()
-    })
+      expect(screen.getByText('CONCURRENT')).toBeInTheDocument();
+    });
 
-    const copyButton = screen.getByRole('button', { name: /复制邀请码/i })
+    const copyButton = screen.getByRole('button', { name: /复制邀请码/i });
     await act(async () => {
-      fireEvent.click(copyButton)
-    })
+      fireEvent.click(copyButton);
+    });
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('CONCURRENT')
-  })
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('CONCURRENT');
+  });
 
   test('should handle route guard for protected pages', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -1353,7 +1466,7 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseCartStore.mockReturnValue({
       items: [],
@@ -1366,7 +1479,7 @@ describe('Integration Tests', () => {
       clearCart: jest.fn(),
       fetchCart: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/cart']}>
@@ -1376,12 +1489,12 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/cart" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText(/购物车/i)).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText(/购物车/i)).toBeInTheDocument();
+    });
+  });
 
   test('should handle token balance integration with user profile', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -1396,11 +1509,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TOKEN123',
-      stats: { totalReferrals: 20, totalRewards: 200, pendingRewards: 40, paidRewards: 160, availableRewards: 120 },
+      stats: {
+        totalReferrals: 20,
+        totalRewards: 200,
+        pendingRewards: 40,
+        paidRewards: 160,
+        availableRewards: 120,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -1414,7 +1533,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1423,12 +1542,12 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('TOKEN123')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('TOKEN123')).toBeInTheDocument();
+    });
+  });
 
   test('should handle order creation flow integration', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -1443,7 +1562,7 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseCartStore.mockReturnValue({
       items: [
@@ -1468,7 +1587,7 @@ describe('Integration Tests', () => {
       clearCart: jest.fn(),
       fetchCart: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/cart']}>
@@ -1477,12 +1596,12 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/cart" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('Order Test Product')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('Order Test Product')).toBeInTheDocument();
+    });
+  });
 
   test('should handle referral code validation', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -1497,11 +1616,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'VALIDCODE',
-      stats: { totalReferrals: 0, totalRewards: 0, pendingRewards: 0, paidRewards: 0, availableRewards: 0 },
+      stats: {
+        totalReferrals: 0,
+        totalRewards: 0,
+        pendingRewards: 0,
+        paidRewards: 0,
+        availableRewards: 0,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -1515,7 +1640,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1524,21 +1649,28 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('VALIDCODE')).toBeInTheDocument()
-    })
+      expect(screen.getByText('VALIDCODE')).toBeInTheDocument();
+    });
 
-    const input = screen.getByPlaceholderText('输入好友的邀请码')
-    expect(input).toBeInTheDocument()
-    expect(input).toHaveAttribute('maxLength', '8')
-  })
+    const input = screen.getByPlaceholderText('输入好友的邀请码');
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveAttribute('maxLength', '8');
+  });
 
   test('should handle multiple store synchronization', async () => {
-    const mockFetchCart = jest.fn().mockResolvedValue(undefined)
-    const mockFetchReferralCode = jest.fn().mockResolvedValue('SYNC123')
-    const mockFetchStats = jest.fn().mockResolvedValue({ totalReferrals: 5, totalRewards: 50, pendingRewards: 10, paidRewards: 40 })
+    const mockFetchCart = jest.fn().mockResolvedValue(undefined);
+    const mockFetchReferralCode = jest.fn().mockResolvedValue('SYNC123');
+    const mockFetchStats = jest
+      .fn()
+      .mockResolvedValue({
+        totalReferrals: 5,
+        totalRewards: 50,
+        pendingRewards: 10,
+        paidRewards: 40,
+      });
 
     mockUseAuthStore.mockReturnValue({
       user: { id: 1, email: 'user@example.com', role: 'user' },
@@ -1552,11 +1684,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'SYNC123',
-      stats: { totalReferrals: 5, totalRewards: 50, pendingRewards: 10, paidRewards: 40, availableRewards: 30 },
+      stats: {
+        totalReferrals: 5,
+        totalRewards: 50,
+        pendingRewards: 10,
+        paidRewards: 40,
+        availableRewards: 30,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -1570,7 +1708,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseCartStore.mockReturnValue({
       items: [],
@@ -1583,7 +1721,7 @@ describe('Integration Tests', () => {
       clearCart: jest.fn(),
       fetchCart: mockFetchCart,
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1592,12 +1730,12 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('SYNC123')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('SYNC123')).toBeInTheDocument();
+    });
+  });
 
   test('should handle error boundary integration', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -1612,7 +1750,7 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -1630,7 +1768,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1639,12 +1777,12 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText(/邀请好友/i)).toBeInTheDocument();
+    });
+  });
 
   test('should handle admin role access control', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -1659,11 +1797,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'ADMIN001',
-      stats: { totalReferrals: 100, totalRewards: 1000, pendingRewards: 200, paidRewards: 800, availableRewards: 600 },
+      stats: {
+        totalReferrals: 100,
+        totalRewards: 1000,
+        pendingRewards: 200,
+        paidRewards: 800,
+        availableRewards: 600,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -1677,7 +1821,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1686,15 +1830,15 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('ADMIN001')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('ADMIN001')).toBeInTheDocument();
+    });
+  });
 
   test('should handle cart quantity update integration', async () => {
-    const mockUpdateQuantity = jest.fn()
+    const mockUpdateQuantity = jest.fn();
 
     mockUseAuthStore.mockReturnValue({
       user: { id: 1, email: 'user@example.com', role: 'user' },
@@ -1708,7 +1852,7 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseCartStore.mockReturnValue({
       items: [
@@ -1733,7 +1877,7 @@ describe('Integration Tests', () => {
       clearCart: jest.fn(),
       fetchCart: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/cart']}>
@@ -1742,12 +1886,12 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/cart" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('Quantity Test Product')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('Quantity Test Product')).toBeInTheDocument();
+    });
+  });
 
   test('should handle referral link generation', async () => {
     mockUseAuthStore.mockReturnValue({
@@ -1762,11 +1906,17 @@ describe('Integration Tests', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'LINKTEST',
-      stats: { totalReferrals: 3, totalRewards: 30, pendingRewards: 6, paidRewards: 24, availableRewards: 18 },
+      stats: {
+        totalReferrals: 3,
+        totalRewards: 30,
+        pendingRewards: 6,
+        paidRewards: 24,
+        availableRewards: 18,
+      },
       referrals: [],
       rewards: [],
       withdrawals: [],
@@ -1780,7 +1930,7 @@ describe('Integration Tests', () => {
       bindReferralCode: jest.fn(),
       requestWithdrawal: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter initialEntries={['/referral']}>
@@ -1789,13 +1939,13 @@ describe('Integration Tests', () => {
           <Route path="/*" element={<Navigate to="/referral" />} />
         </Routes>
       </MemoryRouter>
-    )
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('LINKTEST')).toBeInTheDocument()
-    })
+      expect(screen.getByText('LINKTEST')).toBeInTheDocument();
+    });
 
-    const copyButton = screen.getByRole('button', { name: /复制邀请码/i })
-    expect(copyButton).toBeInTheDocument()
-  })
-})
+    const copyButton = screen.getByRole('button', { name: /复制邀请码/i });
+    expect(copyButton).toBeInTheDocument();
+  });
+});

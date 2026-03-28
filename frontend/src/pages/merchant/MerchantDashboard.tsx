@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { Card, Row, Col, Statistic, Table, Tag, Progress, List, Avatar, Empty } from 'antd'
+import { useEffect } from 'react';
+import { Card, Row, Col, Statistic, Table, Tag, Progress, List, Avatar, Empty } from 'antd';
 import {
   ShoppingCartOutlined,
   DollarOutlined,
@@ -10,21 +10,21 @@ import {
   FireOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
-} from '@ant-design/icons'
-import { useMerchantStore } from '@/stores/merchantStore'
-import { useAuthStore } from '@/stores/authStore'
-import styles from './MerchantDashboard.module.css'
+} from '@ant-design/icons';
+import { useMerchantStore } from '@/stores/merchantStore';
+import { useAuthStore } from '@/stores/authStore';
+import styles from './MerchantDashboard.module.css';
 
 const MerchantDashboard = () => {
-  const { stats, orders, fetchStats, fetchOrders, isLoading } = useMerchantStore()
-  const { user } = useAuthStore()
+  const { stats, orders, fetchStats, fetchOrders, isLoading } = useMerchantStore();
+  const { user } = useAuthStore();
 
   useEffect(() => {
     if (user && user.role === 'merchant') {
-      fetchStats()
-      fetchOrders(1, 5)
+      fetchStats();
+      fetchOrders(1, 5);
     }
-  }, [fetchStats, fetchOrders, user])
+  }, [fetchStats, fetchOrders, user]);
 
   const orderColumns = [
     {
@@ -62,9 +62,9 @@ const MerchantDashboard = () => {
           paid: { color: 'processing', text: '已支付' },
           completed: { color: 'success', text: '已完成' },
           failed: { color: 'error', text: '失败' },
-        }
-        const { color, text } = statusMap[status] || { color: 'default', text: status }
-        return <Tag color={color}>{text}</Tag>
+        };
+        const { color, text } = statusMap[status] || { color: 'default', text: status };
+        return <Tag color={color}>{text}</Tag>;
       },
     },
     {
@@ -74,9 +74,9 @@ const MerchantDashboard = () => {
       width: 120,
       render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
     },
-  ]
+  ];
 
-  const groupSuccessRate = stats?.group_success_rate || 78.5
+  const groupSuccessRate = stats?.group_success_rate || 78.5;
 
   const hotProducts = [
     { id: 1, name: 'GPT-4 API Token', sales: 156, revenue: 15600, trend: 12 },
@@ -84,7 +84,7 @@ const MerchantDashboard = () => {
     { id: 3, name: 'Gemini Pro', sales: 98, revenue: 9800, trend: -3 },
     { id: 4, name: 'Midjourney Credits', sales: 87, revenue: 8700, trend: 15 },
     { id: 5, name: 'DALL-E 3 API', sales: 76, revenue: 7600, trend: 5 },
-  ]
+  ];
 
   const salesTrendData = [
     { day: '周一', value: 65 },
@@ -94,9 +94,9 @@ const MerchantDashboard = () => {
     { day: '周五', value: 95 },
     { day: '周六', value: 72 },
     { day: '周日', value: 85 },
-  ]
+  ];
 
-  const maxValue = Math.max(...salesTrendData.map(d => d.value))
+  const maxValue = Math.max(...salesTrendData.map((d) => d.value));
 
   return (
     <div className={styles.dashboard}>
@@ -149,7 +149,7 @@ const MerchantDashboard = () => {
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} sm={12} lg={8}>
-          <Card 
+          <Card
             className={styles.statCard}
             title={
               <span>
@@ -160,9 +160,9 @@ const MerchantDashboard = () => {
           >
             <div className={styles.groupRateContent}>
               <div className={styles.groupRateCircle}>
-                <Progress 
-                  type="circle" 
-                  percent={groupSuccessRate} 
+                <Progress
+                  type="circle"
+                  percent={groupSuccessRate}
                   strokeColor={{
                     '0%': '#1890ff',
                     '100%': '#52c41a',
@@ -190,7 +190,7 @@ const MerchantDashboard = () => {
         </Col>
 
         <Col xs={24} sm={12} lg={8}>
-          <Card 
+          <Card
             className={styles.statCard}
             title={
               <span>
@@ -205,10 +205,11 @@ const MerchantDashboard = () => {
                 <List.Item className={styles.hotProductItem}>
                   <div className={styles.hotProductRank}>
                     {index < 3 ? (
-                      <Avatar 
-                        size={24} 
-                        style={{ 
-                          backgroundColor: index === 0 ? '#ff4d4f' : index === 1 ? '#faad14' : '#52c41a',
+                      <Avatar
+                        size={24}
+                        style={{
+                          backgroundColor:
+                            index === 0 ? '#ff4d4f' : index === 1 ? '#faad14' : '#52c41a',
                           fontSize: 12,
                         }}
                       >
@@ -232,7 +233,8 @@ const MerchantDashboard = () => {
                       <ArrowDownOutlined style={{ color: '#ff4d4f' }} />
                     )}
                     <span style={{ color: item.trend > 0 ? '#52c41a' : '#ff4d4f' }}>
-                      {item.trend > 0 ? '+' : ''}{item.trend}%
+                      {item.trend > 0 ? '+' : ''}
+                      {item.trend}%
                     </span>
                   </div>
                 </List.Item>
@@ -242,7 +244,7 @@ const MerchantDashboard = () => {
         </Col>
 
         <Col xs={24} sm={12} lg={8}>
-          <Card 
+          <Card
             className={styles.statCard}
             title={
               <span>
@@ -254,12 +256,14 @@ const MerchantDashboard = () => {
             <div className={styles.weeklyStats}>
               <div className={styles.weeklyStat}>
                 <span className={styles.weeklyLabel}>本周销售额</span>
-                <span className={styles.weeklyValue}>¥{(stats?.week_sales || 25680).toLocaleString()}</span>
+                <span className={styles.weeklyValue}>
+                  ¥{(stats?.week_sales || 25680).toLocaleString()}
+                </span>
               </div>
               <div className={styles.weeklyStat}>
                 <span className={styles.weeklyLabel}>环比增长</span>
                 <span className={styles.weeklyValue} style={{ color: '#52c41a' }}>
-                  +{(stats?.week_growth || 15.8)}%
+                  +{stats?.week_growth || 15.8}%
                 </span>
               </div>
               <div className={styles.weeklyStat}>
@@ -284,9 +288,9 @@ const MerchantDashboard = () => {
           <div className={styles.chartBars}>
             {salesTrendData.map((item, index) => (
               <div key={index} className={styles.chartBarWrapper}>
-                <div 
+                <div
                   className={styles.chartBar}
-                  style={{ 
+                  style={{
                     height: `${(item.value / maxValue) * 100}%`,
                     backgroundColor: index === salesTrendData.length - 1 ? '#1890ff' : '#91d5ff',
                   }}
@@ -313,7 +317,7 @@ const MerchantDashboard = () => {
         />
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default MerchantDashboard
+export default MerchantDashboard;

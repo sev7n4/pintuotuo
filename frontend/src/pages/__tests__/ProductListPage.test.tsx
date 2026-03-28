@@ -1,22 +1,22 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import { MemoryRouter, useNavigate } from 'react-router-dom'
-import ProductListPage from '../ProductListPage'
-import { useProductStore } from '@/stores/productStore'
-import { useAuthStore } from '@/stores/authStore'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
+import ProductListPage from '../ProductListPage';
+import { useProductStore } from '@/stores/productStore';
+import { useAuthStore } from '@/stores/authStore';
 
 // 模拟 useProductStore
-jest.mock('@/stores/productStore')
+jest.mock('@/stores/productStore');
 
 // 模拟 useAuthStore
-jest.mock('@/stores/authStore')
+jest.mock('@/stores/authStore');
 
-const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>
+const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>;
 
 // 模拟 useNavigate
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: jest.fn(),
-}))
+}));
 
 // 模拟 antd
 jest.mock('antd', () => ({
@@ -41,46 +41,33 @@ jest.mock('antd', () => ({
   Input: {
     Search: jest.fn(({ placeholder, onSearch }) => (
       <div data-testid="search-input">
-        <input
-          type="text"
-          placeholder={placeholder}
-          data-testid="search-input-field"
-        />
-        <button onClick={() => onSearch((document.querySelector('[data-testid="search-input-field"]') as HTMLInputElement).value)}>
+        <input type="text" placeholder={placeholder} data-testid="search-input-field" />
+        <button
+          onClick={() =>
+            onSearch(
+              (document.querySelector('[data-testid="search-input-field"]') as HTMLInputElement)
+                .value
+            )
+          }
+        >
           搜索
         </button>
       </div>
     )),
   },
   Button: jest.fn(({ type, children, onClick }) => (
-    <button 
-      data-testid="button" 
-      onClick={onClick}
-      className={type === 'primary' ? 'primary' : ''}
-    >
+    <button data-testid="button" onClick={onClick} className={type === 'primary' ? 'primary' : ''}>
       {children}
     </button>
   )),
-  Row: jest.fn(({ children }) => (
-    <div data-testid="row">
-      {children}
-    </div>
-  )),
-  Col: jest.fn(({ children }) => (
-    <div data-testid="col">
-      {children}
-    </div>
-  )),
+  Row: jest.fn(({ children }) => <div data-testid="row">{children}</div>),
+  Col: jest.fn(({ children }) => <div data-testid="col">{children}</div>),
   Tag: jest.fn(({ color, children }) => (
     <span data-testid="tag" style={{ color }}>
       {children}
     </span>
   )),
-  Empty: jest.fn(({ description }) => (
-    <div data-testid="empty">
-      {description}
-    </div>
-  )),
+  Empty: jest.fn(({ description }) => <div data-testid="empty">{description}</div>),
   Spin: jest.fn(({ spinning, children }) => (
     <div data-testid="spin" data-spinning={spinning}>
       {children}
@@ -93,22 +80,18 @@ jest.mock('antd', () => ({
       <button onClick={() => onChange(current + 1, pageSize)}>下一页</button>
     </div>
   )),
-  Space: jest.fn(({ children }) => (
-    <div data-testid="space">
-      {children}
-    </div>
-  )),
-}))
+  Space: jest.fn(({ children }) => <div data-testid="space">{children}</div>),
+}));
 
-const mockUseProductStore = useProductStore as jest.MockedFunction<typeof useProductStore>
-const mockUseNavigate = useNavigate as jest.MockedFunction<typeof useNavigate>
+const mockUseProductStore = useProductStore as jest.MockedFunction<typeof useProductStore>;
+const mockUseNavigate = useNavigate as jest.MockedFunction<typeof useNavigate>;
 
 describe('ProductListPage Component', () => {
-  const mockNavigate = jest.fn()
-  
+  const mockNavigate = jest.fn();
+
   beforeEach(() => {
-    jest.clearAllMocks()
-    mockUseNavigate.mockReturnValue(mockNavigate)
+    jest.clearAllMocks();
+    mockUseNavigate.mockReturnValue(mockNavigate);
     // 默认模拟普通用户
     mockUseAuthStore.mockReturnValue({
       user: { id: 1, email: 'user@example.com', name: 'Test User', role: 'user' },
@@ -123,8 +106,8 @@ describe('ProductListPage Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
-  })
+    });
+  });
 
   test('renders ProductListPage with search input for regular user', async () => {
     const mockProducts = [
@@ -136,7 +119,7 @@ describe('ProductListPage Component', () => {
         stock: 50,
         status: 'active',
       },
-    ]
+    ];
 
     // 模拟 store 状态
     mockUseProductStore.mockReturnValue({
@@ -152,20 +135,20 @@ describe('ProductListPage Component', () => {
       updateProduct: jest.fn(),
       deleteProduct: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <ProductListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     // 检查页面元素 - 普通用户不应该看到发布产品按钮
-    expect(screen.getByPlaceholderText('搜索产品...')).toBeInTheDocument()
-    expect(screen.queryByText('发布产品')).not.toBeInTheDocument()
-  })
+    expect(screen.getByPlaceholderText('搜索产品...')).toBeInTheDocument();
+    expect(screen.queryByText('发布产品')).not.toBeInTheDocument();
+  });
 
   test('renders ProductListPage with publish button for merchant user', async () => {
     const mockProducts = [
@@ -177,7 +160,7 @@ describe('ProductListPage Component', () => {
         stock: 50,
         status: 'active',
       },
-    ]
+    ];
 
     // 模拟商家用户
     mockUseAuthStore.mockReturnValue({
@@ -193,7 +176,7 @@ describe('ProductListPage Component', () => {
       setUser: jest.fn(),
       clearError: jest.fn(),
       setRememberMe: jest.fn(),
-    })
+    });
 
     // 模拟 store 状态
     mockUseProductStore.mockReturnValue({
@@ -209,20 +192,20 @@ describe('ProductListPage Component', () => {
       updateProduct: jest.fn(),
       deleteProduct: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <ProductListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     // 检查页面元素 - 商家用户应该看到发布产品按钮
-    expect(screen.getByPlaceholderText('搜索产品...')).toBeInTheDocument()
-    expect(screen.getByText('发布产品')).toBeInTheDocument()
-  })
+    expect(screen.getByPlaceholderText('搜索产品...')).toBeInTheDocument();
+    expect(screen.getByText('发布产品')).toBeInTheDocument();
+  });
 
   test('shows loading state when fetching products', async () => {
     const mockProducts = [
@@ -234,7 +217,7 @@ describe('ProductListPage Component', () => {
         stock: 50,
         status: 'active',
       },
-    ]
+    ];
 
     // 模拟加载状态
     mockUseProductStore.mockReturnValue({
@@ -250,19 +233,19 @@ describe('ProductListPage Component', () => {
       updateProduct: jest.fn(),
       deleteProduct: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <ProductListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     // 检查加载状态
-    expect(screen.getByTestId('spin')).toBeInTheDocument()
-  })
+    expect(screen.getByTestId('spin')).toBeInTheDocument();
+  });
 
   test('shows error message when there is an error', async () => {
     // 模拟错误状态
@@ -279,19 +262,19 @@ describe('ProductListPage Component', () => {
       updateProduct: jest.fn(),
       deleteProduct: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <ProductListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     // 检查错误信息
-    expect(screen.getByText('错误: 加载失败')).toBeInTheDocument()
-  })
+    expect(screen.getByText('错误: 加载失败')).toBeInTheDocument();
+  });
 
   test('shows empty state when no products', async () => {
     // 模拟无产品状态
@@ -308,19 +291,19 @@ describe('ProductListPage Component', () => {
       updateProduct: jest.fn(),
       deleteProduct: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <ProductListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     // 检查空状态
-    expect(screen.getByText('暂无数据')).toBeInTheDocument()
-  })
+    expect(screen.getByText('暂无数据')).toBeInTheDocument();
+  });
 
   test('renders products list when products exist', async () => {
     const mockProducts = [
@@ -340,7 +323,7 @@ describe('ProductListPage Component', () => {
         stock: 30,
         status: 'inactive',
       },
-    ]
+    ];
 
     // 模拟有产品状态
     mockUseProductStore.mockReturnValue({
@@ -356,21 +339,21 @@ describe('ProductListPage Component', () => {
       updateProduct: jest.fn(),
       deleteProduct: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <ProductListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     // 检查产品列表
-    expect(screen.getByTestId('product-table')).toBeInTheDocument()
-    expect(screen.getByTestId('product-1')).toBeInTheDocument()
-    expect(screen.getByTestId('product-2')).toBeInTheDocument()
-  })
+    expect(screen.getByTestId('product-table')).toBeInTheDocument();
+    expect(screen.getByTestId('product-1')).toBeInTheDocument();
+    expect(screen.getByTestId('product-2')).toBeInTheDocument();
+  });
 
   test('handles search functionality', async () => {
     const mockProducts = [
@@ -382,10 +365,10 @@ describe('ProductListPage Component', () => {
         stock: 50,
         status: 'active',
       },
-    ]
+    ];
 
-    const mockSearchProducts = jest.fn().mockResolvedValue(mockProducts)
-    const mockFetchProducts = jest.fn().mockResolvedValue(mockProducts)
+    const mockSearchProducts = jest.fn().mockResolvedValue(mockProducts);
+    const mockFetchProducts = jest.fn().mockResolvedValue(mockProducts);
 
     // 模拟 store 状态
     mockUseProductStore.mockReturnValue({
@@ -401,30 +384,30 @@ describe('ProductListPage Component', () => {
       updateProduct: jest.fn(),
       deleteProduct: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <ProductListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     // 输入搜索关键词并点击搜索
-    const searchInput = screen.getByTestId('search-input-field') as HTMLInputElement
-    const searchButton = screen.getByText('搜索')
-    
-    fireEvent.change(searchInput, { target: { value: '测试' } })
+    const searchInput = screen.getByTestId('search-input-field') as HTMLInputElement;
+    const searchButton = screen.getByText('搜索');
+
+    fireEvent.change(searchInput, { target: { value: '测试' } });
     await act(async () => {
-      fireEvent.click(searchButton)
-    })
+      fireEvent.click(searchButton);
+    });
 
     // 验证搜索函数被调用
     await waitFor(() => {
-      expect(mockSearchProducts).toHaveBeenCalledWith('测试')
-    })
-  })
+      expect(mockSearchProducts).toHaveBeenCalledWith('测试');
+    });
+  });
 
   test('handles pagination', async () => {
     const mockProducts = [
@@ -436,10 +419,10 @@ describe('ProductListPage Component', () => {
         stock: 50,
         status: 'active',
       },
-    ]
+    ];
 
-    const mockSetFilters = jest.fn()
-    const mockFetchProducts = jest.fn().mockResolvedValue(mockProducts)
+    const mockSetFilters = jest.fn();
+    const mockFetchProducts = jest.fn().mockResolvedValue(mockProducts);
 
     // 模拟 store 状态
     mockUseProductStore.mockReturnValue({
@@ -455,28 +438,28 @@ describe('ProductListPage Component', () => {
       updateProduct: jest.fn(),
       deleteProduct: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <ProductListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     // 点击下一页
-    const nextPageButton = screen.getByText('下一页')
+    const nextPageButton = screen.getByText('下一页');
     await act(async () => {
-      fireEvent.click(nextPageButton)
-    })
+      fireEvent.click(nextPageButton);
+    });
 
     // 验证分页函数被调用
     await waitFor(() => {
-      expect(mockSetFilters).toHaveBeenCalledWith({ page: 2, per_page: 10 })
-      expect(mockFetchProducts).toHaveBeenCalledWith({ page: 2, per_page: 10 })
-    })
-  })
+      expect(mockSetFilters).toHaveBeenCalledWith({ page: 2, per_page: 10 });
+      expect(mockFetchProducts).toHaveBeenCalledWith({ page: 2, per_page: 10 });
+    });
+  });
 
   test('navigates to product detail page', async () => {
     const mockProducts = [
@@ -488,7 +471,7 @@ describe('ProductListPage Component', () => {
         stock: 50,
         status: 'active',
       },
-    ]
+    ];
 
     // 模拟 store 状态
     mockUseProductStore.mockReturnValue({
@@ -504,25 +487,25 @@ describe('ProductListPage Component', () => {
       updateProduct: jest.fn(),
       deleteProduct: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <ProductListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     // 点击产品名称
-    const productName = screen.getByText('测试产品1')
+    const productName = screen.getByText('测试产品1');
     await act(async () => {
-      fireEvent.click(productName)
-    })
+      fireEvent.click(productName);
+    });
 
     // 验证导航函数被调用
-    expect(mockNavigate).toHaveBeenCalledWith('/products/1')
-  })
+    expect(mockNavigate).toHaveBeenCalledWith('/products/1');
+  });
 
   test('navigates to add to cart page', async () => {
     const mockProducts = [
@@ -534,7 +517,7 @@ describe('ProductListPage Component', () => {
         stock: 50,
         status: 'active',
       },
-    ]
+    ];
 
     // 模拟 store 状态
     mockUseProductStore.mockReturnValue({
@@ -550,23 +533,23 @@ describe('ProductListPage Component', () => {
       updateProduct: jest.fn(),
       deleteProduct: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <ProductListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
     // 点击加购按钮
-    const addToCartButton = screen.getByText('加购')
+    const addToCartButton = screen.getByText('加购');
     await act(async () => {
-      fireEvent.click(addToCartButton)
-    })
+      fireEvent.click(addToCartButton);
+    });
 
     // 验证导航函数被调用
-    expect(mockNavigate).toHaveBeenCalledWith('/products/1/cart')
-  })
-})
+    expect(mockNavigate).toHaveBeenCalledWith('/products/1/cart');
+  });
+});

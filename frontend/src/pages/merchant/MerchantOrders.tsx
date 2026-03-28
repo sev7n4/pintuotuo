@@ -1,20 +1,20 @@
-import { useEffect, useState } from 'react'
-import { Card, Table, Tag, Select, Space, Button, message } from 'antd'
-import { useMerchantStore } from '@/stores/merchantStore'
-import styles from './MerchantOrders.module.css'
+import { useEffect, useState } from 'react';
+import { Card, Table, Tag, Select, Space, Button, message } from 'antd';
+import { useMerchantStore } from '@/stores/merchantStore';
+import styles from './MerchantOrders.module.css';
 
 const MerchantOrders = () => {
-  const { orders, fetchOrders, isLoading } = useMerchantStore()
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [page, setPage] = useState(1)
+  const { orders, fetchOrders, isLoading } = useMerchantStore();
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
-    fetchOrders(page, 20, statusFilter === 'all' ? undefined : statusFilter)
-  }, [fetchOrders, page, statusFilter])
+    fetchOrders(page, 20, statusFilter === 'all' ? undefined : statusFilter);
+  }, [fetchOrders, page, statusFilter]);
 
   const handleExport = () => {
-    message.info('导出功能开发中')
-  }
+    message.info('导出功能开发中');
+  };
 
   const statusMap: Record<string, { color: string; text: string }> = {
     pending: { color: 'default', text: '待支付' },
@@ -22,7 +22,7 @@ const MerchantOrders = () => {
     completed: { color: 'success', text: '已完成' },
     failed: { color: 'error', text: '失败' },
     cancelled: { color: 'warning', text: '已取消' },
-  }
+  };
 
   const columns = [
     {
@@ -61,8 +61,8 @@ const MerchantOrders = () => {
       key: 'status',
       width: 100,
       render: (status: string) => {
-        const { color, text } = statusMap[status] || { color: 'default', text: status }
-        return <Tag color={color}>{text}</Tag>
+        const { color, text } = statusMap[status] || { color: 'default', text: status };
+        return <Tag color={color}>{text}</Tag>;
       },
     },
     {
@@ -79,7 +79,7 @@ const MerchantOrders = () => {
       width: 160,
       render: (date: string) => new Date(date).toLocaleString('zh-CN'),
     },
-  ]
+  ];
 
   return (
     <div className={styles.orders}>
@@ -89,8 +89,8 @@ const MerchantOrders = () => {
           <Select
             value={statusFilter}
             onChange={(value) => {
-              setStatusFilter(value)
-              setPage(1)
+              setStatusFilter(value);
+              setPage(1);
             }}
             style={{ width: 120 }}
             options={[
@@ -122,7 +122,7 @@ const MerchantOrders = () => {
         />
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default MerchantOrders
+export default MerchantOrders;

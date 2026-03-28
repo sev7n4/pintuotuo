@@ -1,6 +1,6 @@
-import { Card, Typography } from 'antd'
+import { Card, Typography } from 'antd';
 
-const { Title } = Typography
+const { Title } = Typography;
 
 const AdminSettings = () => {
   return (
@@ -10,7 +10,7 @@ const AdminSettings = () => {
         <p>系统设置页面开发中...</p>
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default AdminSettings
+export default AdminSettings;

@@ -1,10 +1,10 @@
-import { tokenService } from '../token'
-import api from '../api'
-import type { AxiosResponse } from 'axios'
+import { tokenService } from '../token';
+import api from '../api';
+import type { AxiosResponse } from 'axios';
 
-jest.mock('../api')
+jest.mock('../api');
 
-const mockApi = api as jest.Mocked<typeof api>
+const mockApi = api as jest.Mocked<typeof api>;
 
 const createMockResponse = <T>(data: T): AxiosResponse<T> => ({
   data,
@@ -12,12 +12,12 @@ const createMockResponse = <T>(data: T): AxiosResponse<T> => ({
   statusText: 'OK',
   headers: {},
   config: {} as any,
-})
+});
 
 describe('tokenService', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
   test('getBalance calls api.get with correct parameters', async () => {
     const mockResponse = {
@@ -27,15 +27,15 @@ describe('tokenService', () => {
       frozen_balance: 100,
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:00Z',
-    }
+    };
 
-    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await tokenService.getBalance()
+    const result = await tokenService.getBalance();
 
-    expect(mockApi.get).toHaveBeenCalledWith('/tokens/balance')
-    expect(result.data).toEqual(mockResponse)
-  })
+    expect(mockApi.get).toHaveBeenCalledWith('/tokens/balance');
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('getConsumption calls api.get with correct parameters', async () => {
     const mockResponse = [
@@ -47,30 +47,33 @@ describe('tokenService', () => {
         description: 'Purchase product',
         created_at: '2024-01-01T00:00:00Z',
       },
-    ]
+    ];
 
-    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await tokenService.getConsumption()
+    const result = await tokenService.getConsumption();
 
-    expect(mockApi.get).toHaveBeenCalledWith('/tokens/consumption')
-    expect(result.data).toEqual(mockResponse)
-  })
+    expect(mockApi.get).toHaveBeenCalledWith('/tokens/consumption');
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('transfer calls api.post with correct parameters', async () => {
-    const mockRecipientId = 2
-    const mockAmount = 100
+    const mockRecipientId = 2;
+    const mockAmount = 100;
     const mockResponse = {
       message: 'Transfer successful',
-    }
+    };
 
-    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await tokenService.transfer(mockRecipientId, mockAmount)
+    const result = await tokenService.transfer(mockRecipientId, mockAmount);
 
-    expect(mockApi.post).toHaveBeenCalledWith('/tokens/transfer', { recipient_id: mockRecipientId, amount: mockAmount })
-    expect(result.data).toEqual(mockResponse)
-  })
+    expect(mockApi.post).toHaveBeenCalledWith('/tokens/transfer', {
+      recipient_id: mockRecipientId,
+      amount: mockAmount,
+    });
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('getAPIKeys calls api.get with correct parameters', async () => {
     const mockResponse = {
@@ -87,18 +90,18 @@ describe('tokenService', () => {
         },
       ],
       message: 'API keys retrieved successfully',
-    }
+    };
 
-    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await tokenService.getAPIKeys()
+    const result = await tokenService.getAPIKeys();
 
-    expect(mockApi.get).toHaveBeenCalledWith('/tokens/keys')
-    expect(result.data).toEqual(mockResponse)
-  })
+    expect(mockApi.get).toHaveBeenCalledWith('/tokens/keys');
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('createAPIKey calls api.post with correct parameters', async () => {
-    const mockName = 'Test API Key'
+    const mockName = 'Test API Key';
     const mockResponse = {
       id: 1,
       user_id: 1,
@@ -107,22 +110,22 @@ describe('tokenService', () => {
       status: 'active',
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:00Z',
-    }
+    };
 
-    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await tokenService.createAPIKey(mockName)
+    const result = await tokenService.createAPIKey(mockName);
 
-    expect(mockApi.post).toHaveBeenCalledWith('/tokens/keys', { name: mockName })
-    expect(result.data).toEqual(mockResponse)
-  })
+    expect(mockApi.post).toHaveBeenCalledWith('/tokens/keys', { name: mockName });
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('updateAPIKey calls api.put with correct parameters', async () => {
-    const mockApiKeyId = 1
+    const mockApiKeyId = 1;
     const mockData = {
       name: 'Updated API Key',
       status: 'inactive' as const,
-    }
+    };
     const mockResponse = {
       id: 1,
       user_id: 1,
@@ -131,28 +134,28 @@ describe('tokenService', () => {
       status: 'inactive',
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:00Z',
-    }
+    };
 
-    mockApi.put.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.put.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await tokenService.updateAPIKey(mockApiKeyId, mockData)
+    const result = await tokenService.updateAPIKey(mockApiKeyId, mockData);
 
-    expect(mockApi.put).toHaveBeenCalledWith(`/tokens/keys/${mockApiKeyId}`, mockData)
-    expect(result.data).toEqual(mockResponse)
-  })
+    expect(mockApi.put).toHaveBeenCalledWith(`/tokens/keys/${mockApiKeyId}`, mockData);
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('deleteAPIKey calls api.delete with correct parameters', async () => {
-    const mockApiKeyId = 1
+    const mockApiKeyId = 1;
     const mockResponse = {
       success: true,
       message: 'API key deleted successfully',
-    }
+    };
 
-    mockApi.delete.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.delete.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await tokenService.deleteAPIKey(mockApiKeyId)
+    const result = await tokenService.deleteAPIKey(mockApiKeyId);
 
-    expect(mockApi.delete).toHaveBeenCalledWith(`/tokens/keys/${mockApiKeyId}`)
-    expect(result.data).toEqual(mockResponse)
-  })
-})
+    expect(mockApi.delete).toHaveBeenCalledWith(`/tokens/keys/${mockApiKeyId}`);
+    expect(result.data).toEqual(mockResponse);
+  });
+});

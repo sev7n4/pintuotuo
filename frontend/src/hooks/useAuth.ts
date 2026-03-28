@@ -1,14 +1,14 @@
-import { useEffect } from 'react'
-import { useAuthStore } from '@stores/authStore'
+import { useEffect } from 'react';
+import { useAuthStore } from '@stores/authStore';
 
 export const useAuth = () => {
-  const { user, token, isLoading, error, isAuthenticated, fetchUser } = useAuthStore()
+  const { user, token, isLoading, error, isAuthenticated, fetchUser } = useAuthStore();
 
   useEffect(() => {
     if (isAuthenticated && !user) {
-      fetchUser()
+      fetchUser();
     }
-  }, [isAuthenticated, user, fetchUser])
+  }, [isAuthenticated, user, fetchUser]);
 
   return {
     user,
@@ -16,5 +16,5 @@ export const useAuth = () => {
     isLoading,
     error,
     isAuthenticated,
-  }
-}
+  };
+};

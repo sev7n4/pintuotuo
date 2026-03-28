@@ -1,24 +1,31 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Card, Row, Col, Input, Tag, List, Empty, Spin } from 'antd'
-import { SearchOutlined, AppstoreOutlined, CodeOutlined, EyeOutlined, ThunderboltOutlined, ApiOutlined } from '@ant-design/icons'
-import { productService } from '@/services/product'
-import styles from './CategoryPage.module.css'
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Card, Row, Col, Input, Tag, List, Empty, Spin } from 'antd';
+import {
+  SearchOutlined,
+  AppstoreOutlined,
+  CodeOutlined,
+  EyeOutlined,
+  ThunderboltOutlined,
+  ApiOutlined,
+} from '@ant-design/icons';
+import { productService } from '@/services/product';
+import styles from './CategoryPage.module.css';
 
 interface Category {
-  id: string
-  name: string
-  icon: React.ReactNode
-  color: string
-  description: string
-  count: number
+  id: string;
+  name: string;
+  icon: React.ReactNode;
+  color: string;
+  description: string;
+  count: number;
 }
 
 const CategoryPage = () => {
-  const [searchText, setSearchText] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [products, setProducts] = useState<any[]>([])
+  const [searchText, setSearchText] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
 
   const categories: Category[] = [
     {
@@ -61,31 +68,32 @@ const CategoryPage = () => {
       description: '文本嵌入、向量检索模型',
       count: 10,
     },
-  ]
+  ];
 
   useEffect(() => {
     const fetchProducts = async () => {
-      setLoading(true)
+      setLoading(true);
       try {
         const response = await productService.listProducts({
           category: selectedCategory || undefined,
-        })
-        setProducts(response.data?.data?.data || [])
+        });
+        setProducts(response.data?.data?.data || []);
       } catch {
-        setProducts([])
+        setProducts([]);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    fetchProducts()
-  }, [selectedCategory])
+    };
+    fetchProducts();
+  }, [selectedCategory]);
 
   const filteredProducts = products.filter((product: any) => {
-    const matchesSearch = !searchText || 
+    const matchesSearch =
+      !searchText ||
       product.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchText.toLowerCase())
-    return matchesSearch
-  })
+      product.description?.toLowerCase().includes(searchText.toLowerCase());
+    return matchesSearch;
+  });
 
   return (
     <div className={styles.categoryPage}>
@@ -107,10 +115,12 @@ const CategoryPage = () => {
             <Card
               hoverable
               className={`${styles.categoryCard} ${selectedCategory === category.id ? styles.categoryCardActive : ''}`}
-              onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
+              onClick={() =>
+                setSelectedCategory(selectedCategory === category.id ? null : category.id)
+              }
             >
               <div className={styles.categoryContent}>
-                <div 
+                <div
                   className={styles.categoryIcon}
                   style={{ backgroundColor: category.color + '20', color: category.color }}
                 >
@@ -125,7 +135,14 @@ const CategoryPage = () => {
         ))}
       </Row>
 
-      <Card className={styles.productSection} title={selectedCategory ? `${categories.find(c => c.id === selectedCategory)?.name || ''}商品` : '全部商品'}>
+      <Card
+        className={styles.productSection}
+        title={
+          selectedCategory
+            ? `${categories.find((c) => c.id === selectedCategory)?.name || ''}商品`
+            : '全部商品'
+        }
+      >
         {loading ? (
           <div className={styles.loading}>
             <Spin />
@@ -161,7 +178,7 @@ const CategoryPage = () => {
         )}
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default CategoryPage
+export default CategoryPage;

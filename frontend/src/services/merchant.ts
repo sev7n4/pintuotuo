@@ -1,15 +1,25 @@
-import api from './api'
-import { Merchant, MerchantStats, MerchantSettlement, MerchantOrder, Product, MerchantAPIKey, APIKeyUsage, PaginatedResponse, APIResponse } from '@/types'
+import api from './api';
+import {
+  Merchant,
+  MerchantStats,
+  MerchantSettlement,
+  MerchantOrder,
+  Product,
+  MerchantAPIKey,
+  APIKeyUsage,
+  PaginatedResponse,
+  APIResponse,
+} from '@/types';
 
 export const merchantService = {
   registerMerchant: (data: {
-    company_name: string
-    business_license?: string
-    contact_name?: string
-    contact_phone?: string
-    contact_email?: string
-    address?: string
-    description?: string
+    company_name: string;
+    business_license?: string;
+    contact_name?: string;
+    contact_phone?: string;
+    contact_email?: string;
+    address?: string;
+    description?: string;
   }) => api.post<Merchant>('/merchants/register', data),
 
   getProfile: () => api.get<Merchant>('/merchants/profile'),
@@ -38,11 +48,11 @@ export const merchantService = {
   getAPIKeys: () => api.get<APIResponse<MerchantAPIKey[]>>('/merchants/api-keys'),
 
   createAPIKey: (data: {
-    name: string
-    provider: string
-    api_key: string
-    api_secret?: string
-    quota_limit?: number
+    name: string;
+    provider: string;
+    api_key: string;
+    api_secret?: string;
+    quota_limit?: number;
   }) => api.post<MerchantAPIKey>('/merchants/api-keys', data),
 
   updateAPIKey: (id: number, data: Partial<MerchantAPIKey>) =>
@@ -51,4 +61,4 @@ export const merchantService = {
   deleteAPIKey: (id: number) => api.delete(`/merchants/api-keys/${id}`),
 
   getAPIKeyUsage: () => api.get<APIResponse<APIKeyUsage[]>>('/merchants/api-keys/usage'),
-}
+};

@@ -1,14 +1,38 @@
-import { useEffect, useState } from 'react'
-import { Card, Row, Col, Typography, Button, Statistic, Table, Tabs, message, Input, Space, Spin, Modal, Form, Select, InputNumber } from 'antd'
-import { CopyOutlined, ShareAltOutlined, GiftOutlined, TeamOutlined, DollarOutlined, WalletOutlined } from '@ant-design/icons'
-import { useReferralStore } from '@/stores/referralStore'
-import { Referral, ReferralReward, ReferralWithdrawal } from '@/types'
-import type { ColumnsType } from 'antd/es/table'
-import styles from './ReferralPage.module.css'
+import { useEffect, useState } from 'react';
+import {
+  Card,
+  Row,
+  Col,
+  Typography,
+  Button,
+  Statistic,
+  Table,
+  Tabs,
+  message,
+  Input,
+  Space,
+  Spin,
+  Modal,
+  Form,
+  Select,
+  InputNumber,
+} from 'antd';
+import {
+  CopyOutlined,
+  ShareAltOutlined,
+  GiftOutlined,
+  TeamOutlined,
+  DollarOutlined,
+  WalletOutlined,
+} from '@ant-design/icons';
+import { useReferralStore } from '@/stores/referralStore';
+import { Referral, ReferralReward, ReferralWithdrawal } from '@/types';
+import type { ColumnsType } from 'antd/es/table';
+import styles from './ReferralPage.module.css';
 
-const { Title, Text, Paragraph } = Typography
-const { TabPane } = Tabs
-const { Option } = Select
+const { Title, Text, Paragraph } = Typography;
+const { TabPane } = Tabs;
+const { Option } = Select;
 
 const ReferralPage = () => {
   const {
@@ -25,46 +49,46 @@ const ReferralPage = () => {
     fetchWithdrawals,
     bindReferralCode,
     requestWithdrawal,
-  } = useReferralStore()
+  } = useReferralStore();
 
-  const [bindCode, setBindCode] = useState('')
-  const [withdrawalModalVisible, setWithdrawalModalVisible] = useState(false)
-  const [form] = Form.useForm()
+  const [bindCode, setBindCode] = useState('');
+  const [withdrawalModalVisible, setWithdrawalModalVisible] = useState(false);
+  const [form] = Form.useForm();
 
   useEffect(() => {
-    fetchReferralCode()
-    fetchStats()
-    fetchReferrals()
-    fetchRewards()
-    fetchWithdrawals()
-  }, [fetchReferralCode, fetchStats, fetchReferrals, fetchRewards, fetchWithdrawals])
+    fetchReferralCode();
+    fetchStats();
+    fetchReferrals();
+    fetchRewards();
+    fetchWithdrawals();
+  }, [fetchReferralCode, fetchStats, fetchReferrals, fetchRewards, fetchWithdrawals]);
 
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(referralCode)
-    message.success('邀请码已复制到剪贴板')
-  }
+    navigator.clipboard.writeText(referralCode);
+    message.success('邀请码已复制到剪贴板');
+  };
 
   const handleShare = () => {
-    const shareUrl = `${window.location.origin}/register?code=${referralCode}`
-    navigator.clipboard.writeText(shareUrl)
-    message.success('分享链接已复制到剪贴板')
-  }
+    const shareUrl = `${window.location.origin}/register?code=${referralCode}`;
+    navigator.clipboard.writeText(shareUrl);
+    message.success('分享链接已复制到剪贴板');
+  };
 
   const handleBindCode = () => {
     if (bindCode && bindCode.length === 8) {
-      bindReferralCode(bindCode)
-      message.success('邀请码绑定成功')
+      bindReferralCode(bindCode);
+      message.success('邀请码绑定成功');
     }
-  }
+  };
 
   const handleWithdrawalSubmit = async (values: any) => {
-    const success = await requestWithdrawal(values)
+    const success = await requestWithdrawal(values);
     if (success) {
-      message.success('提现申请已提交')
-      setWithdrawalModalVisible(false)
-      form.resetFields()
+      message.success('提现申请已提交');
+      setWithdrawalModalVisible(false);
+      form.resetFields();
     }
-  }
+  };
 
   const withdrawalColumns: ColumnsType<ReferralWithdrawal> = [
     {
@@ -82,8 +106,8 @@ const ReferralPage = () => {
           alipay: '支付宝',
           wechat: '微信支付',
           bank: '银行卡',
-        }
-        return methodMap[method] || method
+        };
+        return methodMap[method] || method;
       },
     },
     {
@@ -96,9 +120,9 @@ const ReferralPage = () => {
           processing: { text: '处理中', className: styles.statusProcessing },
           completed: { text: '已完成', className: styles.statusPaid },
           failed: { text: '失败', className: styles.statusCancelled },
-        }
-        const { text, className } = statusMap[status] || { text: status, className: '' }
-        return <span className={className}>{text}</span>
+        };
+        const { text, className } = statusMap[status] || { text: status, className: '' };
+        return <span className={className}>{text}</span>;
       },
     },
     {
@@ -107,7 +131,7 @@ const ReferralPage = () => {
       key: 'created_at',
       render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
     },
-  ]
+  ];
 
   const referralColumns: ColumnsType<Referral> = [
     {
@@ -136,7 +160,7 @@ const ReferralPage = () => {
       key: 'created_at',
       render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
     },
-  ]
+  ];
 
   const rewardColumns: ColumnsType<ReferralReward> = [
     {
@@ -159,9 +183,9 @@ const ReferralPage = () => {
           pending: { text: '待发放', className: styles.statusPending },
           paid: { text: '已发放', className: styles.statusPaid },
           cancelled: { text: '已取消', className: styles.statusCancelled },
-        }
-        const { text, className } = statusMap[status] || { text: status, className: '' }
-        return <span className={className}>{text}</span>
+        };
+        const { text, className } = statusMap[status] || { text: status, className: '' };
+        return <span className={className}>{text}</span>;
       },
     },
     {
@@ -170,7 +194,7 @@ const ReferralPage = () => {
       key: 'created_at',
       render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
     },
-  ]
+  ];
 
   return (
     <div className={styles.container}>
@@ -310,7 +334,11 @@ const ReferralPage = () => {
             onChange={(e) => setBindCode(e.target.value.toUpperCase())}
             maxLength={8}
           />
-          <Button type="primary" disabled={!bindCode || bindCode.length !== 8} onClick={handleBindCode}>
+          <Button
+            type="primary"
+            disabled={!bindCode || bindCode.length !== 8}
+            onClick={handleBindCode}
+          >
             绑定
           </Button>
         </Space.Compact>
@@ -386,15 +414,13 @@ const ReferralPage = () => {
               <Button type="primary" htmlType="submit" loading={isLoading}>
                 提交申请
               </Button>
-              <Button onClick={() => setWithdrawalModalVisible(false)}>
-                取消
-              </Button>
+              <Button onClick={() => setWithdrawalModalVisible(false)}>取消</Button>
             </Space>
           </Form.Item>
         </Form>
       </Modal>
     </div>
-  )
-}
+  );
+};
 
-export default ReferralPage
+export default ReferralPage;

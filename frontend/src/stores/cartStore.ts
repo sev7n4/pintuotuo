@@ -1,15 +1,15 @@
-import { create } from 'zustand'
-import { CartItem, Product } from '@/types'
+import { create } from 'zustand';
+import { CartItem, Product } from '@/types';
 
 interface CartState {
-  items: CartItem[]
-  total: number
+  items: CartItem[];
+  total: number;
 
-  addItem: (product: Product, quantity: number, groupId?: number) => void
-  removeItem: (id: string) => void
-  updateQuantity: (id: string, quantity: number) => void
-  clear: () => void
-  getTotal: () => number
+  addItem: (product: Product, quantity: number, groupId?: number) => void;
+  removeItem: (id: string) => void;
+  updateQuantity: (id: string, quantity: number) => void;
+  clear: () => void;
+  getTotal: () => number;
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
@@ -20,15 +20,13 @@ export const useCartStore = create<CartState>((set, get) => ({
     set((state) => {
       const existingItem = state.items.find(
         (item) => item.product_id === product.id && item.group_id === groupId
-      )
+      );
 
-      let newItems: CartItem[]
+      let newItems: CartItem[];
       if (existingItem) {
         newItems = state.items.map((item) =>
-          item.id === existingItem.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        )
+          item.id === existingItem.id ? { ...item, quantity: item.quantity + quantity } : item
+        );
       } else {
         newItems = [
           ...state.items,
@@ -39,39 +37,37 @@ export const useCartStore = create<CartState>((set, get) => ({
             quantity,
             group_id: groupId,
           },
-        ]
+        ];
       }
 
       return {
         items: newItems,
         total: newItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-      }
-    })
+      };
+    });
   },
 
   removeItem: (id) => {
     set((state) => {
-      const newItems = state.items.filter((item) => item.id !== id)
+      const newItems = state.items.filter((item) => item.id !== id);
       return {
         items: newItems,
         total: newItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-      }
-    })
+      };
+    });
   },
 
   updateQuantity: (id, quantity) => {
     set((state) => {
-      const newItems = state.items.map((item) =>
-        item.id === id ? { ...item, quantity } : item
-      )
+      const newItems = state.items.map((item) => (item.id === id ? { ...item, quantity } : item));
       return {
         items: newItems,
         total: newItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-      }
-    })
+      };
+    });
   },
 
   clear: () => set({ items: [], total: 0 }),
 
   getTotal: () => get().total,
-}))
+}));

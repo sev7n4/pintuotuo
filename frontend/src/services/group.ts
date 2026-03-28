@@ -1,20 +1,20 @@
-import api from './api'
-import { Group, APIResponse, PaginatedResponse } from '@/types'
+import api from './api';
+import { Group, APIResponse, PaginatedResponse } from '@/types';
 
 export interface CreateGroupRequest {
-  product_id: number
-  target_count: number
-  deadline: string
+  product_id: number;
+  target_count: number;
+  deadline: string;
 }
 
 export interface CreateGroupResponse {
-  group: Group
-  order_id: number
+  group: Group;
+  order_id: number;
 }
 
 export interface JoinGroupResponse {
-  group: Group
-  order_id: number
+  group: Group;
+  order_id: number;
 }
 
 export const groupService = {
@@ -29,18 +29,14 @@ export const groupService = {
     }),
 
   // Get group by ID
-  getGroupByID: (id: number) =>
-    api.get<APIResponse<Group>>(`/groups/${id}`),
+  getGroupByID: (id: number) => api.get<APIResponse<Group>>(`/groups/${id}`),
 
   // Join group
-  joinGroup: (id: number) =>
-    api.post<APIResponse<JoinGroupResponse>>(`/groups/${id}/join`, {}),
+  joinGroup: (id: number) => api.post<APIResponse<JoinGroupResponse>>(`/groups/${id}/join`, {}),
 
   // Cancel group
-  cancelGroup: (id: number) =>
-    api.delete<APIResponse<void>>(`/groups/${id}`),
+  cancelGroup: (id: number) => api.delete<APIResponse<void>>(`/groups/${id}`),
 
   // Get group progress
-  getGroupProgress: (id: number) =>
-    api.get<APIResponse<Group>>(`/groups/${id}/progress`),
-}
+  getGroupProgress: (id: number) => api.get<APIResponse<Group>>(`/groups/${id}/progress`),
+};

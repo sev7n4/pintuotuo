@@ -1,55 +1,51 @@
-import { useEffect } from 'react'
-import { Card, Form, Input, Button, message, Upload, Avatar, Space } from 'antd'
-import { UserOutlined, UploadOutlined, SaveOutlined } from '@ant-design/icons'
-import { useMerchantStore } from '@/stores/merchantStore'
-import type { UploadProps } from 'antd'
-import styles from './MerchantSettings.module.css'
+import { useEffect } from 'react';
+import { Card, Form, Input, Button, message, Upload, Avatar, Space } from 'antd';
+import { UserOutlined, UploadOutlined, SaveOutlined } from '@ant-design/icons';
+import { useMerchantStore } from '@/stores/merchantStore';
+import type { UploadProps } from 'antd';
+import styles from './MerchantSettings.module.css';
 
 const MerchantSettings = () => {
-  const { profile, fetchProfile, updateProfile, isLoading } = useMerchantStore()
-  const [form] = Form.useForm()
+  const { profile, fetchProfile, updateProfile, isLoading } = useMerchantStore();
+  const [form] = Form.useForm();
 
   useEffect(() => {
-    fetchProfile()
-  }, [fetchProfile])
+    fetchProfile();
+  }, [fetchProfile]);
 
   useEffect(() => {
     if (profile) {
-      form.setFieldsValue(profile)
+      form.setFieldsValue(profile);
     }
-  }, [profile, form])
+  }, [profile, form]);
 
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields()
-      const success = await updateProfile(values)
+      const values = await form.validateFields();
+      const success = await updateProfile(values);
       if (success) {
-        message.success('店铺信息已更新')
+        message.success('店铺信息已更新');
       }
     } catch (error) {
-      message.error('更新失败，请检查输入')
+      message.error('更新失败，请检查输入');
     }
-  }
+  };
 
   const uploadProps: UploadProps = {
     name: 'logo',
     showUploadList: false,
     beforeUpload: () => {
-      message.info('Logo上传功能开发中')
-      return false
+      message.info('Logo上传功能开发中');
+      return false;
     },
-  }
+  };
 
   return (
     <div className={styles.settings}>
       <h2 className={styles.pageTitle}>店铺设置</h2>
 
       <Card className={styles.card}>
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-        >
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <div className={styles.logoSection}>
             <Avatar
               size={80}
@@ -92,12 +88,7 @@ const MerchantSettings = () => {
 
           <Form.Item>
             <Space>
-              <Button
-                type="primary"
-                htmlType="submit"
-                icon={<SaveOutlined />}
-                loading={isLoading}
-              >
+              <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={isLoading}>
                 保存设置
               </Button>
             </Space>
@@ -133,7 +124,7 @@ const MerchantSettings = () => {
         </div>
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default MerchantSettings
+export default MerchantSettings;
