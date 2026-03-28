@@ -1,99 +1,126 @@
-import { useEffect } from 'react'
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, message } from 'antd'
-import { 
-  UserOutlined, 
-  LogoutOutlined, 
+import { useEffect, useMemo } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, message, Badge } from 'antd';
+import {
+  UserOutlined,
+  LogoutOutlined,
   HomeOutlined,
   AppstoreOutlined,
   ShoppingCartOutlined,
   HeartOutlined,
   HistoryOutlined,
-  SettingOutlined,
-} from '@ant-design/icons'
-import { useAuthStore } from '@/stores/authStore'
-import './Layout.css'
+} from '@ant-design/icons';
+import { useAuthStore } from '@/stores/authStore';
+import { useCartStore } from '@/stores/cartStore';
+import './Layout.css';
 
-const { Header, Content, Footer } = AntLayout
+const { Header, Content, Footer } = AntLayout;
 
 export default function Layout() {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { user, logout, isAuthenticated, fetchUser } = useAuthStore()
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout, isAuthenticated, fetchUser } = useAuthStore();
+  const { items } = useCartStore();
 
   useEffect(() => {
     if (isAuthenticated && !user) {
-      fetchUser()
+      fetchUser();
     }
-  }, [isAuthenticated, user, fetchUser])
+  }, [isAuthenticated, user, fetchUser]);
+
+  const cartItemCount = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
 
   const getSelectedTab = () => {
-    const path = location.pathname
-    if (path === '/') return 'home'
-    if (path === '/categories' || path.startsWith('/products')) return 'category'
-    if (path.startsWith('/orders') || path.startsWith('/groups') || path.startsWith('/payment') || path === '/my-tokens' || path === '/consumption') return 'orders'
-    if (path === '/my' || path === '/profile' || path === '/referral' || path === '/favorites' || path === '/history') return 'my'
-    return 'home'
-  }
+    const path = location.pathname;
+    if (path === '/') return 'home';
+    if (path === '/categories' || path.startsWith('/products')) return 'category';
+    if (path === '/cart') return 'cart';
+    if (
+      path.startsWith('/orders') ||
+      path.startsWith('/groups') ||
+      path.startsWith('/payment') ||
+      path === '/my-tokens' ||
+      path === '/consumption'
+    )
+      return 'orders';
+    if (
+      path === '/my' ||
+      path === '/profile' ||
+      path === '/referral' ||
+      path === '/favorites' ||
+      path === '/history'
+    )
+      return 'my';
+    return 'home';
+  };
 
-  const tabItems = [
-    { 
-      key: 'home', 
+  const baseTabItems = [
+    {
+      key: 'home',
       label: <Link to="/">首页</Link>,
       icon: <HomeOutlined />,
     },
-    { 
-      key: 'category', 
+    {
+      key: 'category',
       label: <Link to="/categories">分类</Link>,
       icon: <AppstoreOutlined />,
     },
-    { 
-      key: 'orders', 
+    {
+      key: 'cart',
+      label: (
+        <Link to="/cart">
+          <Badge count={cartItemCount} size="small" offset={[6, 0]}>
+            购物车
+          </Badge>
+        </Link>
+      ),
+      icon: <ShoppingCartOutlined />,
+    },
+  ];
+
+  const authTabItems = [
+    {
+      key: 'orders',
       label: <Link to="/orders">订单</Link>,
       icon: <ShoppingCartOutlined />,
     },
-    { 
-      key: 'my', 
-      label: <Link to="/my">我的</Link>,
-      icon: <UserOutlined />,
-    },
-  ]
+  ];
+
+  const tabItems = isAuthenticated ? [...baseTabItems, ...authTabItems] : baseTabItems;
 
   const userMenuItems = [
-    { key: 'profile', label: '个人中心', icon: <UserOutlined /> },
+    { key: 'my', label: '我的主页', icon: <UserOutlined /> },
     { key: 'favorites', label: '我的收藏', icon: <HeartOutlined /> },
     { key: 'history', label: '浏览历史', icon: <HistoryOutlined /> },
-    { key: 'settings', label: '账户设置', icon: <SettingOutlined /> },
     { type: 'divider' as const },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
-  ]
+  ];
 
   const handleUserMenuClick = async ({ key }: { key: string }) => {
     switch (key) {
       case 'logout':
-        await logout()
-        message.success('已退出登录')
-        navigate('/login')
-        break
-      case 'profile':
-        navigate('/profile')
-        break
+        await logout();
+        message.success('已退出登录');
+        navigate('/login');
+        break;
+      case 'my':
+        navigate('/my');
+        break;
       case 'favorites':
-        navigate('/favorites')
-        break
+        navigate('/favorites');
+        break;
       case 'history':
-        navigate('/history')
-        break
-      case 'settings':
-        navigate('/my')
-        break
+        navigate('/history');
+        break;
     }
-  }
+  };
 
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
       <Header className="layout-header">
-        <Link to="/" className="layout-logo">拼脱脱</Link>
+        <Link to="/" className="layout-logo">
+          拼脱脱
+        </Link>
         <Menu
           mode="horizontal"
           selectedKeys={[getSelectedTab()]}
@@ -102,14 +129,11 @@ export default function Layout() {
         />
         <div className="layout-user">
           {isAuthenticated && user ? (
-            <Dropdown 
-              menu={{ items: userMenuItems, onClick: handleUserMenuClick }} 
+            <Dropdown
+              menu={{ items: userMenuItems, onClick: handleUserMenuClick }}
               placement="bottomRight"
             >
-              <Space 
-                style={{ cursor: 'pointer' }} 
-                data-testid="user-dropdown"
-              >
+              <Space style={{ cursor: 'pointer' }} data-testid="user-dropdown">
                 <Avatar icon={<UserOutlined />} />
                 <span className="user-name">{user.name || user.email}</span>
               </Space>
@@ -129,5 +153,5 @@ export default function Layout() {
         <p>&copy; 2026 拼脱脱 - AI Token 二级市场</p>
       </Footer>
     </AntLayout>
-  )
+  );
 }

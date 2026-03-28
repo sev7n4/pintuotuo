@@ -241,3 +241,25 @@ func RegisterFlashSaleRoutes(router *gin.RouterGroup) {
 		authFlashSales.PUT("/:id/status", handlers.UpdateFlashSaleStatus)
 	}
 }
+
+func RegisterFavoriteRoutes(router *gin.RouterGroup) {
+	favorites := router.Group("/favorites")
+	favorites.Use(middleware.AuthMiddleware())
+	{
+		favorites.GET("", handlers.GetFavorites)
+		favorites.POST("", handlers.AddFavorite)
+		favorites.DELETE("/:product_id", handlers.RemoveFavorite)
+		favorites.GET("/check/:product_id", handlers.CheckFavorite)
+	}
+}
+
+func RegisterBrowseHistoryRoutes(router *gin.RouterGroup) {
+	history := router.Group("/browse-history")
+	history.Use(middleware.AuthMiddleware())
+	{
+		history.GET("", handlers.GetBrowseHistory)
+		history.POST("", handlers.AddBrowseHistory)
+		history.DELETE("", handlers.ClearBrowseHistory)
+		history.DELETE("/:product_id", handlers.RemoveBrowseHistoryItem)
+	}
+}

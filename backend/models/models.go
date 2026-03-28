@@ -214,3 +214,38 @@ type CartSummary struct {
 	TotalItems int            `json:"total_items"`
 	TotalPrice float64        `json:"total_price"`
 }
+
+// Favorite represents a user's favorite product
+type Favorite struct {
+	ID        int       `json:"id"`
+	UserID    int       `json:"user_id"`
+	ProductID int       `json:"product_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// FavoriteResponse represents a favorite with product details
+type FavoriteResponse struct {
+	ID        int     `json:"id"`
+	ProductID int     `json:"product_id"`
+	Product   Product `json:"product"`
+	CreatedAt string  `json:"created_at"`
+}
+
+// BrowseHistory represents a user's browse history
+type BrowseHistory struct {
+	ID        int       `json:"id"`
+	UserID    int       `json:"user_id"`
+	ProductID int       `json:"product_id"`
+	ViewCount int       `json:"view_count"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// BrowseHistoryResponse represents a browse history item with product details
+type BrowseHistoryResponse struct {
+	ID        int     `json:"id"`
+	ProductID int     `json:"product_id"`
+	Product   Product `json:"product"`
+	ViewCount int     `json:"view_count"`
+	ViewedAt  string  `json:"viewed_at"`
+}
