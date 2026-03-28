@@ -13,6 +13,8 @@ import (
 	"github.com/pintuotuo/backend/middleware"
 )
 
+const queryParamTrue = "true"
+
 func GetNotifications(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -31,7 +33,7 @@ func GetNotifications(c *gin.Context) {
 		return
 	}
 
-	unreadOnly := c.Query("unread") == "true"
+	unreadOnly := c.Query("unread") == queryParamTrue
 	limitStr := c.DefaultQuery("limit", "20")
 	limit, _ := strconv.Atoi(limitStr)
 	if limit > 100 {

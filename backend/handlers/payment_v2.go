@@ -22,6 +22,8 @@ import (
 	"github.com/pintuotuo/backend/payment"
 )
 
+const envTrue = "true"
+
 var paymentService *payment.PaymentService
 
 func parsePrivateKey(keyStr string) (*rsa.PrivateKey, error) {
@@ -93,7 +95,7 @@ func InitPaymentService() {
 					AlipayPublicKey: publicKey,
 					ReturnURL:       os.Getenv("ALIPAY_RETURN_URL"),
 					NotifyURL:       os.Getenv("ALIPAY_NOTIFY_URL"),
-					Sandbox:         os.Getenv("ALIPAY_SANDBOX") == "true",
+					Sandbox:         os.Getenv("ALIPAY_SANDBOX") == envTrue,
 				}
 				log.Printf("[Payment] Alipay initialized with AppID: %s, Sandbox: %v", appID, alipayConfig.Sandbox)
 			}
@@ -106,7 +108,7 @@ func InitPaymentService() {
 			MchID:     wechatMchID,
 			APIKey:    wechatAPIKey,
 			NotifyURL: os.Getenv("WECHAT_NOTIFY_URL"),
-			Sandbox:   os.Getenv("WECHAT_SANDBOX") == "true",
+			Sandbox:   os.Getenv("WECHAT_SANDBOX") == envTrue,
 		}
 		log.Printf("[Payment] Wechat initialized with MchID: %s, Sandbox: %v", wechatMchID, wechatConfig.Sandbox)
 	}
