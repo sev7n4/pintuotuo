@@ -1,6 +1,11 @@
-import React from 'react'
-import { Card, Row, Col, Statistic } from 'antd'
-import { UserOutlined, ShopOutlined, ShoppingCartOutlined, DollarOutlined } from '@ant-design/icons'
+import React from 'react';
+import { Card, Row, Col, Statistic } from 'antd';
+import {
+  UserOutlined,
+  ShopOutlined,
+  ShoppingCartOutlined,
+  DollarOutlined,
+} from '@ant-design/icons';
 
 const AdminDashboard: React.FC = () => {
   return (
@@ -63,7 +68,7 @@ const AdminDashboard: React.FC = () => {
         </Col>
       </Row>
     </div>
-  )
-}
+  );
+};
 
-export default AdminDashboard
+export default AdminDashboard;

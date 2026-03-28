@@ -1,6 +1,6 @@
-import { Card, Typography } from 'antd'
+import { Card, Typography } from 'antd';
 
-const { Title } = Typography
+const { Title } = Typography;
 
 const AdminOrders = () => {
   return (
@@ -10,7 +10,7 @@ const AdminOrders = () => {
         <p>订单管理页面开发中...</p>
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default AdminOrders
+export default AdminOrders;

@@ -1,44 +1,44 @@
-import React, { useEffect, useState } from 'react'
-import { Table, Card, Tag, Space, Button, Modal, Form, Input, message } from 'antd'
-import { UserOutlined, LockOutlined } from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
+import React, { useEffect, useState } from 'react';
+import { Table, Card, Tag, Space, Button, Modal, Form, Input, message } from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
 
 interface User {
-  id: number
-  email: string
-  name: string
-  role: string
-  created_at: string
+  id: number;
+  email: string;
+  name: string;
+  role: string;
+  created_at: string;
 }
 
 const AdminUsers: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(false)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [form] = Form.useForm()
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [form] = Form.useForm();
 
   useEffect(() => {
-    fetchUsers()
-  }, [])
+    fetchUsers();
+  }, []);
 
   const fetchUsers = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
       const response = await fetch('/api/v1/admin/users', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
         },
-      })
-      const result = await response.json()
+      });
+      const result = await response.json();
       if (result.code === 0) {
-        setUsers(result.data || [])
+        setUsers(result.data || []);
       }
     } catch (error) {
-      message.error('获取用户列表失败')
+      message.error('获取用户列表失败');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleCreateAdmin = async (values: { email: string; name: string; password: string }) => {
     try {
@@ -49,20 +49,20 @@ const AdminUsers: React.FC = () => {
           Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
         },
         body: JSON.stringify({ ...values, role: 'admin' }),
-      })
-      const result = await response.json()
+      });
+      const result = await response.json();
       if (result.code === 0) {
-        message.success('创建管理员成功')
-        setModalVisible(false)
-        form.resetFields()
-        fetchUsers()
+        message.success('创建管理员成功');
+        setModalVisible(false);
+        form.resetFields();
+        fetchUsers();
       } else {
-        message.error(result.message || '创建失败')
+        message.error(result.message || '创建失败');
       }
     } catch (error) {
-      message.error('创建管理员失败')
+      message.error('创建管理员失败');
     }
-  }
+  };
 
   const columns: ColumnsType<User> = [
     {
@@ -90,13 +90,13 @@ const AdminUsers: React.FC = () => {
           admin: 'red',
           merchant: 'blue',
           user: 'green',
-        }
+        };
         const textMap: Record<string, string> = {
           admin: '管理员',
           merchant: '商户',
           user: '用户',
-        }
-        return <Tag color={colorMap[role] || 'default'}>{textMap[role] || role}</Tag>
+        };
+        return <Tag color={colorMap[role] || 'default'}>{textMap[role] || role}</Tag>;
       },
     },
     {
@@ -105,7 +105,7 @@ const AdminUsers: React.FC = () => {
       key: 'created_at',
       render: (date: string) => new Date(date).toLocaleString('zh-CN'),
     },
-  ]
+  ];
 
   return (
     <div>
@@ -171,7 +171,7 @@ const AdminUsers: React.FC = () => {
         </Form>
       </Modal>
     </div>
-  )
-}
+  );
+};
 
-export default AdminUsers
+export default AdminUsers;

@@ -1,21 +1,21 @@
-import { create } from 'zustand'
-import { Group, APIResponse, PaginatedResponse } from '@/types'
-import { groupService, JoinGroupResponse, CreateGroupResponse } from '@/services/group'
+import { create } from 'zustand';
+import { Group, APIResponse, PaginatedResponse } from '@/types';
+import { groupService, JoinGroupResponse, CreateGroupResponse } from '@/services/group';
 
 interface GroupState {
-  groups: Group[]
-  currentGroup: Group | null
-  total: number
-  isLoading: boolean
-  error: string | null
+  groups: Group[];
+  currentGroup: Group | null;
+  total: number;
+  isLoading: boolean;
+  error: string | null;
 
-  fetchGroups: (page?: number, perPage?: number) => Promise<Group[] | null>
-  fetchGroupByID: (id: number) => Promise<void>
-  createGroup: (productId: number, targetCount: number, deadline: string) => Promise<number | null>
-  joinGroup: (id: number) => Promise<number | null>
-  cancelGroup: (id: number) => Promise<void>
-  getGroupProgress: (id: number) => Promise<void>
-  clearError: () => void
+  fetchGroups: (page?: number, perPage?: number) => Promise<Group[] | null>;
+  fetchGroupByID: (id: number) => Promise<void>;
+  createGroup: (productId: number, targetCount: number, deadline: string) => Promise<number | null>;
+  joinGroup: (id: number) => Promise<number | null>;
+  cancelGroup: (id: number) => Promise<void>;
+  getGroupProgress: (id: number) => Promise<void>;
+  clearError: () => void;
 }
 
 export const useGroupStore = create<GroupState>((set) => ({
@@ -26,112 +26,110 @@ export const useGroupStore = create<GroupState>((set) => ({
   error: null,
 
   fetchGroups: async (page = 1, perPage = 20) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null });
     try {
-      const response = await groupService.listGroups(page, perPage)
-      const apiResponse = response.data as APIResponse<PaginatedResponse<Group>>
-      const data = apiResponse.data
+      const response = await groupService.listGroups(page, perPage);
+      const apiResponse = response.data as APIResponse<PaginatedResponse<Group>>;
+      const data = apiResponse.data;
       set({
         groups: data?.data || [],
         total: data?.total || 0,
         isLoading: false,
-      })
-      return data?.data || []
+      });
+      return data?.data || [];
     } catch (error) {
-      const message = error instanceof Error ? error.message : '获取分组列表失败'
-      set({ error: message, isLoading: false })
-      return null
+      const message = error instanceof Error ? error.message : '获取分组列表失败';
+      set({ error: message, isLoading: false });
+      return null;
     }
   },
 
   fetchGroupByID: async (id) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null });
     try {
-      const response = await groupService.getGroupByID(id)
-      const apiResponse = response.data as APIResponse<Group>
-      set({ currentGroup: apiResponse.data || null, isLoading: false })
+      const response = await groupService.getGroupByID(id);
+      const apiResponse = response.data as APIResponse<Group>;
+      set({ currentGroup: apiResponse.data || null, isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '获取分组详情失败'
-      set({ error: message, isLoading: false })
+      const message = error instanceof Error ? error.message : '获取分组详情失败';
+      set({ error: message, isLoading: false });
     }
   },
 
   createGroup: async (productId, targetCount, deadline): Promise<number | null> => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null });
     try {
       const response = await groupService.createGroup({
         product_id: productId,
         target_count: targetCount,
         deadline: new Date(deadline).toISOString(),
-      })
-      const apiResponse = response.data as APIResponse<CreateGroupResponse>
-      const newGroup = apiResponse.data?.group
-      const orderId = apiResponse.data?.order_id
+      });
+      const apiResponse = response.data as APIResponse<CreateGroupResponse>;
+      const newGroup = apiResponse.data?.group;
+      const orderId = apiResponse.data?.order_id;
       if (newGroup) {
         set((state) => ({
           groups: [newGroup, ...state.groups],
           currentGroup: newGroup,
           isLoading: false,
-        }))
+        }));
       }
-      return orderId ?? null
+      return orderId ?? null;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '创建分组失败'
-      set({ error: message, isLoading: false })
-      throw error
+      const message = error instanceof Error ? error.message : '创建分组失败';
+      set({ error: message, isLoading: false });
+      throw error;
     }
   },
 
   joinGroup: async (id) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null });
     try {
-      const response = await groupService.joinGroup(id)
-      const apiResponse = response.data as APIResponse<JoinGroupResponse>
-      const updatedGroup = apiResponse.data?.group
-      const orderId = apiResponse.data?.order_id
+      const response = await groupService.joinGroup(id);
+      const apiResponse = response.data as APIResponse<JoinGroupResponse>;
+      const updatedGroup = apiResponse.data?.group;
+      const orderId = apiResponse.data?.order_id;
       if (updatedGroup) {
         set((state) => ({
-          groups: state.groups.map((g) =>
-            g.id === id ? updatedGroup : g
-          ),
+          groups: state.groups.map((g) => (g.id === id ? updatedGroup : g)),
           currentGroup: updatedGroup,
           isLoading: false,
-        }))
+        }));
       }
-      return orderId ?? null
+      return orderId ?? null;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '加入分组失败'
-      set({ error: message, isLoading: false })
-      throw error
+      const message = error instanceof Error ? error.message : '加入分组失败';
+      set({ error: message, isLoading: false });
+      throw error;
     }
   },
 
   cancelGroup: async (id) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null });
     try {
-      await groupService.cancelGroup(id)
+      await groupService.cancelGroup(id);
       set((state) => ({
         groups: state.groups.filter((g) => g.id !== id),
         isLoading: false,
-      }))
+      }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : '取消分组失败'
-      set({ error: message, isLoading: false })
-      throw error
+      const message = error instanceof Error ? error.message : '取消分组失败';
+      set({ error: message, isLoading: false });
+      throw error;
     }
   },
 
   getGroupProgress: async (id) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null });
     try {
-      const response = await groupService.getGroupProgress(id)
-      const apiResponse = response.data as APIResponse<Group>
-      set({ currentGroup: apiResponse.data || null, isLoading: false })
+      const response = await groupService.getGroupProgress(id);
+      const apiResponse = response.data as APIResponse<Group>;
+      set({ currentGroup: apiResponse.data || null, isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '获取分组进度失败'
-      set({ error: message, isLoading: false })
+      const message = error instanceof Error ? error.message : '获取分组进度失败';
+      set({ error: message, isLoading: false });
     }
   },
 
   clearError: () => set({ error: null }),
-}))
+}));

@@ -1,24 +1,13 @@
-import React from 'react'
-import {
-  Table,
-  Button,
-  Space,
-  Empty,
-  InputNumber,
-  Row,
-  Col,
-  Card,
-  Statistic,
-  message,
-} from 'antd'
-import { DeleteOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
-import { useCartStore } from '@stores/cartStore'
-import type { CartItem } from '@/types'
+import React from 'react';
+import { Table, Button, Space, Empty, InputNumber, Row, Col, Card, Statistic, message } from 'antd';
+import { DeleteOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useCartStore } from '@stores/cartStore';
+import type { CartItem } from '@/types';
 
 export const CartPage: React.FC = () => {
-  const navigate = useNavigate()
-  const { items, total, removeItem, updateQuantity } = useCartStore()
+  const navigate = useNavigate();
+  const { items, total, removeItem, updateQuantity } = useCartStore();
 
   if (items.length === 0) {
     return (
@@ -28,7 +17,7 @@ export const CartPage: React.FC = () => {
           继续购物
         </Button>
       </div>
-    )
+    );
   }
 
   const columns = [
@@ -73,15 +62,15 @@ export const CartPage: React.FC = () => {
           danger
           icon={<DeleteOutlined />}
           onClick={() => {
-            removeItem(record.id)
-            message.success('已删除')
+            removeItem(record.id);
+            message.success('已删除');
           }}
         >
           删除
         </Button>
       ),
     },
-  ]
+  ];
 
   return (
     <div style={{ padding: '20px' }}>
@@ -115,7 +104,7 @@ export const CartPage: React.FC = () => {
         </Col>
       </Row>
     </div>
-  )
-}
+  );
+};
 
-export default CartPage
+export default CartPage;

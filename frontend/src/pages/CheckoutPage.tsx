@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState } from 'react';
 import {
   Card,
   Table,
@@ -12,72 +12,68 @@ import {
   Row,
   Col,
   Checkbox,
-} from 'antd'
-import { AlipayCircleOutlined, WechatOutlined, ArrowLeftOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
-import { useCartStore } from '@stores/cartStore'
-import { useOrderStore } from '@stores/orderStore'
-import type { CartItem } from '@/types'
+} from 'antd';
+import { AlipayCircleOutlined, WechatOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useCartStore } from '@stores/cartStore';
+import { useOrderStore } from '@stores/orderStore';
+import type { CartItem } from '@/types';
 
-type PaymentMethod = 'alipay' | 'wechat'
+type PaymentMethod = 'alipay' | 'wechat';
 
 const CheckoutPage: React.FC = () => {
-  const navigate = useNavigate()
-  const { items, clear } = useCartStore()
-  const { createOrder, isLoading } = useOrderStore()
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('alipay')
-  const [selectedItems, setSelectedItems] = useState<string[]>(
-    items.map((item) => item.id)
-  )
+  const navigate = useNavigate();
+  const { items, clear } = useCartStore();
+  const { createOrder, isLoading } = useOrderStore();
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('alipay');
+  const [selectedItems, setSelectedItems] = useState<string[]>(items.map((item) => item.id));
 
-  const selectedCartItems = items.filter((item) => selectedItems.includes(item.id))
+  const selectedCartItems = items.filter((item) => selectedItems.includes(item.id));
   const selectedTotal = selectedCartItems.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
     0
-  )
+  );
 
   const handleSelectItem = (itemId: string) => {
     setSelectedItems((prev) =>
-      prev.includes(itemId)
-        ? prev.filter((id) => id !== itemId)
-        : [...prev, itemId]
-    )
-  }
+      prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]
+    );
+  };
 
   const handleSelectAll = () => {
     if (selectedItems.length === items.length) {
-      setSelectedItems([])
+      setSelectedItems([]);
     } else {
-      setSelectedItems(items.map((item) => item.id))
+      setSelectedItems(items.map((item) => item.id));
     }
-  }
+  };
 
   const handleCheckout = async () => {
     if (selectedCartItems.length === 0) {
-      message.warning('请选择要结算的商品')
-      return
+      message.warning('请选择要结算的商品');
+      return;
     }
 
     try {
       const orderPromises = selectedCartItems.map((item) =>
         createOrder(item.product_id, item.quantity, item.group_id)
-      )
-      const orderIds = await Promise.all(orderPromises)
-      
-      clear()
-      
-      const firstOrderId = orderIds.find(id => id !== null)
+      );
+      const orderIds = await Promise.all(orderPromises);
+
+      clear();
+
+      const firstOrderId = orderIds.find((id) => id !== null);
       if (firstOrderId) {
-        message.success('订单创建成功，正在跳转到支付页面')
-        navigate(`/payment/${firstOrderId}`)
+        message.success('订单创建成功，正在跳转到支付页面');
+        navigate(`/payment/${firstOrderId}`);
       } else {
-        message.success('订单创建成功')
-        navigate('/orders')
+        message.success('订单创建成功');
+        navigate('/orders');
       }
     } catch (error) {
-      message.error('创建订单失败，请重试')
+      message.error('创建订单失败，请重试');
     }
-  }
+  };
 
   if (items.length === 0) {
     return (
@@ -88,16 +84,13 @@ const CheckoutPage: React.FC = () => {
           </Button>
         </Empty>
       </div>
-    )
+    );
   }
 
   const columns = [
     {
       title: (
-        <Checkbox
-          checked={selectedItems.length === items.length}
-          onChange={handleSelectAll}
-        >
+        <Checkbox checked={selectedItems.length === items.length} onChange={handleSelectAll}>
           全选
         </Checkbox>
       ),
@@ -138,7 +131,7 @@ const CheckoutPage: React.FC = () => {
         </span>
       ),
     },
-  ]
+  ];
 
   return (
     <div style={{ padding: '20px', maxWidth: 1000, margin: '0 auto' }}>
@@ -154,12 +147,7 @@ const CheckoutPage: React.FC = () => {
       <Row gutter={24}>
         <Col xs={24} lg={16}>
           <Card title="确认订单">
-            <Table
-              columns={columns}
-              dataSource={items}
-              rowKey="id"
-              pagination={false}
-            />
+            <Table columns={columns} dataSource={items} rowKey="id" pagination={false} />
           </Card>
         </Col>
 
@@ -187,7 +175,9 @@ const CheckoutPage: React.FC = () => {
                     padding: '0 16px',
                   }}
                 >
-                  <AlipayCircleOutlined style={{ fontSize: 24, color: '#1677ff', marginRight: 10 }} />
+                  <AlipayCircleOutlined
+                    style={{ fontSize: 24, color: '#1677ff', marginRight: 10 }}
+                  />
                   <span>支付宝</span>
                 </Radio.Button>
                 <Radio.Button
@@ -233,7 +223,7 @@ const CheckoutPage: React.FC = () => {
         </Col>
       </Row>
     </div>
-  )
-}
+  );
+};
 
-export default CheckoutPage
+export default CheckoutPage;

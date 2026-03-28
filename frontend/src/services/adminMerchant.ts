@@ -1,26 +1,26 @@
-import api from './api'
+import api from './api';
 
 export interface PendingMerchant {
-  id: number
-  user_id: number
-  company_name: string
-  contact_name: string
-  contact_phone: string
-  contact_email: string
-  address: string
-  description: string
-  status: string
-  created_at: string
-  updated_at: string
-  user_email?: string
-  user_name?: string
+  id: number;
+  user_id: number;
+  company_name: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_email: string;
+  address: string;
+  description: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  user_email?: string;
+  user_name?: string;
 }
 
 export interface MerchantListResponse {
-  data: PendingMerchant[]
-  total: number
-  page: number
-  per_page: number
+  data: PendingMerchant[];
+  total: number;
+  page: number;
+  per_page: number;
 }
 
 export const adminMerchantService = {
@@ -34,4 +34,4 @@ export const adminMerchantService = {
 
   rejectMerchant: (merchantId: number) =>
     api.post<{ code: number; message: string }>(`/admin/merchants/${merchantId}/reject`, {}),
-}
+};

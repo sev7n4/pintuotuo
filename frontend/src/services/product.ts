@@ -1,28 +1,27 @@
-import api from './api'
-import { Product, APIResponse, PaginatedResponse, HomeData, Category, Group } from '@/types'
+import api from './api';
+import { Product, APIResponse, PaginatedResponse, HomeData, Category, Group } from '@/types';
 
 interface ProductFilters {
-  page?: number
-  per_page?: number
-  status?: string
-  merchant_id?: number
-  category?: string
-  sort?: 'hot' | 'new' | 'price_asc' | 'price_desc'
+  page?: number;
+  per_page?: number;
+  status?: string;
+  merchant_id?: number;
+  category?: string;
+  sort?: 'hot' | 'new' | 'price_asc' | 'price_desc';
 }
 
 interface CreateProductRequest {
-  name: string
-  description: string
-  price: number
-  original_price?: number
-  stock: number
-  category?: string
+  name: string;
+  description: string;
+  price: number;
+  original_price?: number;
+  stock: number;
+  category?: string;
 }
 
 export const productService = {
   // Get home page data
-  getHomeData: () =>
-    api.get<HomeData>('/products/home'),
+  getHomeData: () => api.get<HomeData>('/products/home'),
 
   // Get hot products
   getHotProducts: (limit?: number) =>
@@ -33,16 +32,14 @@ export const productService = {
     api.get<APIResponse<Product[]>>('/products/new', { params: { limit } }),
 
   // Get categories
-  getCategories: () =>
-    api.get<APIResponse<Category[]>>('/products/categories'),
+  getCategories: () => api.get<APIResponse<Category[]>>('/products/categories'),
 
   // List products
   listProducts: (filters?: ProductFilters) =>
     api.get<APIResponse<PaginatedResponse<Product>>>('/products', { params: filters }),
 
   // Get product by ID
-  getProductByID: (id: number) =>
-    api.get<APIResponse<Product>>(`/products/${id}`),
+  getProductByID: (id: number) => api.get<APIResponse<Product>>(`/products/${id}`),
 
   // Get active groups for a product
   getProductGroups: (productId: number) =>
@@ -63,6 +60,5 @@ export const productService = {
     api.put<APIResponse<Product>>(`/products/merchants/${id}`, data),
 
   // Delete product (merchant)
-  deleteProduct: (id: number) =>
-    api.delete<APIResponse<void>>(`/products/merchants/${id}`),
-}
+  deleteProduct: (id: number) => api.delete<APIResponse<void>>(`/products/merchants/${id}`),
+};

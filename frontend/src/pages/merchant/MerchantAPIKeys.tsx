@@ -1,67 +1,90 @@
-import { useEffect, useState } from 'react'
-import { Card, Table, Button, Tag, Space, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Progress } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
-import { useMerchantStore } from '@/stores/merchantStore'
-import { MerchantAPIKey } from '@/types'
-import styles from './MerchantAPIKeys.module.css'
+import { useEffect, useState } from 'react';
+import {
+  Card,
+  Table,
+  Button,
+  Tag,
+  Space,
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  Select,
+  message,
+  Popconfirm,
+  Progress,
+} from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useMerchantStore } from '@/stores/merchantStore';
+import { MerchantAPIKey } from '@/types';
+import styles from './MerchantAPIKeys.module.css';
 
 const MerchantAPIKeys = () => {
-  const { apiKeys, apiKeyUsage, fetchAPIKeys, fetchAPIKeyUsage, createAPIKey, updateAPIKey, deleteAPIKey, isLoading } = useMerchantStore()
-  const [modalVisible, setModalVisible] = useState(false)
-  const [editingKey, setEditingKey] = useState<MerchantAPIKey | null>(null)
-  const [form] = Form.useForm()
+  const {
+    apiKeys,
+    apiKeyUsage,
+    fetchAPIKeys,
+    fetchAPIKeyUsage,
+    createAPIKey,
+    updateAPIKey,
+    deleteAPIKey,
+    isLoading,
+  } = useMerchantStore();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingKey, setEditingKey] = useState<MerchantAPIKey | null>(null);
+  const [form] = Form.useForm();
 
   useEffect(() => {
-    fetchAPIKeys()
-    fetchAPIKeyUsage()
-  }, [fetchAPIKeys, fetchAPIKeyUsage])
+    fetchAPIKeys();
+    fetchAPIKeyUsage();
+  }, [fetchAPIKeys, fetchAPIKeyUsage]);
 
   const handleAdd = () => {
-    setEditingKey(null)
-    form.resetFields()
-    setModalVisible(true)
-  }
+    setEditingKey(null);
+    form.resetFields();
+    setModalVisible(true);
+  };
 
   const handleEdit = (record: MerchantAPIKey) => {
-    setEditingKey(record)
+    setEditingKey(record);
     form.setFieldsValue({
       name: record.name,
       quota_limit: record.quota_limit,
       status: record.status,
-    })
-    setModalVisible(true)
-  }
+    });
+    setModalVisible(true);
+  };
 
   const handleDelete = async (id: number) => {
-    const success = await deleteAPIKey(id)
+    const success = await deleteAPIKey(id);
     if (success) {
-      message.success('API密钥已删除')
-      fetchAPIKeys()
+      message.success('API密钥已删除');
+      fetchAPIKeys();
     }
-  }
+  };
 
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields()
+      const values = await form.validateFields();
       if (editingKey) {
-        const success = await updateAPIKey(editingKey.id, values)
+        const success = await updateAPIKey(editingKey.id, values);
         if (success) {
-          message.success('API密钥已更新')
-          setModalVisible(false)
-          fetchAPIKeys()
+          message.success('API密钥已更新');
+          setModalVisible(false);
+          fetchAPIKeys();
         }
       } else {
-        const success = await createAPIKey(values)
+        const success = await createAPIKey(values);
         if (success) {
-          message.success('API密钥已创建')
-          setModalVisible(false)
-          fetchAPIKeys()
+          message.success('API密钥已创建');
+          setModalVisible(false);
+          fetchAPIKeys();
         }
       }
     } catch (error) {
-      message.error('操作失败')
+      message.error('操作失败');
     }
-  }
+  };
 
   const columns = [
     {
@@ -73,20 +96,18 @@ const MerchantAPIKeys = () => {
       title: '提供商',
       dataIndex: 'provider',
       key: 'provider',
-      render: (provider: string) => (
-        <Tag color="blue">{provider.toUpperCase()}</Tag>
-      ),
+      render: (provider: string) => <Tag color="blue">{provider.toUpperCase()}</Tag>,
     },
     {
       title: '配额',
       dataIndex: 'quota_limit',
       key: 'quota_limit',
       render: (_: unknown, record: MerchantAPIKey) => {
-        const usage = apiKeyUsage.find(u => u.id === record.id)
+        const usage = apiKeyUsage.find((u) => u.id === record.id);
         if (!usage || usage.quota_limit === 0) {
-          return '无限制'
+          return '无限制';
         }
-        const percent = Math.min(usage.usage_percentage, 100)
+        const percent = Math.min(usage.usage_percentage, 100);
         return (
           <div className={styles.quotaCell}>
             <Progress percent={percent} size="small" />
@@ -94,7 +115,7 @@ const MerchantAPIKeys = () => {
               ${usage.quota_used.toFixed(2)} / ${usage.quota_limit.toFixed(2)}
             </span>
           </div>
-        )
+        );
       },
     },
     {
@@ -111,7 +132,7 @@ const MerchantAPIKeys = () => {
       title: '最后使用',
       dataIndex: 'last_used_at',
       key: 'last_used_at',
-      render: (date: string) => date ? new Date(date).toLocaleString('zh-CN') : '从未使用',
+      render: (date: string) => (date ? new Date(date).toLocaleString('zh-CN') : '从未使用'),
     },
     {
       title: '创建时间',
@@ -146,7 +167,7 @@ const MerchantAPIKeys = () => {
         </Space>
       ),
     },
-  ]
+  ];
 
   return (
     <div className={styles.apiKeys}>
@@ -230,7 +251,7 @@ const MerchantAPIKeys = () => {
         </Form>
       </Modal>
     </div>
-  )
-}
+  );
+};
 
-export default MerchantAPIKeys
+export default MerchantAPIKeys;

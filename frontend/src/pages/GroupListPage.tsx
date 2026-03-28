@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react';
 import {
   List,
   Card,
@@ -11,101 +11,106 @@ import {
   Typography,
   Space,
   Grid,
-} from 'antd'
-import { UserAddOutlined, ShoppingOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
-import { useGroupStore } from '@stores/groupStore'
-import type { Group } from '@/types'
+} from 'antd';
+import { UserAddOutlined, ShoppingOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useGroupStore } from '@stores/groupStore';
+import type { Group } from '@/types';
 
-const { Title } = Typography
-const { useBreakpoint } = Grid
+const { Title } = Typography;
+const { useBreakpoint } = Grid;
 
 const statusMap: Record<string, { color: string; label: string }> = {
   active: { color: 'blue', label: '进行中' },
   completed: { color: 'green', label: '已成团' },
   failed: { color: 'red', label: '已失败' },
-}
+};
 
 interface GroupWithStore extends Group {
-  onJoin?: () => void
-  isLoading?: boolean
+  onJoin?: () => void;
+  isLoading?: boolean;
 }
 
 export const GroupListPage: React.FC = () => {
-  const navigate = useNavigate()
-  const screens = useBreakpoint()
-  const { isLoading, error, fetchGroups, joinGroup } = useGroupStore()
-  const [groups, setGroups] = useState<GroupWithStore[]>([])
-  const [joiningId, setJoiningId] = useState<number | null>(null)
+  const navigate = useNavigate();
+  const screens = useBreakpoint();
+  const { isLoading, error, fetchGroups, joinGroup } = useGroupStore();
+  const [groups, setGroups] = useState<GroupWithStore[]>([]);
+  const [joiningId, setJoiningId] = useState<number | null>(null);
 
   useEffect(() => {
-    loadGroups()
-  }, [])
+    loadGroups();
+  }, []);
 
   const loadGroups = async () => {
-    const result = await fetchGroups()
+    const result = await fetchGroups();
     if (result) {
-      setGroups(result)
+      setGroups(result);
     }
-  }
+  };
 
   const handleJoinGroup = async (groupId: number) => {
-    setJoiningId(groupId)
+    setJoiningId(groupId);
     try {
-      const orderId = await joinGroup(groupId)
-      message.success('加入拼团成功！请完成支付')
+      const orderId = await joinGroup(groupId);
+      message.success('加入拼团成功！请完成支付');
       if (orderId) {
-        navigate(`/payment/${orderId}`)
+        navigate(`/payment/${orderId}`);
       } else {
-        await loadGroups()
+        await loadGroups();
       }
     } catch (err) {
-      message.error('加入失败，请稍后重试')
+      message.error('加入失败，请稍后重试');
     } finally {
-      setJoiningId(null)
+      setJoiningId(null);
     }
-  }
+  };
 
   const handleViewGroupDetail = (groupId: number) => {
-    navigate(`/groups/${groupId}`)
-  }
+    navigate(`/groups/${groupId}`);
+  };
 
   if (error) {
-    return <Empty description={`错误: ${error}`} />
+    return <Empty description={`错误: ${error}`} />;
   }
 
   if (groups.length === 0) {
     return (
       <div style={{ padding: screens.xs ? 12 : 24, marginTop: 50, textAlign: 'center' }}>
-        <Empty 
+        <Empty
           description={
             <Space direction="vertical">
               <span>暂无进行中的拼团</span>
               <span style={{ color: '#999', fontSize: 14 }}>去商品页面发起拼团吧！</span>
             </Space>
-          } 
+          }
         />
-        <Button 
-          type="primary" 
+        <Button
+          type="primary"
           icon={<ShoppingOutlined />}
-          style={{ marginTop: 16 }} 
+          style={{ marginTop: 16 }}
           onClick={() => navigate('/products')}
         >
           浏览商品
         </Button>
       </div>
-    )
+    );
   }
 
   return (
     <div style={{ padding: screens.xs ? 12 : 24 }}>
-      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Title level={screens.xs ? 4 : 3} style={{ margin: 0 }}>拼团中心</Title>
-        <Button 
-          type="primary" 
-          icon={<ShoppingOutlined />}
-          onClick={() => navigate('/products')}
-        >
+      <div
+        style={{
+          marginBottom: 20,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <Title level={screens.xs ? 4 : 3} style={{ margin: 0 }}>
+          拼团中心
+        </Title>
+        <Button type="primary" icon={<ShoppingOutlined />} onClick={() => navigate('/products')}>
           {screens.xs ? '' : '去拼团'}
         </Button>
       </div>
@@ -115,10 +120,10 @@ export const GroupListPage: React.FC = () => {
           grid={{ gutter: 16, xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 4 }}
           dataSource={groups}
           renderItem={(group) => {
-            const progress = (group.current_count / group.target_count) * 100
-            const deadline = new Date(group.deadline)
-            const isExpired = deadline < new Date()
-            const s = statusMap[group.status] || { color: 'default', label: group.status }
+            const progress = (group.current_count / group.target_count) * 100;
+            const deadline = new Date(group.deadline);
+            const isExpired = deadline < new Date();
+            const s = statusMap[group.status] || { color: 'default', label: group.status };
 
             return (
               <List.Item key={group.id}>
@@ -130,8 +135,8 @@ export const GroupListPage: React.FC = () => {
                       type={group.status === 'active' ? 'primary' : 'default'}
                       icon={<UserAddOutlined />}
                       onClick={(e) => {
-                        e.stopPropagation()
-                        handleJoinGroup(group.id)
+                        e.stopPropagation();
+                        handleJoinGroup(group.id);
                       }}
                       loading={joiningId === group.id}
                       disabled={group.status !== 'active' || isExpired}
@@ -151,28 +156,26 @@ export const GroupListPage: React.FC = () => {
                             {s.label}
                           </Tag>
                         </p>
-                        <Progress 
-                          percent={Math.round(progress)} 
-                          status={group.status === 'active' ? 'active' : 'success'} 
+                        <Progress
+                          percent={Math.round(progress)}
+                          status={group.status === 'active' ? 'active' : 'success'}
                           size="small"
                         />
                         <p style={{ marginTop: 10, fontSize: 12, color: '#999' }}>
                           截止时间: {deadline.toLocaleString('zh-CN')}
                         </p>
-                        {isExpired && (
-                          <Tag color="red">已过期</Tag>
-                        )}
+                        {isExpired && <Tag color="red">已过期</Tag>}
                       </div>
                     }
                   />
                 </Card>
               </List.Item>
-            )
+            );
           }}
         />
       </Spin>
     </div>
-  )
-}
+  );
+};
 
-export default GroupListPage
+export default GroupListPage;

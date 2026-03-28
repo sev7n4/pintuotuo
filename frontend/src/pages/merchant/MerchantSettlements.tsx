@@ -1,37 +1,42 @@
-import { useEffect, useState } from 'react'
-import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col } from 'antd'
-import { DollarOutlined, CheckCircleOutlined, ClockCircleOutlined, SyncOutlined } from '@ant-design/icons'
-import { useMerchantStore } from '@/stores/merchantStore'
-import { MerchantSettlement } from '@/types'
-import styles from './MerchantSettlements.module.css'
+import { useEffect, useState } from 'react';
+import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col } from 'antd';
+import {
+  DollarOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  SyncOutlined,
+} from '@ant-design/icons';
+import { useMerchantStore } from '@/stores/merchantStore';
+import { MerchantSettlement } from '@/types';
+import styles from './MerchantSettlements.module.css';
 
 const MerchantSettlements = () => {
-  const { settlements, fetchSettlements, requestSettlement, isLoading } = useMerchantStore()
-  const [detailVisible, setDetailVisible] = useState(false)
-  const [selectedSettlement, setSelectedSettlement] = useState<MerchantSettlement | null>(null)
+  const { settlements, fetchSettlements, requestSettlement, isLoading } = useMerchantStore();
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [selectedSettlement, setSelectedSettlement] = useState<MerchantSettlement | null>(null);
 
   useEffect(() => {
-    fetchSettlements()
-  }, [fetchSettlements])
+    fetchSettlements();
+  }, [fetchSettlements]);
 
   const handleRequestSettlement = async () => {
-    const success = await requestSettlement()
+    const success = await requestSettlement();
     if (success) {
-      message.success('结算申请已提交')
-      fetchSettlements()
+      message.success('结算申请已提交');
+      fetchSettlements();
     }
-  }
+  };
 
   const handleViewDetail = (record: MerchantSettlement) => {
-    setSelectedSettlement(record)
-    setDetailVisible(true)
-  }
+    setSelectedSettlement(record);
+    setDetailVisible(true);
+  };
 
   const statusMap: Record<string, { color: string; text: string; icon: React.ReactNode }> = {
     pending: { color: 'default', text: '待处理', icon: <ClockCircleOutlined /> },
     processing: { color: 'processing', text: '处理中', icon: <SyncOutlined spin /> },
     completed: { color: 'success', text: '已完成', icon: <CheckCircleOutlined /> },
-  }
+  };
 
   const columns = [
     {
@@ -45,7 +50,8 @@ const MerchantSettlements = () => {
       key: 'period',
       render: (_: unknown, record: MerchantSettlement) => (
         <span>
-          {new Date(record.period_start).toLocaleDateString('zh-CN')} - {new Date(record.period_end).toLocaleDateString('zh-CN')}
+          {new Date(record.period_start).toLocaleDateString('zh-CN')} -{' '}
+          {new Date(record.period_end).toLocaleDateString('zh-CN')}
         </span>
       ),
     },
@@ -65,28 +71,30 @@ const MerchantSettlements = () => {
       title: '结算金额',
       dataIndex: 'settlement_amount',
       key: 'settlement_amount',
-      render: (amount: number) => (
-        <span className={styles.amount}>¥{amount.toFixed(2)}</span>
-      ),
+      render: (amount: number) => <span className={styles.amount}>¥{amount.toFixed(2)}</span>,
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => {
-        const { color, text, icon } = statusMap[status] || { color: 'default', text: status, icon: null }
+        const { color, text, icon } = statusMap[status] || {
+          color: 'default',
+          text: status,
+          icon: null,
+        };
         return (
           <Tag color={color} icon={icon}>
             {text}
           </Tag>
-        )
+        );
       },
     },
     {
       title: '结算时间',
       dataIndex: 'settled_at',
       key: 'settled_at',
-      render: (date: string) => date ? new Date(date).toLocaleString('zh-CN') : '-',
+      render: (date: string) => (date ? new Date(date).toLocaleString('zh-CN') : '-'),
     },
     {
       title: '操作',
@@ -98,10 +106,14 @@ const MerchantSettlements = () => {
         </Button>
       ),
     },
-  ]
+  ];
 
-  const totalSettlements = settlements.filter(s => s.status === 'completed').reduce((sum, s) => sum + s.settlement_amount, 0)
-  const pendingSettlements = settlements.filter(s => s.status === 'pending' || s.status === 'processing').reduce((sum, s) => sum + s.settlement_amount, 0)
+  const totalSettlements = settlements
+    .filter((s) => s.status === 'completed')
+    .reduce((sum, s) => sum + s.settlement_amount, 0);
+  const pendingSettlements = settlements
+    .filter((s) => s.status === 'pending' || s.status === 'processing')
+    .reduce((sum, s) => sum + s.settlement_amount, 0);
 
   return (
     <div className={styles.settlements}>
@@ -167,7 +179,8 @@ const MerchantSettlements = () => {
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="结算周期" span={2}>
-              {new Date(selectedSettlement.period_start).toLocaleDateString('zh-CN')} - {new Date(selectedSettlement.period_end).toLocaleDateString('zh-CN')}
+              {new Date(selectedSettlement.period_start).toLocaleDateString('zh-CN')} -{' '}
+              {new Date(selectedSettlement.period_end).toLocaleDateString('zh-CN')}
             </Descriptions.Item>
             <Descriptions.Item label="销售总额">
               ¥{selectedSettlement.total_sales.toFixed(2)}
@@ -176,19 +189,23 @@ const MerchantSettlements = () => {
               ¥{selectedSettlement.platform_fee.toFixed(2)}
             </Descriptions.Item>
             <Descriptions.Item label="结算金额" span={2}>
-              <span className={styles.amount}>¥{selectedSettlement.settlement_amount.toFixed(2)}</span>
+              <span className={styles.amount}>
+                ¥{selectedSettlement.settlement_amount.toFixed(2)}
+              </span>
             </Descriptions.Item>
             <Descriptions.Item label="创建时间">
               {new Date(selectedSettlement.created_at).toLocaleString('zh-CN')}
             </Descriptions.Item>
             <Descriptions.Item label="结算时间">
-              {selectedSettlement.settled_at ? new Date(selectedSettlement.settled_at).toLocaleString('zh-CN') : '-'}
+              {selectedSettlement.settled_at
+                ? new Date(selectedSettlement.settled_at).toLocaleString('zh-CN')
+                : '-'}
             </Descriptions.Item>
           </Descriptions>
         )}
       </Modal>
     </div>
-  )
-}
+  );
+};
 
-export default MerchantSettlements
+export default MerchantSettlements;

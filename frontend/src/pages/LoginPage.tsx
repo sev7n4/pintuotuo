@@ -1,34 +1,34 @@
-import React, { useEffect } from 'react'
-import { Form, Input, Button, Card, message, Checkbox } from 'antd'
-import { useNavigate } from 'react-router-dom'
-import { useAuthStore } from '@stores/authStore'
+import React, { useEffect } from 'react';
+import { Form, Input, Button, Card, message, Checkbox } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@stores/authStore';
 
 export const LoginPage: React.FC = () => {
-  const navigate = useNavigate()
-  const { login, isLoading, user, isAuthenticated } = useAuthStore()
-  const [form] = Form.useForm()
+  const navigate = useNavigate();
+  const { login, isLoading, user, isAuthenticated } = useAuthStore();
+  const [form] = Form.useForm();
 
   const onFinish = async (values: { email: string; password: string; rememberMe?: boolean }) => {
     try {
-      await login(values.email, values.password, values.rememberMe || false)
-      message.success('登录成功')
+      await login(values.email, values.password, values.rememberMe || false);
+      message.success('登录成功');
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : '登录失败，请检查邮箱和密码'
-      message.error(errorMsg)
+      const errorMsg = err instanceof Error ? err.message : '登录失败，请检查邮箱和密码';
+      message.error(errorMsg);
     }
-  }
+  };
 
   useEffect(() => {
     if (isAuthenticated && user) {
       if (user.role === 'admin') {
-        navigate('/admin', { replace: true })
+        navigate('/admin', { replace: true });
       } else if (user.role === 'merchant') {
-        navigate('/merchant', { replace: true })
+        navigate('/merchant', { replace: true });
       } else {
-        navigate('/', { replace: true })
+        navigate('/', { replace: true });
       }
     }
-  }, [isAuthenticated, user, navigate])
+  }, [isAuthenticated, user, navigate]);
 
   return (
     <div className="auth-page">
@@ -78,7 +78,7 @@ export const LoginPage: React.FC = () => {
         </Form>
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default LoginPage
+export default LoginPage;

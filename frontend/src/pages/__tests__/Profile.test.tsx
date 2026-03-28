@@ -1,13 +1,13 @@
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
-import Profile from '../Profile'
-import { useAuthStore } from '@/stores/authStore'
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import Profile from '../Profile';
+import { useAuthStore } from '@/stores/authStore';
 
 // 模拟 useAuthStore
-jest.mock('@/stores/authStore')
+jest.mock('@/stores/authStore');
 
 // 模拟 CSS 模块
-jest.mock('../Profile.module.css', () => ({}))
+jest.mock('../Profile.module.css', () => ({}));
 
 // 模拟 message
 jest.mock('antd', () => ({
@@ -16,24 +16,24 @@ jest.mock('antd', () => ({
     success: jest.fn(),
     error: jest.fn(),
   },
-}))
+}));
 
-const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>
+const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>;
 
 describe('Profile Component', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
   test('renders Profile page with user info', () => {
     // 模拟 store 状态
     mockUseAuthStore.mockReturnValue({
-      user: { 
-        id: 1, 
-        email: 'user@example.com', 
+      user: {
+        id: 1,
+        email: 'user@example.com',
         name: '测试用户',
         phone: '13800138000',
-        role: 'user'
+        role: 'user',
       },
       token: 'test-token',
       isLoading: false,
@@ -45,31 +45,31 @@ describe('Profile Component', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter>
         <Profile />
       </MemoryRouter>
-    )
+    );
 
     // 检查页面元素
-    expect(screen.getByText('个人中心')).toBeInTheDocument()
-    expect(screen.getAllByText('测试用户').length).toBeGreaterThan(0)
-    expect(screen.getByText('user@example.com')).toBeInTheDocument()
-  })
+    expect(screen.getByText('个人中心')).toBeInTheDocument();
+    expect(screen.getAllByText('测试用户').length).toBeGreaterThan(0);
+    expect(screen.getByText('user@example.com')).toBeInTheDocument();
+  });
 
   test('handles logout', () => {
-    const mockLogout = jest.fn()
-    
+    const mockLogout = jest.fn();
+
     // 模拟 store 状态
     mockUseAuthStore.mockReturnValue({
-      user: { 
-        id: 1, 
-        email: 'user@example.com', 
+      user: {
+        id: 1,
+        email: 'user@example.com',
         name: '测试用户',
         phone: '13800138000',
-        role: 'user'
+        role: 'user',
       },
       token: 'test-token',
       isLoading: false,
@@ -81,17 +81,17 @@ describe('Profile Component', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter>
         <Profile />
       </MemoryRouter>
-    )
+    );
 
     // 验证登出函数被调用
-    expect(mockLogout).toBeDefined()
-  })
+    expect(mockLogout).toBeDefined();
+  });
 
   test('renders correctly when not authenticated', () => {
     // 模拟未认证状态
@@ -107,17 +107,17 @@ describe('Profile Component', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter>
         <Profile />
       </MemoryRouter>
-    )
+    );
 
     // 检查页面是否提示登录
-    expect(screen.getByText('个人中心')).toBeInTheDocument()
-  })
+    expect(screen.getByText('个人中心')).toBeInTheDocument();
+  });
 
   test('shows loading state when fetching user', () => {
     // 模拟加载状态
@@ -133,15 +133,15 @@ describe('Profile Component', () => {
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    })
+    });
 
     render(
       <MemoryRouter>
         <Profile />
       </MemoryRouter>
-    )
+    );
 
     // 检查加载状态
-    expect(screen.getByText('个人中心')).toBeInTheDocument()
-  })
-})
+    expect(screen.getByText('个人中心')).toBeInTheDocument();
+  });
+});

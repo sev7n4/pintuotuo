@@ -1,5 +1,5 @@
-import { render, screen, act } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { render, screen, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 jest.mock('@/stores/merchantStore', () => ({
   useMerchantStore: jest.fn(() => ({
@@ -19,25 +19,25 @@ jest.mock('@/stores/merchantStore', () => ({
     updateProfile: jest.fn(),
     isLoading: false,
   })),
-}))
+}));
 
 jest.mock('@/stores/authStore', () => ({
   useAuthStore: jest.fn(() => ({
     user: { id: 1, name: 'Test Merchant', role: 'merchant' },
   })),
-}))
+}));
 
 jest.mock('@/services/api', () => ({
   default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() },
-}))
+}));
 
 describe('MerchantSettings', () => {
-  let MerchantSettings: React.FC
+  let MerchantSettings: React.FC;
 
   beforeEach(async () => {
-    jest.clearAllMocks()
-    MerchantSettings = (await import('../MerchantSettings')).default
-  })
+    jest.clearAllMocks();
+    MerchantSettings = (await import('../MerchantSettings')).default;
+  });
 
   it('renders settings page with title', async () => {
     await act(async () => {
@@ -45,10 +45,10 @@ describe('MerchantSettings', () => {
         <MemoryRouter>
           <MerchantSettings />
         </MemoryRouter>
-      )
-    })
-    expect(screen.getByText('店铺设置')).toBeInTheDocument()
-  })
+      );
+    });
+    expect(screen.getByText('店铺设置')).toBeInTheDocument();
+  });
 
   it('displays company name field', async () => {
     await act(async () => {
@@ -56,10 +56,10 @@ describe('MerchantSettings', () => {
         <MemoryRouter>
           <MerchantSettings />
         </MemoryRouter>
-      )
-    })
-    expect(screen.getByText('公司名称')).toBeInTheDocument()
-  })
+      );
+    });
+    expect(screen.getByText('公司名称')).toBeInTheDocument();
+  });
 
   it('displays save button', async () => {
     await act(async () => {
@@ -67,10 +67,10 @@ describe('MerchantSettings', () => {
         <MemoryRouter>
           <MerchantSettings />
         </MemoryRouter>
-      )
-    })
-    expect(screen.getByText('保存设置')).toBeInTheDocument()
-  })
+      );
+    });
+    expect(screen.getByText('保存设置')).toBeInTheDocument();
+  });
 
   it('displays upload logo button', async () => {
     await act(async () => {
@@ -78,10 +78,10 @@ describe('MerchantSettings', () => {
         <MemoryRouter>
           <MerchantSettings />
         </MemoryRouter>
-      )
-    })
-    expect(screen.getByText('更换Logo')).toBeInTheDocument()
-  })
+      );
+    });
+    expect(screen.getByText('更换Logo')).toBeInTheDocument();
+  });
 
   it('displays certification status card', async () => {
     await act(async () => {
@@ -89,9 +89,9 @@ describe('MerchantSettings', () => {
         <MemoryRouter>
           <MerchantSettings />
         </MemoryRouter>
-      )
-    })
-    expect(screen.getByText('认证状态')).toBeInTheDocument()
-    expect(screen.getByText('已认证')).toBeInTheDocument()
-  })
-})
+      );
+    });
+    expect(screen.getByText('认证状态')).toBeInTheDocument();
+    expect(screen.getByText('已认证')).toBeInTheDocument();
+  });
+});

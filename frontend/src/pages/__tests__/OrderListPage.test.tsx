@@ -1,14 +1,14 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
-import { MemoryRouter, useNavigate } from 'react-router-dom'
-import OrderListPage from '../OrderListPage'
-import { useOrderStore } from '@/stores/orderStore'
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
+import OrderListPage from '../OrderListPage';
+import { useOrderStore } from '@/stores/orderStore';
 
-jest.mock('@/stores/orderStore')
+jest.mock('@/stores/orderStore');
 
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: jest.fn(),
-}))
+}));
 
 jest.mock('antd', () => ({
   ...jest.requireActual('antd'),
@@ -30,8 +30,8 @@ jest.mock('antd', () => ({
     </div>
   )),
   Button: jest.fn(({ type, children, onClick, disabled }) => (
-    <button 
-      data-testid="button" 
+    <button
+      data-testid="button"
       onClick={onClick}
       disabled={disabled}
       className={type === 'link' ? 'link' : ''}
@@ -39,29 +39,31 @@ jest.mock('antd', () => ({
       {children}
     </button>
   )),
-  Space: jest.fn(({ children }) => (
-    <div data-testid="space">
-      {children}
-    </div>
-  )),
+  Space: jest.fn(({ children }) => <div data-testid="space">{children}</div>),
   Tag: jest.fn(({ color, children }) => (
     <span data-testid="tag" style={{ color }}>
       {children}
     </span>
   )),
-  Empty: jest.fn(({ description }) => (
-    <div data-testid="empty">
-      {description}
-    </div>
-  )),
+  Empty: jest.fn(({ description }) => <div data-testid="empty">{description}</div>),
   Spin: jest.fn(({ spinning, children }) => (
     <div data-testid="spin" data-spinning={spinning}>
       {children}
     </div>
   )),
-  Modal: jest.fn(({ title, open, onCancel }) => (
+  Modal: jest.fn(({ title, open, onCancel }) =>
     open ? (
-      <div data-testid="modal" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)' }}>
+      <div
+        data-testid="modal"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0,0,0,0.5)',
+        }}
+      >
         <div style={{ background: 'white', margin: '50px auto', padding: '20px', width: '500px' }}>
           <h2>{title}</h2>
           <div data-testid="descriptions">
@@ -74,23 +76,25 @@ jest.mock('antd', () => ({
             <div data-testid="description-item">创建时间: 2026-03-19 08:00:00</div>
             <div data-testid="description-item">分组ID: -</div>
           </div>
-          <button onClick={onCancel} data-testid="modal-cancel">关闭</button>
+          <button onClick={onCancel} data-testid="modal-cancel">
+            关闭
+          </button>
         </div>
       </div>
     ) : null
-  )),
-}))
+  ),
+}));
 
-const mockUseOrderStore = useOrderStore as jest.MockedFunction<typeof useOrderStore>
-const mockUseNavigate = useNavigate as jest.MockedFunction<typeof useNavigate>
+const mockUseOrderStore = useOrderStore as jest.MockedFunction<typeof useOrderStore>;
+const mockUseNavigate = useNavigate as jest.MockedFunction<typeof useNavigate>;
 
 describe('OrderListPage Component', () => {
-  const mockNavigate = jest.fn()
-  
+  const mockNavigate = jest.fn();
+
   beforeEach(() => {
-    jest.clearAllMocks()
-    mockUseNavigate.mockReturnValue(mockNavigate)
-  })
+    jest.clearAllMocks();
+    mockUseNavigate.mockReturnValue(mockNavigate);
+  });
 
   test('renders OrderListPage with title', async () => {
     const mockOrders = [
@@ -103,7 +107,7 @@ describe('OrderListPage Component', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -117,18 +121,18 @@ describe('OrderListPage Component', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.getByText('订单列表')).toBeInTheDocument()
-  })
+    expect(screen.getByText('订单列表')).toBeInTheDocument();
+  });
 
   test('shows loading state when fetching orders', async () => {
     const mockOrders = [
@@ -141,7 +145,7 @@ describe('OrderListPage Component', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -155,18 +159,18 @@ describe('OrderListPage Component', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.getByTestId('spin')).toBeInTheDocument()
-  })
+    expect(screen.getByTestId('spin')).toBeInTheDocument();
+  });
 
   test('shows error message when there is an error', async () => {
     mockUseOrderStore.mockReturnValue({
@@ -181,18 +185,18 @@ describe('OrderListPage Component', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.getByText('错误: 加载失败')).toBeInTheDocument()
-  })
+    expect(screen.getByText('错误: 加载失败')).toBeInTheDocument();
+  });
 
   test('shows empty state when no orders', async () => {
     mockUseOrderStore.mockReturnValue({
@@ -207,18 +211,18 @@ describe('OrderListPage Component', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.getByText('暂无订单')).toBeInTheDocument()
-  })
+    expect(screen.getByText('暂无订单')).toBeInTheDocument();
+  });
 
   test('renders orders list when orders exist', async () => {
     const mockOrders = [
@@ -240,7 +244,7 @@ describe('OrderListPage Component', () => {
         created_at: '2026-03-18T00:00:00Z',
         group_id: 5,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -254,20 +258,20 @@ describe('OrderListPage Component', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.getByTestId('order-table')).toBeInTheDocument()
-    expect(screen.getByTestId('order-1')).toBeInTheDocument()
-    expect(screen.getByTestId('order-2')).toBeInTheDocument()
-  })
+    expect(screen.getByTestId('order-table')).toBeInTheDocument();
+    expect(screen.getByTestId('order-1')).toBeInTheDocument();
+    expect(screen.getByTestId('order-2')).toBeInTheDocument();
+  });
 
   test('opens order detail modal', async () => {
     const mockOrders = [
@@ -280,7 +284,7 @@ describe('OrderListPage Component', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -294,24 +298,24 @@ describe('OrderListPage Component', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    const detailButton = screen.getByText('详情')
+    const detailButton = screen.getByText('详情');
     await act(async () => {
-      fireEvent.click(detailButton)
-    })
+      fireEvent.click(detailButton);
+    });
 
-    expect(screen.getByTestId('modal')).toBeInTheDocument()
-    expect(screen.getByText('订单详情 #1')).toBeInTheDocument()
-  })
+    expect(screen.getByTestId('modal')).toBeInTheDocument();
+    expect(screen.getByText('订单详情 #1')).toBeInTheDocument();
+  });
 
   test('closes order detail modal', async () => {
     const mockOrders = [
@@ -324,7 +328,7 @@ describe('OrderListPage Component', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -338,28 +342,28 @@ describe('OrderListPage Component', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    const detailButton = screen.getByText('详情')
+    const detailButton = screen.getByText('详情');
     await act(async () => {
-      fireEvent.click(detailButton)
-    })
+      fireEvent.click(detailButton);
+    });
 
-    const closeButton = screen.getByTestId('modal-cancel')
+    const closeButton = screen.getByTestId('modal-cancel');
     await act(async () => {
-      fireEvent.click(closeButton)
-    })
+      fireEvent.click(closeButton);
+    });
 
-    expect(screen.queryByTestId('modal')).not.toBeInTheDocument()
-  })
+    expect(screen.queryByTestId('modal')).not.toBeInTheDocument();
+  });
 
   test('navigates to payment page for pending orders', async () => {
     const mockOrders = [
@@ -372,7 +376,7 @@ describe('OrderListPage Component', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -386,23 +390,23 @@ describe('OrderListPage Component', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    const payButton = screen.getByText('支付')
+    const payButton = screen.getByText('支付');
     await act(async () => {
-      fireEvent.click(payButton)
-    })
+      fireEvent.click(payButton);
+    });
 
-    expect(mockNavigate).toHaveBeenCalledWith('/payment/1')
-  })
+    expect(mockNavigate).toHaveBeenCalledWith('/payment/1');
+  });
 
   test('does not show pay button for non-pending orders', async () => {
     const mockOrders = [
@@ -415,7 +419,7 @@ describe('OrderListPage Component', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -429,26 +433,26 @@ describe('OrderListPage Component', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.queryByText('支付')).not.toBeInTheDocument()
-  })
-})
+    expect(screen.queryByText('支付')).not.toBeInTheDocument();
+  });
+});
 
 describe('TC-ORDER-001: 取消待支付订单', () => {
   test('should allow cancellation for pending orders', async () => {
     const mockCancelOrder = jest.fn().mockResolvedValue({
       id: 1,
       status: 'cancelled',
-    })
+    });
 
     const mockOrders = [
       {
@@ -460,7 +464,7 @@ describe('TC-ORDER-001: 取消待支付订单', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -474,20 +478,20 @@ describe('TC-ORDER-001: 取消待支付订单', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    const cancelButton = screen.queryByText('取消')
-    expect(cancelButton).toBeInTheDocument()
-  })
-})
+    const cancelButton = screen.queryByText('取消');
+    expect(cancelButton).toBeInTheDocument();
+  });
+});
 
 describe('TC-ORDER-002: 取消已支付订单(申请退款)', () => {
   test('should show refund option for paid orders', async () => {
@@ -501,7 +505,7 @@ describe('TC-ORDER-002: 取消已支付订单(申请退款)', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -515,19 +519,19 @@ describe('TC-ORDER-002: 取消已支付订单(申请退款)', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.getByText('详情')).toBeInTheDocument()
-  })
-})
+    expect(screen.getByText('详情')).toBeInTheDocument();
+  });
+});
 
 describe('TC-ORDER-003: 退款状态跟踪', () => {
   test('should display refunding status correctly', async () => {
@@ -541,7 +545,7 @@ describe('TC-ORDER-003: 退款状态跟踪', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -555,19 +559,19 @@ describe('TC-ORDER-003: 退款状态跟踪', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.getByTestId('order-table')).toBeInTheDocument()
-  })
-})
+    expect(screen.getByTestId('order-table')).toBeInTheDocument();
+  });
+});
 
 describe('TC-ORDER-004: 已完成订单不可取消', () => {
   test('should not show cancel button for completed orders', async () => {
@@ -581,7 +585,7 @@ describe('TC-ORDER-004: 已完成订单不可取消', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -595,20 +599,20 @@ describe('TC-ORDER-004: 已完成订单不可取消', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.queryByText('取消')).not.toBeInTheDocument()
-    expect(screen.queryByText('支付')).not.toBeInTheDocument()
-  })
-})
+    expect(screen.queryByText('取消')).not.toBeInTheDocument();
+    expect(screen.queryByText('支付')).not.toBeInTheDocument();
+  });
+});
 
 describe('TC-ORDER-005: 订单状态显示', () => {
   test('should display correct status label for pending orders', async () => {
@@ -622,7 +626,7 @@ describe('TC-ORDER-005: 订单状态显示', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -636,18 +640,18 @@ describe('TC-ORDER-005: 订单状态显示', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.getByText('待支付')).toBeInTheDocument()
-  })
+    expect(screen.getByText('待支付')).toBeInTheDocument();
+  });
 
   test('should display correct status label for paid orders', async () => {
     const mockOrders = [
@@ -660,7 +664,7 @@ describe('TC-ORDER-005: 订单状态显示', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -674,18 +678,18 @@ describe('TC-ORDER-005: 订单状态显示', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.getByText('已支付')).toBeInTheDocument()
-  })
+    expect(screen.getByText('已支付')).toBeInTheDocument();
+  });
 
   test('should display correct status label for cancelled orders', async () => {
     const mockOrders = [
@@ -698,7 +702,7 @@ describe('TC-ORDER-005: 订单状态显示', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -712,19 +716,19 @@ describe('TC-ORDER-005: 订单状态显示', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    expect(screen.getByText('已取消')).toBeInTheDocument()
-  })
-})
+    expect(screen.getByText('已取消')).toBeInTheDocument();
+  });
+});
 
 describe('TC-ORDER-006: 订单详情完整性', () => {
   test('should display all order details in modal', async () => {
@@ -738,7 +742,7 @@ describe('TC-ORDER-006: 订单详情完整性', () => {
         created_at: '2026-03-19T00:00:00Z',
         group_id: null,
       },
-    ]
+    ];
 
     mockUseOrderStore.mockReturnValue({
       orders: mockOrders,
@@ -752,22 +756,22 @@ describe('TC-ORDER-006: 订单详情完整性', () => {
       requestRefund: jest.fn(),
       clearError: jest.fn(),
       currentOrder: null,
-    })
+    });
 
     await act(async () => {
       render(
         <MemoryRouter>
           <OrderListPage />
         </MemoryRouter>
-      )
-    })
+      );
+    });
 
-    const detailButton = screen.getByText('详情')
+    const detailButton = screen.getByText('详情');
     await act(async () => {
-      fireEvent.click(detailButton)
-    })
+      fireEvent.click(detailButton);
+    });
 
-    expect(screen.getByTestId('descriptions')).toBeInTheDocument()
-    expect(screen.getByTestId('modal')).toBeInTheDocument()
-  })
-})
+    expect(screen.getByTestId('descriptions')).toBeInTheDocument();
+    expect(screen.getByTestId('modal')).toBeInTheDocument();
+  });
+});

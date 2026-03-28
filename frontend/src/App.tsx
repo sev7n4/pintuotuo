@@ -1,53 +1,55 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { ConfigProvider } from 'antd'
-import zhCN from 'antd/locale/zh_CN'
-import Layout from '@components/Layout'
-import MerchantLayout from '@layouts/MerchantLayout'
-import AdminLayout from '@layouts/AdminLayout'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ConfigProvider } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
+import Layout from '@components/Layout';
+import MerchantLayout from '@layouts/MerchantLayout';
+import AdminLayout from '@layouts/AdminLayout';
 
 // Pages
-import LoginPage from '@pages/LoginPage'
-import RegisterPage from '@pages/RegisterPage'
-import HomePage from '@pages/HomePage'
-import ProductListPage from '@pages/ProductListPage'
-import ProductDetailPage from '@pages/ProductDetailPage'
-import CartPage from '@pages/CartPage'
-import CheckoutPage from '@pages/CheckoutPage'
-import OrderListPage from '@pages/OrderListPage'
-import OrderDetailPage from '@pages/OrderDetailPage'
-import PaymentPage from '@pages/PaymentPage'
-import GroupListPage from '@pages/GroupListPage'
-import GroupProgressPage from '@pages/GroupProgressPage'
-import ReferralPage from '@pages/ReferralPage'
-import MyToken from '@pages/MyToken'
-import Profile from '@pages/Profile'
-import Consumption from '@pages/Consumption'
-import HelpCenterPage from '@pages/HelpCenterPage'
-import AboutPage from '@pages/AboutPage'
-import UserAgreementPage from '@pages/UserAgreementPage'
-import PrivacyPolicyPage from '@pages/PrivacyPolicyPage'
-import MyPage from '@pages/MyPage'
-import CategoryPage from '@pages/CategoryPage'
+import LoginPage from '@pages/LoginPage';
+import RegisterPage from '@pages/RegisterPage';
+import HomePage from '@pages/HomePage';
+import ProductListPage from '@pages/ProductListPage';
+import ProductDetailPage from '@pages/ProductDetailPage';
+import CartPage from '@pages/CartPage';
+import CheckoutPage from '@pages/CheckoutPage';
+import OrderListPage from '@pages/OrderListPage';
+import OrderDetailPage from '@pages/OrderDetailPage';
+import PaymentPage from '@pages/PaymentPage';
+import GroupListPage from '@pages/GroupListPage';
+import GroupProgressPage from '@pages/GroupProgressPage';
+import ReferralPage from '@pages/ReferralPage';
+import MyToken from '@pages/MyToken';
+import Profile from '@pages/Profile';
+import Consumption from '@pages/Consumption';
+import HelpCenterPage from '@pages/HelpCenterPage';
+import AboutPage from '@pages/AboutPage';
+import UserAgreementPage from '@pages/UserAgreementPage';
+import PrivacyPolicyPage from '@pages/PrivacyPolicyPage';
+import MyPage from '@pages/MyPage';
+import CategoryPage from '@pages/CategoryPage';
+import FavoritesPage from '@pages/FavoritesPage';
+import HistoryPage from '@pages/HistoryPage';
 
 // Merchant Pages
-import MerchantDashboard from '@pages/merchant/MerchantDashboard'
-import MerchantProducts from '@pages/merchant/MerchantProducts'
-import MerchantOrders from '@pages/merchant/MerchantOrders'
-import MerchantSettings from '@pages/merchant/MerchantSettings'
-import MerchantAPIKeys from '@pages/merchant/MerchantAPIKeys'
-import MerchantSettlements from '@pages/merchant/MerchantSettlements'
-import MerchantAnalytics from '@pages/merchant/MerchantAnalytics'
-import MerchantMarketing from '@pages/merchant/MerchantMarketing'
-import MerchantBills from '@pages/merchant/MerchantBills'
-import MerchantInvoices from '@pages/merchant/MerchantInvoices'
+import MerchantDashboard from '@pages/merchant/MerchantDashboard';
+import MerchantProducts from '@pages/merchant/MerchantProducts';
+import MerchantOrders from '@pages/merchant/MerchantOrders';
+import MerchantSettings from '@pages/merchant/MerchantSettings';
+import MerchantAPIKeys from '@pages/merchant/MerchantAPIKeys';
+import MerchantSettlements from '@pages/merchant/MerchantSettlements';
+import MerchantAnalytics from '@pages/merchant/MerchantAnalytics';
+import MerchantMarketing from '@pages/merchant/MerchantMarketing';
+import MerchantBills from '@pages/merchant/MerchantBills';
+import MerchantInvoices from '@pages/merchant/MerchantInvoices';
 
 // Admin Pages
-import AdminDashboard from '@pages/admin/AdminDashboard'
-import AdminUsers from '@pages/admin/AdminUsers'
-import AdminMerchants from '@pages/admin/AdminMerchants'
-import AdminProducts from '@pages/admin/AdminProducts'
-import AdminOrders from '@pages/admin/AdminOrders'
-import AdminSettings from '@pages/admin/AdminSettings'
+import AdminDashboard from '@pages/admin/AdminDashboard';
+import AdminUsers from '@pages/admin/AdminUsers';
+import AdminMerchants from '@pages/admin/AdminMerchants';
+import AdminProducts from '@pages/admin/AdminProducts';
+import AdminOrders from '@pages/admin/AdminOrders';
+import AdminSettings from '@pages/admin/AdminSettings';
 
 function App() {
   return (
@@ -97,6 +99,12 @@ function App() {
             {/* My Page */}
             <Route path="/my" element={<MyPage />} />
 
+            {/* Favorites */}
+            <Route path="/favorites" element={<FavoritesPage />} />
+
+            {/* Browse History */}
+            <Route path="/history" element={<HistoryPage />} />
+
             {/* Static Pages */}
             <Route path="/help" element={<HelpCenterPage />} />
             <Route path="/about" element={<AboutPage />} />
@@ -133,7 +141,7 @@ function App() {
         </Routes>
       </BrowserRouter>
     </ConfigProvider>
-  )
+  );
 }
 
-export default App
+export default App;

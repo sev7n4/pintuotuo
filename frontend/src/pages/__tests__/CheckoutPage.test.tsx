@@ -1,10 +1,10 @@
-import { render, screen, fireEvent, act } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
-import { useCartStore } from '@/stores/cartStore'
-import { useOrderStore } from '@/stores/orderStore'
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { useCartStore } from '@/stores/cartStore';
+import { useOrderStore } from '@/stores/orderStore';
 
-jest.mock('@/stores/cartStore')
-jest.mock('@/stores/orderStore')
+jest.mock('@/stores/cartStore');
+jest.mock('@/stores/orderStore');
 jest.mock('@/services/api', () => ({
   default: {
     get: jest.fn(),
@@ -12,12 +12,12 @@ jest.mock('@/services/api', () => ({
     put: jest.fn(),
     delete: jest.fn(),
   },
-}))
+}));
 
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: jest.fn(),
-}))
+}));
 
 jest.mock('antd', () => ({
   ...jest.requireActual('antd'),
@@ -26,11 +26,11 @@ jest.mock('antd', () => ({
     success: jest.fn(),
     error: jest.fn(),
   },
-}))
+}));
 
-const mockNavigate = jest.fn()
-const mockClear = jest.fn()
-const mockCreateOrder = jest.fn()
+const mockNavigate = jest.fn();
+const mockClear = jest.fn();
+const mockCreateOrder = jest.fn();
 
 const mockCartItems = [
   {
@@ -71,87 +71,87 @@ const mockCartItems = [
       updated_at: '2024-01-01',
     },
   },
-]
+];
 
 describe('CheckoutPage', () => {
-  let CheckoutPage: React.FC
-  
+  let CheckoutPage: React.FC;
+
   beforeEach(() => {
-    jest.clearAllMocks()
-    ;(require('react-router-dom').useNavigate as jest.Mock).mockReturnValue(mockNavigate)
-    ;(useCartStore as unknown as jest.Mock).mockReturnValue({
+    jest.clearAllMocks();
+    (require('react-router-dom').useNavigate as jest.Mock).mockReturnValue(mockNavigate);
+    (useCartStore as unknown as jest.Mock).mockReturnValue({
       items: mockCartItems,
       clear: mockClear,
-    })
-    ;(useOrderStore as unknown as jest.Mock).mockReturnValue({
+    });
+    (useOrderStore as unknown as jest.Mock).mockReturnValue({
       createOrder: mockCreateOrder,
       isLoading: false,
-    })
-    
-    CheckoutPage = require('../CheckoutPage').default
-  })
+    });
+
+    CheckoutPage = require('../CheckoutPage').default;
+  });
 
   it('renders empty state when cart is empty', () => {
     (useCartStore as unknown as jest.Mock).mockReturnValue({
       items: [],
       clear: mockClear,
-    })
+    });
 
     render(
       <MemoryRouter>
         <CheckoutPage />
       </MemoryRouter>
-    )
+    );
 
-    expect(screen.getByText('购物车是空的')).toBeInTheDocument()
-  })
+    expect(screen.getByText('购物车是空的')).toBeInTheDocument();
+  });
 
   it('renders checkout page with cart items', () => {
     render(
       <MemoryRouter>
         <CheckoutPage />
       </MemoryRouter>
-    )
+    );
 
-    expect(screen.getByText('确认订单')).toBeInTheDocument()
-  })
+    expect(screen.getByText('确认订单')).toBeInTheDocument();
+  });
 
   it('navigates to products page when clicking "去购物" button', () => {
     (useCartStore as unknown as jest.Mock).mockReturnValue({
       items: [],
       clear: mockClear,
-    })
+    });
 
     render(
       <MemoryRouter>
         <CheckoutPage />
       </MemoryRouter>
-    )
+    );
 
-    const goShoppingButton = screen.getByRole('button', { name: /去购物/i })
-    fireEvent.click(goShoppingButton)
+    const goShoppingButton = screen.getByRole('button', { name: /去购物/i });
+    fireEvent.click(goShoppingButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/products')
-  })
+    expect(mockNavigate).toHaveBeenCalledWith('/products');
+  });
 
   it('calls createOrder and clears cart on successful checkout', async () => {
-    mockCreateOrder.mockResolvedValue({ id: 1 })
+    mockCreateOrder.mockResolvedValue({ id: 1 });
 
     render(
       <MemoryRouter>
         <CheckoutPage />
       </MemoryRouter>
-    )
+    );
 
-    const submitButtons = screen.getAllByRole('button')
-    const submitButton = submitButtons.find(btn => btn.textContent?.includes('提交订单'))
-    
+    const submitButtons = screen.getAllByRole('button');
+    const submitButton = submitButtons.find((btn) => btn.textContent?.includes('提交订单'));
+
     if (submitButton) {
       await act(async () => {
-        fireEvent.click(submitButton)
-      })
+        fireEvent.click(submitButton);
+      });
     }
 
-    expect(mockCreateOrder).toHaveBeenCalled()
-  })
-})
+    expect(mockCreateOrder).toHaveBeenCalled();
+  });
+});

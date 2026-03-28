@@ -1,81 +1,106 @@
-import { useEffect, useState } from 'react'
-import { Card, Form, Input, Button, Avatar, message, Descriptions, Tag, Space, Divider, Modal, Tabs, Row, Col, Statistic } from 'antd'
-import { UserOutlined, MailOutlined, PhoneOutlined, EditOutlined, SafetyOutlined, TrophyOutlined } from '@ant-design/icons'
-import { useAuthStore } from '@/stores/authStore'
-import { userService } from '@/services/user'
-import styles from './Profile.module.css'
+import { useEffect, useState } from 'react';
+import {
+  Card,
+  Form,
+  Input,
+  Button,
+  Avatar,
+  message,
+  Descriptions,
+  Tag,
+  Space,
+  Divider,
+  Modal,
+  Tabs,
+  Row,
+  Col,
+  Statistic,
+} from 'antd';
+import {
+  UserOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  EditOutlined,
+  SafetyOutlined,
+  TrophyOutlined,
+} from '@ant-design/icons';
+import { useAuthStore } from '@/stores/authStore';
+import { userService } from '@/services/user';
+import styles from './Profile.module.css';
 
 const Profile = () => {
-  const { user, setUser } = useAuthStore()
-  const [isEditing, setIsEditing] = useState(false)
-  const [passwordModalVisible, setPasswordModalVisible] = useState(false)
-  const [form] = Form.useForm()
-  const [passwordForm] = Form.useForm()
-  const [loading, setLoading] = useState(false)
+  const { user, setUser } = useAuthStore();
+  const [isEditing, setIsEditing] = useState(false);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [form] = Form.useForm();
+  const [passwordForm] = Form.useForm();
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
       form.setFieldsValue({
         name: user.name,
         email: user.email,
-      })
+      });
     }
-  }, [user, form])
+  }, [user, form]);
 
   const handleUpdateProfile = async () => {
     try {
-      const values = await form.validateFields()
-      setLoading(true)
-      const response = await userService.updateCurrentUser(values)
+      const values = await form.validateFields();
+      setLoading(true);
+      const response = await userService.updateCurrentUser(values);
       if (response.data?.data) {
-        setUser(response.data.data)
-        message.success('个人信息更新成功')
-        setIsEditing(false)
+        setUser(response.data.data);
+        message.success('个人信息更新成功');
+        setIsEditing(false);
       }
     } catch {
-      message.error('更新失败')
+      message.error('更新失败');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleChangePassword = async () => {
     try {
-      const values = await passwordForm.validateFields()
+      const values = await passwordForm.validateFields();
       if (values.newPassword !== values.confirmPassword) {
-        message.error('两次输入的密码不一致')
-        return
+        message.error('两次输入的密码不一致');
+        return;
       }
-      setLoading(true)
-      message.success('密码修改成功')
-      setPasswordModalVisible(false)
-      passwordForm.resetFields()
+      setLoading(true);
+      message.success('密码修改成功');
+      setPasswordModalVisible(false);
+      passwordForm.resetFields();
     } catch {
-      message.error('修改失败')
+      message.error('修改失败');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const getRoleTag = (role: string) => {
     const roleMap: Record<string, { color: string; text: string }> = {
       user: { color: 'blue', text: '普通用户' },
       merchant: { color: 'green', text: '商家' },
       admin: { color: 'red', text: '管理员' },
-    }
-    const { color, text } = roleMap[role] || { color: 'default', text: role }
-    return <Tag color={color}>{text}</Tag>
-  }
+    };
+    const { color, text } = roleMap[role] || { color: 'default', text: role };
+    return <Tag color={color}>{text}</Tag>;
+  };
 
   const getUserLevel = (createdAt: string) => {
-    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))
-    if (days < 30) return { level: 1, name: '新用户', progress: days / 30 * 100 }
-    if (days < 90) return { level: 2, name: '活跃用户', progress: (days - 30) / 60 * 100 }
-    if (days < 180) return { level: 3, name: '忠诚用户', progress: (days - 90) / 90 * 100 }
-    return { level: 4, name: '资深用户', progress: 100 }
-  }
+    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24));
+    if (days < 30) return { level: 1, name: '新用户', progress: (days / 30) * 100 };
+    if (days < 90) return { level: 2, name: '活跃用户', progress: ((days - 30) / 60) * 100 };
+    if (days < 180) return { level: 3, name: '忠诚用户', progress: ((days - 90) / 90) * 100 };
+    return { level: 4, name: '资深用户', progress: 100 };
+  };
 
-  const userLevel = user ? getUserLevel(user.created_at) : { level: 1, name: '新用户', progress: 0 }
+  const userLevel = user
+    ? getUserLevel(user.created_at)
+    : { level: 1, name: '新用户', progress: 0 };
 
   return (
     <div className={styles.profile}>
@@ -98,7 +123,14 @@ const Profile = () => {
             <div className={styles.statsSection}>
               <Row gutter={16}>
                 <Col span={12}>
-                  <Statistic title="注册天数" value={Math.floor((Date.now() - new Date(user?.created_at || Date.now()).getTime()) / (1000 * 60 * 60 * 24))} suffix="天" />
+                  <Statistic
+                    title="注册天数"
+                    value={Math.floor(
+                      (Date.now() - new Date(user?.created_at || Date.now()).getTime()) /
+                        (1000 * 60 * 60 * 24)
+                    )}
+                    suffix="天"
+                  />
                 </Col>
                 <Col span={12}>
                   <Statistic title="用户等级" value={userLevel.level} prefix="Lv." />
@@ -143,7 +175,11 @@ const Profile = () => {
                   <div className={styles.infoSection}>
                     <div className={styles.infoHeader}>
                       <h3>账户信息</h3>
-                      <Button type="link" icon={<EditOutlined />} onClick={() => setIsEditing(true)}>
+                      <Button
+                        type="link"
+                        icon={<EditOutlined />}
+                        onClick={() => setIsEditing(true)}
+                      >
                         编辑
                       </Button>
                     </div>
@@ -154,7 +190,9 @@ const Profile = () => {
                         <span>{user && getRoleTag(user.role)}</span>
                       </Descriptions.Item>
                       <Descriptions.Item label="注册时间">
-                        {user?.created_at ? new Date(user.created_at).toLocaleDateString('zh-CN') : '-'}
+                        {user?.created_at
+                          ? new Date(user.created_at).toLocaleDateString('zh-CN')
+                          : '-'}
                       </Descriptions.Item>
                     </Descriptions>
                   </div>
@@ -187,8 +225,8 @@ const Profile = () => {
         open={passwordModalVisible}
         onOk={handleChangePassword}
         onCancel={() => {
-          setPasswordModalVisible(false)
-          passwordForm.resetFields()
+          setPasswordModalVisible(false);
+          passwordForm.resetFields();
         }}
         okText="确认修改"
         cancelText="取消"
@@ -222,7 +260,7 @@ const Profile = () => {
         </Form>
       </Modal>
     </div>
-  )
-}
+  );
+};
 
-export default Profile
+export default Profile;

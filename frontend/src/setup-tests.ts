@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom';
 
 // Mock import.meta.env
 const mockEnv = {
@@ -7,12 +7,12 @@ const mockEnv = {
   DEV: false,
   PROD: false,
   SSR: false,
-}
+};
 
-;(globalThis as any).importMeta = {
+(globalThis as any).importMeta = {
   env: mockEnv,
   glob: jest.fn(),
-}
+};
 
 Object.defineProperty(globalThis, 'importMeta', {
   value: {
@@ -20,12 +20,12 @@ Object.defineProperty(globalThis, 'importMeta', {
     glob: jest.fn(),
   },
   writable: true,
-})
+});
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: jest.fn().mockImplementation(query => ({
+  value: jest.fn().mockImplementation((query) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -35,22 +35,22 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: jest.fn(),
     dispatchEvent: jest.fn(),
   })),
-})
+});
 
 // Suppress console errors in tests (optional)
-const originalError = console.error
+const originalError = console.error;
 beforeAll(() => {
   console.error = (...args: any[]) => {
     if (
       typeof args[0] === 'string' &&
       args[0].includes('Not implemented: HTMLFormElement.prototype.submit')
     ) {
-      return
+      return;
     }
-    originalError.call(console, ...args)
-  }
-})
+    originalError.call(console, ...args);
+  };
+});
 
 afterAll(() => {
-  console.error = originalError
-})
+  console.error = originalError;
+});

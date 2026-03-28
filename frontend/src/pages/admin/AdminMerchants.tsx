@@ -1,35 +1,35 @@
-import { useEffect, useState } from 'react'
-import { Card, Table, Button, Tag, Space, Modal, message, Typography } from 'antd'
-import { CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons'
-import { adminMerchantService, PendingMerchant } from '@/services/adminMerchant'
+import { useEffect, useState } from 'react';
+import { Card, Table, Button, Tag, Space, Modal, message, Typography } from 'antd';
+import { CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons';
+import { adminMerchantService, PendingMerchant } from '@/services/adminMerchant';
 
-const { Title } = Typography
+const { Title } = Typography;
 
 const AdminMerchants = () => {
-  const [merchants, setMerchants] = useState<PendingMerchant[]>([])
-  const [loading, setLoading] = useState(false)
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
+  const [merchants, setMerchants] = useState<PendingMerchant[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 });
 
   const fetchMerchants = async (page = 1) => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await adminMerchantService.getPendingMerchants(page, pagination.pageSize)
-      setMerchants(response.data.data)
+      const response = await adminMerchantService.getPendingMerchants(page, pagination.pageSize);
+      setMerchants(response.data.data);
       setPagination({
         ...pagination,
         current: page,
         total: response.data.total,
-      })
+      });
     } catch (error) {
-      message.error('获取商户列表失败')
+      message.error('获取商户列表失败');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchMerchants()
-  }, [])
+    fetchMerchants();
+  }, []);
 
   const handleApprove = (merchant: PendingMerchant) => {
     Modal.confirm({
@@ -39,15 +39,15 @@ const AdminMerchants = () => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await adminMerchantService.approveMerchant(merchant.id)
-          message.success('商户已批准')
-          fetchMerchants(pagination.current)
+          await adminMerchantService.approveMerchant(merchant.id);
+          message.success('商户已批准');
+          fetchMerchants(pagination.current);
         } catch (error) {
-          message.error('操作失败')
+          message.error('操作失败');
         }
       },
-    })
-  }
+    });
+  };
 
   const handleReject = (merchant: PendingMerchant) => {
     Modal.confirm({
@@ -57,15 +57,15 @@ const AdminMerchants = () => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await adminMerchantService.rejectMerchant(merchant.id)
-          message.success('商户已拒绝')
-          fetchMerchants(pagination.current)
+          await adminMerchantService.rejectMerchant(merchant.id);
+          message.success('商户已拒绝');
+          fetchMerchants(pagination.current);
         } catch (error) {
-          message.error('操作失败')
+          message.error('操作失败');
         }
       },
-    })
-  }
+    });
+  };
 
   const columns = [
     {
@@ -110,14 +110,14 @@ const AdminMerchants = () => {
           active: 'green',
           rejected: 'red',
           suspended: 'gray',
-        }
+        };
         const textMap: Record<string, string> = {
           pending: '待审核',
           active: '已认证',
           rejected: '已拒绝',
           suspended: '已暂停',
-        }
-        return <Tag color={colorMap[status] || 'default'}>{textMap[status] || status}</Tag>
+        };
+        return <Tag color={colorMap[status] || 'default'}>{textMap[status] || status}</Tag>;
       },
     },
     {
@@ -154,11 +154,18 @@ const AdminMerchants = () => {
         </Space>
       ),
     },
-  ]
+  ];
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
+      >
         <Title level={2}>商户管理</Title>
         <Button icon={<ReloadOutlined />} onClick={() => fetchMerchants(pagination.current)}>
           刷新
@@ -179,7 +186,7 @@ const AdminMerchants = () => {
         />
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default AdminMerchants
+export default AdminMerchants;

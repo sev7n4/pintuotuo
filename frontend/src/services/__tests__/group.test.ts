@@ -1,10 +1,10 @@
-import { groupService } from '../group'
-import api from '../api'
-import type { AxiosResponse } from 'axios'
+import { groupService } from '../group';
+import api from '../api';
+import type { AxiosResponse } from 'axios';
 
-jest.mock('../api')
+jest.mock('../api');
 
-const mockApi = api as jest.Mocked<typeof api>
+const mockApi = api as jest.Mocked<typeof api>;
 
 const createMockResponse = <T>(data: T): AxiosResponse<T> => ({
   data,
@@ -12,19 +12,19 @@ const createMockResponse = <T>(data: T): AxiosResponse<T> => ({
   statusText: 'OK',
   headers: {},
   config: {} as any,
-})
+});
 
 describe('groupService', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
   test('createGroup calls api.post with correct parameters', async () => {
     const mockData = {
       product_id: 1,
       target_count: 5,
       deadline: '2024-12-31T23:59:59Z',
-    }
+    };
     const mockResponse = {
       success: true,
       data: {
@@ -38,19 +38,19 @@ describe('groupService', () => {
         updated_at: '2024-01-01T00:00:00Z',
       },
       message: 'Group created successfully',
-    }
+    };
 
-    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await groupService.createGroup(mockData)
+    const result = await groupService.createGroup(mockData);
 
-    expect(mockApi.post).toHaveBeenCalledWith('/groups', mockData)
-    expect(result.data).toEqual(mockResponse)
-  })
+    expect(mockApi.post).toHaveBeenCalledWith('/groups', mockData);
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('listGroups calls api.get with correct parameters', async () => {
-    const mockPage = 1
-    const mockPerPage = 10
+    const mockPage = 1;
+    const mockPerPage = 10;
     const mockResponse = {
       success: true,
       data: {
@@ -71,17 +71,17 @@ describe('groupService', () => {
         per_page: 10,
       },
       message: 'Groups retrieved successfully',
-    }
+    };
 
-    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await groupService.listGroups(mockPage, mockPerPage)
+    const result = await groupService.listGroups(mockPage, mockPerPage);
 
     expect(mockApi.get).toHaveBeenCalledWith('/groups', {
       params: { page: mockPage, per_page: mockPerPage },
-    })
-    expect(result.data).toEqual(mockResponse)
-  })
+    });
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('listGroups calls api.get without parameters when page and per_page are not provided', async () => {
     const mockResponse = {
@@ -93,20 +93,20 @@ describe('groupService', () => {
         per_page: 10,
       },
       message: 'Groups retrieved successfully',
-    }
+    };
 
-    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await groupService.listGroups()
+    const result = await groupService.listGroups();
 
     expect(mockApi.get).toHaveBeenCalledWith('/groups', {
       params: { page: undefined, per_page: undefined },
-    })
-    expect(result.data).toEqual(mockResponse)
-  })
+    });
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('getGroupByID calls api.get with correct parameters', async () => {
-    const mockGroupId = 1
+    const mockGroupId = 1;
     const mockResponse = {
       success: true,
       data: {
@@ -120,18 +120,18 @@ describe('groupService', () => {
         updated_at: '2024-01-01T00:00:00Z',
       },
       message: 'Group retrieved successfully',
-    }
+    };
 
-    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await groupService.getGroupByID(mockGroupId)
+    const result = await groupService.getGroupByID(mockGroupId);
 
-    expect(mockApi.get).toHaveBeenCalledWith(`/groups/${mockGroupId}`)
-    expect(result.data).toEqual(mockResponse)
-  })
+    expect(mockApi.get).toHaveBeenCalledWith(`/groups/${mockGroupId}`);
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('joinGroup calls api.post with correct parameters', async () => {
-    const mockGroupId = 1
+    const mockGroupId = 1;
     const mockResponse = {
       success: true,
       data: {
@@ -145,34 +145,34 @@ describe('groupService', () => {
         updated_at: '2024-01-01T00:00:00Z',
       },
       message: 'Joined group successfully',
-    }
+    };
 
-    mockApi.post.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.post.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await groupService.joinGroup(mockGroupId)
+    const result = await groupService.joinGroup(mockGroupId);
 
-    expect(mockApi.post).toHaveBeenCalledWith(`/groups/${mockGroupId}/join`, {})
-    expect(result.data).toEqual(mockResponse)
-  })
+    expect(mockApi.post).toHaveBeenCalledWith(`/groups/${mockGroupId}/join`, {});
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('cancelGroup calls api.delete with correct parameters', async () => {
-    const mockGroupId = 1
+    const mockGroupId = 1;
     const mockResponse = {
       success: true,
       data: undefined,
       message: 'Group cancelled successfully',
-    }
+    };
 
-    mockApi.delete.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.delete.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await groupService.cancelGroup(mockGroupId)
+    const result = await groupService.cancelGroup(mockGroupId);
 
-    expect(mockApi.delete).toHaveBeenCalledWith(`/groups/${mockGroupId}`)
-    expect(result.data).toEqual(mockResponse)
-  })
+    expect(mockApi.delete).toHaveBeenCalledWith(`/groups/${mockGroupId}`);
+    expect(result.data).toEqual(mockResponse);
+  });
 
   test('getGroupProgress calls api.get with correct parameters', async () => {
-    const mockGroupId = 1
+    const mockGroupId = 1;
     const mockResponse = {
       success: true,
       data: {
@@ -186,13 +186,13 @@ describe('groupService', () => {
         updated_at: '2024-01-01T00:00:00Z',
       },
       message: 'Group progress retrieved successfully',
-    }
+    };
 
-    mockApi.get.mockResolvedValue(createMockResponse(mockResponse))
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await groupService.getGroupProgress(mockGroupId)
+    const result = await groupService.getGroupProgress(mockGroupId);
 
-    expect(mockApi.get).toHaveBeenCalledWith(`/groups/${mockGroupId}/progress`)
-    expect(result.data).toEqual(mockResponse)
-  })
-})
+    expect(mockApi.get).toHaveBeenCalledWith(`/groups/${mockGroupId}/progress`);
+    expect(result.data).toEqual(mockResponse);
+  });
+});

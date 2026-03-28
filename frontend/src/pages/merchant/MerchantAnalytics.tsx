@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react';
 import {
   Card,
   Row,
@@ -14,7 +14,7 @@ import {
   Divider,
   Tag,
   Tabs,
-} from 'antd'
+} from 'antd';
 import {
   UserOutlined,
   RiseOutlined,
@@ -24,38 +24,38 @@ import {
   TrophyOutlined,
   TagOutlined,
   FireOutlined,
-} from '@ant-design/icons'
-import { useMerchantStore } from '@/stores/merchantStore'
-import styles from './Merchant.module.css'
+} from '@ant-design/icons';
+import { useMerchantStore } from '@/stores/merchantStore';
+import styles from './Merchant.module.css';
 
-const { Title, Text } = Typography
+const { Title, Text } = Typography;
 
 interface UserStats {
-  new_customers: number
-  returning_customers: number
-  new_customer_rate: number
-  repeat_rate: number
-  avg_order_value: number
+  new_customers: number;
+  returning_customers: number;
+  new_customer_rate: number;
+  repeat_rate: number;
+  avg_order_value: number;
 }
 
 interface RegionData {
-  region: string
-  count: number
-  percentage: number
+  region: string;
+  count: number;
+  percentage: number;
 }
 
 interface ModelPreference {
-  model: string
-  count: number
-  percentage: number
+  model: string;
+  count: number;
+  percentage: number;
 }
 
 interface TopUser {
-  id: number
-  name: string
-  avatar?: string
-  total_spent: number
-  order_count: number
+  id: number;
+  name: string;
+  avatar?: string;
+  total_spent: number;
+  order_count: number;
 }
 
 const mockUserStats: UserStats = {
@@ -64,7 +64,7 @@ const mockUserStats: UserStats = {
   new_customer_rate: 35,
   repeat_rate: 65,
   avg_order_value: 100.38,
-}
+};
 
 const mockRegionData: RegionData[] = [
   { region: '北京', count: 1250, percentage: 25 },
@@ -72,13 +72,13 @@ const mockRegionData: RegionData[] = [
   { region: '杭州', count: 750, percentage: 15 },
   { region: '深圳', count: 500, percentage: 10 },
   { region: '南京', count: 400, percentage: 8 },
-]
+];
 
 const mockModelPreferences: ModelPreference[] = [
   { model: '编码类', count: 4500, percentage: 45 },
   { model: '文本处理', count: 3000, percentage: 30 },
   { model: '多模态', count: 2500, percentage: 25 },
-]
+];
 
 const mockTopUsers: TopUser[] = [
   { id: 1, name: '张三', total_spent: 5680, order_count: 23 },
@@ -86,21 +86,21 @@ const mockTopUsers: TopUser[] = [
   { id: 3, name: '王五', total_spent: 3150, order_count: 15 },
   { id: 4, name: '赵六', total_spent: 2890, order_count: 12 },
   { id: 5, name: '钱七', total_spent: 2340, order_count: 10 },
-]
+];
 
 interface UserTag {
-  tag: string
-  count: number
-  percentage: number
-  color: string
+  tag: string;
+  count: number;
+  percentage: number;
+  color: string;
 }
 
 interface UserSegment {
-  segment: string
-  description: string
-  count: number
-  percentage: number
-  tags: string[]
+  segment: string;
+  description: string;
+  count: number;
+  percentage: number;
+  tags: string[];
 }
 
 const mockUserTags: UserTag[] = [
@@ -109,30 +109,48 @@ const mockUserTags: UserTag[] = [
   { tag: '新品偏好', count: 180, percentage: 18, color: 'blue' },
   { tag: '大额消费', count: 120, percentage: 12, color: 'green' },
   { tag: '拼团达人', count: 100, percentage: 10, color: 'purple' },
-]
+];
 
 const mockUserSegments: UserSegment[] = [
-  { segment: '高价值用户', description: '消费金额高、复购率高', count: 150, percentage: 15, tags: ['大额消费', '高频购买'] },
-  { segment: '活跃用户', description: '近期有购买行为', count: 350, percentage: 35, tags: ['新品偏好', '拼团达人'] },
-  { segment: '潜力用户', description: '有购买意向但未转化', count: 200, percentage: 20, tags: ['价格敏感'] },
+  {
+    segment: '高价值用户',
+    description: '消费金额高、复购率高',
+    count: 150,
+    percentage: 15,
+    tags: ['大额消费', '高频购买'],
+  },
+  {
+    segment: '活跃用户',
+    description: '近期有购买行为',
+    count: 350,
+    percentage: 35,
+    tags: ['新品偏好', '拼团达人'],
+  },
+  {
+    segment: '潜力用户',
+    description: '有购买意向但未转化',
+    count: 200,
+    percentage: 20,
+    tags: ['价格敏感'],
+  },
   { segment: '沉睡用户', description: '超过30天未活跃', count: 300, percentage: 30, tags: [] },
-]
+];
 
 export const MerchantAnalytics: React.FC = () => {
-  const { isLoading, error, fetchStats } = useMerchantStore()
-  const [userStats] = useState<UserStats>(mockUserStats)
-  const [regionData] = useState<RegionData[]>(mockRegionData)
-  const [modelPreferences] = useState<ModelPreference[]>(mockModelPreferences)
-  const [topUsers] = useState<TopUser[]>(mockTopUsers)
-  const [userTags] = useState<UserTag[]>(mockUserTags)
-  const [userSegments] = useState<UserSegment[]>(mockUserSegments)
+  const { isLoading, error, fetchStats } = useMerchantStore();
+  const [userStats] = useState<UserStats>(mockUserStats);
+  const [regionData] = useState<RegionData[]>(mockRegionData);
+  const [modelPreferences] = useState<ModelPreference[]>(mockModelPreferences);
+  const [topUsers] = useState<TopUser[]>(mockTopUsers);
+  const [userTags] = useState<UserTag[]>(mockUserTags);
+  const [userSegments] = useState<UserSegment[]>(mockUserSegments);
 
   useEffect(() => {
-    fetchStats()
-  }, [fetchStats])
+    fetchStats();
+  }, [fetchStats]);
 
   if (error) {
-    return <Empty description={`错误: ${error}`} />
+    return <Empty description={`错误: ${error}`} />;
   }
 
   return (
@@ -210,7 +228,9 @@ export const MerchantAnalytics: React.FC = () => {
                 renderItem={(item) => (
                   <List.Item>
                     <List.Item.Meta
-                      avatar={<Avatar style={{ backgroundColor: '#1890ff' }}>{item.region[0]}</Avatar>}
+                      avatar={
+                        <Avatar style={{ backgroundColor: '#1890ff' }}>{item.region[0]}</Avatar>
+                      }
                       title={item.region}
                       description={`${item.count} 位用户`}
                     />
@@ -227,7 +247,9 @@ export const MerchantAnalytics: React.FC = () => {
             <Card title="模型偏好分布" extra={<ShoppingCartOutlined />}>
               {modelPreferences.map((pref) => (
                 <div key={pref.model} style={{ marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}
+                  >
                     <Text>{pref.model}</Text>
                     <Text type="secondary">{pref.percentage}%</Text>
                   </div>
@@ -256,9 +278,18 @@ export const MerchantAnalytics: React.FC = () => {
                   <List.Item>
                     <List.Item.Meta
                       avatar={
-                        <Avatar style={{ 
-                          backgroundColor: index === 0 ? '#faad14' : index === 1 ? '#8c8c8c' : index === 2 ? '#cd7f32' : '#1890ff'
-                        }}>
+                        <Avatar
+                          style={{
+                            backgroundColor:
+                              index === 0
+                                ? '#faad14'
+                                : index === 1
+                                  ? '#8c8c8c'
+                                  : index === 2
+                                    ? '#cd7f32'
+                                    : '#1890ff',
+                          }}
+                        >
                           {index + 1}
                         </Avatar>
                       }
@@ -285,30 +316,26 @@ export const MerchantAnalytics: React.FC = () => {
           <Divider />
           <Row gutter={[24, 24]}>
             <Col xs={24} sm={8}>
-              <Statistic
-                title="平均访问时长"
-                value={8.5}
-                suffix="分钟"
-              />
+              <Statistic title="平均访问时长" value={8.5} suffix="分钟" />
             </Col>
             <Col xs={24} sm={8}>
-              <Statistic
-                title="平均浏览商品数"
-                value={12}
-                suffix="件"
-              />
+              <Statistic title="平均浏览商品数" value={12} suffix="件" />
             </Col>
             <Col xs={24} sm={8}>
-              <Statistic
-                title="转化率"
-                value={15.8}
-                suffix="%"
-              />
+              <Statistic title="转化率" value={15.8} suffix="%" />
             </Col>
           </Row>
         </Card>
 
-        <Card style={{ marginTop: 24 }} title={<><TagOutlined style={{ marginRight: 8 }} />用户标签分析</>}>
+        <Card
+          style={{ marginTop: 24 }}
+          title={
+            <>
+              <TagOutlined style={{ marginRight: 8 }} />
+              用户标签分析
+            </>
+          }
+        >
           <Tabs defaultActiveKey="tags">
             <Tabs.TabPane tab="用户标签分布" key="tags">
               <Row gutter={[16, 16]}>
@@ -320,14 +347,10 @@ export const MerchantAnalytics: React.FC = () => {
                           {item.tag}
                         </Tag>
                       </div>
-                      <Statistic
-                        value={item.count}
-                        suffix="人"
-                        valueStyle={{ fontSize: 24 }}
-                      />
-                      <Progress 
-                        percent={item.percentage} 
-                        size="small" 
+                      <Statistic value={item.count} suffix="人" valueStyle={{ fontSize: 24 }} />
+                      <Progress
+                        percent={item.percentage}
+                        size="small"
                         showInfo={false}
                         strokeColor={item.color}
                       />
@@ -346,30 +369,41 @@ export const MerchantAnalytics: React.FC = () => {
                   <List.Item>
                     <List.Item.Meta
                       avatar={
-                        <Avatar 
-                          style={{ 
-                            backgroundColor: item.segment === '高价值用户' ? '#faad14' : 
-                                           item.segment === '活跃用户' ? '#52c41a' :
-                                           item.segment === '潜力用户' ? '#1890ff' : '#8c8c8c'
+                        <Avatar
+                          style={{
+                            backgroundColor:
+                              item.segment === '高价值用户'
+                                ? '#faad14'
+                                : item.segment === '活跃用户'
+                                  ? '#52c41a'
+                                  : item.segment === '潜力用户'
+                                    ? '#1890ff'
+                                    : '#8c8c8c',
                           }}
-                          icon={item.segment === '高价值用户' ? <TrophyOutlined /> : <UserOutlined />}
+                          icon={
+                            item.segment === '高价值用户' ? <TrophyOutlined /> : <UserOutlined />
+                          }
                         />
                       }
                       title={
                         <Space>
                           <Text strong>{item.segment}</Text>
-                          {item.tags.map(tag => (
-                            <Tag key={tag} color="blue">{tag}</Tag>
+                          {item.tags.map((tag) => (
+                            <Tag key={tag} color="blue">
+                              {tag}
+                            </Tag>
                           ))}
                         </Space>
                       }
                       description={item.description}
                     />
                     <Space direction="vertical" align="end">
-                      <Text strong style={{ fontSize: 16 }}>{item.count} 人</Text>
-                      <Progress 
-                        percent={item.percentage} 
-                        size="small" 
+                      <Text strong style={{ fontSize: 16 }}>
+                        {item.count} 人
+                      </Text>
+                      <Progress
+                        percent={item.percentage}
+                        size="small"
                         style={{ width: 100 }}
                         showInfo={false}
                       />
@@ -381,7 +415,15 @@ export const MerchantAnalytics: React.FC = () => {
           </Tabs>
         </Card>
 
-        <Card style={{ marginTop: 24 }} title={<><FireOutlined style={{ marginRight: 8, color: '#ff4d4f' }} />热门标签趋势</>}>
+        <Card
+          style={{ marginTop: 24 }}
+          title={
+            <>
+              <FireOutlined style={{ marginRight: 8, color: '#ff4d4f' }} />
+              热门标签趋势
+            </>
+          }
+        >
           <Row gutter={[16, 16]}>
             <Col xs={24} md={12}>
               <Card type="inner" title="本周新增标签">
@@ -423,7 +465,7 @@ export const MerchantAnalytics: React.FC = () => {
         </Card>
       </Spin>
     </div>
-  )
-}
+  );
+};
 
-export default MerchantAnalytics
+export default MerchantAnalytics;

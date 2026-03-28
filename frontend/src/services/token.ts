@@ -1,5 +1,5 @@
-import api from './api'
-import { Token, TokenTransaction, UserAPIKey, APIResponse } from '@/types'
+import api from './api';
+import { Token, TokenTransaction, UserAPIKey, APIResponse } from '@/types';
 
 export const tokenService = {
   getBalance: () => api.get<Token>('/tokens/balance'),
@@ -11,11 +11,10 @@ export const tokenService = {
 
   getAPIKeys: () => api.get<APIResponse<UserAPIKey[]>>('/tokens/keys'),
 
-  createAPIKey: (name: string) =>
-    api.post<UserAPIKey>('/tokens/keys', { name }),
+  createAPIKey: (name: string) => api.post<UserAPIKey>('/tokens/keys', { name }),
 
   updateAPIKey: (id: number, data: Partial<UserAPIKey>) =>
     api.put<UserAPIKey>(`/tokens/keys/${id}`, data),
 
   deleteAPIKey: (id: number) => api.delete(`/tokens/keys/${id}`),
-}
+};

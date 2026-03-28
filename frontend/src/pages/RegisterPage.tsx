@@ -1,57 +1,52 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Input, Button, Card, message, Radio, Space } from 'antd'
-import { UserOutlined, ShopOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
-import { useAuthStore } from '@stores/authStore'
+import React, { useState, useEffect } from 'react';
+import { Form, Input, Button, Card, message, Radio, Space } from 'antd';
+import { UserOutlined, ShopOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@stores/authStore';
 
-type UserRole = 'user' | 'merchant'
+type UserRole = 'user' | 'merchant';
 
 export const RegisterPage: React.FC = () => {
-  const navigate = useNavigate()
-  const { register, isLoading, error, user, isAuthenticated } = useAuthStore()
-  const [form] = Form.useForm()
-  const [selectedRole, setSelectedRole] = useState<UserRole>('user')
+  const navigate = useNavigate();
+  const { register, isLoading, error, user, isAuthenticated } = useAuthStore();
+  const [form] = Form.useForm();
+  const [selectedRole, setSelectedRole] = useState<UserRole>('user');
 
   const onFinish = async (values: {
-    email: string
-    name: string
-    password: string
-    confirmPassword: string
+    email: string;
+    name: string;
+    password: string;
+    confirmPassword: string;
   }) => {
     if (values.password !== values.confirmPassword) {
-      message.error('两次输入的密码不一致')
-      return
+      message.error('两次输入的密码不一致');
+      return;
     }
 
-    const role = selectedRole || 'user'
+    const role = selectedRole || 'user';
 
     try {
-      await register(values.email, values.name, values.password, role)
-      message.success('注册成功')
+      await register(values.email, values.name, values.password, role);
+      message.success('注册成功');
     } catch (err) {
-      message.error(error || '注册失败，请稍后重试')
+      message.error(error || '注册失败，请稍后重试');
     }
-  }
+  };
 
   useEffect(() => {
     if (isAuthenticated && user) {
       if (user.role === 'merchant') {
-        navigate('/merchant', { replace: true })
+        navigate('/merchant', { replace: true });
       } else {
-        navigate('/', { replace: true })
+        navigate('/', { replace: true });
       }
     }
-  }, [isAuthenticated, user, navigate])
+  }, [isAuthenticated, user, navigate]);
 
   return (
     <div className="auth-page">
       <Card className="auth-card" title="拼脱脱 - 注册" style={{ maxWidth: 400 }}>
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={onFinish}
-          autoComplete="off"
-        >
+        <Form form={form} layout="vertical" onFinish={onFinish} autoComplete="off">
           <Form.Item label="选择角色" name="role">
             <Radio.Group
               style={{ width: '100%' }}
@@ -141,7 +136,7 @@ export const RegisterPage: React.FC = () => {
         </Form>
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default RegisterPage
+export default RegisterPage;

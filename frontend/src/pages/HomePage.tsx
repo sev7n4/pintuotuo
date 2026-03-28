@@ -1,80 +1,100 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Carousel, Card, Row, Col, Spin, Tag, Input, Typography, Space } from 'antd'
-import { FireOutlined, ClockCircleOutlined, SearchOutlined, RightOutlined, ThunderboltOutlined, GiftOutlined, StarOutlined } from '@ant-design/icons'
-import { useHomeStore } from '@/stores/homeStore'
-import { Product } from '@/types'
-import styles from './HomePage.module.css'
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Carousel, Card, Row, Col, Spin, Tag, Input, Typography, Space } from 'antd';
+import {
+  FireOutlined,
+  ClockCircleOutlined,
+  SearchOutlined,
+  RightOutlined,
+  ThunderboltOutlined,
+  GiftOutlined,
+  StarOutlined,
+} from '@ant-design/icons';
+import { useHomeStore } from '@/stores/homeStore';
+import { Product } from '@/types';
+import styles from './HomePage.module.css';
 
-const { Title, Text } = Typography
-const { Search } = Input
+const { Title, Text } = Typography;
+const { Search } = Input;
 
 interface QuickNav {
-  key: string
-  name: string
-  icon: React.ReactNode
-  color: string
-  link: string
+  key: string;
+  name: string;
+  icon: React.ReactNode;
+  color: string;
+  link: string;
 }
 
 const quickNavItems: QuickNav[] = [
-  { key: 'hot', name: '热销爆款', icon: <FireOutlined />, color: '#ff4d4f', link: '/products?sort=hot' },
+  {
+    key: 'hot',
+    name: '热销爆款',
+    icon: <FireOutlined />,
+    color: '#ff4d4f',
+    link: '/products?sort=hot',
+  },
   { key: 'group', name: '超值拼团', icon: <GiftOutlined />, color: '#52c41a', link: '/groups' },
-  { key: 'flash', name: '限时秒杀', icon: <ThunderboltOutlined />, color: '#faad14', link: '/products?flash=true' },
-  { key: 'new', name: '新品上架', icon: <ClockCircleOutlined />, color: '#1890ff', link: '/products?sort=new' },
-]
+  {
+    key: 'flash',
+    name: '限时秒杀',
+    icon: <ThunderboltOutlined />,
+    color: '#faad14',
+    link: '/products?flash=true',
+  },
+  {
+    key: 'new',
+    name: '新品上架',
+    icon: <ClockCircleOutlined />,
+    color: '#1890ff',
+    link: '/products?sort=new',
+  },
+];
 
 const HomePage = () => {
-  const navigate = useNavigate()
-  const { 
-    banners, 
-    hotProducts, 
-    newProducts, 
-    categories, 
-    isLoading, 
-    error,
-    fetchHomeData 
-  } = useHomeStore()
+  const navigate = useNavigate();
+  const { banners, hotProducts, newProducts, categories, isLoading, error, fetchHomeData } =
+    useHomeStore();
 
-  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([])
+  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    fetchHomeData()
-  }, [fetchHomeData])
+    fetchHomeData();
+  }, [fetchHomeData]);
 
   useEffect(() => {
     if (hotProducts.length > 0 && newProducts.length > 0) {
-      const mixed = [...hotProducts.slice(0, 2), ...newProducts.slice(0, 2)]
-      setRecommendedProducts(mixed)
+      const mixed = [...hotProducts.slice(0, 2), ...newProducts.slice(0, 2)];
+      setRecommendedProducts(mixed);
     }
-  }, [hotProducts, newProducts])
+  }, [hotProducts, newProducts]);
 
   const handleSearch = (value: string) => {
     if (value.trim()) {
-      navigate(`/products?search=${encodeURIComponent(value.trim())}`)
+      navigate(`/products?search=${encodeURIComponent(value.trim())}`);
     }
-  }
+  };
 
   const handleProductClick = (productId: number) => {
-    navigate(`/products/${productId}`)
-  }
+    navigate(`/products/${productId}`);
+  };
 
   const handleCategoryClick = (category: string) => {
-    navigate(`/products?category=${encodeURIComponent(category)}`)
-  }
+    navigate(`/products?category=${encodeURIComponent(category)}`);
+  };
 
   const handleQuickNavClick = (link: string) => {
-    navigate(link)
-  }
+    navigate(link);
+  };
 
   const formatPrice = (price: number) => {
-    return `¥${price.toFixed(2)}`
-  }
+    return `¥${price.toFixed(2)}`;
+  };
 
   const renderProductCard = (product: Product, showGroupTag = false) => {
-    const discount = product.original_price && product.original_price > product.price
-      ? Math.round((1 - product.price / product.original_price) * 100)
-      : 0
+    const discount =
+      product.original_price && product.original_price > product.price
+        ? Math.round((1 - product.price / product.original_price) * 100)
+        : 0;
 
     return (
       <Card
@@ -121,12 +141,12 @@ const HomePage = () => {
           </div>
         </div>
       </Card>
-    )
-  }
+    );
+  };
 
   const renderSection = (
-    title: string, 
-    icon: React.ReactNode, 
+    title: string,
+    icon: React.ReactNode,
     products: Product[],
     viewAllLink?: string,
     showGroupTag = false
@@ -135,14 +155,12 @@ const HomePage = () => {
       <div className={styles.sectionHeader}>
         <Space>
           {icon}
-          <Title level={4} className={styles.sectionTitle}>{title}</Title>
+          <Title level={4} className={styles.sectionTitle}>
+            {title}
+          </Title>
         </Space>
         {viewAllLink && (
-          <Text 
-            type="secondary" 
-            className={styles.viewAll}
-            onClick={() => navigate(viewAllLink)}
-          >
+          <Text type="secondary" className={styles.viewAll} onClick={() => navigate(viewAllLink)}>
             查看全部 <RightOutlined />
           </Text>
         )}
@@ -155,14 +173,14 @@ const HomePage = () => {
         ))}
       </Row>
     </div>
-  )
+  );
 
   if (error) {
     return (
       <div className={styles.errorContainer}>
         <Text type="danger">{error}</Text>
       </div>
-    )
+    );
   }
 
   return (
@@ -182,10 +200,7 @@ const HomePage = () => {
         <Row gutter={[12, 12]}>
           {quickNavItems.map((item) => (
             <Col span={6} key={item.key}>
-              <div 
-                className={styles.quickNavItem}
-                onClick={() => handleQuickNavClick(item.link)}
-              >
+              <div className={styles.quickNavItem} onClick={() => handleQuickNavClick(item.link)}>
                 <div className={styles.quickNavIcon} style={{ background: item.color }}>
                   {item.icon}
                 </div>
@@ -200,10 +215,7 @@ const HomePage = () => {
         <Carousel autoplay className={styles.bannerCarousel}>
           {banners.map((banner) => (
             <div key={banner.id} className={styles.bannerItem}>
-              <div 
-                className={styles.bannerContent}
-                onClick={() => navigate(banner.link)}
-              >
+              <div className={styles.bannerContent} onClick={() => navigate(banner.link)}>
                 <Text className={styles.bannerTitle}>{banner.title}</Text>
               </div>
             </div>
@@ -214,12 +226,14 @@ const HomePage = () => {
       {categories.length > 0 && (
         <div className={styles.categorySection}>
           <div className={styles.categoryHeader}>
-            <Title level={5} className={styles.categoryTitle}>商品分类</Title>
+            <Title level={5} className={styles.categoryTitle}>
+              商品分类
+            </Title>
           </div>
           <Row gutter={[12, 12]}>
             {categories.slice(0, 8).map((category) => (
               <Col span={6} key={category.name}>
-                <div 
+                <div
                   className={styles.categoryItem}
                   onClick={() => handleCategoryClick(category.name)}
                 >
@@ -262,7 +276,9 @@ const HomePage = () => {
             <div className={styles.sectionHeader}>
               <Space>
                 <StarOutlined style={{ color: '#faad14' }} />
-                <Title level={4} className={styles.sectionTitle}>猜你喜欢</Title>
+                <Title level={4} className={styles.sectionTitle}>
+                  猜你喜欢
+                </Title>
               </Space>
             </div>
             <Row gutter={[16, 16]}>
@@ -276,7 +292,7 @@ const HomePage = () => {
         )}
       </Spin>
     </div>
-  )
-}
+  );
+};
 
-export default HomePage
+export default HomePage;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react';
 import {
   Card,
   Button,
@@ -19,7 +19,7 @@ import {
   Col,
   Modal,
   Badge,
-} from 'antd'
+} from 'antd';
 import {
   ShoppingCartOutlined,
   ArrowLeftOutlined,
@@ -27,16 +27,16 @@ import {
   TeamOutlined,
   UserOutlined,
   ClockCircleOutlined,
-} from '@ant-design/icons'
-import { useNavigate, useParams } from 'react-router-dom'
-import { useProductStore } from '@stores/productStore'
-import { useCartStore } from '@stores/cartStore'
-import { useGroupStore } from '@stores/groupStore'
-import { productService } from '@services/product'
-import type { Product, GroupPrice, ProductReview, Group } from '@/types'
+} from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useProductStore } from '@stores/productStore';
+import { useCartStore } from '@stores/cartStore';
+import { useGroupStore } from '@stores/groupStore';
+import { productService } from '@services/product';
+import type { Product, GroupPrice, ProductReview, Group } from '@/types';
 
-const { Title, Text } = Typography
-const { TabPane } = Tabs
+const { Title, Text } = Typography;
+const { TabPane } = Tabs;
 
 const mockReviews: ProductReview[] = [
   {
@@ -63,163 +63,166 @@ const mockReviews: ProductReview[] = [
     content: '第二次购买了，一直很稳定，推荐！',
     created_at: '2026-03-10',
   },
-]
+];
 
 const defaultGroupPrices: GroupPrice[] = [
   { min_members: 2, price_per_person: 60, discount_percent: 40 },
   { min_members: 5, price_per_person: 50, discount_percent: 50 },
-]
+];
 
 export const ProductDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const { fetchProductByID, isLoading, error } = useProductStore()
-  const { addItem } = useCartStore()
-  const { createGroup, joinGroup } = useGroupStore()
-  const [product, setProduct] = useState<Product | null>(null)
-  const [quantity, setQuantity] = useState(1)
-  const [purchaseMode, setPurchaseMode] = useState<'single' | 'group'>('group')
-  const [selectedGroupPrice, setSelectedGroupPrice] = useState<GroupPrice | null>(null)
-  const [activeGroups, setActiveGroups] = useState<Group[]>([])
-  const [showGroupsModal, setShowGroupsModal] = useState(false)
-  const [groupsLoading, setGroupsLoading] = useState(false)
-  const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null)
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { fetchProductByID, isLoading, error } = useProductStore();
+  const { addItem } = useCartStore();
+  const { createGroup, joinGroup } = useGroupStore();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [purchaseMode, setPurchaseMode] = useState<'single' | 'group'>('group');
+  const [selectedGroupPrice, setSelectedGroupPrice] = useState<GroupPrice | null>(null);
+  const [activeGroups, setActiveGroups] = useState<Group[]>([]);
+  const [showGroupsModal, setShowGroupsModal] = useState(false);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null);
 
   useEffect(() => {
     if (id) {
-      loadProduct()
+      loadProduct();
     }
-  }, [id])
+  }, [id]);
 
   useEffect(() => {
     if (product?.group_prices?.length) {
-      setSelectedGroupPrice(product.group_prices[0])
+      setSelectedGroupPrice(product.group_prices[0]);
     }
-  }, [product])
+  }, [product]);
 
   const loadProduct = async () => {
-    if (!id) return
-    const result = await fetchProductByID(parseInt(id))
+    if (!id) return;
+    const result = await fetchProductByID(parseInt(id));
     if (result) {
-      setProduct(result)
+      setProduct(result);
     }
-  }
+  };
 
   const loadActiveGroups = async () => {
-    if (!id) return
-    setGroupsLoading(true)
+    if (!id) return;
+    setGroupsLoading(true);
     try {
-      const response = await productService.getProductGroups(parseInt(id))
+      const response = await productService.getProductGroups(parseInt(id));
       if (response.data.code === 0 && response.data.data) {
-        setActiveGroups(response.data.data)
+        setActiveGroups(response.data.data);
       }
     } catch {
-      console.error('Failed to load active groups')
+      console.error('Failed to load active groups');
     } finally {
-      setGroupsLoading(false)
+      setGroupsLoading(false);
     }
-  }
+  };
 
   const handleJoinGroup = async (group: Group) => {
-    setJoiningGroupId(group.id)
+    setJoiningGroupId(group.id);
     try {
-      const orderId = await joinGroup(group.id)
-      message.success('加入拼团成功！')
+      const orderId = await joinGroup(group.id);
+      message.success('加入拼团成功！');
       if (orderId) {
-        navigate(`/payment/${orderId}`)
+        navigate(`/payment/${orderId}`);
       } else {
-        navigate('/orders')
+        navigate('/orders');
       }
     } catch {
-      message.error('加入拼团失败，请重试')
+      message.error('加入拼团失败，请重试');
     } finally {
-      setJoiningGroupId(null)
+      setJoiningGroupId(null);
     }
-  }
+  };
 
   const handleAddToCart = () => {
-    if (!product) return
-    addItem(product, quantity)
-    message.success(`已添加 ${quantity} 件到购物车`)
-    setTimeout(() => navigate('/cart'), 1000)
-  }
+    if (!product) return;
+    addItem(product, quantity);
+    message.success(`已添加 ${quantity} 件到购物车`);
+    setTimeout(() => navigate('/cart'), 1000);
+  };
 
   const handleGroupPurchase = async () => {
     if (!product) {
-      message.error('商品信息加载失败')
-      return
+      message.error('商品信息加载失败');
+      return;
     }
-    const currentGroupPrice = selectedGroupPrice || groupPrices[0]
+    const currentGroupPrice = selectedGroupPrice || groupPrices[0];
     if (!currentGroupPrice) {
-      message.error('请选择拼团规则')
-      return
+      message.error('请选择拼团规则');
+      return;
     }
     try {
-      const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      const orderId = await createGroup(product.id, currentGroupPrice.min_members, deadline)
+      const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const orderId = await createGroup(product.id, currentGroupPrice.min_members, deadline);
       if (orderId) {
-        message.success('拼团已创建，请完成支付！')
-        navigate(`/payment/${orderId}`)
+        message.success('拼团已创建，请完成支付！');
+        navigate(`/payment/${orderId}`);
       } else {
-        message.error('创建拼团失败，请重试')
+        message.error('创建拼团失败，请重试');
       }
     } catch {
-      message.error('创建拼团失败，请重试')
+      message.error('创建拼团失败，请重试');
     }
-  }
+  };
 
   const handleShare = () => {
-    if (!product) return
-    const shareUrl = `${window.location.origin}/products/${product.id}`
+    if (!product) return;
+    const shareUrl = `${window.location.origin}/products/${product.id}`;
     if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(shareUrl)
+      navigator.clipboard
+        .writeText(shareUrl)
         .then(() => {
-          message.success('链接已复制到剪贴板')
+          message.success('链接已复制到剪贴板');
         })
         .catch(() => {
-          message.error('复制失败，请手动复制链接')
-        })
+          message.error('复制失败，请手动复制链接');
+        });
     } else {
       // 降级方案：创建一个临时输入框来复制
-      const textArea = document.createElement('textarea')
-      textArea.value = shareUrl
-      textArea.style.position = 'fixed'
-      textArea.style.left = '-999999px'
-      textArea.style.top = '-999999px'
-      document.body.appendChild(textArea)
-      textArea.focus()
-      textArea.select()
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
       try {
-        document.execCommand('copy')
-        message.success('链接已复制到剪贴板')
+        document.execCommand('copy');
+        message.success('链接已复制到剪贴板');
       } catch {
-        message.error('复制失败，请手动复制链接')
+        message.error('复制失败，请手动复制链接');
       } finally {
-        document.body.removeChild(textArea)
+        document.body.removeChild(textArea);
       }
     }
-  }
+  };
 
   const calculateDiscount = () => {
-    if (!product || !selectedGroupPrice) return 0
-    return Math.round((1 - selectedGroupPrice.price_per_person / product.price) * 100)
-  }
+    if (!product || !selectedGroupPrice) return 0;
+    return Math.round((1 - selectedGroupPrice.price_per_person / product.price) * 100);
+  };
 
   if (error) {
-    return <Empty description={`错误: ${error}`} />
+    return <Empty description={`错误: ${error}`} />;
   }
 
   if (isLoading || !product) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+      <div
+        style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}
+      >
         <Spin size="large" />
       </div>
-    )
+    );
   }
 
-  const groupPrices = product.group_prices || defaultGroupPrices
-  const rating = product.rating || 4.8
-  const reviewCount = product.review_count || 1000
+  const groupPrices = product.group_prices || defaultGroupPrices;
+  const rating = product.rating || 4.8;
+  const reviewCount = product.review_count || 1000;
 
   return (
     <div style={{ padding: '20px', maxWidth: 900, margin: '0 auto' }}>
@@ -232,16 +235,20 @@ export const ProductDetailPage: React.FC = () => {
       <Card>
         <Row gutter={[24, 24]}>
           <Col xs={24} md={12}>
-            <div style={{ 
-              background: '#f5f5f5', 
-              borderRadius: 8, 
-              height: 300, 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              marginBottom: 16,
-            }}>
-              <Text type="secondary" style={{ fontSize: 48 }}>📦</Text>
+            <div
+              style={{
+                background: '#f5f5f5',
+                borderRadius: 8,
+                height: 300,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 16,
+              }}
+            >
+              <Text type="secondary" style={{ fontSize: 48 }}>
+                📦
+              </Text>
             </div>
           </Col>
 
@@ -249,7 +256,9 @@ export const ProductDetailPage: React.FC = () => {
             <Title level={3}>{product.name}</Title>
             <Space style={{ marginBottom: 16 }}>
               <Tag color="blue">已拼 {(product.sold_count || 100000).toLocaleString()} 件</Tag>
-              <Tag color="gold">⭐ {rating}/5.0 ({reviewCount}+ 评)</Tag>
+              <Tag color="gold">
+                ⭐ {rating}/5.0 ({reviewCount}+ 评)
+              </Tag>
             </Space>
 
             <div style={{ marginBottom: 16 }}>
@@ -261,16 +270,24 @@ export const ProductDetailPage: React.FC = () => {
             <div style={{ marginBottom: 16 }}>
               <Space direction="vertical" size="small">
                 {product.token_count && (
-                  <Text>包含：<Text strong>{(product.token_count / 10000).toFixed(0)}万 Token</Text></Text>
+                  <Text>
+                    包含：<Text strong>{(product.token_count / 10000).toFixed(0)}万 Token</Text>
+                  </Text>
                 )}
                 {product.models && product.models.length > 0 && (
-                  <Text>模型：<Text strong>{product.models.join(', ')}</Text></Text>
+                  <Text>
+                    模型：<Text strong>{product.models.join(', ')}</Text>
+                  </Text>
                 )}
                 {product.validity_period && (
-                  <Text>有效期：<Text strong>{product.validity_period}</Text></Text>
+                  <Text>
+                    有效期：<Text strong>{product.validity_period}</Text>
+                  </Text>
                 )}
                 {product.context_length && (
-                  <Text>上下文：<Text strong>{product.context_length}</Text></Text>
+                  <Text>
+                    上下文：<Text strong>{product.context_length}</Text>
+                  </Text>
                 )}
               </Space>
             </div>
@@ -283,10 +300,10 @@ export const ProductDetailPage: React.FC = () => {
           <Title level={4}>定价信息</Title>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12}>
-              <Card 
-                size="small" 
+              <Card
+                size="small"
                 hoverable
-                style={{ 
+                style={{
                   border: purchaseMode === 'single' ? '2px solid #1890ff' : '1px solid #d9d9d9',
                   cursor: 'pointer',
                 }}
@@ -294,9 +311,9 @@ export const ProductDetailPage: React.FC = () => {
               >
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Text type="secondary">单独购买</Text>
-                  <Statistic 
-                    value={product.price} 
-                    prefix="¥" 
+                  <Statistic
+                    value={product.price}
+                    prefix="¥"
                     valueStyle={{ color: '#333', fontSize: 24 }}
                   />
                   <Text type="secondary">原价购买，立即发货</Text>
@@ -305,10 +322,10 @@ export const ProductDetailPage: React.FC = () => {
             </Col>
 
             <Col xs={24} sm={12}>
-              <Card 
-                size="small" 
+              <Card
+                size="small"
                 hoverable
-                style={{ 
+                style={{
                   border: purchaseMode === 'group' ? '2px solid #52c41a' : '1px solid #d9d9d9',
                   cursor: 'pointer',
                   background: '#f6ffed',
@@ -320,11 +337,15 @@ export const ProductDetailPage: React.FC = () => {
                     <Text type="secondary">拼团购买</Text>
                     <Tag color="green">推荐</Tag>
                   </Space>
-                  <Statistic 
-                    value={selectedGroupPrice?.price_per_person || groupPrices[0].price_per_person} 
-                    prefix="¥" 
+                  <Statistic
+                    value={selectedGroupPrice?.price_per_person || groupPrices[0].price_per_person}
+                    prefix="¥"
                     valueStyle={{ color: '#52c41a', fontSize: 24 }}
-                    suffix={<Text type="secondary" style={{ fontSize: 14 }}>/人</Text>}
+                    suffix={
+                      <Text type="secondary" style={{ fontSize: 14 }}>
+                        /人
+                      </Text>
+                    }
                   />
                   <Text type="success">节省 {calculateDiscount()}%</Text>
                 </Space>
@@ -338,12 +359,15 @@ export const ProductDetailPage: React.FC = () => {
             <Title level={5}>选择拼团规则</Title>
             <Space direction="vertical" style={{ width: '100%' }}>
               {groupPrices.map((gp) => (
-                <Card 
+                <Card
                   key={gp.min_members}
                   size="small"
                   hoverable
-                  style={{ 
-                    border: selectedGroupPrice?.min_members === gp.min_members ? '2px solid #52c41a' : '1px solid #d9d9d9',
+                  style={{
+                    border:
+                      selectedGroupPrice?.min_members === gp.min_members
+                        ? '2px solid #52c41a'
+                        : '1px solid #d9d9d9',
                     cursor: 'pointer',
                   }}
                   onClick={() => setSelectedGroupPrice(gp)}
@@ -358,8 +382,12 @@ export const ProductDetailPage: React.FC = () => {
                     </Col>
                     <Col>
                       <Space>
-                        <Text delete type="secondary">¥{product.price}</Text>
-                        <Text strong style={{ color: '#52c41a', fontSize: 18 }}>¥{gp.price_per_person}/人</Text>
+                        <Text delete type="secondary">
+                          ¥{product.price}
+                        </Text>
+                        <Text strong style={{ color: '#52c41a', fontSize: 18 }}>
+                          ¥{gp.price_per_person}/人
+                        </Text>
                       </Space>
                     </Col>
                   </Row>
@@ -381,7 +409,9 @@ export const ProductDetailPage: React.FC = () => {
               onChange={(val) => setQuantity(val || 1)}
               style={{ marginLeft: '10px', width: 100 }}
             />
-            <Text type="secondary" style={{ marginLeft: 16 }}>库存: {product.stock} 件</Text>
+            <Text type="secondary" style={{ marginLeft: 16 }}>
+              库存: {product.stock} 件
+            </Text>
           </div>
 
           <Space style={{ width: '100%' }} size="middle">
@@ -404,8 +434,8 @@ export const ProductDetailPage: React.FC = () => {
                     size="large"
                     icon={<TeamOutlined />}
                     onClick={() => {
-                      loadActiveGroups()
-                      setShowGroupsModal(true)
+                      loadActiveGroups();
+                      setShowGroupsModal(true);
                     }}
                     disabled={product.stock === 0}
                     style={{ background: '#52c41a', borderColor: '#52c41a' }}
@@ -425,11 +455,7 @@ export const ProductDetailPage: React.FC = () => {
                 </Button>
               </Space>
             )}
-            <Button
-              size="large"
-              icon={<ShareAltOutlined />}
-              onClick={handleShare}
-            >
+            <Button size="large" icon={<ShareAltOutlined />} onClick={handleShare}>
               分享
             </Button>
           </Space>
@@ -442,7 +468,9 @@ export const ProductDetailPage: React.FC = () => {
             <Space direction="vertical" style={{ width: '100%' }}>
               <Title level={5}>商品信息</Title>
               <ul style={{ paddingLeft: 20 }}>
-                <li>包含Token数量和类型：{(product.token_count || 1000000).toLocaleString()} Token</li>
+                <li>
+                  包含Token数量和类型：{(product.token_count || 1000000).toLocaleString()} Token
+                </li>
                 <li>支持模型：{product.models?.join('、') || 'GLM-5, K2.5'}</li>
                 <li>有效期：{product.validity_period || '1年'}</li>
                 <li>上下文长度：{product.context_length || '128K'}</li>
@@ -470,12 +498,16 @@ export const ProductDetailPage: React.FC = () => {
                 <div>
                   <Text strong>Q: 拼团失败怎么办？</Text>
                   <br />
-                  <Text type="secondary">A: 拼团失败后，系统会自动退款，您可以选择重新发起拼团或单独购买。</Text>
+                  <Text type="secondary">
+                    A: 拼团失败后，系统会自动退款，您可以选择重新发起拼团或单独购买。
+                  </Text>
                 </div>
                 <div>
                   <Text strong>Q: Token可以转让吗？</Text>
                   <br />
-                  <Text type="secondary">A: Token暂不支持转让，但可以通过API为其他项目提供服务。</Text>
+                  <Text type="secondary">
+                    A: Token暂不支持转让，但可以通过API为其他项目提供服务。
+                  </Text>
                 </div>
               </Space>
             </Space>
@@ -506,7 +538,9 @@ export const ProductDetailPage: React.FC = () => {
                       description={
                         <Space direction="vertical" size="small">
                           <Text>{review.content}</Text>
-                          <Text type="secondary" style={{ fontSize: 12 }}>{review.created_at}</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {review.created_at}
+                          </Text>
                         </Space>
                       }
                     />
@@ -536,10 +570,13 @@ export const ProductDetailPage: React.FC = () => {
                 itemLayout="horizontal"
                 dataSource={activeGroups}
                 renderItem={(group) => {
-                  const remainingSlots = group.target_count - group.current_count
-                  const deadline = new Date(group.deadline)
-                  const now = new Date()
-                  const hoursLeft = Math.max(0, Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60)))
+                  const remainingSlots = group.target_count - group.current_count;
+                  const deadline = new Date(group.deadline);
+                  const now = new Date();
+                  const hoursLeft = Math.max(
+                    0,
+                    Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60))
+                  );
 
                   return (
                     <List.Item
@@ -551,11 +588,13 @@ export const ProductDetailPage: React.FC = () => {
                           onClick={() => handleJoinGroup(group)}
                         >
                           加入 ({remainingSlots}位)
-                        </Button>
+                        </Button>,
                       ]}
                     >
                       <List.Item.Meta
-                        avatar={<Avatar icon={<TeamOutlined />} style={{ background: '#1890ff' }} />}
+                        avatar={
+                          <Avatar icon={<TeamOutlined />} style={{ background: '#1890ff' }} />
+                        }
                         title={
                           <Space>
                             <Text strong>{group.target_count}人团</Text>
@@ -565,7 +604,8 @@ export const ProductDetailPage: React.FC = () => {
                         description={
                           <Space direction="vertical" size="small">
                             <Text type="secondary">
-                              <UserOutlined /> 已参与 {group.current_count} 人，还差 {remainingSlots} 人
+                              <UserOutlined /> 已参与 {group.current_count} 人，还差{' '}
+                              {remainingSlots} 人
                             </Text>
                             <Text type="secondary">
                               <ClockCircleOutlined /> 剩余 {hoursLeft} 小时
@@ -574,7 +614,7 @@ export const ProductDetailPage: React.FC = () => {
                         }
                       />
                     </List.Item>
-                  )
+                  );
                 }}
               />
             )}
@@ -582,7 +622,7 @@ export const ProductDetailPage: React.FC = () => {
         </Modal>
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default ProductDetailPage
+export default ProductDetailPage;

@@ -1,15 +1,15 @@
-import React from 'react'
-import { Card, Typography, Space, Divider, Row, Col, Avatar } from 'antd'
-import { TeamOutlined, TrophyOutlined, SafetyOutlined, GlobalOutlined } from '@ant-design/icons'
+import React from 'react';
+import { Card, Typography, Space, Divider, Row, Col, Avatar } from 'antd';
+import { TeamOutlined, TrophyOutlined, SafetyOutlined, GlobalOutlined } from '@ant-design/icons';
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text, Paragraph } = Typography;
 
 const teamMembers = [
   { name: '张三', role: '创始人 & CEO', avatar: 'Z' },
   { name: '李四', role: '技术负责人', avatar: 'L' },
   { name: '王五', role: '产品负责人', avatar: 'W' },
   { name: '赵六', role: '运营负责人', avatar: 'Z' },
-]
+];
 
 export const AboutPage: React.FC = () => {
   return (
@@ -80,7 +80,9 @@ export const AboutPage: React.FC = () => {
                     <div>
                       <Text strong>{member.name}</Text>
                     </div>
-                    <Text type="secondary" style={{ fontSize: 12 }}>{member.role}</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {member.role}
+                    </Text>
                   </Card>
                 </Col>
               ))}
@@ -101,7 +103,7 @@ export const AboutPage: React.FC = () => {
         </Space>
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default AboutPage
+export default AboutPage;

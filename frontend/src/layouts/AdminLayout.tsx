@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, message, Spin, Drawer, Button } from 'antd'
+import { useEffect, useState } from 'react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Layout, Menu, Avatar, Dropdown, message, Spin, Drawer, Button } from 'antd';
 import {
   DashboardOutlined,
   UserOutlined,
@@ -11,11 +11,11 @@ import {
   AppstoreOutlined,
   MenuOutlined,
   CloseOutlined,
-} from '@ant-design/icons'
-import { useAuthStore } from '@/stores/authStore'
-import styles from './AdminLayout.module.css'
+} from '@ant-design/icons';
+import { useAuthStore } from '@/stores/authStore';
+import styles from './AdminLayout.module.css';
 
-const { Header, Sider, Content } = Layout
+const { Header, Sider, Content } = Layout;
 
 const menuItems = [
   {
@@ -48,70 +48,72 @@ const menuItems = [
     icon: <SettingOutlined />,
     label: '系统设置',
   },
-]
+];
 
 const AdminLayout = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { user, logout, isAuthenticated, fetchUser } = useAuthStore()
-  const [collapsed, setCollapsed] = useState(false)
-  const [checkingAuth, setCheckingAuth] = useState(true)
-  const [isMobile, setIsMobile] = useState(false)
-  const [drawerVisible, setDrawerVisible] = useState(false)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, logout, isAuthenticated, fetchUser } = useAuthStore();
+  const [collapsed, setCollapsed] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 992)
-    }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
+      setIsMobile(window.innerWidth < 992);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
-      const hasToken = !!(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'))
+      const hasToken = !!(
+        localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
+      );
       if (!hasToken) {
-        navigate('/login', { state: { from: location.pathname } })
-        return
+        navigate('/login', { state: { from: location.pathname } });
+        return;
       }
 
       if (!user) {
         try {
-          await fetchUser()
+          await fetchUser();
         } catch {
-          localStorage.removeItem('auth_token')
-          sessionStorage.removeItem('auth_token')
-          navigate('/login', { state: { from: location.pathname } })
-          return
+          localStorage.removeItem('auth_token');
+          sessionStorage.removeItem('auth_token');
+          navigate('/login', { state: { from: location.pathname } });
+          return;
         }
       }
 
-      setCheckingAuth(false)
-    }
+      setCheckingAuth(false);
+    };
 
-    checkAuth()
-  }, [isAuthenticated, user, fetchUser, navigate, location.pathname])
+    checkAuth();
+  }, [isAuthenticated, user, fetchUser, navigate, location.pathname]);
 
   useEffect(() => {
     if (!checkingAuth && user && user.role !== 'admin') {
-      message.error('无权限访问管理后台')
-      navigate('/')
+      message.error('无权限访问管理后台');
+      navigate('/');
     }
-  }, [checkingAuth, user, navigate])
+  }, [checkingAuth, user, navigate]);
 
   const handleMenuClick = ({ key }: { key: string }) => {
-    navigate(key)
+    navigate(key);
     if (isMobile) {
-      setDrawerVisible(false)
+      setDrawerVisible(false);
     }
-  }
+  };
 
   const handleLogout = () => {
-    logout()
-    message.success('已退出登录')
-    navigate('/login')
-  }
+    logout();
+    message.success('已退出登录');
+    navigate('/login');
+  };
 
   const userMenuItems = [
     {
@@ -129,28 +131,30 @@ const AdminLayout = () => {
       label: '退出登录',
       onClick: handleLogout,
     },
-  ]
+  ];
 
   const getSelectedKey = () => {
-    const path = location.pathname
-    if (path === '/admin') return '/admin'
-    return path
-  }
+    const path = location.pathname;
+    if (path === '/admin') return '/admin';
+    return path;
+  };
 
   const toggleDrawer = () => {
-    setDrawerVisible(!drawerVisible)
-  }
+    setDrawerVisible(!drawerVisible);
+  };
 
   if (checkingAuth) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div
+        style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}
+      >
         <Spin size="large" tip="加载中..." />
       </div>
-    )
+    );
   }
 
   if (!isAuthenticated || (user && user.role !== 'admin')) {
-    return null
+    return null;
   }
 
   const menuContent = (
@@ -162,7 +166,7 @@ const AdminLayout = () => {
       theme="dark"
       style={{ borderRight: 0, background: 'transparent' }}
     />
-  )
+  );
 
   const siderMenuContent = (
     <Menu
@@ -173,7 +177,7 @@ const AdminLayout = () => {
       theme="dark"
       style={{ borderRight: 0 }}
     />
-  )
+  );
 
   return (
     <Layout className={styles.layout}>
@@ -225,9 +229,7 @@ const AdminLayout = () => {
               className={styles.menuBtn}
             />
           )}
-          <div className={styles.headerTitle}>
-            {isMobile && <span>运营管理</span>}
-          </div>
+          <div className={styles.headerTitle}>{isMobile && <span>运营管理</span>}</div>
           <div className={styles.headerRight}>
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <div className={styles.userInfo}>
@@ -242,7 +244,7 @@ const AdminLayout = () => {
         </Content>
       </Layout>
     </Layout>
-  )
-}
+  );
+};
 
-export default AdminLayout
+export default AdminLayout;

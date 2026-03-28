@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, message, Spin, Drawer, Button } from 'antd'
+import { useState, useEffect } from 'react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Layout, Menu, Avatar, Dropdown, message, Spin, Drawer, Button } from 'antd';
 import {
   ShopOutlined,
   AppstoreOutlined,
@@ -16,12 +16,12 @@ import {
   TeamOutlined,
   MenuOutlined,
   CloseOutlined,
-} from '@ant-design/icons'
-import { useAuthStore } from '@/stores/authStore'
-import { useMerchantStore } from '@/stores/merchantStore'
-import styles from './MerchantLayout.module.css'
+} from '@ant-design/icons';
+import { useAuthStore } from '@/stores/authStore';
+import { useMerchantStore } from '@/stores/merchantStore';
+import styles from './MerchantLayout.module.css';
 
-const { Header, Sider, Content } = Layout
+const { Header, Sider, Content } = Layout;
 
 const menuItems = [
   {
@@ -74,96 +74,108 @@ const menuItems = [
     icon: <SettingOutlined />,
     label: '店铺设置',
   },
-]
+];
 
 const MerchantLayout = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { user, logout, isAuthenticated, fetchUser } = useAuthStore()
-  const { profile: merchantProfile, fetchProfile } = useMerchantStore()
-  const [collapsed, setCollapsed] = useState(false)
-  const [checkingAuth, setCheckingAuth] = useState(true)
-  const [isMobile, setIsMobile] = useState(false)
-  const [drawerVisible, setDrawerVisible] = useState(false)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, logout, isAuthenticated, fetchUser } = useAuthStore();
+  const { profile: merchantProfile, fetchProfile } = useMerchantStore();
+  const [collapsed, setCollapsed] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 992)
-    }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
+      setIsMobile(window.innerWidth < 992);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
-      const hasToken = !!(localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'))
+      const hasToken = !!(
+        localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
+      );
       if (!hasToken) {
-        navigate('/login', { state: { from: location.pathname } })
-        return
+        navigate('/login', { state: { from: location.pathname } });
+        return;
       }
 
       if (!user) {
         try {
-          await fetchUser()
+          await fetchUser();
         } catch {
-          localStorage.removeItem('auth_token')
-          sessionStorage.removeItem('auth_token')
-          navigate('/login', { state: { from: location.pathname } })
-          return
+          localStorage.removeItem('auth_token');
+          sessionStorage.removeItem('auth_token');
+          navigate('/login', { state: { from: location.pathname } });
+          return;
         }
       }
 
-      setCheckingAuth(false)
-      
+      setCheckingAuth(false);
+
       if (user && user.role === 'merchant') {
         try {
-          await fetchProfile()
-          const profile = merchantProfile
+          await fetchProfile();
+          const profile = merchantProfile;
           if (profile && profile.status === 'pending') {
-            message.warning('您的商户申请正在审核中，请先提交资料')
-            navigate('/merchant/settings')
+            message.warning('您的商户申请正在审核中，请先提交资料');
+            navigate('/merchant/settings');
           }
         } catch {
-          message.error('获取商户信息失败')
+          message.error('获取商户信息失败');
         }
       }
-    }
+    };
 
-    checkAuth()
-  }, [isAuthenticated, user, fetchUser, fetchProfile, merchantProfile, navigate, location.pathname])
+    checkAuth();
+  }, [
+    isAuthenticated,
+    user,
+    fetchUser,
+    fetchProfile,
+    merchantProfile,
+    navigate,
+    location.pathname,
+  ]);
 
   useEffect(() => {
     if (!checkingAuth && user && user.role !== 'merchant') {
-      message.error('无权限访问商户后台')
-      navigate('/')
+      message.error('无权限访问商户后台');
+      navigate('/');
     }
-  }, [checkingAuth, user, navigate])
+  }, [checkingAuth, user, navigate]);
 
   if (checkingAuth) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div
+        style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}
+      >
         <Spin size="large" />
       </div>
-    )
+    );
   }
 
   if (!isAuthenticated || (user && user.role !== 'merchant')) {
-    return null
+    return null;
   }
 
   const handleMenuClick = ({ key }: { key: string }) => {
-    navigate(key)
+    navigate(key);
     if (isMobile) {
-      setDrawerVisible(false)
+      setDrawerVisible(false);
     }
-  }
+  };
 
   const handleLogout = () => {
-    logout()
-    message.success('已退出登录')
-    navigate('/login')
-  }
+    logout();
+    message.success('已退出登录');
+    navigate('/login');
+  };
 
   const userMenuItems = [
     {
@@ -181,17 +193,17 @@ const MerchantLayout = () => {
       label: '退出登录',
       onClick: handleLogout,
     },
-  ]
+  ];
 
   const getSelectedKey = () => {
-    const path = location.pathname
-    if (path === '/merchant') return '/merchant'
-    return path
-  }
+    const path = location.pathname;
+    if (path === '/merchant') return '/merchant';
+    return path;
+  };
 
   const toggleDrawer = () => {
-    setDrawerVisible(!drawerVisible)
-  }
+    setDrawerVisible(!drawerVisible);
+  };
 
   const menuContent = (
     <Menu
@@ -201,7 +213,7 @@ const MerchantLayout = () => {
       onClick={handleMenuClick}
       style={{ borderRight: 0 }}
     />
-  )
+  );
 
   return (
     <Layout className={styles.layout}>
@@ -255,9 +267,7 @@ const MerchantLayout = () => {
               className={styles.menuBtn}
             />
           )}
-          <div className={styles.headerTitle}>
-            {isMobile && <span>商家后台</span>}
-          </div>
+          <div className={styles.headerTitle}>{isMobile && <span>商家后台</span>}</div>
           <div className={styles.headerRight}>
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <div className={styles.userInfo}>
@@ -272,7 +282,7 @@ const MerchantLayout = () => {
         </Content>
       </Layout>
     </Layout>
-  )
-}
+  );
+};
 
-export default MerchantLayout
+export default MerchantLayout;

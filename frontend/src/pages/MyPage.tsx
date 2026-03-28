@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Card, Row, Col, Avatar, List, Button, Divider, Tag, Space, Statistic } from 'antd'
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, Row, Col, Avatar, List, Button, Divider, Tag, Space, Statistic } from 'antd';
 import {
   UserOutlined,
   WalletOutlined,
@@ -13,39 +13,41 @@ import {
   BarChartOutlined,
   ShoppingCartOutlined,
   TeamOutlined,
-} from '@ant-design/icons'
-import { useAuthStore } from '@/stores/authStore'
-import styles from './MyPage.module.css'
+} from '@ant-design/icons';
+import { useAuthStore } from '@/stores/authStore';
+import styles from './MyPage.module.css';
 
 const MyPage = () => {
-  const { user, isAuthenticated, fetchUser } = useAuthStore()
-  const navigate = useNavigate()
+  const { user, isAuthenticated, fetchUser } = useAuthStore();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (isAuthenticated && !user) {
-      fetchUser()
+      fetchUser();
     }
-  }, [isAuthenticated, user, fetchUser])
+  }, [isAuthenticated, user, fetchUser]);
 
   const getRoleTag = (role: string) => {
     const roleMap: Record<string, { color: string; text: string }> = {
       user: { color: 'blue', text: '普通用户' },
       merchant: { color: 'green', text: '商家' },
       admin: { color: 'red', text: '管理员' },
-    }
-    const { color, text } = roleMap[role] || { color: 'default', text: role }
-    return <Tag color={color}>{text}</Tag>
-  }
+    };
+    const { color, text } = roleMap[role] || { color: 'default', text: role };
+    return <Tag color={color}>{text}</Tag>;
+  };
 
   const getUserLevel = (createdAt: string) => {
-    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24))
-    if (days < 30) return { level: 1, name: '新用户', progress: days / 30 * 100 }
-    if (days < 90) return { level: 2, name: '活跃用户', progress: (days - 30) / 60 * 100 }
-    if (days < 180) return { level: 3, name: '忠诚用户', progress: (days - 90) / 90 * 100 }
-    return { level: 4, name: '资深用户', progress: 100 }
-  }
+    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24));
+    if (days < 30) return { level: 1, name: '新用户', progress: (days / 30) * 100 };
+    if (days < 90) return { level: 2, name: '活跃用户', progress: ((days - 30) / 60) * 100 };
+    if (days < 180) return { level: 3, name: '忠诚用户', progress: ((days - 90) / 90) * 100 };
+    return { level: 4, name: '资深用户', progress: 100 };
+  };
 
-  const userLevel = user ? getUserLevel(user.created_at) : { level: 1, name: '新用户', progress: 0 }
+  const userLevel = user
+    ? getUserLevel(user.created_at)
+    : { level: 1, name: '新用户', progress: 0 };
 
   const menuItems = [
     {
@@ -61,10 +63,22 @@ const MyPage = () => {
       color: '#52c41a',
     },
     {
+      title: '我的收藏',
+      icon: <HeartOutlined />,
+      link: '/favorites',
+      color: '#ff4d4f',
+    },
+    {
+      title: '浏览历史',
+      icon: <HistoryOutlined />,
+      link: '/history',
+      color: '#722ed1',
+    },
+    {
       title: '消费明细',
       icon: <BarChartOutlined />,
       link: '/consumption',
-      color: '#722ed1',
+      color: '#13c2c2',
     },
     {
       title: '邀请好友',
@@ -72,23 +86,13 @@ const MyPage = () => {
       link: '/referral',
       color: '#faad14',
     },
-  ]
+  ];
 
   const settingItems = [
     {
       title: '个人资料',
       icon: <UserOutlined />,
       link: '/profile',
-    },
-    {
-      title: '我的收藏',
-      icon: <HeartOutlined />,
-      link: '/favorites',
-    },
-    {
-      title: '浏览历史',
-      icon: <HistoryOutlined />,
-      link: '/history',
     },
     {
       title: '账户安全',
@@ -101,15 +105,15 @@ const MyPage = () => {
       icon: <SettingOutlined />,
       link: '/help',
     },
-  ]
+  ];
 
   const handleMenuClick = (link: string, tab?: string) => {
     if (tab) {
-      navigate(`${link}?tab=${tab}`)
+      navigate(`${link}?tab=${tab}`);
     } else {
-      navigate(link)
+      navigate(link);
     }
-  }
+  };
 
   if (!isAuthenticated) {
     return (
@@ -124,7 +128,7 @@ const MyPage = () => {
           </div>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
@@ -148,10 +152,13 @@ const MyPage = () => {
         <Divider />
         <Row gutter={16}>
           <Col span={8}>
-            <Statistic 
-              title="注册天数" 
-              value={Math.floor((Date.now() - new Date(user?.created_at || Date.now()).getTime()) / (1000 * 60 * 60 * 24))} 
-              suffix="天" 
+            <Statistic
+              title="注册天数"
+              value={Math.floor(
+                (Date.now() - new Date(user?.created_at || Date.now()).getTime()) /
+                  (1000 * 60 * 60 * 24)
+              )}
+              suffix="天"
             />
           </Col>
           <Col span={8}>
@@ -167,11 +174,11 @@ const MyPage = () => {
         <Row gutter={[16, 16]}>
           {menuItems.map((item) => (
             <Col xs={12} sm={6} key={item.title}>
-              <div 
-                className={styles.menuItem} 
-                onClick={() => handleMenuClick(item.link)}
-              >
-                <div className={styles.menuIcon} style={{ backgroundColor: item.color + '20', color: item.color }}>
+              <div className={styles.menuItem} onClick={() => handleMenuClick(item.link)}>
+                <div
+                  className={styles.menuIcon}
+                  style={{ backgroundColor: item.color + '20', color: item.color }}
+                >
                   {item.icon}
                 </div>
                 <span className={styles.menuTitle}>{item.title}</span>
@@ -185,7 +192,7 @@ const MyPage = () => {
         <List
           dataSource={settingItems}
           renderItem={(item) => (
-            <List.Item 
+            <List.Item
               className={styles.settingItem}
               onClick={() => handleMenuClick(item.link, item.tab)}
             >
@@ -199,7 +206,7 @@ const MyPage = () => {
         />
       </Card>
     </div>
-  )
-}
+  );
+};
 
-export default MyPage
+export default MyPage;

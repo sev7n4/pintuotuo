@@ -1,12 +1,38 @@
-import { useEffect, useState } from 'react'
-import { Card, Tabs, Table, Button, Tag, Space, Modal, Form, Input, InputNumber, message, Statistic, Row, Col, Popconfirm, Empty, Typography } from 'antd'
-import { WalletOutlined, ApiOutlined, HistoryOutlined, PlusOutlined, DeleteOutlined, SendOutlined, ReloadOutlined } from '@ant-design/icons'
-import { useTokenStore } from '@/stores/tokenStore'
-import { UserAPIKey } from '@/types'
-import styles from './MyToken.module.css'
+import { useEffect, useState } from 'react';
+import {
+  Card,
+  Tabs,
+  Table,
+  Button,
+  Tag,
+  Space,
+  Modal,
+  Form,
+  Input,
+  InputNumber,
+  message,
+  Statistic,
+  Row,
+  Col,
+  Popconfirm,
+  Empty,
+  Typography,
+} from 'antd';
+import {
+  WalletOutlined,
+  ApiOutlined,
+  HistoryOutlined,
+  PlusOutlined,
+  DeleteOutlined,
+  SendOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons';
+import { useTokenStore } from '@/stores/tokenStore';
+import { UserAPIKey } from '@/types';
+import styles from './MyToken.module.css';
 
-const { TabPane } = Tabs
-const { Text, Paragraph } = Typography
+const { TabPane } = Tabs;
+const { Text, Paragraph } = Typography;
 
 const MyToken = () => {
   const {
@@ -20,63 +46,63 @@ const MyToken = () => {
     deleteAPIKey,
     transfer,
     isLoading,
-  } = useTokenStore()
+  } = useTokenStore();
 
-  const [createKeyModalVisible, setCreateKeyModalVisible] = useState(false)
-  const [transferModalVisible, setTransferModalVisible] = useState(false)
-  const [keyForm] = Form.useForm()
-  const [transferForm] = Form.useForm()
-  const [newKeyDisplay, setNewKeyDisplay] = useState<string | null>(null)
+  const [createKeyModalVisible, setCreateKeyModalVisible] = useState(false);
+  const [transferModalVisible, setTransferModalVisible] = useState(false);
+  const [keyForm] = Form.useForm();
+  const [transferForm] = Form.useForm();
+  const [newKeyDisplay, setNewKeyDisplay] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchBalance()
-    fetchTransactions()
-    fetchAPIKeys()
-  }, [fetchBalance, fetchTransactions, fetchAPIKeys])
+    fetchBalance();
+    fetchTransactions();
+    fetchAPIKeys();
+  }, [fetchBalance, fetchTransactions, fetchAPIKeys]);
 
   const handleCreateKey = async () => {
     try {
-      const values = await keyForm.validateFields()
-      const success = await createAPIKey(values.name)
+      const values = await keyForm.validateFields();
+      const success = await createAPIKey(values.name);
       if (success) {
-        message.success('API密钥创建成功')
-        setCreateKeyModalVisible(false)
-        keyForm.resetFields()
-        fetchAPIKeys()
+        message.success('API密钥创建成功');
+        setCreateKeyModalVisible(false);
+        keyForm.resetFields();
+        fetchAPIKeys();
       }
     } catch {
-      message.error('创建失败')
+      message.error('创建失败');
     }
-  }
+  };
 
   const handleDeleteKey = async (id: number) => {
-    const success = await deleteAPIKey(id)
+    const success = await deleteAPIKey(id);
     if (success) {
-      message.success('API密钥已删除')
-      fetchAPIKeys()
+      message.success('API密钥已删除');
+      fetchAPIKeys();
     }
-  }
+  };
 
   const handleTransfer = async () => {
     try {
-      const values = await transferForm.validateFields()
-      const success = await transfer(values.recipient_id, values.amount)
+      const values = await transferForm.validateFields();
+      const success = await transfer(values.recipient_id, values.amount);
       if (success) {
-        message.success('转账成功')
-        setTransferModalVisible(false)
-        transferForm.resetFields()
-        fetchBalance()
-        fetchTransactions()
+        message.success('转账成功');
+        setTransferModalVisible(false);
+        transferForm.resetFields();
+        fetchBalance();
+        fetchTransactions();
       }
     } catch {
-      message.error('转账失败')
+      message.error('转账失败');
     }
-  }
+  };
 
   const handleCopyKey = (key: string) => {
-    navigator.clipboard.writeText(key)
-    message.success('已复制到剪贴板')
-  }
+    navigator.clipboard.writeText(key);
+    message.success('已复制到剪贴板');
+  };
 
   const transactionTypeMap: Record<string, { color: string; text: string }> = {
     purchase: { color: 'green', text: '购买' },
@@ -84,7 +110,7 @@ const MyToken = () => {
     transfer: { color: 'blue', text: '转账' },
     reward: { color: 'purple', text: '奖励' },
     refund: { color: 'cyan', text: '退款' },
-  }
+  };
 
   const transactionColumns = [
     {
@@ -93,8 +119,8 @@ const MyToken = () => {
       key: 'type',
       width: 100,
       render: (type: string) => {
-        const { color, text } = transactionTypeMap[type] || { color: 'default', text: type }
-        return <Tag color={color}>{text}</Tag>
+        const { color, text } = transactionTypeMap[type] || { color: 'default', text: type };
+        return <Tag color={color}>{text}</Tag>;
       },
     },
     {
@@ -104,7 +130,8 @@ const MyToken = () => {
       width: 120,
       render: (amount: number) => (
         <span style={{ color: amount > 0 ? '#52c41a' : '#ff4d4f' }}>
-          {amount > 0 ? '+' : ''}{amount.toLocaleString()}
+          {amount > 0 ? '+' : ''}
+          {amount.toLocaleString()}
         </span>
       ),
     },
@@ -121,7 +148,7 @@ const MyToken = () => {
       width: 180,
       render: (date: string) => new Date(date).toLocaleString('zh-CN'),
     },
-  ]
+  ];
 
   const apiKeyColumns = [
     {
@@ -181,7 +208,7 @@ const MyToken = () => {
         </Popconfirm>
       ),
     },
-  ]
+  ];
 
   return (
     <div className={styles.myToken}>
@@ -235,7 +262,13 @@ const MyToken = () => {
           >
             转账
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => { fetchBalance(); fetchTransactions(); }}>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => {
+              fetchBalance();
+              fetchTransactions();
+            }}
+          >
             刷新
           </Button>
         </Space>
@@ -244,7 +277,11 @@ const MyToken = () => {
       <Card className={styles.tabsCard}>
         <Tabs defaultActiveKey="transactions">
           <TabPane
-            tab={<span><HistoryOutlined /> 交易记录</span>}
+            tab={
+              <span>
+                <HistoryOutlined /> 交易记录
+              </span>
+            }
             key="transactions"
           >
             <Table
@@ -258,7 +295,11 @@ const MyToken = () => {
           </TabPane>
 
           <TabPane
-            tab={<span><ApiOutlined /> API密钥</span>}
+            tab={
+              <span>
+                <ApiOutlined /> API密钥
+              </span>
+            }
             key="apikeys"
           >
             <div className={styles.tabHeader}>
@@ -287,20 +328,20 @@ const MyToken = () => {
         open={createKeyModalVisible}
         onOk={handleCreateKey}
         onCancel={() => {
-          setCreateKeyModalVisible(false)
-          keyForm.resetFields()
-          setNewKeyDisplay(null)
+          setCreateKeyModalVisible(false);
+          keyForm.resetFields();
+          setNewKeyDisplay(null);
         }}
         okText="创建"
         cancelText="取消"
       >
         {newKeyDisplay ? (
           <div className={styles.newKeyDisplay}>
-            <Paragraph type="warning">
-              请妥善保存以下密钥，关闭后将无法再次查看完整密钥：
-            </Paragraph>
+            <Paragraph type="warning">请妥善保存以下密钥，关闭后将无法再次查看完整密钥：</Paragraph>
             <Paragraph copyable={{ onCopy: () => handleCopyKey(newKeyDisplay) }}>
-              <Text code className={styles.keyText}>{newKeyDisplay}</Text>
+              <Text code className={styles.keyText}>
+                {newKeyDisplay}
+              </Text>
             </Paragraph>
           </div>
         ) : (
@@ -321,8 +362,8 @@ const MyToken = () => {
         open={transferModalVisible}
         onOk={handleTransfer}
         onCancel={() => {
-          setTransferModalVisible(false)
-          transferForm.resetFields()
+          setTransferModalVisible(false);
+          transferForm.resetFields();
         }}
         okText="确认转账"
         cancelText="取消"
@@ -357,7 +398,7 @@ const MyToken = () => {
         </Form>
       </Modal>
     </div>
-  )
-}
+  );
+};
 
-export default MyToken
+export default MyToken;
