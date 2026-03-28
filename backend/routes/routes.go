@@ -226,3 +226,18 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.POST("/merchants/:id/reject", handlers.RejectMerchant)
 	}
 }
+
+func RegisterFlashSaleRoutes(router *gin.RouterGroup) {
+	flashSales := router.Group("/flash-sales")
+	{
+		flashSales.GET("/active", handlers.GetActiveFlashSales)
+		flashSales.GET("/:id/products", handlers.GetFlashSaleProducts)
+	}
+
+	authFlashSales := router.Group("/flash-sales")
+	authFlashSales.Use(middleware.AuthMiddleware())
+	{
+		authFlashSales.POST("", handlers.CreateFlashSale)
+		authFlashSales.PUT("/:id/status", handlers.UpdateFlashSaleStatus)
+	}
+}
