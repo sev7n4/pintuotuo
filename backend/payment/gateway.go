@@ -307,6 +307,9 @@ func (s *PaymentService) CreateAlipayPayment(outTradeNo string, amount float64, 
 }
 
 func (s *PaymentService) CreateWechatPayment(outTradeNo string, amount int, body string) (string, error) {
+	if s.wechat == nil || s.wechat.config == nil || s.wechat.config.APIKey == "" {
+		return "", fmt.Errorf("wechat pay not configured: missing api key")
+	}
 	req := &WechatNativePayRequest{
 		OutTradeNo: outTradeNo,
 		TotalFee:   amount,
