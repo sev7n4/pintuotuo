@@ -32,4 +32,10 @@ CREATE INDEX IF NOT EXISTS idx_flash_sale_products_sale ON flash_sale_products(f
 CREATE INDEX IF NOT EXISTS idx_flash_sale_products_product ON flash_sale_products(product_id);
 
 -- Add flash_sale_id to order_items for tracking flash sale purchases
-ALTER TABLE order_items ADD COLUMN IF NOT EXISTS flash_sale_id INTEGER REFERENCES flash_sales(id);
+-- Only add if order_items table exists
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'order_items') THEN
+        ALTER TABLE order_items ADD COLUMN IF NOT EXISTS flash_sale_id INTEGER REFERENCES flash_sales(id);
+    END IF;
+END $$;

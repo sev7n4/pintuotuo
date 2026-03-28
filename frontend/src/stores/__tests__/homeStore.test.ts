@@ -19,6 +19,7 @@ const mockProduct: Product = {
 };
 
 const mockCategory: Category = {
+  id: 1,
   name: 'Test Category',
   count: 10,
 };
