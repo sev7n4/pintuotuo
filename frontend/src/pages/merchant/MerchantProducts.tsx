@@ -16,7 +16,7 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
 import { productService } from '@/services/product';
-import { Product } from '@/types';
+import { Product, Category } from '@/types';
 import styles from './MerchantProducts.module.css';
 
 const MerchantProducts = () => {
@@ -25,10 +25,28 @@ const MerchantProducts = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form] = Form.useForm();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   useEffect(() => {
     fetchProducts(1, 20, statusFilter === 'all' ? undefined : statusFilter);
   }, [fetchProducts, statusFilter]);
+
+  const fetchCategories = async () => {
+    setCategoriesLoading(true);
+    try {
+      const response = await productService.getCategories();
+      setCategories(response.data.data || []);
+    } catch {
+      console.error('Failed to fetch categories');
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   const handleAdd = () => {
     setEditingProduct(null);
@@ -97,7 +115,7 @@ const MerchantProducts = () => {
           okText: '去提交',
           cancelText: '取消',
           onOk: () => {
-            window.location.href = responseData?.data?.redirect || '/merchant/apply';
+            window.location.href = '/merchant/settings';
           },
         });
         return;
@@ -291,7 +309,17 @@ const MerchantProducts = () => {
             <InputNumber min={-Infinity} style={{ width: '100%' }} placeholder="请输入库存" />
           </Form.Item>
           <Form.Item name="category" label="分类">
-            <Input placeholder="请输入分类" />
+            <Select
+              placeholder="请选择分类"
+              loading={categoriesLoading}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={categories.map((cat) => ({
+                value: cat.name,
+                label: cat.name,
+              }))}
+            />
           </Form.Item>
           <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
             <Select
