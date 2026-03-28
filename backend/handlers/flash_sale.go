@@ -27,16 +27,16 @@ type FlashSale struct {
 }
 
 type FlashSaleProduct struct {
-	ID           int     `json:"id"`
-	FlashSaleID  int     `json:"flash_sale_id"`
-	ProductID    int     `json:"product_id"`
-	ProductName  string  `json:"product_name"`
-	FlashPrice   float64 `json:"flash_price"`
+	ID            int     `json:"id"`
+	FlashSaleID   int     `json:"flash_sale_id"`
+	ProductID     int     `json:"product_id"`
+	ProductName   string  `json:"product_name"`
+	FlashPrice    float64 `json:"flash_price"`
 	OriginalPrice float64 `json:"original_price"`
-	StockLimit   int     `json:"stock_limit"`
-	StockSold    int     `json:"stock_sold"`
-	PerUserLimit int     `json:"per_user_limit"`
-	Discount     int     `json:"discount"`
+	StockLimit    int     `json:"stock_limit"`
+	StockSold     int     `json:"stock_sold"`
+	PerUserLimit  int     `json:"per_user_limit"`
+	Discount      int     `json:"discount"`
 }
 
 type FlashSaleWithProducts struct {
@@ -295,8 +295,8 @@ func CreateFlashSale(c *gin.Context) {
 
 func UpdateFlashSaleStatus(c *gin.Context) {
 	saleID := c.Param("id")
-	saleIDInt, err := strconv.Atoi(saleID)
-	if err != nil {
+	saleIDInt, convErr := strconv.Atoi(saleID)
+	if convErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
@@ -305,12 +305,12 @@ func UpdateFlashSaleStatus(c *gin.Context) {
 		Status string `json:"status" binding:"required"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	validStatuses := map[string]bool{"upcoming": true, "active": true, "ended": true, "cancelled": true}
+	validStatuses := map[string]bool{"upcoming": true, "active": true, "ended": true, "canceled": true}
 	if !validStatuses[req.Status] {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"INVALID_STATUS",
@@ -328,7 +328,7 @@ func UpdateFlashSaleStatus(c *gin.Context) {
 	}
 
 	var sale FlashSale
-	err = db.QueryRow(`
+	err := db.QueryRow(`
 		UPDATE flash_sales SET status = $1, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $2
 		RETURNING id, name, description, start_time, end_time, status, created_at, updated_at`,

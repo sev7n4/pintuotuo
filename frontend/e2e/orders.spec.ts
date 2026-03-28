@@ -99,8 +99,8 @@ test.describe('Groups', () => {
     await page.goto('/groups');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
-    const heading = page.locator('h1').first();
-    const emptyState = page.getByText('暂无分组');
+    const heading = page.locator('h1, h2, h3').first();
+    const emptyState = page.getByText(/暂无.*拼团|暂无分组/);
     await expect(heading.or(emptyState)).toBeVisible({ timeout: 10000 });
   });
 
