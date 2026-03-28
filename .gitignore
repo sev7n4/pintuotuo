@@ -140,3 +140,9 @@ backend/IMPLEMENTATION_GUIDE.md
 backend/LOADTEST_RESULTS.md
 backend/PRIORITY2_CACHING_REPORT.md
 backend/WEEK2_*.md
+
+# Alipay sensitive files
+alipay_config.txt
+app_private_key.pem
+app_public_key.pem
+*.pem
