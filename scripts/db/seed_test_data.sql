@@ -61,3 +61,49 @@ ON CONFLICT (user_id) DO UPDATE SET balance = 1000.00;
 -- Verify test data
 SELECT id, email, name, role, status FROM users 
 WHERE email IN ('demo@example.com', 'merchant@example.com', 'admin@example.com');
+
+-- Insert default categories if not exists
+-- 一级分类：厂家/模型（level=1）
+INSERT INTO categories (name, level, description, sort_order)
+SELECT 'GPT 系列', 1, 'OpenAI GPT 系列（GPT-3.5, GPT-4, GPT-4o 等）', 1
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'GPT 系列' AND level = 1);
+
+INSERT INTO categories (name, level, description, sort_order)
+SELECT 'Claude 系列', 1, 'Anthropic Claude 系列（Claude 3 Opus/Sonnet/Haiku）', 2
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Claude 系列' AND level = 1);
+
+INSERT INTO categories (name, level, description, sort_order)
+SELECT 'Gemini 系列', 1, 'Google Gemini 系列', 3
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Gemini 系列' AND level = 1);
+
+INSERT INTO categories (name, level, description, sort_order)
+SELECT '其他模型', 1, '其他 AI 模型', 99
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = '其他模型' AND level = 1);
+
+-- 二级分类：计费类型（level=2）
+INSERT INTO categories (name, level, description, sort_order)
+SELECT '免费试用', 2, '免费体验套餐', 0
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = '免费试用' AND level = 2);
+
+INSERT INTO categories (name, level, description, sort_order)
+SELECT '月度基础版', 2, '月度入门级不限量套餐', 1
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = '月度基础版' AND level = 2);
+
+INSERT INTO categories (name, level, description, sort_order)
+SELECT '月度标准版', 2, '月度标准级不限量套餐', 2
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = '月度标准版' AND level = 2);
+
+INSERT INTO categories (name, level, description, sort_order)
+SELECT '月度高级版', 2, '月度高级不限量套餐', 3
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = '月度高级版' AND level = 2);
+
+INSERT INTO categories (name, level, description, sort_order)
+SELECT '按量付费', 2, '按 Token 计费', 10
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = '按量付费' AND level = 2);
+
+INSERT INTO categories (name, level, description, sort_order)
+SELECT '企业定制', 2, '企业级定制方案', 11
+WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = '企业定制' AND level = 2);
+
+-- Verify categories
+SELECT id, name, level, description FROM categories ORDER BY level, sort_order;
