@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -60,9 +61,11 @@ func CreatePayment(c *gin.Context) {
 
 	var req CreatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[CreatePayment] Bind error: %v, userID: %d", err, userIDInt)
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
+	log.Printf("[CreatePayment] Request: order_id=%d, pay_method=%s, amount=%.2f, userID=%d", req.OrderID, req.PayMethod, req.Amount, userIDInt)
 
 	db := config.GetDB()
 	if db == nil {
@@ -76,9 +79,11 @@ func CreatePayment(c *gin.Context) {
 		req.OrderID,
 	).Scan(&order.ID, &order.UserID, &order.TotalPrice, &order.Status)
 	if err != nil {
+		log.Printf("[CreatePayment] Order query error: %v, order_id: %d", err, req.OrderID)
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
 	}
+	log.Printf("[CreatePayment] Order found: id=%d, user_id=%d, status=%s", order.ID, order.UserID, order.Status)
 
 	if order.UserID != userIDInt {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
@@ -105,6 +110,7 @@ func CreatePayment(c *gin.Context) {
 		req.OrderID, userIDInt, req.Amount, req.PayMethod, outTradeNo,
 	).Scan(&paymentID)
 	if err != nil {
+		log.Printf("[CreatePayment] Payment insert error: %v", err)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"PAYMENT_CREATE_FAILED",
 			"Failed to create payment record",
@@ -113,6 +119,7 @@ func CreatePayment(c *gin.Context) {
 		))
 		return
 	}
+	log.Printf("[CreatePayment] Payment created: id=%d, out_trade_no=%s", paymentID, outTradeNo)
 
 	var payURL, qrCodeURL string
 
