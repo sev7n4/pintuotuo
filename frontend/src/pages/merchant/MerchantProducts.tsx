@@ -37,14 +37,17 @@ const MerchantProducts = () => {
   const fetchCategories = async () => {
     setCategoriesLoading(true);
     try {
+      console.log('Fetching categories...');
       const [modelsRes, packagesRes] = await Promise.all([
         productService.getModels(),
         productService.getPackages(),
       ]);
+      console.log('Models response:', modelsRes.data);
+      console.log('Packages response:', packagesRes.data);
       setModels(modelsRes.data.data || []);
       setPackages(packagesRes.data.data || []);
-    } catch {
-      console.error('Failed to fetch categories');
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
     } finally {
       setCategoriesLoading(false);
     }
