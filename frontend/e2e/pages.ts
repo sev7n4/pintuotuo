@@ -106,19 +106,19 @@ export class MerchantProductsPage {
     
     if (selectCount >= 1) {
       await selects.first().click({ force: true });
-      await this.page.waitForTimeout(500);
+      await this.page.waitForTimeout(1000);
       const modelOption = data.modelId || 'GPT 系列';
-      const dropdown = this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
-      await dropdown.getByText(modelOption, { exact: false }).click();
+      const dropdown = this.page.locator('.ant-select-dropdown').last();
+      await dropdown.locator('.ant-select-item').filter({ hasText: modelOption }).first().click();
       await this.page.waitForTimeout(500);
     }
     
     if (selectCount >= 2) {
       await selects.nth(1).click({ force: true });
-      await this.page.waitForTimeout(500);
+      await this.page.waitForTimeout(1000);
       const packageOption = data.packageId || '月度标准版';
-      const dropdown = this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
-      await dropdown.getByText(packageOption, { exact: false }).click();
+      const dropdown = this.page.locator('.ant-select-dropdown').last();
+      await dropdown.locator('.ant-select-item').filter({ hasText: packageOption }).first().click();
       await this.page.waitForTimeout(500);
     }
     
@@ -134,9 +134,9 @@ export class MerchantProductsPage {
     
     if (data.status && selectCount >= 3) {
       await selects.nth(2).click({ force: true });
-      await this.page.waitForTimeout(500);
-      const dropdown = this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
-      await dropdown.getByText(data.status).click();
+      await this.page.waitForTimeout(1000);
+      const dropdown = this.page.locator('.ant-select-dropdown').last();
+      await dropdown.locator('.ant-select-item').filter({ hasText: data.status }).first().click();
     }
   }
 
