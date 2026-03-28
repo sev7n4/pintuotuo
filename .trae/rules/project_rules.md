@@ -1,13 +1,11 @@
 # Pintuotuo Project Rules for Trae AI
 
-> 本文件定义了 Trae AI 在本项目中必须遵循的规则和工作流。
-> 参考：Anthropic Claude Code Best Practices & OpenAI Engineering Guidelines
+> 本文件定义了 Trae AI 在本项目中必须遵循的规则。
+> 工作流执行请使用 `mydev-github-workflow` skill
 
----
+***
 
-## 🚨 CRITICAL: 强制工作流规则
-
-### 绝对禁止事项（NEVER）
+## 🚨 绝对禁止事项（NEVER）
 
 1. **NEVER 直接推送到 main 分支** - 所有代码变更必须通过 PR 流程
 2. **NEVER 跳过版本一致性检查** - 开始任务前必须验证三环境同步
@@ -15,80 +13,33 @@
 4. **NEVER 提交敏感信息** - 密码、API Key、Token 等
 5. **NEVER 跳过测试直接提交** - 必须运行 `make test` 通过
 
-### 强制执行顺序
+***
 
-```
-1. 版本检查（三环境一致性）
-   ↓
-2. 分支状态检查（工作区干净）
-   ↓
-3. 创建功能分支（从 main）
-   ↓
-4. 开发/修复
-   ↓
-5. 本地测试（make test）
-   ↓
-6. 代码质量检查（make format && make lint）
-   ↓
-7. 提交（遵循提交规范）
-   ↓
-8. 推送分支
-   ↓
-9. 创建 PR
-   ↓
-10. 等待 CI 通过 + 审批
-   ↓
-11. Squash & Merge 到 main
-```
+## 🔄 开发工作流
 
----
+⚠️ 开发任务请调用 `mydev-github-workflow` skill 执行完整工作流
 
-## 📋 任务开始前强制检查
+**工作流包含**：
+- 版本一致性检查（三环境同步）
+- 分支创建与管理
+- TDD 开发流程
+- CI/CD 监控
+- 部署验证
 
-### Step 1: 版本一致性验证
-
-**必须执行以下命令**：
-
-```bash
-echo "=== 本地环境 ===" && git log --oneline -3 && echo "" && echo "=== 远程仓库 (origin/main) ===" && git log origin/main --oneline -3 && echo "" && echo "=== 腾讯云服务器 ===" && ssh -i ~/.ssh/tencent_cloud_deploy root@119.29.173.89 "cd /opt/pintuotuo && git log --oneline -3"
-```
-
-**验证要求**：
-- 三个环境的最新 commit hash 必须一致
-- 如果不一致，必须先同步：
-  ```bash
-  git checkout main
-  git pull origin main
-  ```
-
-### Step 2: 分支状态检查
-
-```bash
-git status
-```
-
-**必须显示**：`nothing to commit, working tree clean`
-
-### Step 3: 创建功能分支
-
-```bash
-git checkout main
-git pull origin main
-git checkout -b feature/功能描述
-```
-
----
+***
 
 ## 🌿 分支命名规范
 
 | 类型 | 格式 | 示例 |
 |------|------|------|
-| 功能 | `feature/描述` | `feature/user-profile` |
-| 修复 | `fix/描述` | `fix/login-error` |
-| 热修复 | `hotfix/描述` | `hotfix/payment-critical` |
-| 重构 | `refactor/描述` | `refactor/auth-module` |
+| 功能 | `feature/issue-{id}` | `feature/issue-123` |
+| 修复 | `fix/issue-{id}` | `fix/issue-456` |
+| 热修复 | `hotfix/issue-{id}` | `hotfix/issue-789` |
+| 重构 | `refactor/issue-{id}` | `refactor/issue-101` |
 
----
+> **说明**: `{id}` 为 GitHub Issue 编号或任务标识
+
+***
 
 ## 📝 提交信息规范
 
@@ -103,43 +54,19 @@ git checkout -b feature/功能描述
 | `test` | 测试相关 |
 | `chore` | 构建/工具 |
 | `perf` | 性能优化 |
+| `hotfix` | 紧急修复 |
 
----
+**示例**: `feat(auth): add OAuth2 login support`
 
-## ✅ 提交前检查清单
+***
 
-在执行 `git commit` 前，必须确保：
+## 🔒 安全规则
 
-```bash
-# 1. 运行测试
-make test
+1. **禁止提交敏感信息**
+2. **使用环境变量管理配置**
+3. **SSH 密钥不提交到仓库**
 
-# 2. 代码格式化
-make format
-
-# 3. Lint 检查
-make lint
-
-# 4. 确认无敏感信息
-grep -r "password\|secret\|api_key" --include="*.go" --include="*.ts" --include="*.tsx"
-```
-
----
-
-## 🔄 PR 工作流
-
-### PR 合并条件
-
-- [ ] CI 通过（单元测试 + 静态分析）
-- [ ] 至少 1 人批准
-- [ ] 无合并冲突
-- [ ] 代码审查完成
-
-### 合并方式
-
-使用 **Squash & Merge** 合并到 main
-
----
+***
 
 ## 🚀 部署信息
 
@@ -153,7 +80,7 @@ grep -r "password\|secret\|api_key" --include="*.go" --include="*.ts" --include=
 
 合并到 main 分支后自动触发部署
 
----
+***
 
 ## 🛠️ 常用命令
 
@@ -180,11 +107,11 @@ make format         # 格式化代码
 make lint           # Lint 检查
 ```
 
----
+***
 
 ## 📁 项目结构
 
-```
+```text
 pintuotuo/
 ├── backend/           # Go 后端 (Gin)
 │   ├── handlers/      # HTTP 处理器
@@ -199,34 +126,7 @@ pintuotuo/
 └── Makefile           # 开发命令
 ```
 
----
-
-## 🔒 安全规则
-
-1. **禁止提交敏感信息**
-2. **使用环境变量管理配置**
-3. **SSH 密钥不提交到仓库**
-
----
-
-## ⚠️ 紧急修复流程
-
-```bash
-# 1. 从 main 创建热修复分支
-git checkout main && git pull origin main
-git checkout -b hotfix/xxx
-
-# 2. 快速修复并测试
-make test
-
-# 3. 提交并推送
-git commit -m "hotfix: 描述"
-git push origin hotfix/xxx
-
-# 4. 创建 PR 并快速审查合并
-```
-
----
+***
 
 ## 📚 相关文档
 
@@ -235,6 +135,6 @@ git push origin hotfix/xxx
 - [DEPLOYMENT.md](./DEPLOYMENT.md) - 部署指南
 - [CLAUDE.md](./CLAUDE.md) - Claude Code 规则
 
----
+***
 
-**最后更新**: 2026-03-28
+**最后更新**: 2026-03-29

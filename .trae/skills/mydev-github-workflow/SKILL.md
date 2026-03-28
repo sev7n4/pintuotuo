@@ -16,7 +16,7 @@ description: |
 ✅ Phase 2: 合并部署阶段
    └─ 合并 → 部署
 
-[1] 禁止忽略 current_fix_cases 失败！必须修复后才能合并！
+[1] 禁止忽略CI日志报错失败！必须修复后才能合并！
 [2] 禁止跳过状态跟踪写入！每个步骤必须更新状态文件！
 [3] 禁止跳过本地验证！必须通过测试+类型检查才能提交！
 [4] 禁止跳过CI监控！必须完成 CI/CD → Integration → E2E 完整链路！
@@ -66,13 +66,12 @@ Step 11: 错误修复 ─────────────┘
 ```
 
 **触发逻辑**：
-- PR 创建触发完整 CI 链路: CI/CD → Integration → E2E
 - 注意: Push 到 feature 分支不会触发 CI，只有 PR 才会触发
 
 **合并条件**：
 - CI/CD Pipeline: 全量通过 ✅
 - Integration Tests: 全量通过 ✅
-- E2E Tests: current_fix_cases 通过 ✅ (其他用例失败可忽略)
+- E2E Tests: 全量通过 通过 ✅
 
 ---
 
@@ -80,15 +79,27 @@ Step 11: 错误修复 ─────────────┘
 
 **命名规范**: `references/00_00_naming_convention.md`
 
+**检查命令**:
 ```bash
+# 版本一致性检查（三环境同步）
+echo "=== 本地环境 ===" && git log --oneline -3 && \
+echo "" && \
+echo "=== 远程仓库 (origin/main) ===" && git log origin/main --oneline -3 && \
+echo "" && \
+echo "=== 腾讯云服务器 ===" && ssh -i ~/.ssh/tencent_cloud_deploy root@119.29.173.89 "cd /opt/pintuotuo && git log --oneline -3"
+
+# 工作区状态检查
 git status --porcelain
 ```
 
 **检查项**：
+- 三个环境的最新 commit hash 必须一致（无网络时可跳过）
 - 工作区是否干净
 - 是否在 main 分支
 
-**状态写入**: 初始化 `scripts/00_01_workflow_state.json`
+**状态写入**: 
+- 初始化 `scripts/00_01_workflow_state.json`
+- `scripts/00_01_workflow_state.json.version_check = passed`
 
 **详细字段**: `references/00_01_state_fields.md`
 
@@ -117,8 +128,15 @@ git checkout -b {type}/issue-{id}
 ```
 
 **分支命名**: `{type}/issue-{id}`
-- type: bugfix / feature / enhancement
-- id: ISSUE-XXX
+
+| 类型 | 说明 | 示例 |
+|------|------|------|
+| `feature` | 新功能 | feature/issue-123 |
+| `fix` | Bug 修复 | fix/issue-456 |
+| `hotfix` | 紧急修复 | hotfix/issue-789 |
+| `refactor` | 代码重构 | refactor/issue-101 |
+
+- id: ISSUE-XXX 或 GitHub Issue 编号
 
 **详细规范**: `references/03_01_branch_naming.md`
 
@@ -173,17 +191,38 @@ git checkout -b {type}/issue-{id}
 
 ## Step 8: 本地验证 ⚠️ [约束3]
 
-```bash
-# 前端
-cd frontend && npm run type-check && npm test
+**验证顺序**: 测试 → 格式化 → Lint → 敏感信息检查
 
-# 后端
-cd backend && go test -v ./...
+### 8.1 运行测试
+```bash
+make test
+# 或分别运行：
+# 前端: cd frontend && npm run type-check && npm test
+# 后端: cd backend && go test -v ./...
 ```
 
+### 8.2 代码格式化
+```bash
+make format
+```
+
+### 8.3 Lint 检查
+```bash
+make lint
+```
+
+### 8.4 敏感信息检查
+```bash
+grep -r "password\|secret\|api_key\|token" --include="*.go" --include="*.ts" --include="*.tsx"
+```
+**注意**: 如果发现敏感信息，必须移除或使用环境变量替代
+
 **验证项**：
-- 类型检查通过
-- 单元测试通过
+- [ ] 类型检查通过
+- [ ] 单元测试通过
+- [ ] 代码格式化完成
+- [ ] Lint 检查通过
+- [ ] 无敏感信息泄露
 
 **状态写入**: `scripts/00_01_workflow_state.json.local_validation = passed`
 
@@ -191,10 +230,27 @@ cd backend && go test -v ./...
 
 ## Step 9: Push + 创建 PR
 
+**提交格式**: `<type>(<scope>): <subject>`
+
+| 类型 | 说明 | 示例 |
+|------|------|------|
+| `feat` | 新功能 | feat(auth): add OAuth2 login |
+| `fix` | Bug 修复 | fix(api): resolve timeout issue |
+| `docs` | 文档更新 | docs(readme): update installation |
+| `refactor` | 代码重构 | refactor(db): optimize query |
+| `test` | 测试相关 | test(user): add unit tests |
+| `chore` | 构建/工具 | chore(deps): update dependencies |
+| `perf` | 性能优化 | perf(cache): reduce memory usage |
+| `hotfix` | 紧急修复 | hotfix(payment): fix critical bug |
+
 ```bash
-# 提交代码 (格式见 references/09_01_pr_template.md)
+# 提交代码
 git add .
-git commit -m "{type}: {description}"
+git commit -m "<type>(<scope>): <subject>"
+
+# 示例
+git commit -m "feat(auth): add OAuth2 login support"
+git commit -m "fix(api): resolve timeout issue in user service"
 
 # 推送到远程
 git push -u origin {branch-name}
@@ -279,12 +335,16 @@ Step 11.5: 修复后重新 commit + push
 ## Step 12: 合并 PR ⚠️ [约束5]
 
 **合并条件**：
-- CI/CD Pipeline: 全量通过 ✅
-- Integration Tests: 全量通过 ✅
-- E2E Tests: current_fix_cases 通过 ✅
+- [ ] CI/CD Pipeline: 全量通过 ✅
+- [ ] Integration Tests: 全量通过 ✅
+- [ ] E2E Tests: current_fix_cases 通过 ✅
+- [ ] 无合并冲突
+- [ ] 代码审查完成（至少 1 人批准，或 self-merge for trivial changes）
+
+**合并方式**: 使用 **Squash & Merge** 合并到 main
 
 ```bash
-gh pr merge {pr-number} --merge --delete-branch
+gh pr merge {pr-number} --squash --delete-branch
 ```
 
 **状态写入**: `scripts/00_01_workflow_state.json.merged = true`
