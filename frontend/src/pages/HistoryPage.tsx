@@ -78,22 +78,7 @@ export default function HistoryPage() {
   };
 
   const handleAddToCart = (item: BrowseHistoryItem) => {
-    addItem(
-      {
-        id: item.product_id,
-        name: item.product.name,
-        price: item.product.price,
-        image: '',
-        description: item.product.description || '',
-        stock: item.product.stock,
-        merchant_id: item.product.merchant_id,
-        category_id: 0,
-        status: item.product.status,
-        created_at: '',
-        updated_at: '',
-      },
-      1
-    );
+    addItem(item.product, 1);
     message.success('已添加到购物车');
   };
 
