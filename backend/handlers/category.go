@@ -199,7 +199,7 @@ func UpdateCategory(c *gin.Context) {
 	}
 
 	var req UpdateCategoryRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err = c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError("INVALID_REQUEST", "Invalid request body", http.StatusBadRequest, err))
 		return
 	}
