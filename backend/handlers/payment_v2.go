@@ -71,50 +71,56 @@ func InitPaymentService() {
 	privateKeyStr := os.Getenv("ALIPAY_PRIVATE_KEY")
 	publicKeyStr := os.Getenv("ALIPAY_PUBLIC_KEY")
 
-	if appID == "" || privateKeyStr == "" || publicKeyStr == "" {
+	wechatAppID := os.Getenv("WECHAT_APP_ID")
+	wechatMchID := os.Getenv("WECHAT_MCH_ID")
+	wechatAPIKey := os.Getenv("WECHAT_API_KEY")
+
+	var alipayConfig *payment.AlipayConfig
+	var wechatConfig *payment.WechatPayConfig
+
+	if appID != "" && privateKeyStr != "" && publicKeyStr != "" {
+		privateKey, err := parsePrivateKey(strings.ReplaceAll(privateKeyStr, " ", ""))
+		if err != nil {
+			log.Printf("[Payment] Failed to parse private key: %v", err)
+		} else {
+			publicKey, err := parsePublicKey(strings.ReplaceAll(publicKeyStr, " ", ""))
+			if err != nil {
+				log.Printf("[Payment] Failed to parse public key: %v", err)
+			} else {
+				alipayConfig = &payment.AlipayConfig{
+					AppID:           appID,
+					PrivateKey:      privateKey,
+					AlipayPublicKey: publicKey,
+					ReturnURL:       os.Getenv("ALIPAY_RETURN_URL"),
+					NotifyURL:       os.Getenv("ALIPAY_NOTIFY_URL"),
+					Sandbox:         os.Getenv("ALIPAY_SANDBOX") == "true",
+				}
+				log.Printf("[Payment] Alipay initialized with AppID: %s, Sandbox: %v", appID, alipayConfig.Sandbox)
+			}
+		}
+	}
+
+	if wechatAppID != "" && wechatMchID != "" && wechatAPIKey != "" {
+		wechatConfig = &payment.WechatPayConfig{
+			AppID:     wechatAppID,
+			MchID:     wechatMchID,
+			APIKey:    wechatAPIKey,
+			NotifyURL: os.Getenv("WECHAT_NOTIFY_URL"),
+			Sandbox:   os.Getenv("WECHAT_SANDBOX") == "true",
+		}
+		log.Printf("[Payment] Wechat initialized with MchID: %s, Sandbox: %v", wechatMchID, wechatConfig.Sandbox)
+	}
+
+	if alipayConfig == nil {
 		log.Println("[Payment] Alipay config not complete, using mock mode")
-		paymentService = payment.NewPaymentService(
-			&payment.AlipayConfig{
-				AppID:   "",
-				Sandbox: true,
-			},
-			&payment.WechatPayConfig{
-				AppID:   "",
-				MchID:   "",
-				Sandbox: true,
-			},
-		)
-		return
+		alipayConfig = &payment.AlipayConfig{Sandbox: true}
+	}
+	if wechatConfig == nil {
+		log.Println("[Payment] Wechat config not complete, using mock mode")
+		wechatConfig = &payment.WechatPayConfig{Sandbox: true}
 	}
 
-	privateKey, err := parsePrivateKey(strings.ReplaceAll(privateKeyStr, " ", ""))
-	if err != nil {
-		log.Printf("[Payment] Failed to parse private key: %v", err)
-		return
-	}
-
-	publicKey, err := parsePublicKey(strings.ReplaceAll(publicKeyStr, " ", ""))
-	if err != nil {
-		log.Printf("[Payment] Failed to parse public key: %v", err)
-		return
-	}
-
-	paymentService = payment.NewPaymentService(
-		&payment.AlipayConfig{
-			AppID:           appID,
-			PrivateKey:      privateKey,
-			AlipayPublicKey: publicKey,
-			ReturnURL:       "http://119.29.173.89/orders",
-			NotifyURL:       "http://119.29.173.89:8080/api/v1/payments/webhooks/alipay",
-			Sandbox:         true,
-		},
-		&payment.WechatPayConfig{
-			AppID:   os.Getenv("WECHAT_APP_ID"),
-			MchID:   os.Getenv("WECHAT_MCH_ID"),
-			Sandbox: true,
-		},
-	)
-	log.Printf("[Payment] Alipay initialized with AppID: %s", appID)
+	paymentService = payment.NewPaymentService(alipayConfig, wechatConfig)
 }
 
 func IsPaymentServiceInitialized() bool {
