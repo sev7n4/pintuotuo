@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { Table, Card, DatePicker, Select, Button, Tag, Space, Statistic, Row, Col, Modal, Descriptions, Spin, message } from 'antd'
-import { EyeOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Table, Card, DatePicker, Select, Button, Tag, Space, Statistic, Row, Col, Modal, Descriptions, Spin, message, Grid } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import { EyeOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import styles from './Consumption.module.css'
 
+const { useBreakpoint } = Grid
 const { RangePicker } = DatePicker
 
 interface ConsumptionRecord {
@@ -47,6 +48,9 @@ const Consumption: React.FC = () => {
     dayjs()
   ])
   const [provider, setProvider] = useState<string>('all')
+  const screens = useBreakpoint()
+
+  const isMobile = screens.xs || (screens.sm && !screens.md)
 
   useEffect(() => {
     fetchConsumptionData()
@@ -129,14 +133,15 @@ const Consumption: React.FC = () => {
     return colors[provider] || 'default'
   }
 
-  const columns: ColumnsType<ConsumptionRecord> = [
+  const columns: ColumnsType<ConsumptionRecord> = useMemo(() => [
     {
       title: '请求ID',
       dataIndex: 'request_id',
       key: 'request_id',
-      width: 180,
+      width: 120,
+      fixed: 'left',
       ellipsis: true,
-      render: (text: string) => <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{text.slice(0, 12)}...</span>
+      render: (text: string) => <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{text.slice(0, 8)}...</span>
     },
     {
       title: 'Provider',
@@ -145,114 +150,129 @@ const Consumption: React.FC = () => {
       width: 100,
       render: (provider: string) => <Tag color={getProviderColor(provider)}>{provider.toUpperCase()}</Tag>
     },
-    {
+    ...(screens.md ? [{
       title: 'Model',
       dataIndex: 'model',
       key: 'model',
-      width: 180,
+      width: 150,
       ellipsis: true
-    },
-    {
-      title: '输入Tokens',
+    }] : []),
+    ...(screens.lg ? [{
+      title: '输入',
       dataIndex: 'input_tokens',
       key: 'input_tokens',
-      width: 100,
-      align: 'right',
+      width: 80,
+      align: 'right' as const,
       render: (v: number) => v.toLocaleString()
-    },
-    {
-      title: '输出Tokens',
+    }] : []),
+    ...(screens.lg ? [{
+      title: '输出',
       dataIndex: 'output_tokens',
       key: 'output_tokens',
-      width: 100,
-      align: 'right',
+      width: 80,
+      align: 'right' as const,
       render: (v: number) => v.toLocaleString()
-    },
+    }] : []),
     {
-      title: '费用($)',
+      title: '费用',
       dataIndex: 'cost',
       key: 'cost',
-      width: 100,
-      align: 'right',
-      render: (cost: number) => <span style={{ color: '#f5222d' }}>${cost.toFixed(6)}</span>
-    },
-    {
-      title: '延迟(ms)',
-      dataIndex: 'latency_ms',
-      key: 'latency_ms',
       width: 90,
       align: 'right',
+      render: (cost: number) => <span style={{ color: '#f5222d' }}>${cost.toFixed(4)}</span>
+    },
+    ...(screens.sm ? [{
+      title: '延迟',
+      dataIndex: 'latency_ms',
+      key: 'latency_ms',
+      width: 70,
+      align: 'right' as const,
       render: (v: number) => {
         const color = v < 1000 ? '#52c41a' : v < 3000 ? '#faad14' : '#f5222d'
         return <span style={{ color }}>{v}</span>
       }
-    },
+    }] : []),
     {
       title: '状态',
       dataIndex: 'status_code',
       key: 'status_code',
-      width: 80,
+      width: 70,
       align: 'center',
       render: (code: number) => {
         const color = code >= 200 && code < 300 ? 'success' : 'error'
         return <Tag color={color}>{code}</Tag>
       }
     },
-    {
+    ...(screens.xl ? [{
       title: '时间',
       dataIndex: 'created_at',
       key: 'created_at',
-      width: 160,
-      render: (time: string) => dayjs(time).format('MM-DD HH:mm:ss')
-    },
+      width: 100,
+      render: (time: string) => dayjs(time).format('MM-DD HH:mm')
+    }] : []),
     {
       title: '操作',
       key: 'action',
-      width: 80,
+      width: 60,
       fixed: 'right',
       render: (_, record) => (
         <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => showDetail(record)}>
-          详情
+          {!isMobile && '详情'}
         </Button>
       )
     }
-  ]
+  ], [screens, isMobile])
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} style={{ padding: isMobile ? 12 : 24 }}>
       <Card className={styles.statsCard}>
-        <Row gutter={24}>
-          <Col span={6}>
-            <Statistic title="总请求数" value={stats?.total_requests || 0} suffix="次" />
+        <Row gutter={[16, 16]}>
+          <Col xs={12} sm={12} md={6}>
+            <Statistic 
+              title="总请求数" 
+              value={stats?.total_requests || 0} 
+              suffix="次"
+              valueStyle={{ fontSize: isMobile ? 18 : 24 }}
+            />
           </Col>
-          <Col span={6}>
-            <Statistic title="总Tokens" value={stats?.total_tokens || 0} />
+          <Col xs={12} sm={12} md={6}>
+            <Statistic 
+              title="总Tokens" 
+              value={stats?.total_tokens || 0}
+              valueStyle={{ fontSize: isMobile ? 18 : 24 }}
+            />
           </Col>
-          <Col span={6}>
+          <Col xs={12} sm={12} md={6}>
             <Statistic 
               title="总费用" 
               value={stats?.total_cost || 0} 
               precision={4} 
               prefix="$"
-              valueStyle={{ color: '#f5222d' }}
+              valueStyle={{ color: '#f5222d', fontSize: isMobile ? 18 : 24 }}
             />
           </Col>
-          <Col span={6}>
-            <Statistic title="平均延迟" value={stats?.avg_latency_ms || 0} suffix="ms" />
+          <Col xs={12} sm={12} md={6}>
+            <Statistic 
+              title="平均延迟" 
+              value={stats?.avg_latency_ms || 0} 
+              suffix="ms"
+              valueStyle={{ fontSize: isMobile ? 18 : 24 }}
+            />
           </Col>
         </Row>
       </Card>
 
       {providerStats.length > 0 && (
         <Card className={styles.providerCard} title="按Provider统计">
-          <Row gutter={16}>
+          <Row gutter={[16, 16]}>
             {providerStats.map(p => (
-              <Col span={6} key={p.provider}>
+              <Col xs={12} sm={12} md={6} key={p.provider}>
                 <Card size="small">
                   <Statistic
                     title={<Tag color={getProviderColor(p.provider)}>{p.provider.toUpperCase()}</Tag>}
                     value={p.count}
                     suffix={`次 / $${p.cost.toFixed(4)}`}
+                    valueStyle={{ fontSize: isMobile ? 14 : 16 }}
                   />
                 </Card>
               </Col>
@@ -265,28 +285,38 @@ const Consumption: React.FC = () => {
         className={styles.tableCard}
         title="消费明细"
         extra={
-          <Space>
+          <Space size="small" wrap>
             <RangePicker
               value={dateRange}
               onChange={(dates) => dates && setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs])}
               allowClear={false}
+              size={isMobile ? 'small' : 'middle'}
             />
             <Select
               value={provider}
               onChange={setProvider}
-              style={{ width: 120 }}
+              style={{ width: isMobile ? 100 : 120 }}
+              size={isMobile ? 'small' : 'middle'}
               options={[
-                { value: 'all', label: '全部Provider' },
+                { value: 'all', label: '全部' },
                 { value: 'openai', label: 'OpenAI' },
                 { value: 'anthropic', label: 'Anthropic' },
                 { value: 'google', label: 'Google' }
               ]}
             />
-            <Button icon={<ReloadOutlined />} onClick={fetchConsumptionData}>
-              刷新
+            <Button 
+              icon={<ReloadOutlined />} 
+              onClick={fetchConsumptionData}
+              size={isMobile ? 'small' : 'middle'}
+            >
+              {!isMobile && '刷新'}
             </Button>
-            <Button icon={<DownloadOutlined />} onClick={exportData}>
-              导出
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={exportData}
+              size={isMobile ? 'small' : 'middle'}
+            >
+              {!isMobile && '导出'}
             </Button>
           </Space>
         }
@@ -296,12 +326,14 @@ const Consumption: React.FC = () => {
             columns={columns}
             dataSource={records}
             rowKey="id"
-            scroll={{ x: 1200 }}
+            scroll={{ x: 600 }}
+            size={isMobile ? 'small' : 'middle'}
             pagination={{
               pageSize: 20,
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total) => `共 ${total} 条记录`
+              size: isMobile ? 'small' : 'default',
+              showSizeChanger: !isMobile,
+              showQuickJumper: !isMobile,
+              showTotal: isMobile ? undefined : (total) => `共 ${total} 条记录`
             }}
           />
         </Spin>
@@ -312,10 +344,10 @@ const Consumption: React.FC = () => {
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
         footer={null}
-        width={600}
+        width={isMobile ? '95%' : 600}
       >
         {selectedRecord && (
-          <Descriptions column={2} bordered size="small">
+          <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
             <Descriptions.Item label="请求ID" span={2}>
               <code style={{ fontSize: 12 }}>{selectedRecord.request_id}</code>
             </Descriptions.Item>

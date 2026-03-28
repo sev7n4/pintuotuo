@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import {
   Table,
   Button,
@@ -15,7 +15,9 @@ import {
   Typography,
   Tabs,
   Card,
+  Grid,
 } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import { FundOutlined, ReloadOutlined, TeamOutlined, ShoppingOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useOrderStore } from '@stores/orderStore'
@@ -23,6 +25,7 @@ import { useCartStore } from '@stores/cartStore'
 import { useProductStore } from '@stores/productStore'
 import type { Order } from '@/types'
 
+const { useBreakpoint } = Grid
 const { Option } = Select
 const { TextArea } = Input
 const { Text } = Typography
@@ -72,6 +75,9 @@ export const OrderListPage: React.FC = () => {
   const [cancelReasonText, setCancelReasonText] = useState<string>('')
   const [refundReason, setRefundReason] = useState<string>('')
   const [activeTab, setActiveTab] = useState<string>('all')
+  const screens = useBreakpoint()
+
+  const isMobile = screens.xs || (screens.sm && !screens.md)
 
   useEffect(() => {
     fetchOrders()
@@ -147,33 +153,39 @@ export const OrderListPage: React.FC = () => {
     setRefundModalVisible(true)
   }
 
-  const columns = [
+  const columns: ColumnsType<Order> = useMemo(() => [
     {
       title: '订单号',
       dataIndex: 'id',
       key: 'id',
+      width: 100,
+      fixed: 'left',
       render: (id: number) => <Text strong>#{id}</Text>,
     },
-    {
+    ...(screens.md ? [{
       title: '产品ID',
       dataIndex: 'product_id',
       key: 'product_id',
-    },
-    {
+      width: 100,
+    }] : []),
+    ...(screens.sm ? [{
       title: '数量',
       dataIndex: 'quantity',
       key: 'quantity',
-    },
+      width: 80,
+    }] : []),
     {
       title: '总价',
       dataIndex: 'total_price',
       key: 'total_price',
+      width: 100,
       render: (price: number) => <Text type="danger">¥{price.toFixed(2)}</Text>,
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
+      width: 120,
       render: (status: string, record: Order) => {
         const s = statusMap[status] || { color: 'default', label: status }
         const groupStatus = record.group_id ? groupStatusMap[record.group_status || 'active'] : null
@@ -189,19 +201,23 @@ export const OrderListPage: React.FC = () => {
         )
       },
     },
-    {
+    ...(screens.lg ? [{
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
+      width: 120,
       render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
-    },
+    }] : []),
     {
       title: '操作',
       key: 'action',
+      width: isMobile ? 80 : 200,
+      fixed: 'right',
       render: (_: unknown, record: Order) => (
-        <Space>
+        <Space size="small" wrap>
           <Button
             type="link"
+            size="small"
             onClick={() => {
               setSelectedOrder(record)
               setModalVisible(true)
@@ -212,40 +228,42 @@ export const OrderListPage: React.FC = () => {
           {record.status === 'completed' && (
             <Button 
               type="link" 
+              size="small"
               icon={<ReloadOutlined />} 
               onClick={() => handleBuyAgain(record)}
             >
-              再次购买
+              {!isMobile && '再次购买'}
             </Button>
           )}
           {record.status === 'pending' && (
             <>
-              <Button type="link" onClick={() => navigate(`/payment/${record.id}`)}>
+              <Button type="link" size="small" onClick={() => navigate(`/payment/${record.id}`)}>
                 支付
               </Button>
-              <Button type="link" danger onClick={() => openCancelModal(record)}>
+              <Button type="link" size="small" danger onClick={() => openCancelModal(record)}>
                 取消
               </Button>
             </>
           )}
           {record.status === 'paid' && (
-            <Button type="link" icon={<FundOutlined />} onClick={() => openRefundModal(record)}>
-              退款
+            <Button type="link" size="small" icon={<FundOutlined />} onClick={() => openRefundModal(record)}>
+              {!isMobile && '退款'}
             </Button>
           )}
           {record.group_id && record.group_status === 'active' && (
             <Button 
               type="link" 
+              size="small"
               icon={<TeamOutlined />} 
               onClick={() => navigate(`/groups/${record.group_id}`)}
             >
-              拼团进度
+              {!isMobile && '拼团'}
             </Button>
           )}
         </Space>
       ),
     },
-  ]
+  ], [screens, isMobile, navigate])
 
   if (error) {
     return <Empty description={`错误: ${error}`} />
@@ -271,10 +289,10 @@ export const OrderListPage: React.FC = () => {
   }))
 
   return (
-    <div style={{ padding: '20px', maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: isMobile ? '12px' : '20px', maxWidth: 1200, margin: '0 auto' }}>
       <Card>
         <Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
-          <Typography.Title level={3} style={{ margin: 0 }}>
+          <Typography.Title level={isMobile ? 4 : 3} style={{ margin: 0 }}>
             <ShoppingOutlined style={{ marginRight: 8 }} />
             我的订单
           </Typography.Title>
@@ -284,6 +302,7 @@ export const OrderListPage: React.FC = () => {
           activeKey={activeTab}
           onChange={setActiveTab}
           items={tabItems}
+          size={isMobile ? 'small' : 'middle'}
         />
 
         <Spin spinning={isLoading}>
@@ -291,8 +310,13 @@ export const OrderListPage: React.FC = () => {
             columns={columns}
             dataSource={filteredOrders}
             rowKey="id"
-            pagination={{ pageSize: 10 }}
+            scroll={{ x: 600 }}
+            pagination={{ 
+              pageSize: 10,
+              size: isMobile ? 'small' : 'default',
+            }}
             locale={{ emptyText: <Empty description="暂无订单" /> }}
+            size={isMobile ? 'small' : 'middle'}
           />
         </Spin>
       </Card>
@@ -302,9 +326,10 @@ export const OrderListPage: React.FC = () => {
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={null}
+        width={isMobile ? '95%' : 520}
       >
         {selectedOrder && (
-          <Descriptions column={2}>
+          <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
             <Descriptions.Item label="订单号">{selectedOrder.id}</Descriptions.Item>
             <Descriptions.Item label="产品ID">{selectedOrder.product_id}</Descriptions.Item>
             <Descriptions.Item label="数量">{selectedOrder.quantity}</Descriptions.Item>
@@ -317,7 +342,7 @@ export const OrderListPage: React.FC = () => {
             <Descriptions.Item label="状态">
               {statusMap[selectedOrder.status]?.label || selectedOrder.status}
             </Descriptions.Item>
-            <Descriptions.Item label="创建时间">
+            <Descriptions.Item label="创建时间" span={2}>
               {new Date(selectedOrder.created_at).toLocaleString('zh-CN')}
             </Descriptions.Item>
             {selectedOrder.group_id && (
@@ -325,6 +350,7 @@ export const OrderListPage: React.FC = () => {
                 <Descriptions.Item label="拼团ID">
                   <Button 
                     type="link" 
+                    size="small"
                     onClick={() => {
                       setModalVisible(false)
                       navigate(`/groups/${selectedOrder.group_id}`)

@@ -93,7 +93,7 @@ export default function Layout() {
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
       <Header className="layout-header">
-        <div className="layout-logo">拼脱脱</div>
+        <Link to="/" className="layout-logo">拼脱脱</Link>
         <Menu
           mode="horizontal"
           selectedKeys={[getSelectedTab()]}

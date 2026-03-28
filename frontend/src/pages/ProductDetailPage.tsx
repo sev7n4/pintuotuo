@@ -421,7 +421,7 @@ export const ProductDetailPage: React.FC = () => {
                   disabled={product.stock === 0}
                   style={{ flex: 1, background: '#1890ff', borderColor: '#1890ff' }}
                 >
-                  {product.stock === 0 ? '暂无库存' : `发起拼团 (¥${selectedGroupPrice?.price_per_person || groupPrices[0].price_per_person}/人)`}
+                  {product.stock === 0 ? '暂无库存' : '发起拼团'}
                 </Button>
               </Space>
             )}
