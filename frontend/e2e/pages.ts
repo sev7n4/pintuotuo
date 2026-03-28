@@ -89,15 +89,35 @@ export class MerchantProductsPage {
   }
 
   async fillProductForm(data: {
-    name: string;
-    description: string;
+    name?: string;
+    description?: string;
     price: number;
     stock: number;
     category?: string;
     status?: string;
+    modelId?: string;
+    packageId?: string;
   }) {
-    await this.page.getByPlaceholder('请输入商品名称').fill(data.name);
-    await this.page.getByPlaceholder('请输入商品描述').fill(data.description);
+    await this.page.waitForTimeout(500);
+    
+    const selects = this.page.locator('.ant-select');
+    const selectCount = await selects.count();
+    
+    if (selectCount >= 1) {
+      await selects.first().click();
+      await this.page.waitForTimeout(300);
+      const modelOption = data.modelId || 'GPT 系列';
+      await this.page.getByText(modelOption, { exact: false }).first().click();
+      await this.page.waitForTimeout(300);
+    }
+    
+    if (selectCount >= 2) {
+      await selects.nth(1).click();
+      await this.page.waitForTimeout(300);
+      const packageOption = data.packageId || '月度标准版';
+      await this.page.getByText(packageOption, { exact: false }).first().click();
+      await this.page.waitForTimeout(500);
+    }
     
     const priceInput = this.page.getByPlaceholder('请输入价格');
     await priceInput.fill(data.price.toString());
@@ -109,13 +129,9 @@ export class MerchantProductsPage {
     
     await this.page.waitForTimeout(300);
     
-    if (data.category) {
-      await this.page.locator('.ant-select').first().click();
-      await this.page.getByText(data.category).click();
-    }
-    
-    if (data.status) {
-      await this.page.locator('.ant-select').nth(1).click();
+    if (data.status && selectCount >= 3) {
+      await selects.nth(2).click();
+      await this.page.waitForTimeout(300);
       await this.page.getByText(data.status).click();
     }
   }

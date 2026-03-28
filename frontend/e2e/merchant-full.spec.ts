@@ -73,8 +73,6 @@ test.describe('商家管理界面 - 商品管理', () => {
 
     await productsPage.clickAddProduct();
     await productsPage.fillProductForm({
-      name: `测试商品 ${Date.now()}`,
-      description: '这是一个E2E测试商品',
       price: 99.99,
       stock: 100,
     });
@@ -89,8 +87,6 @@ test.describe('商家管理界面 - 商品管理', () => {
 
     await productsPage.clickAddProduct();
     await productsPage.fillProductForm({
-      name: '测试商品负价格',
-      description: '测试负价格',
       price: -10,
       stock: 100,
     });
@@ -105,8 +101,6 @@ test.describe('商家管理界面 - 商品管理', () => {
 
     await productsPage.clickAddProduct();
     await productsPage.fillProductForm({
-      name: '测试商品负库存',
-      description: '测试负库存',
       price: 99.99,
       stock: -10,
     });
@@ -123,8 +117,6 @@ test.describe('商家管理界面 - 商品管理', () => {
     if (productCount > 0) {
       await productsPage.editProduct('测试商品');
       await productsPage.fillProductForm({
-        name: '更新后的商品名称',
-        description: '更新后的描述',
         price: 199.99,
         stock: 200,
       });
@@ -356,8 +348,6 @@ test.describe('商家管理界面 - 边界与异常', () => {
 
     await productsPage.clickAddProduct();
     await productsPage.fillProductForm({
-      name: '<script>alert("xss")</script>测试商品',
-      description: '测试特殊字符 & < > " \' / \\',
       price: 99.99,
       stock: 100,
     });
