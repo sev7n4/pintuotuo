@@ -11,6 +11,12 @@
   font-weight: bold;
   color: #1890ff;
   margin-right: 24px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.layout-logo:hover {
+  color: #40a9ff;
 }
 
 .layout-menu {
