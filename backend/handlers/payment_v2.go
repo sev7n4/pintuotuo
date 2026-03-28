@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -60,9 +61,11 @@ func CreatePayment(c *gin.Context) {
 
 	var req CreatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[CreatePayment] Failed to bind JSON: %v, userID: %d", err, userIDInt)
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
+	log.Printf("[CreatePayment] Request: order_id=%d, pay_method=%s, amount=%.2f, userID=%d", req.OrderID, req.PayMethod, req.Amount, userIDInt)
 
 	db := config.GetDB()
 	if db == nil {
