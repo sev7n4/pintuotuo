@@ -32,7 +32,12 @@ const PaymentPage: React.FC = () => {
         pay_method: paymentMethod,
         amount: currentOrder.total_price,
       });
-      const payment = response.data.data as Payment;
+      const payment = response.data.data as Payment & { pay_url?: string; qrcode_url?: string };
+
+      if (payment.pay_url) {
+        window.location.href = payment.pay_url;
+        return;
+      }
 
       if (payment.status === 'success' || payment.status === 'pending') {
         setPaymentResult('success');
