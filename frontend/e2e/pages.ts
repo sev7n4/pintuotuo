@@ -105,20 +105,26 @@ export class MerchantProductsPage {
     const selectCount = await selects.count();
     
     if (selectCount >= 1) {
-      await selects.first().click({ force: true });
-      await this.page.waitForSelector('.ant-select-dropdown .ant-select-item-option', { state: 'visible', timeout: 5000 });
-      await this.page.waitForTimeout(500);
+      await selects.first().scrollIntoViewIfNeeded();
+      await selects.first().click({ force: true, timeout: 10000 });
+      await this.page.waitForTimeout(1000);
+      
       const modelOption = data.modelId || 'GPT 系列';
-      await this.page.locator('.ant-select-dropdown .ant-select-item-option').filter({ hasText: modelOption }).first().click();
+      const optionLocator = this.page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: modelOption });
+      await optionLocator.first().waitFor({ state: 'visible', timeout: 10000 });
+      await optionLocator.first().click();
       await this.page.waitForTimeout(500);
     }
     
     if (selectCount >= 2) {
-      await selects.nth(1).click({ force: true });
-      await this.page.waitForSelector('.ant-select-dropdown .ant-select-item-option', { state: 'visible', timeout: 5000 });
-      await this.page.waitForTimeout(500);
+      await selects.nth(1).scrollIntoViewIfNeeded();
+      await selects.nth(1).click({ force: true, timeout: 10000 });
+      await this.page.waitForTimeout(1000);
+      
       const packageOption = data.packageId || '月度标准版';
-      await this.page.locator('.ant-select-dropdown .ant-select-item-option').filter({ hasText: packageOption }).first().click();
+      const optionLocator = this.page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: packageOption });
+      await optionLocator.first().waitFor({ state: 'visible', timeout: 10000 });
+      await optionLocator.first().click();
       await this.page.waitForTimeout(500);
     }
     
@@ -133,10 +139,13 @@ export class MerchantProductsPage {
     await this.page.waitForTimeout(300);
     
     if (data.status && selectCount >= 3) {
-      await selects.nth(2).click({ force: true });
-      await this.page.waitForSelector('.ant-select-dropdown .ant-select-item-option', { state: 'visible', timeout: 5000 });
-      await this.page.waitForTimeout(500);
-      await this.page.locator('.ant-select-dropdown .ant-select-item-option').filter({ hasText: data.status }).first().click();
+      await selects.nth(2).scrollIntoViewIfNeeded();
+      await selects.nth(2).click({ force: true, timeout: 10000 });
+      await this.page.waitForTimeout(1000);
+      
+      const optionLocator = this.page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: data.status });
+      await optionLocator.first().waitFor({ state: 'visible', timeout: 10000 });
+      await optionLocator.first().click();
     }
   }
 
