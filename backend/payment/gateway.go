@@ -75,7 +75,7 @@ func (c *AlipayClient) CreateTradePagePay(req *AlipayTradePayRequest) (string, e
 
 	baseURL := "https://openapi.alipay.com/gateway.do"
 	if c.config.Sandbox {
-		baseURL = "https://openapi.alipaydev.com/gateway.do"
+		baseURL = "https://openapi-sandbox.dl.alipaydev.com/gateway.do"
 	}
 
 	values := url.Values{}
@@ -295,6 +295,9 @@ func NewPaymentService(alipayConfig *AlipayConfig, wechatConfig *WechatPayConfig
 }
 
 func (s *PaymentService) CreateAlipayPayment(outTradeNo string, amount float64, subject string) (string, error) {
+	if s.alipay == nil || s.alipay.config == nil || s.alipay.config.PrivateKey == nil {
+		return "", fmt.Errorf("alipay not configured: missing private key")
+	}
 	req := &AlipayTradePayRequest{
 		OutTradeNo:  outTradeNo,
 		TotalAmount: amount,

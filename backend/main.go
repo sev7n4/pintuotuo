@@ -11,6 +11,7 @@ import (
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/db"
 	_ "github.com/pintuotuo/backend/docs"
+	"github.com/pintuotuo/backend/handlers"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/routes"
 	"github.com/pintuotuo/backend/scheduler"
@@ -46,6 +47,8 @@ func main() {
 		log.Fatalf("Failed to initialize Redis: %v", err)
 	}
 	defer cache.Close()
+
+	handlers.InitPaymentService()
 
 	orderScheduler = scheduler.NewOrderScheduler(
 		5*time.Minute,

@@ -21,6 +21,9 @@ services:
       - DB_CONN_MAX_LIFETIME=30m
       - DB_CONN_MAX_IDLE_TIME=10m
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      - ALIPAY_APP_ID=${ALIPAY_APP_ID}
+      - ALIPAY_PRIVATE_KEY=${ALIPAY_PRIVATE_KEY}
+      - ALIPAY_PUBLIC_KEY=${ALIPAY_PUBLIC_KEY}
     depends_on:
       postgres:
         condition: service_healthy
