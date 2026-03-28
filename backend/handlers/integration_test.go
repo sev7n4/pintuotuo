@@ -180,7 +180,7 @@ func TestConcurrentRequestHandling(t *testing.T) {
 
 	var (
 		requestCount int
-		mu          sync.Mutex
+		mu           sync.Mutex
 	)
 	router.GET("/concurrent", func(c *gin.Context) {
 		mu.Lock()

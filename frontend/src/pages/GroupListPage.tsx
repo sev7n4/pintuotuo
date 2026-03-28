@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   List,
   Card,
@@ -8,11 +8,17 @@ import {
   Spin,
   Empty,
   message,
+  Typography,
+  Space,
+  Grid,
 } from 'antd'
-import { UserAddOutlined } from '@ant-design/icons'
+import { UserAddOutlined, ShoppingOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useGroupStore } from '@stores/groupStore'
 import type { Group } from '@/types'
+
+const { Title } = Typography
+const { useBreakpoint } = Grid
 
 const statusMap: Record<string, { color: string; label: string }> = {
   active: { color: 'blue', label: '进行中' },
@@ -27,9 +33,10 @@ interface GroupWithStore extends Group {
 
 export const GroupListPage: React.FC = () => {
   const navigate = useNavigate()
+  const screens = useBreakpoint()
   const { isLoading, error, fetchGroups, joinGroup } = useGroupStore()
-  const [groups, setGroups] = React.useState<GroupWithStore[]>([])
-  const [joiningId, setJoiningId] = React.useState<number | null>(null)
+  const [groups, setGroups] = useState<GroupWithStore[]>([])
+  const [joiningId, setJoiningId] = useState<number | null>(null)
 
   useEffect(() => {
     loadGroups()
@@ -45,14 +52,22 @@ export const GroupListPage: React.FC = () => {
   const handleJoinGroup = async (groupId: number) => {
     setJoiningId(groupId)
     try {
-      await joinGroup(groupId)
-      message.success('加入分组成功！')
-      await loadGroups()
+      const orderId = await joinGroup(groupId)
+      message.success('加入拼团成功！请完成支付')
+      if (orderId) {
+        navigate(`/payment/${orderId}`)
+      } else {
+        await loadGroups()
+      }
     } catch (err) {
       message.error('加入失败，请稍后重试')
     } finally {
       setJoiningId(null)
     }
+  }
+
+  const handleViewGroupDetail = (groupId: number) => {
+    navigate(`/groups/${groupId}`)
   }
 
   if (error) {
@@ -61,27 +76,43 @@ export const GroupListPage: React.FC = () => {
 
   if (groups.length === 0) {
     return (
-      <div style={{ marginTop: 50, textAlign: 'center' }}>
-        <Empty description="暂无分组" />
-        <Button type="primary" style={{ marginTop: 16 }} onClick={() => navigate('/create-group')}>
-          创建分组
+      <div style={{ padding: screens.xs ? 12 : 24, marginTop: 50, textAlign: 'center' }}>
+        <Empty 
+          description={
+            <Space direction="vertical">
+              <span>暂无进行中的拼团</span>
+              <span style={{ color: '#999', fontSize: 14 }}>去商品页面发起拼团吧！</span>
+            </Space>
+          } 
+        />
+        <Button 
+          type="primary" 
+          icon={<ShoppingOutlined />}
+          style={{ marginTop: 16 }} 
+          onClick={() => navigate('/products')}
+        >
+          浏览商品
         </Button>
       </div>
     )
   }
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between' }}>
-        <h1>拼团中心</h1>
-        <Button type="primary" onClick={() => navigate('/create-group')}>
-          创建分组
+    <div style={{ padding: screens.xs ? 12 : 24 }}>
+      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Title level={screens.xs ? 4 : 3} style={{ margin: 0 }}>拼团中心</Title>
+        <Button 
+          type="primary" 
+          icon={<ShoppingOutlined />}
+          onClick={() => navigate('/products')}
+        >
+          {screens.xs ? '' : '去拼团'}
         </Button>
       </div>
 
       <Spin spinning={isLoading}>
         <List
-          grid={{ gutter: 16, column: 2 }}
+          grid={{ gutter: 16, xs: 1, sm: 2, md: 2, lg: 3, xl: 3, xxl: 4 }}
           dataSource={groups}
           renderItem={(group) => {
             const progress = (group.current_count / group.target_count) * 100
@@ -93,30 +124,38 @@ export const GroupListPage: React.FC = () => {
               <List.Item key={group.id}>
                 <Card
                   hoverable
+                  onClick={() => handleViewGroupDetail(group.id)}
                   actions={[
                     <Button
                       type={group.status === 'active' ? 'primary' : 'default'}
                       icon={<UserAddOutlined />}
-                      onClick={() => handleJoinGroup(group.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleJoinGroup(group.id)
+                      }}
                       loading={joiningId === group.id}
-                      disabled={group.status !== 'active'}
+                      disabled={group.status !== 'active' || isExpired}
                     >
                       {group.status === 'active' ? '加入拼团' : '已' + s.label}
                     </Button>,
                   ]}
                 >
                   <Card.Meta
-                    title={`分组 #${group.id}`}
+                    title={`拼团 #${group.id}`}
                     description={
                       <div>
-                        <p>目标人数: {group.target_count}人</p>
-                        <p>
+                        <p style={{ margin: '8px 0' }}>目标人数: {group.target_count}人</p>
+                        <p style={{ margin: '8px 0' }}>
                           当前人数: {group.current_count}人
                           <Tag color={s.color} style={{ marginLeft: 10 }}>
                             {s.label}
                           </Tag>
                         </p>
-                        <Progress percent={progress} status={group.status === 'active' ? 'active' : 'success'} />
+                        <Progress 
+                          percent={Math.round(progress)} 
+                          status={group.status === 'active' ? 'active' : 'success'} 
+                          size="small"
+                        />
                         <p style={{ marginTop: 10, fontSize: 12, color: '#999' }}>
                           截止时间: {deadline.toLocaleString('zh-CN')}
                         </p>

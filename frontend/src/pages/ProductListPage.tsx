@@ -13,14 +13,33 @@ import {
   Select,
   Slider,
   Dropdown,
+  Typography,
+  Card,
+  Grid,
+  Progress,
+  Statistic,
 } from 'antd'
-import { SearchOutlined, PlusOutlined, FilterOutlined, SortAscendingOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { 
+  SearchOutlined, 
+  PlusOutlined, 
+  FilterOutlined, 
+  SortAscendingOutlined, 
+  FireOutlined, 
+  ClockCircleOutlined,
+  ThunderboltOutlined,
+  ShoppingCartOutlined,
+} from '@ant-design/icons'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useProductStore } from '@stores/productStore'
 import { useAuthStore } from '@stores/authStore'
+import { productService } from '@/services/product'
+import api from '@/services/api'
 import type { Product } from '@/types'
+import dayjs from 'dayjs'
 
 const { Option } = Select
+const { Title, Text } = Typography
+const { useBreakpoint } = Grid
 
 type SortField = 'price' | 'stock' | 'created_at'
 type SortOrder = 'asc' | 'desc'
@@ -32,8 +51,39 @@ interface ProductFilters {
   status?: string
 }
 
+interface FlashSaleProduct {
+  id: number
+  flash_sale_id: number
+  product_id: number
+  product_name: string
+  flash_price: number
+  original_price: number
+  stock_limit: number
+  stock_sold: number
+  per_user_limit: number
+  discount: number
+}
+
+interface FlashSale {
+  id: number
+  name: string
+  description: string
+  start_time: string
+  end_time: string
+  status: string
+  products: FlashSaleProduct[]
+}
+
+const sortTypeMap: Record<string, { title: string; icon: React.ReactNode }> = {
+  hot: { title: '热销爆款', icon: <FireOutlined style={{ color: '#ff4d4f' }} /> },
+  new: { title: '新品上架', icon: <ClockCircleOutlined style={{ color: '#1890ff' }} /> },
+  flash: { title: '限时秒杀', icon: <ThunderboltOutlined style={{ color: '#faad14' }} /> },
+}
+
 export const ProductListPage: React.FC = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const screens = useBreakpoint()
   const {
     products,
     total,
@@ -50,10 +100,113 @@ export const ProductListPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [productFilters, setProductFilters] = useState<ProductFilters>({})
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000])
+  const [localLoading, setLocalLoading] = useState(false)
+  const [localProducts, setLocalProducts] = useState<Product[]>([])
+  const [flashSales, setFlashSales] = useState<FlashSale[]>([])
+  const [flashLoading, setFlashLoading] = useState(false)
+  const [countdown, setCountdown] = useState<string>('')
+
+  const sortParam = searchParams.get('sort')
+  const flashParam = searchParams.get('flash')
+  const categoryParam = searchParams.get('category')
+  const searchParam = searchParams.get('search')
+
+  const isSpecialSort = sortParam === 'hot' || sortParam === 'new'
+  const isFlashSale = flashParam === 'true'
+  const pageTitle = isFlashSale ? '限时秒杀' : (sortParam ? sortTypeMap[sortParam]?.title : '商品列表')
+  const pageIcon = isFlashSale ? sortTypeMap['flash'].icon : (sortParam ? sortTypeMap[sortParam]?.icon : null)
 
   useEffect(() => {
-    fetchProducts()
-  }, [])
+    if (isFlashSale) {
+      loadFlashSales()
+      return
+    }
+    
+    if (sortParam === 'hot') {
+      loadHotProducts()
+    } else if (sortParam === 'new') {
+      loadNewProducts()
+    } else if (searchParam) {
+      searchProducts(searchParam)
+    } else {
+      fetchProducts()
+    }
+  }, [sortParam, flashParam, searchParam])
+
+  useEffect(() => {
+    if (categoryParam) {
+      setProductFilters(prev => ({ ...prev, category: categoryParam }))
+      fetchProducts({ category: categoryParam } as any)
+    }
+  }, [categoryParam])
+
+  useEffect(() => {
+    if (!isFlashSale || flashSales.length === 0) return
+
+    const timer = setInterval(() => {
+      const now = dayjs()
+      const endTime = dayjs(flashSales[0]?.end_time)
+      const diff = endTime.diff(now, 'second')
+      
+      if (diff <= 0) {
+        setCountdown('已结束')
+        loadFlashSales()
+      } else {
+        const hours = Math.floor(diff / 3600)
+        const minutes = Math.floor((diff % 3600) / 60)
+        const seconds = diff % 60
+        setCountdown(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
+      }
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [isFlashSale, flashSales])
+
+  const loadFlashSales = async () => {
+    setFlashLoading(true)
+    try {
+      const response = await api.get('/flash-sales/active')
+      const data = (response.data as any)?.data || []
+      setFlashSales(data)
+    } catch {
+      setFlashSales([])
+    } finally {
+      setFlashLoading(false)
+    }
+  }
+
+  const loadHotProducts = async () => {
+    setLocalLoading(true)
+    try {
+      const response = await productService.getHotProducts(50)
+      const apiResponse = response.data
+      setLocalProducts(apiResponse.data || [])
+    } catch {
+      setLocalProducts([])
+    } finally {
+      setLocalLoading(false)
+    }
+  }
+
+  const loadNewProducts = async () => {
+    setLocalLoading(true)
+    try {
+      const response = await productService.getNewProducts(50)
+      const apiResponse = response.data
+      setLocalProducts(apiResponse.data || [])
+    } catch {
+      setLocalProducts([])
+    } finally {
+      setLocalLoading(false)
+    }
+  }
+
+  const handleBuyFlashProduct = (product: FlashSaleProduct) => {
+    navigate(`/products/${product.product_id}?flash_sale_id=${product.flash_sale_id}`)
+  }
+
+  const displayProducts = isSpecialSort ? localProducts : products
+  const displayLoading = isFlashSale ? flashLoading : (isSpecialSort ? localLoading : isLoading)
 
   const columns = [
     {
@@ -68,22 +221,22 @@ export const ProductListPage: React.FC = () => {
       title: '描述',
       dataIndex: 'description',
       key: 'description',
-      width: 200,
+      width: screens.md ? 200 : 100,
       ellipsis: true,
     },
     {
       title: '价格',
       dataIndex: 'price',
       key: 'price',
-      render: (price: number) => `¥${price.toFixed(2)}`,
+      render: (price: number) => <Text type="danger">¥{price.toFixed(2)}</Text>,
       width: 100,
     },
-    {
+    ...(screens.md ? [{
       title: '库存',
       dataIndex: 'stock',
       key: 'stock',
       width: 80,
-    },
+    }] : []),
     {
       title: '状态',
       dataIndex: 'status',
@@ -99,10 +252,10 @@ export const ProductListPage: React.FC = () => {
       key: 'action',
       render: (_: any, record: Product) => (
         <Space>
-          <Button type="link" onClick={() => navigate(`/products/${record.id}`)}>
+          <Button type="link" size="small" onClick={() => navigate(`/products/${record.id}`)}>
             详情
           </Button>
-          <Button type="link" onClick={() => navigate(`/products/${record.id}/cart`)}>
+          <Button type="link" size="small" onClick={() => navigate(`/products/${record.id}/cart`)}>
             加购
           </Button>
         </Space>
@@ -112,9 +265,7 @@ export const ProductListPage: React.FC = () => {
 
   const handleSearch = (value: string) => {
     if (value.trim()) {
-      searchProducts(value)
-    } else {
-      fetchProducts()
+      navigate(`/products?search=${encodeURIComponent(value.trim())}`)
     }
   }
 
@@ -154,6 +305,130 @@ export const ProductListPage: React.FC = () => {
     setSortField('created_at')
     setSortOrder('desc')
     fetchProducts()
+  }
+
+  if (error) {
+    return <Empty description={`错误: ${error}`} />
+  }
+
+  if (isFlashSale) {
+    return (
+      <div style={{ padding: screens.xs ? 12 : 24 }}>
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col flex="auto">
+            <Space>
+              {pageIcon}
+              <Title level={screens.xs ? 4 : 3} style={{ margin: 0 }}>{pageTitle}</Title>
+            </Space>
+          </Col>
+          {flashSales.length > 0 && (
+            <Col>
+              <Card size="small" style={{ background: '#fff7e6', borderColor: '#faad14' }}>
+                <Statistic 
+                  title="距离结束" 
+                  value={countdown} 
+                  valueStyle={{ color: '#faad14', fontSize: screens.xs ? 18 : 24 }}
+                />
+              </Card>
+            </Col>
+          )}
+        </Row>
+
+        <Spin spinning={displayLoading}>
+          {flashSales.length === 0 ? (
+            <Card>
+              <Empty
+                description={
+                  <Space direction="vertical">
+                    <Title level={4}>暂无进行中的秒杀活动</Title>
+                    <Text type="secondary">敬请期待下一场秒杀！</Text>
+                    <Button type="primary" onClick={() => navigate('/products')}>
+                      浏览商品
+                    </Button>
+                  </Space>
+                }
+              />
+            </Card>
+          ) : (
+            flashSales.map(sale => (
+              <div key={sale.id} style={{ marginBottom: 24 }}>
+                <Card 
+                  title={
+                    <Space>
+                      <ThunderboltOutlined style={{ color: '#faad14' }} />
+                      <span>{sale.name}</span>
+                      {sale.description && <Text type="secondary">({sale.description})</Text>}
+                    </Space>
+                  }
+                  style={{ marginBottom: 16 }}
+                >
+                  <Row gutter={[16, 16]}>
+                    {sale.products.map(product => {
+                      const stockPercent = ((product.stock_limit - product.stock_sold) / product.stock_limit) * 100
+                      return (
+                        <Col xs={24} sm={12} md={8} lg={6} key={product.id}>
+                          <Card
+                            hoverable
+                            cover={
+                              <div style={{ 
+                                height: 120, 
+                                background: '#f5f5f5', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center' 
+                              }}>
+                                <Text style={{ fontSize: 32 }}>{product.product_name.substring(0, 2)}</Text>
+                              </div>
+                            }
+                            onClick={() => handleBuyFlashProduct(product)}
+                          >
+                            <Card.Meta
+                              title={product.product_name}
+                              description={
+                                <Space direction="vertical" style={{ width: '100%' }}>
+                                  <Space>
+                                    <Text type="danger" strong style={{ fontSize: 18 }}>
+                                      ¥{product.flash_price.toFixed(2)}
+                                    </Text>
+                                    <Text delete type="secondary">
+                                      ¥{product.original_price.toFixed(2)}
+                                    </Text>
+                                  </Space>
+                                  <Tag color="red">-{product.discount}%</Tag>
+                                  <Progress 
+                                    percent={100 - stockPercent} 
+                                    size="small" 
+                                    strokeColor="#ff4d4f"
+                                    format={() => `已抢${product.stock_sold}/${product.stock_limit}`}
+                                  />
+                                  <Button 
+                                    type="primary" 
+                                    danger 
+                                    block 
+                                    icon={<ShoppingCartOutlined />}
+                                    disabled={stockPercent <= 0}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleBuyFlashProduct(product)
+                                    }}
+                                  >
+                                    {stockPercent <= 0 ? '已抢光' : '立即抢购'}
+                                  </Button>
+                                </Space>
+                              }
+                            />
+                          </Card>
+                        </Col>
+                      )
+                    })}
+                  </Row>
+                </Card>
+              </div>
+            ))
+          )}
+        </Spin>
+      </div>
+    )
   }
 
   const filterDropdownItems = [
@@ -240,53 +515,63 @@ export const ProductListPage: React.FC = () => {
     },
   ]
 
-  if (error) {
-    return <Empty description={`错误: ${error}`} />
-  }
-
   return (
-    <div style={{ padding: '20px' }}>
+    <div style={{ padding: screens.xs ? 12 : 24 }}>
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col flex="auto">
+          <Space>
+            {pageIcon}
+            <Title level={screens.xs ? 4 : 3} style={{ margin: 0 }}>{pageTitle}</Title>
+          </Space>
+        </Col>
+      </Row>
+
       <Row gutter={16} style={{ marginBottom: '20px' }}>
         <Col flex="auto">
           <Input.Search
             placeholder="搜索产品..."
             prefix={<SearchOutlined />}
             onSearch={handleSearch}
+            defaultValue={searchParam || ''}
             style={{ width: '100%' }}
           />
         </Col>
-        <Col>
-          <Space>
-            <Dropdown menu={{ items: filterDropdownItems }} trigger={['click']}>
-              <Button icon={<FilterOutlined />}>
-                筛选
-              </Button>
-            </Dropdown>
-            <Dropdown menu={{ items: sortDropdownItems }} trigger={['click']}>
-              <Button icon={<SortAscendingOutlined />}>
-                排序
-              </Button>
-            </Dropdown>
-            {user?.role === 'merchant' && (
-              <Button type="primary" icon={<PlusOutlined />}>
-                发布产品
-              </Button>
-            )}
-          </Space>
-        </Col>
+        {!isSpecialSort && (
+          <Col>
+            <Space>
+              <Dropdown menu={{ items: filterDropdownItems }} trigger={['click']}>
+                <Button icon={<FilterOutlined />}>
+                  筛选
+                </Button>
+              </Dropdown>
+              <Dropdown menu={{ items: sortDropdownItems }} trigger={['click']}>
+                <Button icon={<SortAscendingOutlined />}>
+                  排序
+                </Button>
+              </Dropdown>
+              {user?.role === 'merchant' && (
+                <Button type="primary" icon={<PlusOutlined />}>
+                  发布产品
+                </Button>
+              )}
+            </Space>
+          </Col>
+        )}
       </Row>
 
-      <Spin spinning={isLoading}>
+      <Spin spinning={displayLoading}>
         <Table
           columns={columns}
-          dataSource={products}
+          dataSource={displayProducts}
           rowKey="id"
           pagination={false}
+          scroll={{ x: 600 }}
           locale={{ emptyText: '暂无数据' }}
+          size={screens.xs ? 'small' : 'middle'}
         />
       </Spin>
 
-      {total > 0 && (
+      {!isSpecialSort && total > 0 && (
         <Pagination
           current={filters.page}
           pageSize={filters.per_page}
