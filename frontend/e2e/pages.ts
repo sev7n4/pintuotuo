@@ -105,17 +105,19 @@ export class MerchantProductsPage {
     
     if (selectCount >= 1) {
       await selects.first().click();
-      await this.page.waitForTimeout(300);
+      await this.page.waitForTimeout(500);
       const modelOption = data.modelId || 'GPT 系列';
-      await this.page.getByText(modelOption, { exact: false }).first().click();
-      await this.page.waitForTimeout(300);
+      const dropdown = this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+      await dropdown.getByText(modelOption, { exact: false }).click();
+      await this.page.waitForTimeout(500);
     }
     
     if (selectCount >= 2) {
       await selects.nth(1).click();
-      await this.page.waitForTimeout(300);
+      await this.page.waitForTimeout(500);
       const packageOption = data.packageId || '月度标准版';
-      await this.page.getByText(packageOption, { exact: false }).first().click();
+      const dropdown = this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+      await dropdown.getByText(packageOption, { exact: false }).click();
       await this.page.waitForTimeout(500);
     }
     
@@ -131,8 +133,9 @@ export class MerchantProductsPage {
     
     if (data.status && selectCount >= 3) {
       await selects.nth(2).click();
-      await this.page.waitForTimeout(300);
-      await this.page.getByText(data.status).click();
+      await this.page.waitForTimeout(500);
+      const dropdown = this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+      await dropdown.getByText(data.status).click();
     }
   }
 
