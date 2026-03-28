@@ -29,7 +29,8 @@ const PaymentPage: React.FC = () => {
     try {
       const response = await paymentService.initiatePayment({
         order_id: currentOrder.id,
-        method: paymentMethod,
+        pay_method: paymentMethod,
+        amount: currentOrder.total_price,
       });
       const payment = response.data.data as Payment;
 
