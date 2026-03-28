@@ -106,19 +106,19 @@ export class MerchantProductsPage {
     
     if (selectCount >= 1) {
       await selects.first().click({ force: true });
-      await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
+      await this.page.waitForSelector('.ant-select-dropdown .ant-select-item-option', { state: 'visible', timeout: 5000 });
       await this.page.waitForTimeout(500);
       const modelOption = data.modelId || 'GPT 系列';
-      await this.page.getByRole('option', { name: modelOption, exact: false }).first().click();
+      await this.page.locator('.ant-select-dropdown .ant-select-item-option').filter({ hasText: modelOption }).first().click();
       await this.page.waitForTimeout(500);
     }
     
     if (selectCount >= 2) {
       await selects.nth(1).click({ force: true });
-      await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
+      await this.page.waitForSelector('.ant-select-dropdown .ant-select-item-option', { state: 'visible', timeout: 5000 });
       await this.page.waitForTimeout(500);
       const packageOption = data.packageId || '月度标准版';
-      await this.page.getByRole('option', { name: packageOption, exact: false }).first().click();
+      await this.page.locator('.ant-select-dropdown .ant-select-item-option').filter({ hasText: packageOption }).first().click();
       await this.page.waitForTimeout(500);
     }
     
@@ -134,9 +134,9 @@ export class MerchantProductsPage {
     
     if (data.status && selectCount >= 3) {
       await selects.nth(2).click({ force: true });
-      await this.page.waitForSelector('.ant-select-dropdown', { state: 'visible', timeout: 5000 });
+      await this.page.waitForSelector('.ant-select-dropdown .ant-select-item-option', { state: 'visible', timeout: 5000 });
       await this.page.waitForTimeout(500);
-      await this.page.getByRole('option', { name: data.status, exact: false }).first().click();
+      await this.page.locator('.ant-select-dropdown .ant-select-item-option').filter({ hasText: data.status }).first().click();
     }
   }
 
