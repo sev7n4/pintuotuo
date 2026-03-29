@@ -1,9 +1,11 @@
 import React from 'react';
-import { Table, Button, Space, Empty, InputNumber, Row, Col, Card, Statistic, message } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Space, Empty, InputNumber, Row, Col, Card, Statistic, message, Tag, Typography } from 'antd';
+import { DeleteOutlined, TagsOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '@stores/cartStore';
 import type { CartItem } from '@/types';
+
+const { Text } = Typography;
 
 export const CartPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,8 +28,38 @@ export const CartPage: React.FC = () => {
       dataIndex: ['product', 'name'],
       key: 'name',
       render: (text: string, record: CartItem) => (
-        <a onClick={() => navigate(`/products/${record.product_id}`)}>{text}</a>
+        <Space direction="vertical" size={0}>
+          <a onClick={() => navigate(`/products/${record.product_id}`)}>{text}</a>
+          {record.sku_name && (
+            <Space size={4}>
+              <TagsOutlined style={{ fontSize: 12, color: '#999' }} />
+              <Text type="secondary" style={{ fontSize: 12 }}>{record.sku_name}</Text>
+            </Space>
+          )}
+        </Space>
       ),
+    },
+    {
+      title: '规格',
+      key: 'specs',
+      render: (_: any, record: CartItem) => {
+        if (!record.sku_type) return <Text type="secondary">-</Text>;
+        const typeMap: Record<string, { color: string; text: string }> = {
+          token_pack: { color: 'blue', text: 'Token包' },
+          subscription: { color: 'green', text: '订阅' },
+          concurrent: { color: 'orange', text: '并发' },
+          trial: { color: 'purple', text: '试用' },
+        };
+        const config = typeMap[record.sku_type] || { color: 'default', text: record.sku_type };
+        return (
+          <Space direction="vertical" size={0}>
+            <Tag color={config.color}>{config.text}</Tag>
+            {record.sku_specs && (
+              <Text type="secondary" style={{ fontSize: 12 }}>{record.sku_specs}</Text>
+            )}
+          </Space>
+        );
+      },
     },
     {
       title: '单价',
