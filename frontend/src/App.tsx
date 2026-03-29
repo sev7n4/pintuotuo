@@ -50,6 +50,8 @@ import AdminMerchants from '@pages/admin/AdminMerchants';
 import AdminProducts from '@pages/admin/AdminProducts';
 import AdminOrders from '@pages/admin/AdminOrders';
 import AdminSettings from '@pages/admin/AdminSettings';
+import AdminSPUs from '@pages/admin/AdminSPUs';
+import AdminSKUs from '@pages/admin/AdminSKUs';
 
 function App() {
   return (
@@ -137,6 +139,8 @@ function App() {
             <Route path="products" element={<AdminProducts />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="spus" element={<AdminSPUs />} />
+            <Route path="skus" element={<AdminSKUs />} />
           </Route>
         </Routes>
       </BrowserRouter>
