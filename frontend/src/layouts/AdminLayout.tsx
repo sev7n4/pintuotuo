@@ -11,6 +11,8 @@ import {
   AppstoreOutlined,
   MenuOutlined,
   CloseOutlined,
+  DatabaseOutlined,
+  TagsOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -37,6 +39,16 @@ const menuItems = [
     key: '/admin/products',
     icon: <AppstoreOutlined />,
     label: '商品管理',
+  },
+  {
+    key: '/admin/spus',
+    icon: <DatabaseOutlined />,
+    label: 'SPU管理',
+  },
+  {
+    key: '/admin/skus',
+    icon: <TagsOutlined />,
+    label: 'SKU管理',
   },
   {
     key: '/admin/orders',
