@@ -192,9 +192,9 @@ func GetAvailableSKUs(c *gin.Context) {
 		var tokenAmount sql.NullInt64
 		var computePoints, originalPrice, groupDiscountRate sql.NullFloat64
 
-		err := rows.Scan(&s.ID, &s.SKUCode, &s.SKUType, &tokenAmount, &computePoints, &s.RetailPrice, &originalPrice,
+		scanErr := rows.Scan(&s.ID, &s.SKUCode, &s.SKUType, &tokenAmount, &computePoints, &s.RetailPrice, &originalPrice,
 			&s.ValidDays, &s.GroupEnabled, &groupDiscountRate, &s.SPUID, &s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier)
-		if err != nil {
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
