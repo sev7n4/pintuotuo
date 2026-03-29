@@ -16,21 +16,21 @@ type MerchantSKU struct {
 
 type MerchantSKUDetail struct {
 	MerchantSKU
-	SKUCode          string  `json:"sku_code"`
-	SKUType          string  `json:"sku_type"`
-	TokenAmount      int64   `json:"token_amount,omitempty"`
-	ComputePoints    float64 `json:"compute_points,omitempty"`
-	RetailPrice      float64 `json:"retail_price"`
-	OriginalPrice    float64 `json:"original_price,omitempty"`
-	ValidDays        int     `json:"valid_days"`
-	GroupEnabled     bool    `json:"group_enabled"`
+	SKUCode           string  `json:"sku_code"`
+	SKUType           string  `json:"sku_type"`
+	TokenAmount       int64   `json:"token_amount,omitempty"`
+	ComputePoints     float64 `json:"compute_points,omitempty"`
+	RetailPrice       float64 `json:"retail_price"`
+	OriginalPrice     float64 `json:"original_price,omitempty"`
+	ValidDays         int     `json:"valid_days"`
+	GroupEnabled      bool    `json:"group_enabled"`
 	GroupDiscountRate float64 `json:"group_discount_rate,omitempty"`
-	SPUName          string  `json:"spu_name"`
-	ModelProvider    string  `json:"model_provider"`
-	ModelName        string  `json:"model_name"`
-	ModelTier        string  `json:"model_tier"`
-	APIKeyName       string  `json:"api_key_name,omitempty"`
-	APIKeyProvider   string  `json:"api_key_provider,omitempty"`
+	SPUName           string  `json:"spu_name"`
+	ModelProvider     string  `json:"model_provider"`
+	ModelName         string  `json:"model_name"`
+	ModelTier         string  `json:"model_tier"`
+	APIKeyName        string  `json:"api_key_name,omitempty"`
+	APIKeyProvider    string  `json:"api_key_provider,omitempty"`
 }
 
 type MerchantSKUCreateRequest struct {
@@ -44,20 +44,20 @@ type MerchantSKUUpdateRequest struct {
 }
 
 type AvailableSKU struct {
-	ID               int     `json:"id"`
-	SKUCode          string  `json:"sku_code"`
-	SKUType          string  `json:"sku_type"`
-	TokenAmount      int64   `json:"token_amount,omitempty"`
-	ComputePoints    float64 `json:"compute_points,omitempty"`
-	RetailPrice      float64 `json:"retail_price"`
-	OriginalPrice    float64 `json:"original_price,omitempty"`
-	ValidDays        int     `json:"valid_days"`
-	GroupEnabled     bool    `json:"group_enabled"`
+	ID                int     `json:"id"`
+	SKUCode           string  `json:"sku_code"`
+	SKUType           string  `json:"sku_type"`
+	TokenAmount       int64   `json:"token_amount,omitempty"`
+	ComputePoints     float64 `json:"compute_points,omitempty"`
+	RetailPrice       float64 `json:"retail_price"`
+	OriginalPrice     float64 `json:"original_price,omitempty"`
+	ValidDays         int     `json:"valid_days"`
+	GroupEnabled      bool    `json:"group_enabled"`
 	GroupDiscountRate float64 `json:"group_discount_rate,omitempty"`
-	SPUID            int     `json:"spu_id"`
-	SPUName          string  `json:"spu_name"`
-	ModelProvider    string  `json:"model_provider"`
-	ModelName        string  `json:"model_name"`
-	ModelTier        string  `json:"model_tier"`
-	IsSelected       bool    `json:"is_selected"`
+	SPUID             int     `json:"spu_id"`
+	SPUName           string  `json:"spu_name"`
+	ModelProvider     string  `json:"model_provider"`
+	ModelName         string  `json:"model_name"`
+	ModelTier         string  `json:"model_tier"`
+	IsSelected        bool    `json:"is_selected"`
 }

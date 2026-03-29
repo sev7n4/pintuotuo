@@ -64,12 +64,10 @@ func ListMerchantSKUs(c *gin.Context) {
 		group_enabled, group_discount_rate, spu_name, model_provider, model_name, model_tier, api_key_name, api_key_provider
 		FROM merchant_sku_details WHERE merchant_id = $1`
 	args := []interface{}{merchantID}
-	argPos := 1
 
 	if status != "" && status != "all" {
-		query += " AND status = $" + strconv.Itoa(argPos)
+		query += " AND status = $" + strconv.Itoa(len(args)+1)
 		args = append(args, status)
-		argPos++
 	}
 
 	query += " ORDER BY created_at DESC"
@@ -169,17 +167,14 @@ func GetAvailableSKUs(c *gin.Context) {
 		FROM skus s JOIN spus sp ON s.spu_id = sp.id 
 		WHERE s.status = 'active' AND sp.status = 'active'`
 	args := []interface{}{}
-	argPos := 1
 
 	if provider != "" {
-		query += " AND sp.model_provider = $" + strconv.Itoa(argPos)
+		query += " AND sp.model_provider = $" + strconv.Itoa(len(args)+1)
 		args = append(args, provider)
-		argPos++
 	}
 	if skuType != "" {
-		query += " AND s.sku_type = $" + strconv.Itoa(argPos)
+		query += " AND s.sku_type = $" + strconv.Itoa(len(args)+1)
 		args = append(args, skuType)
-		argPos++
 	}
 
 	query += " ORDER BY sp.model_tier, s.retail_price ASC"
@@ -192,17 +187,6 @@ func GetAvailableSKUs(c *gin.Context) {
 	defer rows.Close()
 
 	var skus []models.AvailableSKU
-
-	ctx := context.Background()
-	cacheKey := cache.AvailableSKUsKey(merchantID, provider, skuType)
-
-	if cachedSKUs, cacheErr := cache.Get(ctx, cacheKey); cacheErr == nil {
-		if unmarshalErr := json.Unmarshal([]byte(cachedSKUs), &skus); unmarshalErr == nil {
-			c.JSON(http.StatusOK, gin.H{"data": skus})
-			return
-		}
-	}
-
 	for rows.Next() {
 		var s models.AvailableSKU
 		var tokenAmount sql.NullInt64
@@ -237,7 +221,7 @@ func GetAvailableSKUs(c *gin.Context) {
 		selectedMap := make(map[int]bool)
 		for rows2.Next() {
 			var skuID int
-			if err := rows2.Scan(&skuID); err == nil {
+			if scanErr := rows2.Scan(&skuID); scanErr == nil {
 				selectedMap[skuID] = true
 			}
 		}
@@ -263,7 +247,7 @@ func CreateMerchantSKU(c *gin.Context) {
 	}
 
 	var req models.MerchantSKUCreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
@@ -392,7 +376,7 @@ func UpdateMerchantSKU(c *gin.Context) {
 	}
 
 	var req models.MerchantSKUUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
