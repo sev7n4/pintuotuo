@@ -18,6 +18,7 @@ import {
   Grid,
   Progress,
   Statistic,
+  Tabs,
 } from 'antd';
 import {
   SearchOutlined,
@@ -28,18 +29,23 @@ import {
   ClockCircleOutlined,
   ThunderboltOutlined,
   ShoppingCartOutlined,
+  AppstoreOutlined,
+  TagsOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProductStore } from '@stores/productStore';
 import { useAuthStore } from '@stores/authStore';
 import { productService } from '@/services/product';
+import { skuService } from '@/services/sku';
 import api from '@/services/api';
 import type { Product } from '@/types';
+import type { SKUWithSPU } from '@/types/sku';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
+const { TabPane } = Tabs;
 
 type SortField = 'price' | 'stock' | 'created_at';
 type SortOrder = 'asc' | 'desc';
@@ -97,6 +103,15 @@ export const ProductListPage: React.FC = () => {
   const [flashSales, setFlashSales] = useState<FlashSale[]>([]);
   const [flashLoading, setFlashLoading] = useState(false);
   const [countdown, setCountdown] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'products' | 'skus'>('products');
+  const [skus, setSKUs] = useState<SKUWithSPU[]>([]);
+  const [skuTotal, setSkuTotal] = useState(0);
+  const [skuLoading, setSkuLoading] = useState(false);
+  const [skuFilters, setSkuFilters] = useState<{
+    type?: string;
+    provider?: string;
+    tier?: string;
+  }>({});
 
   const sortParam = searchParams.get('sort');
   const flashParam = searchParams.get('flash');
@@ -132,6 +147,31 @@ export const ProductListPage: React.FC = () => {
       fetchProducts();
     }
   }, [sortParam, flashParam, searchParam]);
+
+  useEffect(() => {
+    if (activeTab === 'skus') {
+      loadSKUs();
+    }
+  }, [activeTab, skuFilters]);
+
+  const loadSKUs = async () => {
+    setSkuLoading(true);
+    try {
+      const response = await skuService.getPublicSKUs({
+        page: filters.page,
+        per_page: filters.per_page,
+        ...skuFilters,
+      });
+      const apiResponse = response.data;
+      setSKUs(apiResponse.data || []);
+      setSkuTotal(apiResponse.total || 0);
+    } catch {
+      setSKUs([]);
+      setSkuTotal(0);
+    } finally {
+      setSkuLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (categoryParam) {
@@ -262,6 +302,113 @@ export const ProductListPage: React.FC = () => {
             详情
           </Button>
           <Button type="link" size="small" onClick={() => navigate(`/products/${record.id}/cart`)}>
+            加购
+          </Button>
+        </Space>
+      ),
+    },
+  ];
+
+  const skuColumns = [
+    {
+      title: 'SKU名称',
+      dataIndex: 'spu_name',
+      key: 'spu_name',
+      render: (text: string, record: SKUWithSPU) => (
+        <a onClick={() => navigate(`/skus/${record.id}`)}>{text}</a>
+      ),
+    },
+    {
+      title: '类型',
+      dataIndex: 'sku_type',
+      key: 'sku_type',
+      width: 100,
+      render: (type: string) => {
+        const typeMap: Record<string, { color: string; text: string }> = {
+          token_pack: { color: 'blue', text: 'Token包' },
+          subscription: { color: 'green', text: '订阅' },
+          concurrent: { color: 'orange', text: '并发' },
+          trial: { color: 'purple', text: '试用' },
+        };
+        const config = typeMap[type] || { color: 'default', text: type };
+        return <Tag color={config.color}>{config.text}</Tag>;
+      },
+    },
+    {
+      title: '模型',
+      dataIndex: 'model_name',
+      key: 'model_name',
+      width: 120,
+      render: (name: string, record: SKUWithSPU) => (
+        <Space direction="vertical" size={0}>
+          <Text strong>{name}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {record.model_provider} · {record.model_tier}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: '规格',
+      key: 'specs',
+      width: 150,
+      render: (_: any, record: SKUWithSPU) => {
+        if (record.sku_type === 'token_pack') {
+          return <Text>{record.token_amount?.toLocaleString()} tokens</Text>;
+        } else if (record.sku_type === 'subscription') {
+          const periodMap: Record<string, string> = {
+            monthly: '月度',
+            quarterly: '季度',
+            yearly: '年度',
+          };
+          return <Text>{periodMap[record.subscription_period || 'monthly'] || '月度'}</Text>;
+        } else if (record.sku_type === 'concurrent') {
+          return <Text>{record.concurrent_requests} 并发</Text>;
+        } else if (record.sku_type === 'trial') {
+          return <Text>{record.trial_duration_days}天试用</Text>;
+        }
+        return null;
+      },
+    },
+    {
+      title: '价格',
+      dataIndex: 'retail_price',
+      key: 'retail_price',
+      width: 100,
+      render: (price: number, record: SKUWithSPU) => (
+        <Space direction="vertical" size={0}>
+          <Text type="danger" strong>¥{price.toFixed(2)}</Text>
+          {record.original_price && record.original_price > price && (
+            <Text delete type="secondary" style={{ fontSize: 12 }}>
+              ¥{record.original_price.toFixed(2)}
+            </Text>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: '拼团',
+      key: 'group',
+      width: 80,
+      render: (_: any, record: SKUWithSPU) =>
+        record.group_enabled ? (
+          <Tag color="red">
+            {record.min_group_size}-{record.max_group_size}人
+          </Tag>
+        ) : (
+          <Text type="secondary">-</Text>
+        ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 120,
+      render: (_: any, record: SKUWithSPU) => (
+        <Space>
+          <Button type="link" size="small" onClick={() => navigate(`/skus/${record.id}`)}>
+            详情
+          </Button>
+          <Button type="link" size="small" onClick={() => navigate(`/skus/${record.id}/cart`)}>
             加购
           </Button>
         </Space>
@@ -552,56 +699,144 @@ export const ProductListPage: React.FC = () => {
         </Col>
       </Row>
 
-      <Row gutter={16} style={{ marginBottom: '20px' }}>
-        <Col flex="auto">
-          <Input.Search
-            placeholder="搜索产品..."
-            prefix={<SearchOutlined />}
-            onSearch={handleSearch}
-            defaultValue={searchParam || ''}
-            style={{ width: '100%' }}
-          />
-        </Col>
-        {!isSpecialSort && (
-          <Col>
-            <Space>
-              <Dropdown menu={{ items: filterDropdownItems }} trigger={['click']}>
-                <Button icon={<FilterOutlined />}>筛选</Button>
-              </Dropdown>
-              <Dropdown menu={{ items: sortDropdownItems }} trigger={['click']}>
-                <Button icon={<SortAscendingOutlined />}>排序</Button>
-              </Dropdown>
-              {user?.role === 'merchant' && (
-                <Button type="primary" icon={<PlusOutlined />}>
-                  发布产品
-                </Button>
-              )}
-            </Space>
-          </Col>
-        )}
-      </Row>
+      <Tabs
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as 'products' | 'skus')}
+        style={{ marginBottom: 16 }}
+      >
+        <TabPane
+          tab={
+            <span>
+              <AppstoreOutlined />
+              商品
+            </span>
+          }
+          key="products"
+        >
+          <Row gutter={16} style={{ marginBottom: '20px' }}>
+            <Col flex="auto">
+              <Input.Search
+                placeholder="搜索产品..."
+                prefix={<SearchOutlined />}
+                onSearch={handleSearch}
+                defaultValue={searchParam || ''}
+                style={{ width: '100%' }}
+              />
+            </Col>
+            {!isSpecialSort && (
+              <Col>
+                <Space>
+                  <Dropdown menu={{ items: filterDropdownItems }} trigger={['click']}>
+                    <Button icon={<FilterOutlined />}>筛选</Button>
+                  </Dropdown>
+                  <Dropdown menu={{ items: sortDropdownItems }} trigger={['click']}>
+                    <Button icon={<SortAscendingOutlined />}>排序</Button>
+                  </Dropdown>
+                  {user?.role === 'merchant' && (
+                    <Button type="primary" icon={<PlusOutlined />}>
+                      发布产品
+                    </Button>
+                  )}
+                </Space>
+              </Col>
+            )}
+          </Row>
 
-      <Spin spinning={displayLoading}>
-        <Table
-          columns={columns}
-          dataSource={displayProducts}
-          rowKey="id"
-          pagination={false}
-          scroll={{ x: 600 }}
-          locale={{ emptyText: '暂无数据' }}
-          size={screens.xs ? 'small' : 'middle'}
-        />
-      </Spin>
+          <Spin spinning={displayLoading}>
+            <Table
+              columns={columns}
+              dataSource={displayProducts}
+              rowKey="id"
+              pagination={false}
+              scroll={{ x: 600 }}
+              locale={{ emptyText: '暂无数据' }}
+              size={screens.xs ? 'small' : 'middle'}
+            />
+          </Spin>
 
-      {!isSpecialSort && total > 0 && (
-        <Pagination
-          current={filters.page}
-          pageSize={filters.per_page}
-          total={total}
-          onChange={handlePageChange}
-          style={{ marginTop: '20px', textAlign: 'right' }}
-        />
-      )}
+          {!isSpecialSort && total > 0 && (
+            <Pagination
+              current={filters.page}
+              pageSize={filters.per_page}
+              total={total}
+              onChange={handlePageChange}
+              style={{ marginTop: '20px', textAlign: 'right' }}
+            />
+          )}
+        </TabPane>
+
+        <TabPane
+          tab={
+            <span>
+              <TagsOutlined />
+              SKU套餐
+            </span>
+          }
+          key="skus"
+        >
+          <Row gutter={16} style={{ marginBottom: '20px' }}>
+            <Col flex="auto">
+              <Space>
+                <Select
+                  placeholder="类型"
+                  allowClear
+                  style={{ width: 120 }}
+                  onChange={(value) => setSkuFilters((prev) => ({ ...prev, type: value }))}
+                >
+                  <Option value="token_pack">Token包</Option>
+                  <Option value="subscription">订阅</Option>
+                  <Option value="concurrent">并发</Option>
+                  <Option value="trial">试用</Option>
+                </Select>
+                <Select
+                  placeholder="厂商"
+                  allowClear
+                  style={{ width: 120 }}
+                  onChange={(value) => setSkuFilters((prev) => ({ ...prev, provider: value }))}
+                >
+                  <Option value="openai">OpenAI</Option>
+                  <Option value="anthropic">Anthropic</Option>
+                  <Option value="google">Google</Option>
+                  <Option value="deepseek">DeepSeek</Option>
+                </Select>
+                <Select
+                  placeholder="层级"
+                  allowClear
+                  style={{ width: 100 }}
+                  onChange={(value) => setSkuFilters((prev) => ({ ...prev, tier: value }))}
+                >
+                  <Option value="pro">Pro</Option>
+                  <Option value="lite">Lite</Option>
+                  <Option value="mini">Mini</Option>
+                  <Option value="vision">Vision</Option>
+                </Select>
+              </Space>
+            </Col>
+          </Row>
+
+          <Spin spinning={skuLoading}>
+            <Table
+              columns={skuColumns}
+              dataSource={skus}
+              rowKey="id"
+              pagination={false}
+              scroll={{ x: 800 }}
+              locale={{ emptyText: '暂无SKU数据' }}
+              size={screens.xs ? 'small' : 'middle'}
+            />
+          </Spin>
+
+          {skuTotal > 0 && (
+            <Pagination
+              current={filters.page}
+              pageSize={filters.per_page}
+              total={skuTotal}
+              onChange={handlePageChange}
+              style={{ marginTop: '20px', textAlign: 'right' }}
+            />
+          )}
+        </TabPane>
+      </Tabs>
     </div>
   );
 };
