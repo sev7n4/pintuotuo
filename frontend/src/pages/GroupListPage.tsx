@@ -12,12 +12,12 @@ import {
   Space,
   Grid,
 } from 'antd';
-import { UserAddOutlined, ShoppingOutlined } from '@ant-design/icons';
+import { UserAddOutlined, ShoppingOutlined, TagsOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useGroupStore } from '@stores/groupStore';
 import type { Group } from '@/types';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
 const statusMap: Record<string, { color: string; label: string }> = {
@@ -146,9 +146,37 @@ export const GroupListPage: React.FC = () => {
                   ]}
                 >
                   <Card.Meta
-                    title={`拼团 #${group.id}`}
+                    title={
+                      <Space direction="vertical" size={0}>
+                        <span>拼团 #{group.id}</span>
+                        {group.sku_name && (
+                          <Space size={4}>
+                            <TagsOutlined style={{ fontSize: 12, color: '#999' }} />
+                            <Text type="secondary" style={{ fontSize: 12 }}>{group.sku_name}</Text>
+                          </Space>
+                        )}
+                      </Space>
+                    }
                     description={
                       <div>
+                        {group.sku_type && (
+                          <p style={{ margin: '8px 0' }}>
+                            <Space>
+                              <Text type="secondary">规格:</Text>
+                              <Tag color={group.sku_type === 'token_pack' ? 'blue' : group.sku_type === 'subscription' ? 'green' : 'orange'}>
+                                {group.sku_type === 'token_pack' ? 'Token包' : group.sku_type === 'subscription' ? '订阅' : '并发'}
+                              </Tag>
+                              {group.sku_specs && (
+                                <Text type="secondary" style={{ fontSize: 12 }}>{group.sku_specs}</Text>
+                              )}
+                            </Space>
+                          </p>
+                        )}
+                        {group.group_discount_rate && (
+                          <p style={{ margin: '8px 0' }}>
+                            <Tag color="red">拼团折扣 {(group.group_discount_rate * 100).toFixed(0)}%</Tag>
+                          </p>
+                        )}
                         <p style={{ margin: '8px 0' }}>目标人数: {group.target_count}人</p>
                         <p style={{ margin: '8px 0' }}>
                           当前人数: {group.current_count}人

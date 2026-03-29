@@ -97,6 +97,8 @@ export interface Order {
 export interface Group {
   id: number;
   product_id: number;
+  sku_id?: number;
+  spu_id?: number;
   creator_id: number;
   target_count: number;
   current_count: number;
@@ -104,6 +106,10 @@ export interface Group {
   deadline: string;
   created_at: string;
   updated_at: string;
+  sku_name?: string;
+  sku_type?: string;
+  sku_specs?: string;
+  group_discount_rate?: number;
 }
 
 // Token related types
