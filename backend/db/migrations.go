@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 type MigrationStatus struct {
@@ -19,6 +20,15 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 	version VARCHAR(255) PRIMARY KEY,
 	executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )`
+
+func isAlreadyExistsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "already exists") ||
+		strings.Contains(errStr, "duplicate key")
+}
 
 func RunMigrations() error {
 	if dbConn == nil {
@@ -89,6 +99,17 @@ func RunMigrations() error {
 
 		if _, err := tx.Exec(string(sqlBytes)); err != nil {
 			tx.Rollback()
+			if isAlreadyExistsError(err) {
+				log.Printf("Migration %s objects already exist, marking as complete", filename)
+				if _, err := dbConn.Exec(
+					"INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING",
+					filename,
+				); err != nil {
+					return fmt.Errorf("failed to record migration %s: %w", filename, err)
+				}
+				executed++
+				continue
+			}
 			return fmt.Errorf("failed to execute migration %s: %w", filename, err)
 		}
 
