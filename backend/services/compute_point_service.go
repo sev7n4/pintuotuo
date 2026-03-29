@@ -39,8 +39,8 @@ func (s *ComputePointService) CreditComputePoints(userID int, points float64, de
 			return nil, err
 		}
 		account = models.ComputePointAccount{
-			UserID:   userID,
-			Balance:  0,
+			UserID:  userID,
+			Balance: 0,
 		}
 	} else if err != nil {
 		return nil, err
