@@ -35,6 +35,11 @@ const menuItems = [
     label: '商品管理',
   },
   {
+    key: '/merchant/skus',
+    icon: <ShopOutlined />,
+    label: 'SKU管理',
+  },
+  {
     key: '/merchant/orders',
     icon: <ShoppingCartOutlined />,
     label: '订单管理',

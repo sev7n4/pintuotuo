@@ -590,9 +590,9 @@ func CreateSKU(c *gin.Context) {
 
 	db := config.GetDB()
 
-	var merchantID int
-	err := db.QueryRow(`SELECT merchant_id FROM spus WHERE id = $1 AND status = 'active'`, req.SPUID).Scan(&merchantID)
-	if err != nil {
+	var spuExists bool
+	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM spus WHERE id = $1 AND status = 'active')`, req.SPUID).Scan(&spuExists)
+	if err != nil || !spuExists {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SPU_NOT_FOUND",
 			"SPU不存在或已下架",
@@ -604,14 +604,14 @@ func CreateSKU(c *gin.Context) {
 
 	var sku models.SKU
 	err = db.QueryRow(
-		`INSERT INTO skus (spu_id, sku_code, merchant_id, sku_type, token_amount, compute_points, 
+		`INSERT INTO skus (spu_id, sku_code, sku_type, token_amount, compute_points, 
 		 subscription_period, is_unlimited, fair_use_limit, tpm_limit, rpm_limit, concurrent_requests,
 		 valid_days, retail_price, wholesale_price, original_price, stock, daily_limit,
 		 group_enabled, min_group_size, max_group_size, group_discount_rate,
 		 is_trial, trial_duration_days, status, is_promoted) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) 
 		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, created_at, updated_at`,
-		req.SPUID, req.SKUCode, merchantID, req.SKUType, req.TokenAmount, req.ComputePoints,
+		req.SPUID, req.SKUCode, req.SKUType, req.TokenAmount, req.ComputePoints,
 		req.SubscriptionPeriod, req.IsUnlimited, req.FairUseLimit, req.TPMLimit, req.RPMLimit, req.ConcurrentReqs,
 		req.ValidDays, req.RetailPrice, req.WholesalePrice, req.OriginalPrice, req.Stock, req.DailyLimit,
 		req.GroupEnabled, req.MinGroupSize, req.MaxGroupSize, req.GroupDiscountRate,

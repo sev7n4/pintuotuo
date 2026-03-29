@@ -212,6 +212,14 @@ func ComputePointBalanceKey(userID int) string {
 	return fmt.Sprintf("compute_points:balance:%d", userID)
 }
 
+func MerchantSKUsKey(merchantID int, status string) string {
+	return fmt.Sprintf("merchant:%d:skus:%s", merchantID, status)
+}
+
+func AvailableSKUsKey(merchantID int, provider, skuType string) string {
+	return fmt.Sprintf("merchant:%d:available_skus:%s:%s", merchantID, provider, skuType)
+}
+
 // InvalidatePatterns invalidates cache keys matching a pattern
 func InvalidatePatterns(ctx context.Context, pattern string) error {
 	if client == nil {

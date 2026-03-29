@@ -197,6 +197,15 @@ func RegisterMerchantRoutes(router *gin.RouterGroup) {
 			apiKeys.DELETE("/:id", handlers.DeleteMerchantAPIKey)
 			apiKeys.GET("/usage", handlers.GetMerchantAPIKeyUsage)
 		}
+
+		skus := authMerchants.Group("/skus")
+		{
+			skus.GET("", handlers.ListMerchantSKUs)
+			skus.GET("/available", handlers.GetAvailableSKUs)
+			skus.POST("", handlers.CreateMerchantSKU)
+			skus.PUT("/:id", handlers.UpdateMerchantSKU)
+			skus.DELETE("/:id", handlers.DeleteMerchantSKU)
+		}
 	}
 }
 
