@@ -18,6 +18,7 @@ import (
 )
 
 const orderStatusPending = "pending"
+const groupStatusActive = "active"
 
 // CreateOrder creates a new order
 func CreateOrder(c *gin.Context) {
@@ -560,7 +561,7 @@ func CreateGroup(c *gin.Context) {
 		`INSERT INTO groups (product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
 		 RETURNING id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at`,
-		productID, skuID, spuID, userID, req.TargetCount, 1, "active", req.Deadline,
+		productID, skuID, spuID, userID, req.TargetCount, 1, groupStatusActive, req.Deadline,
 	).Scan(&group.ID, &group.ProductID, &group.SKUID, &group.SPUID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
@@ -818,7 +819,7 @@ func JoinGroup(c *gin.Context) {
 		group.SPUID = int(spuID.Int64)
 	}
 
-	if group.Status != "active" {
+	if group.Status != groupStatusActive {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"GROUP_INACTIVE",
 			"Group is not active",
