@@ -55,7 +55,7 @@ func ListSPUs(c *gin.Context) {
 	args := []interface{}{}
 	argPos := 1
 
-	if status != "" && status != "all" {
+	if status != "" && status != allProductStatus {
 		query += " AND status = $" + strconv.Itoa(argPos)
 		args = append(args, status)
 		argPos++
@@ -95,7 +95,7 @@ func ListSPUs(c *gin.Context) {
 	countQuery := "SELECT COUNT(*) FROM spus WHERE 1=1"
 	countArgs := []interface{}{}
 
-	if status != "" && status != "all" {
+	if status != "" && status != allProductStatus {
 		countQuery += " AND status = $" + strconv.Itoa(len(countArgs)+1)
 		countArgs = append(countArgs, status)
 	}
@@ -332,7 +332,7 @@ func ListSKUs(c *gin.Context) {
 	args := []interface{}{}
 	argPos := 1
 
-	if status != "" && status != "all" {
+	if status != "" && status != allProductStatus {
 		query += " AND s.status = $" + strconv.Itoa(argPos)
 		args = append(args, status)
 		argPos++
@@ -430,7 +430,7 @@ func ListSKUs(c *gin.Context) {
 	countQuery := "SELECT COUNT(*) FROM skus s WHERE 1=1"
 	countArgs := []interface{}{}
 
-	if status != "" && status != "all" {
+	if status != "" && status != allProductStatus {
 		countQuery += " AND s.status = $" + strconv.Itoa(len(countArgs)+1)
 		countArgs = append(countArgs, status)
 	}
