@@ -37,10 +37,10 @@ func ListSPUs(c *gin.Context) {
 
 	if cachedList, err := cache.Get(ctx, cacheKey); err == nil {
 		var cachedData struct {
-			Total   int           `json:"total"`
-			Page    int           `json:"page"`
-			PerPage int           `json:"per_page"`
-			Data    []models.SPU  `json:"data"`
+			Total   int          `json:"total"`
+			Page    int          `json:"page"`
+			PerPage int          `json:"per_page"`
+			Data    []models.SPU `json:"data"`
 		}
 		if err := json.Unmarshal([]byte(cachedList), &cachedData); err == nil {
 			c.JSON(http.StatusOK, cachedData)
@@ -94,22 +94,18 @@ func ListSPUs(c *gin.Context) {
 
 	countQuery := "SELECT COUNT(*) FROM spus WHERE 1=1"
 	countArgs := []interface{}{}
-	countArgPos := 1
 
 	if status != "" && status != "all" {
-		countQuery += " AND status = $" + strconv.Itoa(countArgPos)
+		countQuery += " AND status = $" + strconv.Itoa(len(countArgs)+1)
 		countArgs = append(countArgs, status)
-		countArgPos++
 	}
 	if provider != "" {
-		countQuery += " AND model_provider = $" + strconv.Itoa(countArgPos)
+		countQuery += " AND model_provider = $" + strconv.Itoa(len(countArgs)+1)
 		countArgs = append(countArgs, provider)
-		countArgPos++
 	}
 	if tier != "" {
-		countQuery += " AND model_tier = $" + strconv.Itoa(countArgPos)
+		countQuery += " AND model_tier = $" + strconv.Itoa(len(countArgs)+1)
 		countArgs = append(countArgs, tier)
-		countArgPos++
 	}
 
 	var total int
@@ -312,10 +308,10 @@ func ListSKUs(c *gin.Context) {
 
 	if cachedList, err := cache.Get(ctx, cacheKey); err == nil {
 		var cachedData struct {
-			Total   int                  `json:"total"`
-			Page    int                  `json:"page"`
-			PerPage int                  `json:"per_page"`
-			Data    []models.SKUWithSPU  `json:"data"`
+			Total   int                 `json:"total"`
+			Page    int                 `json:"page"`
+			PerPage int                 `json:"per_page"`
+			Data    []models.SKUWithSPU `json:"data"`
 		}
 		if err := json.Unmarshal([]byte(cachedList), &cachedData); err == nil {
 			c.JSON(http.StatusOK, cachedData)
@@ -433,22 +429,18 @@ func ListSKUs(c *gin.Context) {
 
 	countQuery := "SELECT COUNT(*) FROM skus s WHERE 1=1"
 	countArgs := []interface{}{}
-	countArgPos := 1
 
 	if status != "" && status != "all" {
-		countQuery += " AND s.status = $" + strconv.Itoa(countArgPos)
+		countQuery += " AND s.status = $" + strconv.Itoa(len(countArgs)+1)
 		countArgs = append(countArgs, status)
-		countArgPos++
 	}
 	if spuID != "" {
-		countQuery += " AND s.spu_id = $" + strconv.Itoa(countArgPos)
+		countQuery += " AND s.spu_id = $" + strconv.Itoa(len(countArgs)+1)
 		countArgs = append(countArgs, idToInt(spuID))
-		countArgPos++
 	}
 	if skuType != "" {
-		countQuery += " AND s.sku_type = $" + strconv.Itoa(countArgPos)
+		countQuery += " AND s.sku_type = $" + strconv.Itoa(len(countArgs)+1)
 		countArgs = append(countArgs, skuType)
-		countArgPos++
 	}
 
 	var total int

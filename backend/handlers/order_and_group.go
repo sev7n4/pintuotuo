@@ -121,16 +121,16 @@ func CreateOrder(c *gin.Context) {
 	defer tx.Rollback()
 
 	if skuID > 0 {
-		result, err := tx.Exec(
+		result, execErr := tx.Exec(
 			"UPDATE skus SET stock = stock - $1 WHERE id = $2 AND (stock = -1 OR stock >= $1)",
 			req.Quantity, skuID,
 		)
-		if err != nil {
+		if execErr != nil {
 			middleware.RespondWithError(c, apperrors.NewAppError(
 				"STOCK_UPDATE_FAILED",
 				"Failed to update stock",
 				http.StatusInternalServerError,
-				err,
+				execErr,
 			))
 			return
 		}
@@ -141,16 +141,16 @@ func CreateOrder(c *gin.Context) {
 			return
 		}
 	} else if productID > 0 {
-		result, err := tx.Exec(
+		result, execErr := tx.Exec(
 			"UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1",
 			req.Quantity, productID,
 		)
-		if err != nil {
+		if execErr != nil {
 			middleware.RespondWithError(c, apperrors.NewAppError(
 				"STOCK_UPDATE_FAILED",
 				"Failed to update stock",
 				http.StatusInternalServerError,
-				err,
+				execErr,
 			))
 			return
 		}
