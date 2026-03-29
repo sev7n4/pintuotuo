@@ -300,6 +300,10 @@ export interface CartItem {
   product: Product;
   quantity: number;
   group_id?: number;
+  sku_id?: number;
+  sku_name?: string;
+  sku_type?: string;
+  sku_specs?: string;
 }
 
 // API Response types
