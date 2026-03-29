@@ -72,7 +72,9 @@ const AdminSPUs = () => {
   const handleAdd = () => {
     setEditingSPU(null);
     form.resetFields();
+    const timestamp = Date.now().toString(36).toUpperCase().slice(-6);
     form.setFieldsValue({
+      spu_code: `SPU-${timestamp}`,
       base_compute_points: 1.0,
       status: 'active',
       sort_order: 0,
@@ -211,16 +213,16 @@ const AdminSPUs = () => {
 
   return (
     <div>
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col flex="auto">
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} sm={12}>
           <h2 style={{ margin: 0 }}>SPU 管理</h2>
         </Col>
-        <Col>
-          <Space>
+        <Col xs={24} sm={12}>
+          <Space wrap style={{ width: '100%' }}>
             <Select
               value={filters.provider}
               onChange={(v) => setFilters({ ...filters, provider: v })}
-              style={{ width: 120 }}
+              style={{ width: '100%' }}
               placeholder="厂商"
               allowClear
             >
@@ -233,7 +235,7 @@ const AdminSPUs = () => {
             <Select
               value={filters.tier}
               onChange={(v) => setFilters({ ...filters, tier: v })}
-              style={{ width: 120 }}
+              style={{ width: '100%' }}
               placeholder="层级"
               allowClear
             >
