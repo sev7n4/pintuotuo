@@ -27,13 +27,16 @@ import {
   TeamOutlined,
   UserOutlined,
   ClockCircleOutlined,
+  TagsOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useProductStore } from '@stores/productStore';
 import { useCartStore } from '@stores/cartStore';
 import { useGroupStore } from '@stores/groupStore';
 import { productService } from '@services/product';
+import { skuService } from '@services/sku';
 import type { Product, GroupPrice, ProductReview, Group } from '@/types';
+import type { SKUWithSPU } from '@/types/sku';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -84,6 +87,9 @@ export const ProductDetailPage: React.FC = () => {
   const [showGroupsModal, setShowGroupsModal] = useState(false);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null);
+  const [skus, setSKUs] = useState<SKUWithSPU[]>([]);
+  const [selectedSKU, setSelectedSKU] = useState<SKUWithSPU | null>(null);
+  const [skuLoading, setSkuLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -95,7 +101,32 @@ export const ProductDetailPage: React.FC = () => {
     if (product?.group_prices?.length) {
       setSelectedGroupPrice(product.group_prices[0]);
     }
+    if (product?.id) {
+      loadSKUs(product.id);
+    }
   }, [product]);
+
+  const loadSKUs = async (productId: number) => {
+    setSkuLoading(true);
+    try {
+      const response = await skuService.getPublicSKUs({
+        page: 1,
+        per_page: 20,
+      });
+      const apiResponse = response.data;
+      const productSKUs = (apiResponse.data || []).filter(
+        (sku: SKUWithSPU) => sku.spu_id === productId
+      );
+      setSKUs(productSKUs);
+      if (productSKUs.length > 0) {
+        setSelectedSKU(productSKUs[0]);
+      }
+    } catch {
+      setSKUs([]);
+    } finally {
+      setSkuLoading(false);
+    }
+  };
 
   const loadProduct = async () => {
     if (!id) return;
@@ -293,6 +324,80 @@ export const ProductDetailPage: React.FC = () => {
             </div>
           </Col>
         </Row>
+
+        <Divider />
+
+        {skus.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <Title level={4}>
+              <TagsOutlined /> 选择套餐
+            </Title>
+            <Spin spinning={skuLoading}>
+              <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                {skus.map((sku) => (
+                  <Card
+                    key={sku.id}
+                    size="small"
+                    hoverable
+                    style={{
+                      border: selectedSKU?.id === sku.id ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                      cursor: 'pointer',
+                      background: selectedSKU?.id === sku.id ? '#e6f7ff' : 'white',
+                    }}
+                    onClick={() => setSelectedSKU(sku)}
+                  >
+                    <Row justify="space-between" align="middle">
+                      <Col flex="auto">
+                        <Space direction="vertical" size={0}>
+                          <Space>
+                            <Tag color={sku.sku_type === 'token_pack' ? 'blue' : sku.sku_type === 'subscription' ? 'green' : 'orange'}>
+                              {sku.sku_type === 'token_pack' ? 'Token包' : sku.sku_type === 'subscription' ? '订阅' : '并发'}
+                            </Tag>
+                            <Text strong>{sku.spu_name}</Text>
+                          </Space>
+                          <Space size="small">
+                            {sku.token_amount && (
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                {sku.token_amount.toLocaleString()} tokens
+                              </Text>
+                            )}
+                            {sku.subscription_period && (
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                {sku.subscription_period === 'monthly' ? '月度' : sku.subscription_period === 'yearly' ? '年度' : '季度'}
+                              </Text>
+                            )}
+                            {sku.concurrent_requests && (
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                {sku.concurrent_requests} 并发
+                              </Text>
+                            )}
+                          </Space>
+                        </Space>
+                      </Col>
+                      <Col>
+                        <Space direction="vertical" size={0} align="end">
+                          <Text strong style={{ fontSize: 18, color: '#1890ff' }}>
+                            ¥{sku.retail_price.toFixed(2)}
+                          </Text>
+                          {sku.original_price && sku.original_price > sku.retail_price && (
+                            <Text delete type="secondary" style={{ fontSize: 12 }}>
+                              ¥{sku.original_price.toFixed(2)}
+                            </Text>
+                          )}
+                          {sku.group_enabled && (
+                            <Tag color="red" style={{ marginTop: 4 }}>
+                              <TeamOutlined /> {sku.min_group_size}-{sku.max_group_size}人团
+                            </Tag>
+                          )}
+                        </Space>
+                      </Col>
+                    </Row>
+                  </Card>
+                ))}
+              </Space>
+            </Spin>
+          </div>
+        )}
 
         <Divider />
 
