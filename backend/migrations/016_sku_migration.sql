@@ -118,17 +118,17 @@ ON CONFLICT (sku_code) DO NOTHING;
 -- 更新 orders 表关联
 UPDATE orders o SET sku_id = s.id, spu_id = s.spu_id
 FROM skus s
-WHERE s.sku_code = 'SKU-' || (SELECT spu_code FROM spus WHERE id = s.spu_id)
-WHERE s.status = 'active';
+WHERE s.sku_code = 'SKU-' || (SELECT spu_code FROM spus sp WHERE sp.id = s.spu_id)
+  AND s.status = 'active';
 
 -- 更新 cart_items 表关联
 UPDATE cart_items c SET sku_id = s.id, spu_id = s.spu_id
 FROM skus s
-WHERE s.sku_code = 'SKU-' || (SELECT spu_code FROM spus WHERE id = s.spu_id)
-WHERE s.status = 'active';
+WHERE s.sku_code = 'SKU-' || (SELECT spu_code FROM spus sp WHERE sp.id = s.spu_id)
+  AND s.status = 'active';
 
 -- 更新 groups 表关联
 UPDATE groups g SET sku_id = s.id, spu_id = s.spu_id
 FROM skus s
-WHERE s.sku_code = 'SKU-' || (SELECT spu_code FROM spus WHERE id = s.spu_id)
-WHERE s.status = 'active';
+WHERE s.sku_code = 'SKU-' || (SELECT spu_code FROM spus sp WHERE sp.id = s.spu_id)
+  AND s.status = 'active';
