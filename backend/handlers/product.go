@@ -15,6 +15,9 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
+const merchantStatusActive = "active"
+const productStatusActive = "active"
+
 // ListProducts retrieves product list with pagination
 func ListProducts(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
@@ -55,7 +58,7 @@ func ListProducts(c *gin.Context) {
 	// Build query with proper parameter handling for PostgreSQL
 	var rows *sql.Rows
 	var err error
-	if status == "" || status == "all" {
+	if status == "" || status == allProductStatus {
 		rows, err = db.Query(
 			"SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products ORDER BY created_at DESC LIMIT $1 OFFSET $2",
 			perPageNum, offset,
@@ -87,7 +90,7 @@ func ListProducts(c *gin.Context) {
 	// Get total count
 	var total int
 	var countErr error
-	if status == "" || status == "all" {
+	if status == "" || status == allProductStatus {
 		countErr = db.QueryRow("SELECT COUNT(*) FROM products").Scan(&total)
 	} else {
 		countErr = db.QueryRow("SELECT COUNT(*) FROM products WHERE status = $1", status).Scan(&total)
@@ -316,7 +319,7 @@ func CreateProduct(c *gin.Context) {
 		return
 	}
 
-	if merchantStatus != "active" {
+	if merchantStatus != merchantStatusActive {
 		c.JSON(http.StatusForbidden, gin.H{
 			"code":    "MERCHANT_NOT_APPROVED",
 			"message": "您的商户申请正在审核中，审核通过后即可创建商品",
@@ -331,7 +334,7 @@ func CreateProduct(c *gin.Context) {
 	var product models.Product
 	err = db.QueryRow(
 		"INSERT INTO products (merchant_id, name, description, price, original_price, stock, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, merchant_id, name, description, price, stock, status, created_at, updated_at",
-		merchantID, req.Name, req.Description, req.Price, req.OriginalPrice, req.Stock, "active",
+		merchantID, req.Name, req.Description, req.Price, req.OriginalPrice, req.Stock, productStatusActive,
 	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
 
 	if err != nil {

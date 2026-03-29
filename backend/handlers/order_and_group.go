@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 )
 
 const orderStatusPending = "pending"
+const groupStatusActive = "active"
 
 // CreateOrder creates a new order
 func CreateOrder(c *gin.Context) {
@@ -27,7 +29,8 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	var req struct {
-		ProductID int `json:"product_id" binding:"required"`
+		ProductID int `json:"product_id"`
+		SKUID     int `json:"sku_id"`
 		GroupID   int `json:"group_id"`
 		Quantity  int `json:"quantity" binding:"required,gt=0"`
 	}
@@ -37,25 +40,71 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
+	if req.ProductID == 0 && req.SKUID == 0 {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MISSING_PRODUCT_OR_SKU",
+			"product_id or sku_id is required",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 
-	// Get product info
-	var product models.Product
-	err := db.QueryRow(
-		"SELECT id, price, stock FROM products WHERE id = $1",
-		req.ProductID,
-	).Scan(&product.ID, &product.Price, &product.Stock)
+	var skuID, spuID, productID int
+	var retailPrice, wholesalePrice float64
+	var stock int
+	var skuType string
 
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-		return
+	if req.SKUID > 0 {
+		var groupEnabled bool
+		var minGroupSize, maxGroupSize int
+		var groupDiscountRate sql.NullFloat64
+		err := db.QueryRow(
+			`SELECT s.id, s.spu_id, s.retail_price, s.wholesale_price, s.stock, s.sku_type,
+				s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate
+			 FROM skus s JOIN spus sp ON s.spu_id = sp.id 
+			 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
+			req.SKUID,
+		).Scan(&skuID, &spuID, &retailPrice, &wholesalePrice, &stock, &skuType,
+			&groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+			return
+		}
+
+		if req.GroupID > 0 && !groupEnabled {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"SKU_GROUP_NOT_ENABLED",
+				"This SKU does not support group purchase",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+
+		productID = 0
+		skuID = req.SKUID
+	} else {
+		err := db.QueryRow(
+			`SELECT s.id, s.spu_id, s.retail_price, s.stock, s.sku_type 
+			 FROM products_v2 s WHERE s.id = $1 AND s.status = 'active'`,
+			req.ProductID,
+		).Scan(&skuID, &spuID, &retailPrice, &stock, &skuType)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+			return
+		}
+		wholesalePrice = retailPrice
+		productID = req.ProductID
 	}
 
-	if product.Stock < req.Quantity {
+	if stock != -1 && stock < req.Quantity {
 		middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
 		return
 	}
@@ -72,30 +121,55 @@ func CreateOrder(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
-	result, err := tx.Exec(
-		"UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1",
-		req.Quantity, req.ProductID,
-	)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"STOCK_UPDATE_FAILED",
-			"Failed to update stock",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
+	if skuID > 0 {
+		result, execErr := tx.Exec(
+			"UPDATE skus SET stock = stock - $1 WHERE id = $2 AND (stock = -1 OR stock >= $1)",
+			req.Quantity, skuID,
+		)
+		if execErr != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"STOCK_UPDATE_FAILED",
+				"Failed to update stock",
+				http.StatusInternalServerError,
+				execErr,
+			))
+			return
+		}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
-		return
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
+			return
+		}
+	} else if productID > 0 {
+		result, execErr := tx.Exec(
+			"UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1",
+			req.Quantity, productID,
+		)
+		if execErr != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"STOCK_UPDATE_FAILED",
+				"Failed to update stock",
+				http.StatusInternalServerError,
+				execErr,
+			))
+			return
+		}
+
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
+			return
+		}
 	}
 
 	var order models.Order
-	totalPrice := product.Price * float64(req.Quantity)
+	unitPrice := retailPrice
+	if wholesalePrice > 0 && wholesalePrice < retailPrice {
+		unitPrice = wholesalePrice
+	}
+	totalPrice := unitPrice * float64(req.Quantity)
 
-	// Handle group_id - use NULL if it's 0 (no group)
 	var groupID interface{}
 	if req.GroupID > 0 {
 		groupID = req.GroupID
@@ -104,11 +178,13 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	err = tx.QueryRow(
-		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at",
-		userID, req.ProductID, groupID, req.Quantity, product.Price, totalPrice, orderStatusPending,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+		 RETURNING id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at`,
+		userID, productID, skuID, spuID, groupID, req.Quantity, unitPrice, totalPrice, orderStatusPending,
+	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.SKUID, &order.SPUID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
-	fmt.Printf("ORDER DEBUG: userID=%d, productID=%d, groupID=%v, quantity=%d, unit_price=%.2f, total=%.2f, err=%v\n", userID, req.ProductID, groupID, req.Quantity, product.Price, totalPrice, err)
+	fmt.Printf("ORDER DEBUG: userID=%d, productID=%d, skuID=%d, spuID=%d, groupID=%v, quantity=%d, unit_price=%.2f, total=%.2f, err=%v\n", userID, productID, skuID, spuID, groupID, req.Quantity, unitPrice, totalPrice, err)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -167,7 +243,8 @@ func ListOrders(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		"SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+		`SELECT id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at 
+		 FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
 		userID, perPageNum, offset,
 	)
 	if err != nil {
@@ -179,10 +256,17 @@ func ListOrders(c *gin.Context) {
 	var orders []models.Order
 	for rows.Next() {
 		var o models.Order
-		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+		var skuID, spuID sql.NullInt64
+		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &skuID, &spuID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
+		}
+		if skuID.Valid {
+			o.SKUID = int(skuID.Int64)
+		}
+		if spuID.Valid {
+			o.SPUID = int(spuID.Int64)
 		}
 		orders = append(orders, o)
 	}
@@ -236,12 +320,21 @@ func GetOrderByID(c *gin.Context) {
 	}
 
 	var order models.Order
-	err := db.QueryRow("SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at FROM orders WHERE id = $1 AND user_id = $2", id, userID).Scan(
-		&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt,
-	)
+	var skuID, spuID sql.NullInt64
+	err := db.QueryRow(
+		`SELECT id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at 
+		 FROM orders WHERE id = $1 AND user_id = $2`, id, userID,
+	).Scan(&order.ID, &order.UserID, &order.ProductID, &skuID, &spuID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
+	}
+
+	if skuID.Valid {
+		order.SKUID = int(skuID.Int64)
+	}
+	if spuID.Valid {
+		order.SPUID = int(spuID.Int64)
 	}
 
 	if orderJSON, err := json.Marshal(order); err == nil {
@@ -274,12 +367,13 @@ func CancelOrder(c *gin.Context) {
 	var orderInfo struct {
 		status    string
 		productID int
+		skuID     sql.NullInt64
 		quantity  int
 	}
 	err := db.QueryRow(
-		"SELECT status, product_id, quantity FROM orders WHERE id = $1 AND user_id = $2",
+		"SELECT status, product_id, sku_id, quantity FROM orders WHERE id = $1 AND user_id = $2",
 		id, userID,
-	).Scan(&orderInfo.status, &orderInfo.productID, &orderInfo.quantity)
+	).Scan(&orderInfo.status, &orderInfo.productID, &orderInfo.skuID, &orderInfo.quantity)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
@@ -304,10 +398,12 @@ func CancelOrder(c *gin.Context) {
 	defer tx.Rollback()
 
 	var order models.Order
+	var skuIDNull, spuIDNull sql.NullInt64
 	err = tx.QueryRow(
-		"UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING id, user_id, product_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at",
+		`UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3 
+		 RETURNING id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at`,
 		"canceled", id, userID,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	).Scan(&order.ID, &order.UserID, &order.ProductID, &skuIDNull, &spuIDNull, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -319,10 +415,24 @@ func CancelOrder(c *gin.Context) {
 		return
 	}
 
-	_, err = tx.Exec(
-		"UPDATE products SET stock = stock + $1 WHERE id = $2",
-		orderInfo.quantity, orderInfo.productID,
-	)
+	if skuIDNull.Valid {
+		order.SKUID = int(skuIDNull.Int64)
+	}
+	if spuIDNull.Valid {
+		order.SPUID = int(spuIDNull.Int64)
+	}
+
+	if orderInfo.skuID.Valid && orderInfo.skuID.Int64 > 0 {
+		_, err = tx.Exec(
+			"UPDATE skus SET stock = stock + $1 WHERE id = $2",
+			orderInfo.quantity, orderInfo.skuID.Int64,
+		)
+	} else {
+		_, err = tx.Exec(
+			"UPDATE products SET stock = stock + $1 WHERE id = $2",
+			orderInfo.quantity, orderInfo.productID,
+		)
+	}
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"STOCK_RESTORE_FAILED",
@@ -361,7 +471,8 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	var req struct {
-		ProductID   int       `json:"product_id" binding:"required"`
+		ProductID   int       `json:"product_id"`
+		SKUID       int       `json:"sku_id"`
 		TargetCount int       `json:"target_count" binding:"required,gt=0"`
 		Deadline    time.Time `json:"deadline" binding:"required"`
 	}
@@ -371,7 +482,16 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
-	// Validate deadline is in future
+	if req.ProductID == 0 && req.SKUID == 0 {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MISSING_PRODUCT_OR_SKU",
+			"product_id or sku_id is required",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
 	if req.Deadline.Before(time.Now()) {
 		middleware.RespondWithError(c, apperrors.ErrInvalidGroupData)
 		return
@@ -383,19 +503,66 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
-	// Verify product exists and get price
-	var productPrice float64
-	err := db.QueryRow("SELECT id, price FROM products WHERE id = $1", req.ProductID).Scan(&req.ProductID, &productPrice)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-		return
+	var skuID, spuID, productID int
+	var retailPrice float64
+	var groupEnabled bool
+	var minGroupSize, maxGroupSize int
+	var groupDiscountRate sql.NullFloat64
+
+	if req.SKUID > 0 {
+		err := db.QueryRow(
+			`SELECT s.id, s.spu_id, s.retail_price, s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate
+			 FROM skus s JOIN spus sp ON s.spu_id = sp.id 
+			 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
+			req.SKUID,
+		).Scan(&skuID, &spuID, &retailPrice, &groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+			return
+		}
+
+		if !groupEnabled {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"SKU_GROUP_NOT_ENABLED",
+				"This SKU does not support group purchase",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+
+		if req.TargetCount < minGroupSize || req.TargetCount > maxGroupSize {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_GROUP_SIZE",
+				fmt.Sprintf("Group size must be between %d and %d", minGroupSize, maxGroupSize),
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+		skuID = req.SKUID
+	} else {
+		err := db.QueryRow(
+			"SELECT id, price FROM products WHERE id = $1 AND status = 'active'",
+			req.ProductID,
+		).Scan(&productID, &retailPrice)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+			return
+		}
+		groupEnabled = true
+		minGroupSize = 2
+		maxGroupSize = 10
+		productID = req.ProductID
 	}
 
 	var group models.Group
-	err = db.QueryRow(
-		"INSERT INTO groups (product_id, creator_id, target_count, current_count, status, deadline) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at",
-		req.ProductID, userID, req.TargetCount, 1, "active", req.Deadline,
-	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
+	err := db.QueryRow(
+		`INSERT INTO groups (product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+		 RETURNING id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at`,
+		productID, skuID, spuID, userID, req.TargetCount, 1, groupStatusActive, req.Deadline,
+	).Scan(&group.ID, &group.ProductID, &group.SKUID, &group.SPUID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -407,11 +574,16 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
-	// Create order for group creator
 	var orderID int
+	var groupPrice float64 = retailPrice
+	if groupDiscountRate.Valid && groupDiscountRate.Float64 > 0 {
+		groupPrice = retailPrice * (1 - groupDiscountRate.Float64)
+	}
+
 	err = db.QueryRow(
-		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-		userID, group.ProductID, group.ID, 1, productPrice, productPrice, orderStatusPending,
+		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+		userID, productID, skuID, spuID, group.ID, 1, groupPrice, groupPrice, orderStatusPending,
 	).Scan(&orderID)
 
 	if err != nil {
@@ -424,7 +596,6 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
-	// Add creator to group members
 	_, err = db.Exec(
 		"INSERT INTO group_members (group_id, user_id, order_id) VALUES ($1, $2, $3)",
 		group.ID, userID, orderID,
@@ -470,7 +641,8 @@ func ListGroups(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		"SELECT id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at FROM groups WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+		`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at 
+		 FROM groups WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
 		status, perPageNum, offset,
 	)
 	if err != nil {
@@ -482,10 +654,17 @@ func ListGroups(c *gin.Context) {
 	var groups []models.Group
 	for rows.Next() {
 		var g models.Group
-		err := rows.Scan(&g.ID, &g.ProductID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
+		var skuID, spuID sql.NullInt64
+		err := rows.Scan(&g.ID, &g.ProductID, &skuID, &spuID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
+		}
+		if skuID.Valid {
+			g.SKUID = int(skuID.Int64)
+		}
+		if spuID.Valid {
+			g.SPUID = int(spuID.Int64)
 		}
 		groups = append(groups, g)
 	}
@@ -517,7 +696,8 @@ func GetGroupsByProduct(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		"SELECT id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at FROM groups WHERE product_id = $1 AND status = $2 AND deadline > NOW() ORDER BY created_at DESC",
+		`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at 
+		 FROM groups WHERE product_id = $1 AND status = $2 AND deadline > NOW() ORDER BY created_at DESC`,
 		productIDNum, "active",
 	)
 	if err != nil {
@@ -529,10 +709,17 @@ func GetGroupsByProduct(c *gin.Context) {
 	var groups []models.Group
 	for rows.Next() {
 		var g models.Group
-		err := rows.Scan(&g.ID, &g.ProductID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
+		var skuID, spuID sql.NullInt64
+		err := rows.Scan(&g.ID, &g.ProductID, &skuID, &spuID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
+		}
+		if skuID.Valid {
+			g.SKUID = int(skuID.Int64)
+		}
+		if spuID.Valid {
+			g.SPUID = int(spuID.Int64)
 		}
 		groups = append(groups, g)
 	}
@@ -566,14 +753,23 @@ func GetGroupByID(c *gin.Context) {
 	}
 
 	var group models.Group
+	var skuID, spuID sql.NullInt64
 	err := db.QueryRow(
-		"SELECT id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at FROM groups WHERE id = $1",
+		`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at 
+		 FROM groups WHERE id = $1`,
 		id,
-	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
+	).Scan(&group.ID, &group.ProductID, &skuID, &spuID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
 		return
+	}
+
+	if skuID.Valid {
+		group.SKUID = int(skuID.Int64)
+	}
+	if spuID.Valid {
+		group.SPUID = int(spuID.Int64)
 	}
 
 	if groupJSON, err := json.Marshal(group); err == nil {
@@ -603,19 +799,27 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
-	// Get group info
 	var group models.Group
+	var skuID, spuID sql.NullInt64
 	err := db.QueryRow(
-		"SELECT id, product_id, target_count, current_count, status, deadline FROM groups WHERE id = $1",
+		`SELECT id, product_id, sku_id, spu_id, target_count, current_count, status, deadline 
+		 FROM groups WHERE id = $1`,
 		groupID,
-	).Scan(&group.ID, &group.ProductID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline)
+	).Scan(&group.ID, &group.ProductID, &skuID, &spuID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
 		return
 	}
 
-	if group.Status != "active" {
+	if skuID.Valid {
+		group.SKUID = int(skuID.Int64)
+	}
+	if spuID.Valid {
+		group.SPUID = int(spuID.Int64)
+	}
+
+	if group.Status != groupStatusActive {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"GROUP_INACTIVE",
 			"Group is not active",
@@ -635,18 +839,38 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
-	// Create order for group
-	var product models.Product
-	err = db.QueryRow("SELECT price FROM products WHERE id = $1", group.ProductID).Scan(&product.Price)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-		return
+	var unitPrice float64
+	if group.SKUID > 0 {
+		var retailPrice float64
+		var groupDiscountRate sql.NullFloat64
+		err = db.QueryRow(
+			`SELECT s.retail_price, s.group_discount_rate 
+			 FROM skus s WHERE s.id = $1 AND s.status = 'active'`,
+			group.SKUID,
+		).Scan(&retailPrice, &groupDiscountRate)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+			return
+		}
+		unitPrice = retailPrice
+		if groupDiscountRate.Valid && groupDiscountRate.Float64 > 0 {
+			unitPrice = retailPrice * (1 - groupDiscountRate.Float64)
+		}
+	} else {
+		var product models.Product
+		err = db.QueryRow("SELECT price FROM products WHERE id = $1", group.ProductID).Scan(&product.Price)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+			return
+		}
+		unitPrice = product.Price
 	}
 
 	var orderID int
 	err = db.QueryRow(
-		"INSERT INTO orders (user_id, product_id, group_id, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-		userID, group.ProductID, group.ID, 1, product.Price, product.Price, orderStatusPending,
+		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+		userID, group.ProductID, group.SKUID, group.SPUID, group.ID, 1, unitPrice, unitPrice, orderStatusPending,
 	).Scan(&orderID)
 
 	if err != nil {
@@ -659,7 +883,6 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
-	// Add to group members
 	_, err = db.Exec(
 		"INSERT INTO group_members (group_id, user_id, order_id) VALUES ($1, $2, $3)",
 		group.ID, userID, orderID,
@@ -670,17 +893,18 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
-	// Update group count
 	newCount := group.CurrentCount + 1
 	newStatus := group.Status
 	if newCount >= group.TargetCount {
 		newStatus = "completed"
 	}
 
+	var skuIDUpdate, spuIDUpdate sql.NullInt64
 	err = db.QueryRow(
-		"UPDATE groups SET current_count = $1, status = $2 WHERE id = $3 RETURNING id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at",
+		`UPDATE groups SET current_count = $1, status = $2 WHERE id = $3 
+		 RETURNING id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at`,
 		newCount, newStatus, group.ID,
-	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
+	).Scan(&group.ID, &group.ProductID, &skuIDUpdate, &spuIDUpdate, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -690,6 +914,13 @@ func JoinGroup(c *gin.Context) {
 			err,
 		))
 		return
+	}
+
+	if skuIDUpdate.Valid {
+		group.SKUID = int(skuIDUpdate.Int64)
+	}
+	if spuIDUpdate.Valid {
+		group.SPUID = int(spuIDUpdate.Int64)
 	}
 
 	cache.Delete(context.Background(), cache.GroupKey(group.ID))
@@ -762,14 +993,23 @@ func GetGroupProgress(c *gin.Context) {
 	}
 
 	var group models.Group
+	var skuID, spuID sql.NullInt64
 	err := db.QueryRow(
-		"SELECT id, product_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at FROM groups WHERE id = $1",
+		`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at 
+		 FROM groups WHERE id = $1`,
 		id,
-	).Scan(&group.ID, &group.ProductID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
+	).Scan(&group.ID, &group.ProductID, &skuID, &spuID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
 		return
+	}
+
+	if skuID.Valid {
+		group.SKUID = int(skuID.Int64)
+	}
+	if spuID.Valid {
+		group.SPUID = int(spuID.Int64)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
