@@ -86,7 +86,6 @@ func main() {
 		routes.RegisterFlashSaleRoutes(v1)
 		routes.RegisterFavoriteRoutes(v1)
 		routes.RegisterBrowseHistoryRoutes(v1)
-		routes.RegisterCategoryRoutes(v1)
 	}
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

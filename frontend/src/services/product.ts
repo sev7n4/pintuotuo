@@ -31,14 +31,8 @@ export const productService = {
   getNewProducts: (limit?: number) =>
     api.get<APIResponse<Product[]>>('/products/new', { params: { limit } }),
 
-  // Get categories (legacy)
+  // Get categories
   getCategories: () => api.get<APIResponse<Category[]>>('/products/categories'),
-
-  // Get model categories (level=1)
-  getModels: () => api.get<APIResponse<Category[]>>('/categories/models'),
-
-  // Get package categories (level=2)
-  getPackages: () => api.get<APIResponse<Category[]>>('/categories/packages'),
 
   // List products
   listProducts: (filters?: ProductFilters) =>

@@ -25,10 +25,8 @@ const MerchantProducts = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form] = Form.useForm();
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [models, setModels] = useState<Category[]>([]);
-  const [packages, setPackages] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [selectedModelId, setSelectedModelId] = useState<number | undefined>();
 
   useEffect(() => {
     fetchProducts(1, 20, statusFilter === 'all' ? undefined : statusFilter);
@@ -37,12 +35,8 @@ const MerchantProducts = () => {
   const fetchCategories = async () => {
     setCategoriesLoading(true);
     try {
-      const [modelsRes, packagesRes] = await Promise.all([
-        productService.getModels(),
-        productService.getPackages(),
-      ]);
-      setModels(modelsRes.data.data || []);
-      setPackages(packagesRes.data.data || []);
+      const response = await productService.getCategories();
+      setCategories(response.data.data || []);
     } catch {
       console.error('Failed to fetch categories');
     } finally {
@@ -53,30 +47,6 @@ const MerchantProducts = () => {
   useEffect(() => {
     fetchCategories();
   }, []);
-
-  const handleModelChange = (modelId: number) => {
-    setSelectedModelId(modelId);
-    const selectedModel = models.find((m) => m.id === modelId);
-    const selectedPackage = form.getFieldValue('package_id');
-    if (selectedModel && selectedPackage) {
-      const pkg = packages.find((p) => p.id === selectedPackage);
-      if (pkg) {
-        form.setFieldsValue({
-          name: `${selectedModel.name} - ${pkg.name}`,
-        });
-      }
-    }
-  };
-
-  const handlePackageChange = (packageId: number) => {
-    const selectedPackage = packages.find((p) => p.id === packageId);
-    const selectedModel = models.find((m) => m.id === selectedModelId);
-    if (selectedModel && selectedPackage) {
-      form.setFieldsValue({
-        name: `${selectedModel.name} - ${selectedPackage.name}`,
-      });
-    }
-  };
 
   const handleAdd = () => {
     setEditingProduct(null);
@@ -285,48 +255,11 @@ const MerchantProducts = () => {
       >
         <Form form={form} layout="vertical">
           <Form.Item
-            name="model_id"
-            label="厂家/模型"
-            rules={[{ required: true, message: '请选择厂家/模型' }]}
-            extra="选择你要销售的 AI 模型类型"
-          >
-            <Select
-              placeholder="请选择厂家/模型"
-              loading={categoriesLoading}
-              showSearch
-              optionFilterProp="label"
-              onChange={handleModelChange}
-              options={models.map((model) => ({
-                value: model.id,
-                label: model.name,
-              }))}
-            />
-          </Form.Item>
-          <Form.Item
-            name="package_id"
-            label="计费类型"
-            rules={[{ required: true, message: '请选择计费类型' }]}
-            extra="选择 Token 的计费方式"
-          >
-            <Select
-              placeholder="请选择计费类型"
-              loading={categoriesLoading}
-              showSearch
-              optionFilterProp="label"
-              onChange={handlePackageChange}
-              options={packages.map((pkg) => ({
-                value: pkg.id,
-                label: pkg.name,
-              }))}
-            />
-          </Form.Item>
-          <Form.Item
             name="name"
             label="商品名称"
             rules={[{ required: true, message: '请输入商品名称' }]}
-            extra="自动生成：{厂家/模型} - {计费类型}"
           >
-            <Input placeholder="商品名称将自动生成" />
+            <Input placeholder="请输入商品名称" />
           </Form.Item>
           <Form.Item name="description" label="商品描述">
             <Input.TextArea rows={3} placeholder="请输入商品描述" />
@@ -374,6 +307,19 @@ const MerchantProducts = () => {
             validateTrigger="onBlur"
           >
             <InputNumber min={-Infinity} style={{ width: '100%' }} placeholder="请输入库存" />
+          </Form.Item>
+          <Form.Item name="category" label="分类">
+            <Select
+              placeholder="请选择分类"
+              loading={categoriesLoading}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={categories.map((cat) => ({
+                value: cat.name,
+                label: cat.name,
+              }))}
+            />
           </Form.Item>
           <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
             <Select

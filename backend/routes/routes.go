@@ -224,19 +224,6 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.GET("/merchants/pending", handlers.GetPendingMerchants)
 		admin.POST("/merchants/:id/approve", handlers.ApproveMerchant)
 		admin.POST("/merchants/:id/reject", handlers.RejectMerchant)
-
-		admin.GET("/categories", handlers.GetAllCategories)
-		admin.POST("/categories", handlers.CreateCategory)
-		admin.PUT("/categories/:id", handlers.UpdateCategory)
-		admin.DELETE("/categories/:id", handlers.DeleteCategory)
-	}
-}
-
-func RegisterCategoryRoutes(router *gin.RouterGroup) {
-	categories := router.Group("/categories")
-	{
-		categories.GET("/models", handlers.GetModels)
-		categories.GET("/packages", handlers.GetPackages)
 	}
 }
 

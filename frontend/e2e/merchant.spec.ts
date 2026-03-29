@@ -42,14 +42,8 @@ test.describe('Merchant Dashboard', () => {
     const modal = page.locator('.ant-modal-content');
     await expect(modal).toBeVisible({ timeout: 5000 });
     
-    await page.locator('.ant-select').first().click();
-    await page.getByText('GPT 系列').click();
-    
-    await page.locator('.ant-select').nth(1).click();
-    await page.getByText('月度标准版').click();
-    
-    await page.waitForTimeout(500);
-    
+    await page.getByPlaceholder('请输入商品名称').fill('测试商品E2E');
+    await page.getByPlaceholder('请输入商品描述').fill('这是一个E2E测试商品');
     await page.getByPlaceholder('请输入价格').fill('99.99');
     await page.getByPlaceholder('请输入库存').fill('100');
     
