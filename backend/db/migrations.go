@@ -101,11 +101,11 @@ func RunMigrations() error {
 			tx.Rollback()
 			if isAlreadyExistsError(err) {
 				log.Printf("Migration %s objects already exist, marking as complete", filename)
-				if _, err := dbConn.Exec(
+				if _, insertErr := dbConn.Exec(
 					"INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING",
 					filename,
-				); err != nil {
-					return fmt.Errorf("failed to record migration %s: %w", filename, err)
+				); insertErr != nil {
+					return fmt.Errorf("failed to record migration %s: %w", filename, insertErr)
 				}
 				executed++
 				continue
