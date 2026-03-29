@@ -63,8 +63,11 @@ COMMENT ON COLUMN browse_history.sku_id IS '关联的SKU ID';
 -- Phase 6: 创建兼容视图
 -- ============================================================
 
+-- 先删除旧视图（如果存在）
+DROP VIEW IF EXISTS products_v2 CASCADE;
+
 -- 创建 products_v2 兼容视图
-CREATE OR REPLACE VIEW products_v2 AS
+CREATE VIEW products_v2 AS
 SELECT 
   s.id,
   s.sku_code as sku_code,
