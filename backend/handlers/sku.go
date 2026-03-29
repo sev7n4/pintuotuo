@@ -591,13 +591,22 @@ func CreateSKU(c *gin.Context) {
 	db := config.GetDB()
 
 	var spuExists bool
-	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM spus WHERE id = $1 AND status = 'active')`, req.SPUID).Scan(&spuExists)
-	if err != nil || !spuExists {
+	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM spus WHERE id = $1)`, req.SPUID).Scan(&spuExists)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SPU_QUERY_FAILED",
+			"查询SPU失败",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+	if !spuExists {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SPU_NOT_FOUND",
-			"SPU不存在或已下架",
+			"SPU不存在",
 			http.StatusBadRequest,
-			err,
+			nil,
 		))
 		return
 	}

@@ -11,7 +11,10 @@ import {
   Popconfirm,
   Empty,
   Typography,
-  Tooltip
+  Tooltip,
+  Row,
+  Col,
+  Grid
 } from 'antd'
 import { PlusOutlined, DeleteOutlined, ApiOutlined, ShopOutlined } from '@ant-design/icons'
 import { merchantSkuService } from '@/services/merchantSku'
@@ -21,8 +24,10 @@ import { merchantService } from '@/services/merchant'
 import styles from './MerchantProducts.module.css'
 
 const { Text } = Typography
+const { useBreakpoint } = Grid
 
 const MerchantSKUs = () => {
+  const screens = useBreakpoint()
   const [merchantSKUs, setMerchantSKUs] = useState<MerchantSKUDetail[]>([])
   const [availableSKUs, setAvailableSKUs] = useState<AvailableSKU[]>([])
   const [apiKeys, setApiKeys] = useState<MerchantAPIKey[]>([])
@@ -187,13 +192,13 @@ const MerchantSKUs = () => {
       title: 'SKU编码',
       dataIndex: 'sku_code',
       key: 'sku_code',
-      width: 150
+      width: screens.xs ? 100 : 150
     },
     {
       title: 'SPU名称',
       dataIndex: 'spu_name',
       key: 'spu_name',
-      width: 150,
+      width: screens.xs ? 100 : 150,
       render: (name: string, record: MerchantSKUDetail) => (
         <Tooltip title={`${record.model_name} (${record.model_tier})`}>
           <span>{name}</span>
@@ -204,20 +209,20 @@ const MerchantSKUs = () => {
       title: '厂商',
       dataIndex: 'model_provider',
       key: 'model_provider',
-      width: 100,
+      width: screens.xs ? 80 : 100,
       render: (provider: string) => getProviderLabel(provider)
     },
     {
       title: '类型',
       dataIndex: 'sku_type',
       key: 'sku_type',
-      width: 100,
+      width: 80,
       render: (type: string) => <Tag>{getSKUTypeLabel(type)}</Tag>
     },
     {
       title: '规格',
       key: 'spec',
-      width: 100,
+      width: 80,
       render: (_: unknown, record: MerchantSKUDetail) => {
         if (record.sku_type === 'token_pack') {
           return formatTokenAmount(record.token_amount)
@@ -229,14 +234,14 @@ const MerchantSKUs = () => {
       title: '价格',
       dataIndex: 'retail_price',
       key: 'retail_price',
-      width: 100,
+      width: 80,
       render: (price: number) => <Text strong>{formatPrice(price)}</Text>
     },
     {
       title: '关联API Key',
       dataIndex: 'api_key_name',
       key: 'api_key_name',
-      width: 150,
+      width: screens.xs ? 100 : 150,
       render: (_: unknown, record: MerchantSKUDetail) => (
         <Select
           style={{ width: '100%' }}
@@ -260,13 +265,13 @@ const MerchantSKUs = () => {
       title: '销量',
       dataIndex: 'sales_count',
       key: 'sales_count',
-      width: 80
+      width: 60
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 80,
+      width: 70,
       render: (status: string) => (
         <Tag color={status === 'active' ? 'success' : 'warning'}>
           {status === 'active' ? '在售' : '下架'}
@@ -276,7 +281,7 @@ const MerchantSKUs = () => {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: screens.xs ? 100 : 150,
       render: (_: unknown, record: MerchantSKUDetail) => (
         <Space size="small">
           <Button
@@ -306,13 +311,13 @@ const MerchantSKUs = () => {
       title: 'SKU编码',
       dataIndex: 'sku_code',
       key: 'sku_code',
-      width: 150
+      width: 120
     },
     {
       title: 'SPU名称',
       dataIndex: 'spu_name',
       key: 'spu_name',
-      width: 150
+      width: 120
     },
     {
       title: '厂商',
@@ -325,13 +330,13 @@ const MerchantSKUs = () => {
       title: '类型',
       dataIndex: 'sku_type',
       key: 'sku_type',
-      width: 100,
+      width: 80,
       render: (type: string) => <Tag>{getSKUTypeLabel(type)}</Tag>
     },
     {
       title: '规格',
       key: 'spec',
-      width: 100,
+      width: 80,
       render: (_: unknown, record: AvailableSKU) => {
         if (record.sku_type === 'token_pack') {
           return formatTokenAmount(record.token_amount)
@@ -343,7 +348,7 @@ const MerchantSKUs = () => {
       title: '价格',
       dataIndex: 'retail_price',
       key: 'retail_price',
-      width: 100,
+      width: 80,
       render: (price: number) => <Text strong>{formatPrice(price)}</Text>
     },
     {
@@ -379,9 +384,9 @@ const MerchantSKUs = () => {
           </Space>
         }
         extra={
-          <Space>
+          <Space wrap>
             <Select
-              style={{ width: 120 }}
+              style={{ width: 100 }}
               value={statusFilter}
               onChange={setStatusFilter}
               options={[
@@ -401,11 +406,13 @@ const MerchantSKUs = () => {
           dataSource={merchantSKUs}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 900 }}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
             showTotal: (total) => `共 ${total} 条`
           }}
+          size={screens.xs ? 'small' : 'middle'}
           locale={{
             emptyText: (
               <Empty
@@ -425,7 +432,7 @@ const MerchantSKUs = () => {
         title="选择要上架的商品"
         open={selectModalVisible}
         onCancel={() => setSelectModalVisible(false)}
-        width={900}
+        width={screens.xs ? '95%' : 900}
         footer={[
           <Button key="cancel" onClick={() => setSelectModalVisible(false)}>
             取消
@@ -441,24 +448,28 @@ const MerchantSKUs = () => {
           </Button>
         ]}
       >
-        <Space style={{ marginBottom: 16 }}>
-          <Select
-            style={{ width: 150 }}
-            placeholder="筛选厂商"
-            value={providerFilter || undefined}
-            onChange={(value) => setProviderFilter(value || '')}
-            allowClear
-            options={providers.map((p) => ({ value: p, label: getProviderLabel(p) }))}
-          />
-          <Select
-            style={{ width: 120 }}
-            placeholder="筛选类型"
-            value={typeFilter || undefined}
-            onChange={(value) => setTypeFilter(value || '')}
-            allowClear
-            options={types.map((t) => ({ value: t, label: getSKUTypeLabel(t) }))}
-          />
-        </Space>
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={24} sm={12}>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="筛选厂商"
+              value={providerFilter || undefined}
+              onChange={(value) => setProviderFilter(value || '')}
+              allowClear
+              options={providers.map((p) => ({ value: p, label: getProviderLabel(p) }))}
+            />
+          </Col>
+          <Col xs={24} sm={12}>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="筛选类型"
+              value={typeFilter || undefined}
+              onChange={(value) => setTypeFilter(value || '')}
+              allowClear
+              options={types.map((t) => ({ value: t, label: getSKUTypeLabel(t) }))}
+            />
+          </Col>
+        </Row>
 
         <Table
           columns={availableColumns}
@@ -467,6 +478,7 @@ const MerchantSKUs = () => {
           rowSelection={rowSelection}
           pagination={{ pageSize: 5 }}
           size="small"
+          scroll={{ x: 700 }}
         />
 
         <div style={{ marginTop: 16 }}>

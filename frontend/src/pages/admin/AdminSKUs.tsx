@@ -16,13 +16,17 @@ import {
   Col,
   Switch,
   Divider,
+  Grid,
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
 import type { SKUWithSPU, SPU, SKUCreateRequest, SKUUpdateRequest } from '@/types/sku';
 import { SKU_TYPE_LABELS, MODEL_TIER_LABELS, SUBSCRIPTION_PERIOD_LABELS } from '@/types/sku';
 
+const { useBreakpoint } = Grid;
+
 const AdminSKUs = () => {
+  const screens = useBreakpoint();
   const [skus, setSKUs] = useState<SKUWithSPU[]>([]);
   const [spus, setSPUs] = useState<SPU[]>([]);
   const [loading, setLoading] = useState(false);
@@ -274,16 +278,13 @@ const AdminSKUs = () => {
 
   return (
     <div>
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col flex="auto">
-          <h2 style={{ margin: 0 }}>SKU 管理</h2>
-        </Col>
-        <Col>
-          <Space>
+      <Card>
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={24} sm={12} md={8}>
             <Select
               value={filters.spu_id}
               onChange={(v) => setFilters({ ...filters, spu_id: v })}
-              style={{ width: 180 }}
+              style={{ width: '100%' }}
               placeholder="选择SPU"
               allowClear
               showSearch
@@ -295,10 +296,12 @@ const AdminSKUs = () => {
                 </Select.Option>
               ))}
             </Select>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
             <Select
               value={filters.type}
               onChange={(v) => setFilters({ ...filters, type: v })}
-              style={{ width: 120 }}
+              style={{ width: '100%' }}
               placeholder="类型"
               allowClear
             >
@@ -307,14 +310,14 @@ const AdminSKUs = () => {
               <Select.Option value="concurrent">并发套餐</Select.Option>
               <Select.Option value="trial">试用套餐</Select.Option>
             </Select>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+          </Col>
+          <Col xs={24} sm={24} md={8} style={{ textAlign: 'right' }}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} block={!screens?.md}>
               新增SKU
             </Button>
-          </Space>
-        </Col>
-      </Row>
+          </Col>
+        </Row>
 
-      <Card>
         <Table
           columns={columns}
           dataSource={skus}
