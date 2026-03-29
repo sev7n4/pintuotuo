@@ -77,6 +77,11 @@ export class MerchantProductsPage {
   async goto() {
     await this.page.goto('/merchant/products');
     await this.page.waitForLoadState('networkidle');
+    await this.page.waitForResponse(
+      (response) => response.url().includes('/categories/models') || response.url().includes('/categories/packages'),
+      { timeout: 15000 }
+    ).catch(() => {});
+    await this.page.waitForTimeout(1000);
   }
 
   async expectProductsPageVisible() {
