@@ -34,6 +34,7 @@ import HistoryPage from '@pages/HistoryPage';
 // Merchant Pages
 import MerchantDashboard from '@pages/merchant/MerchantDashboard';
 import MerchantProducts from '@pages/merchant/MerchantProducts';
+import MerchantSKUs from '@pages/merchant/MerchantSKUs';
 import MerchantOrders from '@pages/merchant/MerchantOrders';
 import MerchantSettings from '@pages/merchant/MerchantSettings';
 import MerchantAPIKeys from '@pages/merchant/MerchantAPIKeys';
@@ -121,6 +122,7 @@ function App() {
           <Route path="/merchant" element={<MerchantLayout />}>
             <Route index element={<MerchantDashboard />} />
             <Route path="products" element={<MerchantProducts />} />
+            <Route path="skus" element={<MerchantSKUs />} />
             <Route path="orders" element={<MerchantOrders />} />
             <Route path="settlements" element={<MerchantSettlements />} />
             <Route path="bills" element={<MerchantBills />} />
