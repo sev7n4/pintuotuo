@@ -38,6 +38,10 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := db.RunMigrations(); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+
 	if err := config.InitDB(); err != nil {
 		log.Fatalf("Failed to initialize config database: %v", err)
 	}

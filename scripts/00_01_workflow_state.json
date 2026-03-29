@@ -1,30 +1,20 @@
 {
-  "current_step": 4,
-  "current_fix_cases": [],
-  "retry_count": 0,
+  "workflow_id": "fix-migration-auto-run",
+  "created_at": "2026-03-29T20:00:00+08:00",
+  "issue_type": "bug",
+  "issue_description": "数据库迁移文件不会自动执行，导致新环境部署时缺少数据表",
+  "current_fix_cases": ["migration-001"],
+  "status": "local_validation_passed",
+  "branch": "fix/migration-auto-run",
   "pr_number": null,
-  "merged": false,
-  "issue_id": "ISSUE-PAGE-003",
-  "issue_type": "enhancement",
-  "issue_title": "首页优化",
-  "branch_name": "feature/issue-PAGE-003-homepage-optimize",
-  "analysis": {
-    "problem_location": "frontend/src/pages/HomePage.tsx",
-    "impact_scope": "首页用户体验、转化率",
-    "missing_features": [
-      "限时秒杀入口（分类导航中缺少）",
-      "个性化推荐（第二屏以下）"
-    ],
-    "files_to_modify": [
-      "frontend/src/pages/HomePage.tsx (优化)",
-      "frontend/src/pages/HomePage.module.css (样式优化)",
-      "frontend/src/pages/__tests__/HomePage.test.tsx (更新测试)"
-    ]
-  },
+  "retry_count": 0,
+  "error_history": [],
   "ci_status": {
-    "cicd": "pending",
-    "integration": "pending",
-    "e2e": "pending"
+    "cicd": null,
+    "integration": null,
+    "e2e": null,
+    "deploy": null
   },
-  "local_validation": "pending"
+  "local_validation": "passed",
+  "merged": false
 }
