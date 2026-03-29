@@ -224,6 +224,20 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.GET("/merchants/pending", handlers.GetPendingMerchants)
 		admin.POST("/merchants/:id/approve", handlers.ApproveMerchant)
 		admin.POST("/merchants/:id/reject", handlers.RejectMerchant)
+
+		admin.GET("/spus", handlers.ListSPUs)
+		admin.GET("/spus/:id", handlers.GetSPUByID)
+		admin.POST("/spus", handlers.CreateSPU)
+		admin.PUT("/spus/:id", handlers.UpdateSPU)
+		admin.DELETE("/spus/:id", handlers.DeleteSPU)
+
+		admin.GET("/skus", handlers.ListSKUs)
+		admin.GET("/skus/:id", handlers.GetSKUByID)
+		admin.POST("/skus", handlers.CreateSKU)
+		admin.PUT("/skus/:id", handlers.UpdateSKU)
+		admin.DELETE("/skus/:id", handlers.DeleteSKU)
+
+		admin.GET("/model-providers", handlers.GetModelProviders)
 	}
 }
 
@@ -261,5 +275,26 @@ func RegisterBrowseHistoryRoutes(router *gin.RouterGroup) {
 		history.POST("", handlers.AddBrowseHistory)
 		history.DELETE("", handlers.ClearBrowseHistory)
 		history.DELETE("/:product_id", handlers.RemoveBrowseHistoryItem)
+	}
+}
+
+func RegisterSKURoutes(router *gin.RouterGroup) {
+	skus := router.Group("/skus")
+	{
+		skus.GET("", handlers.ListPublicSKUs)
+		skus.GET("/:id", handlers.GetPublicSKUByID)
+	}
+
+	computePoints := router.Group("/compute-points")
+	computePoints.Use(middleware.AuthMiddleware())
+	{
+		computePoints.GET("/balance", handlers.GetComputePointBalance)
+		computePoints.GET("/transactions", handlers.GetComputePointTransactions)
+	}
+
+	subscriptions := router.Group("/subscriptions")
+	subscriptions.Use(middleware.AuthMiddleware())
+	{
+		subscriptions.GET("", handlers.GetUserSubscriptions)
 	}
 }

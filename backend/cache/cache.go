@@ -192,6 +192,26 @@ func MerchantAPIKeysKey(merchantID int) string {
 	return fmt.Sprintf("merchant:%d:apikeys", merchantID)
 }
 
+func SPUKey(id int) string {
+	return fmt.Sprintf("spu:%d", id)
+}
+
+func SPUListKey(page, perPage int, provider, tier, status string) string {
+	return fmt.Sprintf("spus:list:%s:%s:%s:page:%d:limit:%d", provider, tier, status, page, perPage)
+}
+
+func SKUKey(id int) string {
+	return fmt.Sprintf("sku:%d", id)
+}
+
+func SKUListKey(page, perPage int, spuID, skuType, status string) string {
+	return fmt.Sprintf("skus:list:%s:%s:%s:page:%d:limit:%d", spuID, skuType, status, page, perPage)
+}
+
+func ComputePointBalanceKey(userID int) string {
+	return fmt.Sprintf("compute_points:balance:%d", userID)
+}
+
 // InvalidatePatterns invalidates cache keys matching a pattern
 func InvalidatePatterns(ctx context.Context, pattern string) error {
 	if client == nil {

@@ -38,6 +38,8 @@ type Order struct {
 	ID         int         `json:"id"`
 	UserID     int         `json:"user_id"`
 	ProductID  int         `json:"product_id"`
+	SKUID      int         `json:"sku_id,omitempty"`
+	SPUID      int         `json:"spu_id,omitempty"`
 	GroupID    interface{} `json:"group_id"` // Can be NULL
 	Quantity   int         `json:"quantity"`
 	UnitPrice  float64     `json:"unit_price"`
@@ -51,6 +53,8 @@ type Order struct {
 type Group struct {
 	ID           int       `json:"id"`
 	ProductID    int       `json:"product_id"`
+	SKUID        int       `json:"sku_id,omitempty"`
+	SPUID        int       `json:"spu_id,omitempty"`
 	CreatorID    int       `json:"creator_id"`
 	TargetCount  int       `json:"target_count"`
 	CurrentCount int       `json:"current_count"`
@@ -193,6 +197,8 @@ type CartItem struct {
 	ID        int       `json:"id"`
 	UserID    int       `json:"user_id"`
 	ProductID int       `json:"product_id"`
+	SKUID     int       `json:"sku_id,omitempty"`
+	SPUID     int       `json:"spu_id,omitempty"`
 	GroupID   int       `json:"group_id,omitempty"`
 	Quantity  int       `json:"quantity"`
 	CreatedAt time.Time `json:"created_at"`
