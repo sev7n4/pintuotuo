@@ -384,21 +384,23 @@ const MerchantSKUs = () => {
           </Space>
         }
         extra={
-          <Space wrap>
-            <Select
-              style={{ width: 100 }}
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={[
-                { value: 'all', label: '全部' },
-                { value: 'active', label: '在售' },
-                { value: 'inactive', label: '已下架' }
-              ]}
-            />
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleSelectSKU}>
-              选择商品上架
-            </Button>
-          </Space>
+          merchantSKUs.length > 0 ? (
+            <Space wrap>
+              <Select
+                style={{ width: 100 }}
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={[
+                  { value: 'all', label: '全部' },
+                  { value: 'active', label: '在售' },
+                  { value: 'inactive', label: '已下架' }
+                ]}
+              />
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleSelectSKU}>
+                选择商品上架
+              </Button>
+            </Space>
+          ) : null
         }
       >
         <Table
@@ -419,7 +421,7 @@ const MerchantSKUs = () => {
                 description="暂无SKU"
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               >
-                <Button type="primary" onClick={handleSelectSKU}>
+                <Button type="primary" icon={<PlusOutlined />} onClick={handleSelectSKU}>
                   选择商品上架
                 </Button>
               </Empty>
