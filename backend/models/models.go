@@ -133,20 +133,20 @@ type ReferralReward struct {
 
 // Merchant represents a merchant/seller
 type Merchant struct {
-	ID              int       `json:"id"`
-	UserID          int       `json:"user_id"`
-	CompanyName     string    `json:"company_name"`
-	BusinessLicense *string   `json:"business_license,omitempty"`
-	ContactName     *string   `json:"contact_name,omitempty"`
-	ContactPhone    *string   `json:"contact_phone,omitempty"`
-	ContactEmail    *string   `json:"contact_email,omitempty"`
-	Address         *string   `json:"address,omitempty"`
-	Description     *string   `json:"description,omitempty"`
-	LogoURL         *string   `json:"logo_url,omitempty"`
-	Status          string    `json:"status"` // pending, active, suspended, rejected
+	ID              int        `json:"id"`
+	UserID          int        `json:"user_id"`
+	CompanyName     string     `json:"company_name"`
+	BusinessLicense *string    `json:"business_license,omitempty"`
+	ContactName     *string    `json:"contact_name,omitempty"`
+	ContactPhone    *string    `json:"contact_phone,omitempty"`
+	ContactEmail    *string    `json:"contact_email,omitempty"`
+	Address         *string    `json:"address,omitempty"`
+	Description     *string    `json:"description,omitempty"`
+	LogoURL         *string    `json:"logo_url,omitempty"`
+	Status          string     `json:"status"` // pending, active, suspended, rejected
 	VerifiedAt      *time.Time `json:"verified_at,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 // MerchantAPIKey represents a merchant's API key for token托管
