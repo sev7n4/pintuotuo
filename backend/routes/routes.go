@@ -172,14 +172,10 @@ func RegisterReferralRoutes(router *gin.RouterGroup) {
 }
 
 func RegisterMerchantRoutes(router *gin.RouterGroup) {
-	merchants := router.Group("/merchants")
-	{
-		merchants.POST("/register", handlers.RegisterMerchant)
-	}
-
 	authMerchants := router.Group("/merchants")
 	authMerchants.Use(middleware.AuthMiddleware())
 	{
+		authMerchants.POST("/register", handlers.RegisterMerchant)
 		authMerchants.GET("/profile", handlers.GetMerchantProfile)
 		authMerchants.PUT("/profile", handlers.UpdateMerchantProfile)
 		authMerchants.GET("/stats", handlers.GetMerchantStats)
