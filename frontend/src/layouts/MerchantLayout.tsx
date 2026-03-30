@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Avatar, Dropdown, message, Spin, Drawer, Button } from 'antd';
 import {
@@ -90,6 +90,8 @@ const MerchantLayout = () => {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const profileFetchedRef = useRef(false);
+  const statusCheckedRef = useRef(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -122,31 +124,34 @@ const MerchantLayout = () => {
       }
 
       setCheckingAuth(false);
-
-      if (user && user.role === 'merchant') {
-        try {
-          await fetchProfile();
-          const profile = merchantProfile;
-          if (profile && profile.status === 'pending') {
-            message.warning('您的商户申请正在审核中，请先提交资料');
-            navigate('/merchant/settings');
-          }
-        } catch {
-          message.error('获取商户信息失败');
-        }
-      }
     };
 
     checkAuth();
-  }, [
-    isAuthenticated,
-    user,
-    fetchUser,
-    fetchProfile,
-    merchantProfile,
-    navigate,
-    location.pathname,
-  ]);
+  }, [isAuthenticated, user, fetchUser, navigate, location.pathname]);
+
+  useEffect(() => {
+    if (!checkingAuth && user && user.role === 'merchant' && !profileFetchedRef.current) {
+      profileFetchedRef.current = true;
+      fetchProfile().catch(() => {
+        message.error('获取商户信息失败');
+      });
+    }
+  }, [checkingAuth, user, fetchProfile]);
+
+  useEffect(() => {
+    if (
+      !checkingAuth &&
+      merchantProfile &&
+      !statusCheckedRef.current &&
+      location.pathname !== '/merchant/settings'
+    ) {
+      statusCheckedRef.current = true;
+      if (merchantProfile.status === 'pending' || merchantProfile.status === 'reviewing') {
+        message.warning('您的商户申请正在审核中，请先提交资料');
+        navigate('/merchant/settings');
+      }
+    }
+  }, [checkingAuth, merchantProfile, navigate, location.pathname]);
 
   useEffect(() => {
     if (!checkingAuth && user && user.role !== 'merchant') {
