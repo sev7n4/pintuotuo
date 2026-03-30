@@ -97,19 +97,17 @@ describe('ProductDetailPage', () => {
       error: null,
       fetchGroups: jest.fn(),
       fetchGroupByID: jest.fn(),
-      createGroup: jest
-        .fn()
-        .mockResolvedValue({
-          id: 1,
-          product_id: 1,
-          creator_id: 1,
-          target_count: 2,
-          current_count: 1,
-          status: 'active',
-          deadline: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }),
+      createGroup: jest.fn().mockResolvedValue({
+        id: 1,
+        product_id: 1,
+        creator_id: 1,
+        target_count: 2,
+        current_count: 1,
+        status: 'active',
+        deadline: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
       joinGroup: jest.fn(),
       cancelGroup: jest.fn(),
       getGroupProgress: jest.fn(),
@@ -289,19 +287,17 @@ describe('ProductDetailPage', () => {
   });
 
   test('点击拼团按钮创建拼团', async () => {
-    const mockCreateGroup = jest
-      .fn()
-      .mockResolvedValue({
-        id: 1,
-        product_id: 1,
-        creator_id: 1,
-        target_count: 2,
-        current_count: 1,
-        status: 'active',
-        deadline: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+    const mockCreateGroup = jest.fn().mockResolvedValue({
+      id: 1,
+      product_id: 1,
+      creator_id: 1,
+      target_count: 2,
+      current_count: 1,
+      status: 'active',
+      deadline: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
 
     mockUseProductStore.mockReturnValue({
       fetchProductByID: jest.fn().mockResolvedValue(mockProduct),

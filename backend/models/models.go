@@ -133,20 +133,26 @@ type ReferralReward struct {
 
 // Merchant represents a merchant/seller
 type Merchant struct {
-	ID              int        `json:"id"`
-	UserID          int        `json:"user_id"`
-	CompanyName     string     `json:"company_name"`
-	BusinessLicense *string    `json:"business_license,omitempty"`
-	ContactName     *string    `json:"contact_name,omitempty"`
-	ContactPhone    *string    `json:"contact_phone,omitempty"`
-	ContactEmail    *string    `json:"contact_email,omitempty"`
-	Address         *string    `json:"address,omitempty"`
-	Description     *string    `json:"description,omitempty"`
-	LogoURL         *string    `json:"logo_url,omitempty"`
-	Status          string     `json:"status"` // pending, active, suspended, rejected
-	VerifiedAt      *time.Time `json:"verified_at,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID                 int        `json:"id"`
+	UserID             int        `json:"user_id"`
+	CompanyName        string     `json:"company_name"`
+	BusinessLicense    *string    `json:"business_license,omitempty"`
+	BusinessLicenseURL *string    `json:"business_license_url,omitempty"`
+	IDCardFrontURL     *string    `json:"id_card_front_url,omitempty"`
+	IDCardBackURL      *string    `json:"id_card_back_url,omitempty"`
+	Attachments        *string    `json:"attachments,omitempty"` // JSON array of file URLs
+	ContactName        *string    `json:"contact_name,omitempty"`
+	ContactPhone       *string    `json:"contact_phone,omitempty"`
+	ContactEmail       *string    `json:"contact_email,omitempty"`
+	Address            *string    `json:"address,omitempty"`
+	Description        *string    `json:"description,omitempty"`
+	LogoURL            *string    `json:"logo_url,omitempty"`
+	Status             string     `json:"status"` // pending, reviewing, active, suspended, rejected
+	ReviewedAt         *time.Time `json:"reviewed_at,omitempty"`
+	ReviewNote         *string    `json:"review_note,omitempty"`
+	RejectionReason    *string    `json:"rejection_reason,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 // MerchantAPIKey represents a merchant's API key for token托管

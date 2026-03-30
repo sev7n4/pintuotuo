@@ -44,7 +44,6 @@ export const merchantService = {
 
   getSettlementDetail: (id: number) => api.get<MerchantSettlement>(`/merchants/settlements/${id}`),
 
-  // API Key management
   getAPIKeys: () => api.get<APIResponse<MerchantAPIKey[]>>('/merchants/api-keys'),
 
   createAPIKey: (data: {
@@ -61,4 +60,22 @@ export const merchantService = {
   deleteAPIKey: (id: number) => api.delete(`/merchants/api-keys/${id}`),
 
   getAPIKeyUsage: () => api.get<APIResponse<APIKeyUsage[]>>('/merchants/api-keys/usage'),
+
+  submitDocuments: (data: {
+    business_license_url: string;
+    id_card_front_url?: string;
+    id_card_back_url?: string;
+    attachments?: string;
+    contact_name?: string;
+    contact_phone?: string;
+    contact_email?: string;
+    address?: string;
+  }) => api.post<Merchant>('/merchants/documents', data),
+
+  getMerchantStatus: () =>
+    api.get<{
+      status: string;
+      can_submit: boolean;
+      rejection_reason?: string;
+    }>('/merchants/status'),
 };

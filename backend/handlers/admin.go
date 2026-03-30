@@ -306,10 +306,10 @@ func ApproveMerchant(c *gin.Context) {
 		return
 	}
 
-	if currentStatus != merchantStatusPending {
+	if currentStatus != merchantStatusPending && currentStatus != "reviewing" {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"INVALID_STATUS",
-			"Merchant is not in pending status",
+			"Merchant is not in pending or reviewing status",
 			http.StatusBadRequest,
 			nil,
 		))
@@ -318,7 +318,7 @@ func ApproveMerchant(c *gin.Context) {
 
 	var merchant models.Merchant
 	err = db.QueryRow(
-		`UPDATE merchants SET status = 'active', verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+		`UPDATE merchants SET status = 'active', reviewed_at = CURRENT_TIMESTAMP, review_note = NULL, updated_at = CURRENT_TIMESTAMP 
 		 WHERE id = $1 
 		 RETURNING id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, created_at, updated_at`,
 		merchantID,
@@ -386,10 +386,10 @@ func RejectMerchant(c *gin.Context) {
 		return
 	}
 
-	if currentStatus != merchantStatusPending {
+	if currentStatus != merchantStatusPending && currentStatus != "reviewing" {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"INVALID_STATUS",
-			"Merchant is not in pending status",
+			"Merchant is not in pending or reviewing status",
 			http.StatusBadRequest,
 			nil,
 		))
@@ -398,10 +398,10 @@ func RejectMerchant(c *gin.Context) {
 
 	var merchant models.Merchant
 	err = db.QueryRow(
-		`UPDATE merchants SET status = 'rejected', updated_at = CURRENT_TIMESTAMP 
-		 WHERE id = $1 
+		`UPDATE merchants SET status = 'rejected', review_note = $1, updated_at = CURRENT_TIMESTAMP 
+		 WHERE id = $2 
 		 RETURNING id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, created_at, updated_at`,
-		merchantID,
+		req.Reason, merchantID,
 	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense, &merchant.ContactName,
 		&merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address, &merchant.Description, &merchant.Status,
 		&merchant.CreatedAt, &merchant.UpdatedAt)

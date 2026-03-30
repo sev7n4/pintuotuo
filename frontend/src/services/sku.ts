@@ -18,7 +18,10 @@ export const skuService = {
     provider?: string;
     tier?: string;
     status?: string;
-  }) => api.get<{ total: number; page: number; per_page: number; data: SPU[] }>('/admin/spus', { params }),
+  }) =>
+    api.get<{ total: number; page: number; per_page: number; data: SPU[] }>('/admin/spus', {
+      params,
+    }),
 
   getSPU: (id: number) => api.get<{ data: SPU }>(`/admin/spus/${id}`),
 
@@ -35,7 +38,10 @@ export const skuService = {
     spu_id?: number;
     type?: string;
     status?: string;
-  }) => api.get<{ total: number; page: number; per_page: number; data: SKUWithSPU[] }>('/admin/skus', { params }),
+  }) =>
+    api.get<{ total: number; page: number; per_page: number; data: SKUWithSPU[] }>('/admin/skus', {
+      params,
+    }),
 
   getSKU: (id: number) => api.get<{ data: SKUWithSPU }>(`/admin/skus/${id}`),
 
@@ -66,12 +72,10 @@ export const skuService = {
 
   getUserSubscriptions: () => api.get<{ data: UserSubscriptionWithSKU[] }>('/subscriptions'),
 
-  getPublicSKUs: (params?: {
-    page?: number;
-    per_page?: number;
-    spu_id?: number;
-    type?: string;
-  }) => api.get<{ total: number; page: number; per_page: number; data: SKUWithSPU[] }>('/skus', { params }),
+  getPublicSKUs: (params?: { page?: number; per_page?: number; spu_id?: number; type?: string }) =>
+    api.get<{ total: number; page: number; per_page: number; data: SKUWithSPU[] }>('/skus', {
+      params,
+    }),
 
   getPublicSKU: (id: number) => api.get<{ data: SKUWithSPU }>(`/skus/${id}`),
 };

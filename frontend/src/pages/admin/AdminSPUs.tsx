@@ -153,7 +153,11 @@ const AdminSPUs = () => {
       key: 'model_tier',
       width: 100,
       render: (tier: string) => (
-        <Tag color={tier === 'pro' ? 'red' : tier === 'lite' ? 'blue' : tier === 'mini' ? 'green' : 'purple'}>
+        <Tag
+          color={
+            tier === 'pro' ? 'red' : tier === 'lite' ? 'blue' : tier === 'mini' ? 'green' : 'purple'
+          }
+        >
           {MODEL_TIER_LABELS[tier] || tier}
         </Tag>
       ),
