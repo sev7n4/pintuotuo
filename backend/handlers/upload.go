@@ -72,7 +72,7 @@ func UploadFile(c *gin.Context) {
 	subdir := getUploadSubdir(uploadType)
 
 	fullDir := filepath.Join(uploadDir, subdir)
-	if err := os.MkdirAll(fullDir, 0755); err != nil {
+	if mkdirErr := os.MkdirAll(fullDir, 0755); mkdirErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建目录失败"})
 		return
 	}
@@ -80,14 +80,14 @@ func UploadFile(c *gin.Context) {
 	filename := fmt.Sprintf("%s_%s%s", time.Now().Format("20060102150405"), uuid.New().String()[:8], ext)
 	filePath := filepath.Join(fullDir, filename)
 
-	dst, err := os.Create(filePath)
-	if err != nil {
+	dst, createErr := os.Create(filePath)
+	if createErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建文件失败"})
 		return
 	}
 	defer dst.Close()
 
-	if _, err := io.Copy(dst, file); err != nil {
+	if _, copyErr := io.Copy(dst, file); copyErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存文件失败"})
 		return
 	}
