@@ -71,9 +71,12 @@ func main() {
 	router.Use(middleware.ErrorHandlingMiddleware())
 	router.Use(middleware.LoggingMiddleware())
 
+	router.Static("/uploads", "./uploads")
+
 	v1 := router.Group("/api/v1")
 	{
 		routes.RegisterHealthRoutes(v1)
+		routes.RegisterUploadRoutes(v1)
 		routes.RegisterUserRoutes(v1)
 		routes.RegisterProductRoutes(v1)
 		routes.RegisterCartRoutes(v1)

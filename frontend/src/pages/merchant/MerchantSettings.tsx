@@ -12,6 +12,7 @@ import {
   Divider,
   Alert,
   Spin,
+  Image,
 } from 'antd';
 import {
   UserOutlined,
@@ -24,7 +25,8 @@ import {
 } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
 import { merchantService } from '@/services/merchant';
-import type { UploadProps } from 'antd';
+import { uploadService } from '@/services/upload';
+import type { UploadProps, UploadFile } from 'antd';
 import styles from './MerchantSettings.module.css';
 
 interface MerchantStatus {
@@ -47,12 +49,16 @@ const MerchantSettings = () => {
   const [documentForm] = Form.useForm();
   const [merchantStatus, setMerchantStatus] = useState<MerchantStatus | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string>('');
+  const [businessLicenseFileList, setBusinessLicenseFileList] = useState<UploadFile[]>([]);
+  const [idCardFrontFileList, setIdCardFrontFileList] = useState<UploadFile[]>([]);
+  const [idCardBackFileList, setIdCardBackFileList] = useState<UploadFile[]>([]);
 
   useEffect(() => {
     fetchProfile();
     fetchMerchantStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchProfile]);
 
   useEffect(() => {
     if (profile) {
@@ -63,6 +69,22 @@ const MerchantSettings = () => {
         contact_email: profile.contact_email,
         address: profile.address,
       });
+      setLogoUrl(profile.logo_url || '');
+      if (profile.business_license_url) {
+        setBusinessLicenseFileList([
+          { uid: '-1', name: '营业执照', status: 'done', url: profile.business_license_url },
+        ]);
+      }
+      if (profile.id_card_front_url) {
+        setIdCardFrontFileList([
+          { uid: '-2', name: '身份证正面', status: 'done', url: profile.id_card_front_url },
+        ]);
+      }
+      if (profile.id_card_back_url) {
+        setIdCardBackFileList([
+          { uid: '-3', name: '身份证背面', status: 'done', url: profile.id_card_back_url },
+        ]);
+      }
     }
   }, [profile, form, documentForm]);
 
@@ -78,6 +100,9 @@ const MerchantSettings = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+      if (logoUrl) {
+        values.logo_url = logoUrl;
+      }
       const success = await updateProfile(values);
       if (success) {
         message.success('店铺信息已更新');
@@ -90,13 +115,21 @@ const MerchantSettings = () => {
   const handleDocumentSubmit = async () => {
     try {
       const values = await documentForm.validateFields();
-      if (!values.business_license_url) {
+
+      if (businessLicenseFileList.length === 0 || !businessLicenseFileList[0].url) {
         message.error('请上传营业执照');
         return;
       }
 
       setSubmitting(true);
-      await merchantService.submitDocuments(values);
+      const submitData = {
+        ...values,
+        business_license_url: businessLicenseFileList[0].url || businessLicenseFileList[0].response?.url,
+        id_card_front_url: idCardFrontFileList[0]?.url || idCardFrontFileList[0]?.response?.url,
+        id_card_back_url: idCardBackFileList[0]?.url || idCardBackFileList[0]?.response?.url,
+      };
+
+      await merchantService.submitDocuments(submitData);
       message.success('资料提交成功，请等待审核');
       fetchProfile();
       fetchMerchantStatus();
@@ -107,13 +140,72 @@ const MerchantSettings = () => {
     }
   };
 
-  const uploadProps: UploadProps = {
+  const handleLogoUpload = async (options: any) => {
+    const { file, onSuccess, onError } = options;
+    setUploadingLogo(true);
+    try {
+      const url = await uploadService.uploadFile(file, 'logo');
+      setLogoUrl(url);
+      onSuccess({ url });
+      message.success('Logo上传成功');
+    } catch (error) {
+      onError(error);
+      message.error('Logo上传失败');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const createUploadProps = (
+    type: 'license' | 'idcard',
+    fileList: UploadFile[],
+    setFileList: React.Dispatch<React.SetStateAction<UploadFile[]>>
+  ): UploadProps => ({
+    name: 'file',
+    listType: 'picture-card',
+    fileList,
+    accept: '.jpg,.jpeg,.png,.gif,.webp',
+    maxCount: 1,
+    beforeUpload: (file) => {
+      const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/gif' || file.type === 'image/webp';
+      if (!isJpgOrPng) {
+        message.error('只能上传 JPG/PNG/GIF/WEBP 格式的图片');
+        return false;
+      }
+      const isLt5M = file.size / 1024 / 1024 < 5;
+      if (!isLt5M) {
+        message.error('图片大小不能超过 5MB');
+        return false;
+      }
+      return true;
+    },
+    customRequest: async (options) => {
+      const { file, onSuccess, onError } = options;
+      try {
+        const url = await uploadService.uploadFile(file as File, type);
+        onSuccess?.({ url });
+      } catch (error) {
+        onError?.(error as Error);
+      }
+    },
+    onChange: (info) => {
+      setFileList(info.fileList);
+      if (info.file.status === 'done') {
+        message.success(`${info.file.name} 上传成功`);
+      } else if (info.file.status === 'error') {
+        message.error(`${info.file.name} 上传失败`);
+      }
+    },
+    onRemove: () => {
+      setFileList([]);
+    },
+  });
+
+  const logoUploadProps: UploadProps = {
     name: 'file',
     showUploadList: false,
-    beforeUpload: () => {
-      message.info('文件上传功能开发中');
-      return false;
-    },
+    accept: '.jpg,.jpeg,.png,.gif,.webp',
+    customRequest: handleLogoUpload,
   };
 
   const currentStatus = merchantStatus?.status || profile?.status || 'pending';
@@ -129,11 +221,13 @@ const MerchantSettings = () => {
             <Avatar
               size={80}
               icon={<UserOutlined />}
-              src={profile?.logo_url}
+              src={logoUrl || profile?.logo_url}
               className={styles.logo}
             />
-            <Upload {...uploadProps}>
-              <Button icon={<UploadOutlined />}>更换Logo</Button>
+            <Upload {...logoUploadProps}>
+              <Button icon={<UploadOutlined />} loading={uploadingLogo}>
+                更换Logo
+              </Button>
             </Upload>
           </div>
 
@@ -198,19 +292,37 @@ const MerchantSettings = () => {
             {profile?.business_license_url && (
               <div className={styles.statusItem}>
                 <span className={styles.label}>营业执照：</span>
-                <span className={styles.value}>已上传</span>
+                <Image
+                  src={profile.business_license_url}
+                  alt="营业执照"
+                  width={100}
+                  height={100}
+                  style={{ objectFit: 'cover', borderRadius: 4 }}
+                />
               </div>
             )}
             {profile?.id_card_front_url && (
               <div className={styles.statusItem}>
                 <span className={styles.label}>身份证正面：</span>
-                <span className={styles.value}>已上传</span>
+                <Image
+                  src={profile.id_card_front_url}
+                  alt="身份证正面"
+                  width={100}
+                  height={100}
+                  style={{ objectFit: 'cover', borderRadius: 4 }}
+                />
               </div>
             )}
             {profile?.id_card_back_url && (
               <div className={styles.statusItem}>
                 <span className={styles.label}>身份证背面：</span>
-                <span className={styles.value}>已上传</span>
+                <Image
+                  src={profile.id_card_back_url}
+                  alt="身份证背面"
+                  width={100}
+                  height={100}
+                  style={{ objectFit: 'cover', borderRadius: 4 }}
+                />
               </div>
             )}
           </div>
@@ -228,27 +340,42 @@ const MerchantSettings = () => {
 
           <Form form={documentForm} layout="vertical" onFinish={handleDocumentSubmit}>
             <Form.Item
-              name="business_license_url"
               label="营业执照"
-              rules={[{ required: true, message: '请上传营业执照' }]}
+              required
+              tooltip="请上传清晰的营业执照照片"
             >
-              <Upload {...uploadProps}>
-                <Button icon={<UploadOutlined />}>上传营业执照</Button>
+              <Upload {...createUploadProps('license', businessLicenseFileList, setBusinessLicenseFileList)}>
+                {businessLicenseFileList.length === 0 && (
+                  <div>
+                    <UploadOutlined />
+                    <div style={{ marginTop: 8 }}>上传营业执照</div>
+                  </div>
+                )}
               </Upload>
-              <span className="ant-form-item-extra" style={{ marginLeft: 8, color: '#999' }}>
-                支持 JPG、PNG 格式，文件大小不超过 5MB
+              <span className="ant-form-item-extra" style={{ color: '#999', fontSize: 12 }}>
+                支持 JPG、PNG、GIF、WEBP 格式，文件大小不超过 5MB
               </span>
             </Form.Item>
 
-            <Form.Item name="id_card_front_url" label="身份证正面">
-              <Upload {...uploadProps}>
-                <Button icon={<UploadOutlined />}>上传身份证正面</Button>
+            <Form.Item label="身份证正面">
+              <Upload {...createUploadProps('idcard', idCardFrontFileList, setIdCardFrontFileList)}>
+                {idCardFrontFileList.length === 0 && (
+                  <div>
+                    <UploadOutlined />
+                    <div style={{ marginTop: 8 }}>上传身份证正面</div>
+                  </div>
+                )}
               </Upload>
             </Form.Item>
 
-            <Form.Item name="id_card_back_url" label="身份证背面">
-              <Upload {...uploadProps}>
-                <Button icon={<UploadOutlined />}>上传身份证背面</Button>
+            <Form.Item label="身份证背面">
+              <Upload {...createUploadProps('idcard', idCardBackFileList, setIdCardBackFileList)}>
+                {idCardBackFileList.length === 0 && (
+                  <div>
+                    <UploadOutlined />
+                    <div style={{ marginTop: 8 }}>上传身份证背面</div>
+                  </div>
+                )}
               </Upload>
             </Form.Item>
 

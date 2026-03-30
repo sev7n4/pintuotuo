@@ -6,6 +6,14 @@ import (
 	"github.com/pintuotuo/backend/middleware"
 )
 
+func RegisterUploadRoutes(router *gin.RouterGroup) {
+	upload := router.Group("/upload")
+	upload.Use(middleware.AuthMiddleware())
+	{
+		upload.POST("", handlers.UploadFile)
+	}
+}
+
 func RegisterHealthRoutes(router *gin.RouterGroup) {
 	health := router.Group("/health")
 	{
