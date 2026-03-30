@@ -189,6 +189,9 @@ const MerchantSettings = () => {
       }
     },
     onChange: (info) => {
+      if (info.file.status === 'done' && info.file.response?.url) {
+        info.file.url = info.file.response.url;
+      }
       setFileList(info.fileList);
       if (info.file.status === 'done') {
         message.success(`${info.file.name} 上传成功`);
