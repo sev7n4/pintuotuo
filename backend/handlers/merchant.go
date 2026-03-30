@@ -19,6 +19,14 @@ import (
 
 const allProductStatus = "all"
 
+const (
+	merchantStatusPending   = "pending"
+	merchantStatusReviewing = "reviewing"
+	merchantStatusActive    = "active"
+	merchantStatusRejected  = "rejected"
+	merchantStatusSuspended = "suspended"
+)
+
 func RegisterMerchant(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -740,7 +748,7 @@ func GetMerchantStatus(c *gin.Context) {
 		return
 	}
 
-	canSubmit := status == "pending" || status == "rejected"
+	canSubmit := status == merchantStatusPending || status == merchantStatusRejected
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":           status,
