@@ -231,14 +231,19 @@ export interface Merchant {
   user_id: number;
   company_name: string;
   business_license?: string;
+  business_license_url?: string;
+  id_card_front_url?: string;
+  id_card_back_url?: string;
+  attachments?: string;
   contact_name?: string;
   contact_phone?: string;
   contact_email?: string;
   address?: string;
   description?: string;
   logo_url?: string;
-  status: 'pending' | 'active' | 'suspended' | 'rejected';
-  verified_at?: string;
+  status: 'pending' | 'reviewing' | 'active' | 'suspended' | 'rejected';
+  reviewed_at?: string;
+  review_note?: string;
   created_at: string;
   updated_at: string;
 }

@@ -9,7 +9,6 @@ import {
   Avatar,
   Space,
   Tag,
-  Typography,
   Divider,
   Alert,
   Spin,
@@ -27,8 +26,6 @@ import { useMerchantStore } from '@/stores/merchantStore';
 import { merchantService } from '@/services/merchant';
 import type { UploadProps } from 'antd';
 import styles from './MerchantSettings.module.css';
-
-const { Text, Paragraph } = Typography;
 
 interface MerchantStatus {
   status: string;
@@ -238,9 +235,9 @@ const MerchantSettings = () => {
               <Upload {...uploadProps}>
                 <Button icon={<UploadOutlined />}>上传营业执照</Button>
               </Upload>
-              <Text type="secondary" style={{ marginLeft: 8 }}>
+              <span className="ant-form-item-extra" style={{ marginLeft: 8, color: '#999' }}>
                 支持 JPG、PNG 格式，文件大小不超过 5MB
-              </Text>
+              </span>
             </Form.Item>
 
             <Form.Item name="id_card_front_url" label="身份证正面">

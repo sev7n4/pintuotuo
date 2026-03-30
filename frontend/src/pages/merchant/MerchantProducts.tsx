@@ -234,7 +234,7 @@ const MerchantProducts = () => {
         <Card>
           <Table
             columns={columns}
-            dataSource={products?.data || []}
+            dataSource={products || []}
             rowKey="id"
             loading={isLoading}
             scroll={{ x: 900 }}

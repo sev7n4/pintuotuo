@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import { merchantService } from '@/services/merchant';
 
-const { Text, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 interface MerchantGuardProps {
   children: React.ReactNode;
