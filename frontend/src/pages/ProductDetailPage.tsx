@@ -340,7 +340,8 @@ export const ProductDetailPage: React.FC = () => {
                     size="small"
                     hoverable
                     style={{
-                      border: selectedSKU?.id === sku.id ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                      border:
+                        selectedSKU?.id === sku.id ? '2px solid #1890ff' : '1px solid #d9d9d9',
                       cursor: 'pointer',
                       background: selectedSKU?.id === sku.id ? '#e6f7ff' : 'white',
                     }}
@@ -350,8 +351,20 @@ export const ProductDetailPage: React.FC = () => {
                       <Col flex="auto">
                         <Space direction="vertical" size={0}>
                           <Space>
-                            <Tag color={sku.sku_type === 'token_pack' ? 'blue' : sku.sku_type === 'subscription' ? 'green' : 'orange'}>
-                              {sku.sku_type === 'token_pack' ? 'Token包' : sku.sku_type === 'subscription' ? '订阅' : '并发'}
+                            <Tag
+                              color={
+                                sku.sku_type === 'token_pack'
+                                  ? 'blue'
+                                  : sku.sku_type === 'subscription'
+                                    ? 'green'
+                                    : 'orange'
+                              }
+                            >
+                              {sku.sku_type === 'token_pack'
+                                ? 'Token包'
+                                : sku.sku_type === 'subscription'
+                                  ? '订阅'
+                                  : '并发'}
                             </Tag>
                             <Text strong>{sku.spu_name}</Text>
                           </Space>
@@ -363,7 +376,11 @@ export const ProductDetailPage: React.FC = () => {
                             )}
                             {sku.subscription_period && (
                               <Text type="secondary" style={{ fontSize: 12 }}>
-                                {sku.subscription_period === 'monthly' ? '月度' : sku.subscription_period === 'yearly' ? '年度' : '季度'}
+                                {sku.subscription_period === 'monthly'
+                                  ? '月度'
+                                  : sku.subscription_period === 'yearly'
+                                    ? '年度'
+                                    : '季度'}
                               </Text>
                             )}
                             {sku.concurrent_requests && (

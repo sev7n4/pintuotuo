@@ -48,7 +48,7 @@ export interface SPU {
   id: number;
   spu_code: string;
   name: string;
-  
+
   model_provider: string;
   provider_model_id?: string;
   provider_api_endpoint?: string;
@@ -56,27 +56,27 @@ export interface SPU {
   provider_billing_type?: string;
   provider_input_rate?: number;
   provider_output_rate?: number;
-  
+
   model_name: string;
   model_version?: string;
   model_tier: 'pro' | 'lite' | 'mini' | 'vision';
-  
+
   context_window?: number;
   max_output_tokens?: number;
   supported_functions?: string[];
-  
+
   base_compute_points: number;
   billing_coefficient?: number;
-  
+
   description?: string;
   features?: string[];
   thumbnail_url?: string;
-  
+
   input_length_ranges?: InputRange[];
   billing_adapter?: BillingAdapter;
   routing_rules?: RoutingRules;
   batch_inference?: BatchConfig;
-  
+
   status: string;
   sort_order: number;
   total_sales_count: number;

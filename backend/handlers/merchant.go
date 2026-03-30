@@ -19,6 +19,14 @@ import (
 
 const allProductStatus = "all"
 
+const (
+	merchantStatusPending   = "pending"
+	merchantStatusReviewing = "reviewing"
+	merchantStatusActive    = "active"
+	merchantStatusRejected  = "rejected"
+	merchantStatusSuspended = "suspended"
+)
+
 func RegisterMerchant(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -128,7 +136,7 @@ func GetMerchantProfile(c *gin.Context) {
 	var merchant models.Merchant
 	var verifiedAt sql.NullTime
 	err := db.QueryRow(
-		`SELECT id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, logo_url, status, verified_at, created_at, updated_at 
+		`SELECT id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, logo_url, status, reviewed_at, created_at, updated_at 
 		 FROM merchants WHERE user_id = $1`,
 		userIDInt,
 	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense, &merchant.ContactName,
@@ -151,7 +159,7 @@ func GetMerchantProfile(c *gin.Context) {
 	}
 
 	if verifiedAt.Valid {
-		merchant.VerifiedAt = &verifiedAt.Time
+		merchant.ReviewedAt = &verifiedAt.Time
 	}
 
 	if merchantJSON, err := json.Marshal(merchant); err == nil {
@@ -208,7 +216,7 @@ func UpdateMerchantProfile(c *gin.Context) {
 		 logo_url = COALESCE(NULLIF($7, ''), logo_url),
 		 updated_at = CURRENT_TIMESTAMP
 		 WHERE user_id = $8
-		 RETURNING id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, logo_url, status, verified_at, created_at, updated_at`,
+		 RETURNING id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, logo_url, status, reviewed_at, created_at, updated_at`,
 		req.CompanyName, req.ContactName, req.ContactPhone, req.ContactEmail, req.Address, req.Description, req.LogoURL, userIDInt,
 	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense, &merchant.ContactName,
 		&merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address, &merchant.Description, &merchant.LogoURL,
@@ -228,7 +236,7 @@ func UpdateMerchantProfile(c *gin.Context) {
 	}
 
 	if verifiedAt.Valid {
-		merchant.VerifiedAt = &verifiedAt.Time
+		merchant.ReviewedAt = &verifiedAt.Time
 	}
 
 	ctx := context.Background()
@@ -617,4 +625,134 @@ func GetMerchantSettlements(c *gin.Context) {
 
 func parseInt(s string) (int, error) {
 	return strconv.Atoi(s)
+}
+
+func SubmitMerchantDocuments(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	var req struct {
+		BusinessLicenseURL string `json:"business_license_url"`
+		IDCardFrontURL     string `json:"id_card_front_url"`
+		IDCardBackURL      string `json:"id_card_back_url"`
+		Attachments        string `json:"attachments"` // JSON array string
+		ContactName        string `json:"contact_name"`
+		ContactPhone       string `json:"contact_phone"`
+		ContactEmail       string `json:"contact_email"`
+		Address            string `json:"address"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	if req.BusinessLicenseURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "business_license_url is required"})
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var merchant models.Merchant
+	var reviewedAt sql.NullTime
+	err := db.QueryRow(
+		`UPDATE merchants SET 
+		 business_license_url = $1,
+		 id_card_front_url = $2,
+		 id_card_back_url = $3,
+		 attachments = $4,
+		 contact_name = COALESCE(NULLIF($5, ''), contact_name),
+		 contact_phone = COALESCE(NULLIF($6, ''), contact_phone),
+		 contact_email = COALESCE(NULLIF($7, ''), contact_email),
+		 address = COALESCE(NULLIF($8, ''), address),
+		 status = 'reviewing',
+		 updated_at = CURRENT_TIMESTAMP
+		 WHERE user_id = $9
+		 RETURNING id, user_id, company_name, business_license, business_license_url, id_card_front_url, id_card_back_url, attachments, contact_name, contact_phone, contact_email, address, description, logo_url, status, reviewed_at, created_at, updated_at`,
+		req.BusinessLicenseURL, req.IDCardFrontURL, req.IDCardBackURL, req.Attachments,
+		req.ContactName, req.ContactPhone, req.ContactEmail, req.Address, userIDInt,
+	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense,
+		&merchant.BusinessLicenseURL, &merchant.IDCardFrontURL, &merchant.IDCardBackURL, &merchant.Attachments,
+		&merchant.ContactName, &merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address,
+		&merchant.Description, &merchant.LogoURL, &merchant.Status, &reviewedAt,
+		&merchant.CreatedAt, &merchant.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"Merchant profile not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	} else if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	if reviewedAt.Valid {
+		merchant.ReviewedAt = &reviewedAt.Time
+	}
+
+	ctx := context.Background()
+	cache.Delete(ctx, cache.MerchantKey(userIDInt))
+
+	c.JSON(http.StatusOK, merchant)
+}
+
+func GetMerchantStatus(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var status string
+	var rejectionReason sql.NullString
+	err := db.QueryRow("SELECT status, review_note FROM merchants WHERE user_id = $1", userIDInt).Scan(&status, &rejectionReason)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusOK, gin.H{
+			"status":           "not_registered",
+			"can_submit":       false,
+			"rejection_reason": nil,
+		})
+		return
+	} else if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	canSubmit := status == merchantStatusPending || status == merchantStatusRejected
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":           status,
+		"can_submit":       canSubmit,
+		"rejection_reason": rejectionReason.String,
+	})
 }

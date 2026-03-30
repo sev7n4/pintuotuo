@@ -258,7 +258,12 @@ const AdminSKUs = () => {
       width: 150,
       render: (_: unknown, record: SKUWithSPU) => (
         <Space size="small">
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          >
             编辑
           </Button>
           <Popconfirm
@@ -569,7 +574,11 @@ const AdminSKUs = () => {
                   </Form.Item>
                 </Col>
                 <Col span={6}>
-                  <Form.Item name="group_discount_rate" label="拼团折扣率(%)" extra="如: 20 表示8折">
+                  <Form.Item
+                    name="group_discount_rate"
+                    label="拼团折扣率(%)"
+                    extra="如: 20 表示8折"
+                  >
                     <InputNumber min={0} max={100} style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>

@@ -17,6 +17,7 @@ import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
 import { productService } from '@/services/product';
 import { Product, Category } from '@/types';
+import MerchantGuard from '@/components/MerchantGuard';
 import styles from './MerchantProducts.module.css';
 
 const MerchantProducts = () => {
@@ -208,131 +209,141 @@ const MerchantProducts = () => {
   ];
 
   return (
-    <div className={styles.products}>
-      <div className={styles.header}>
-        <h2 className={styles.pageTitle}>商品管理</h2>
-        <Space>
-          <Select
-            value={statusFilter}
-            onChange={setStatusFilter}
-            style={{ width: 120 }}
-            options={[
-              { value: 'all', label: '全部状态' },
-              { value: 'active', label: '在售' },
-              { value: 'inactive', label: '下架' },
-              { value: 'archived', label: '归档' },
-            ]}
-          />
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            添加商品
-          </Button>
-        </Space>
-      </div>
-
-      <Card>
-        <Table
-          columns={columns}
-          dataSource={products}
-          rowKey="id"
-          loading={isLoading}
-          scroll={{ x: 900 }}
-          pagination={{
-            pageSize: 20,
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 条`,
-          }}
-        />
-      </Card>
-
-      <Modal
-        title={editingProduct ? '编辑商品' : '添加商品'}
-        open={modalVisible}
-        onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
-        okText="保存"
-        cancelText="取消"
-        width={600}
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label="商品名称"
-            rules={[{ required: true, message: '请输入商品名称' }]}
-          >
-            <Input placeholder="请输入商品名称" />
-          </Form.Item>
-          <Form.Item name="description" label="商品描述">
-            <Input.TextArea rows={3} placeholder="请输入商品描述" />
-          </Form.Item>
-          <Form.Item
-            name="price"
-            label="价格"
-            rules={[
-              { required: true, message: '请输入价格' },
-              {
-                validator: (_, value) => {
-                  if (value !== undefined && value <= 0) {
-                    return Promise.reject(new Error('价格必须大于0'));
-                  }
-                  return Promise.resolve();
-                },
-              },
-            ]}
-            validateTrigger="onBlur"
-          >
-            <InputNumber
-              min={-Infinity}
-              precision={2}
-              style={{ width: '100%' }}
-              placeholder="请输入价格"
-            />
-          </Form.Item>
-          <Form.Item name="original_price" label="原价">
-            <InputNumber precision={2} style={{ width: '100%' }} placeholder="请输入原价（可选）" />
-          </Form.Item>
-          <Form.Item
-            name="stock"
-            label="库存"
-            rules={[
-              { required: true, message: '请输入库存' },
-              {
-                validator: (_, value) => {
-                  if (value !== undefined && value < 0) {
-                    return Promise.reject(new Error('库存必须大于等于0'));
-                  }
-                  return Promise.resolve();
-                },
-              },
-            ]}
-            validateTrigger="onBlur"
-          >
-            <InputNumber min={-Infinity} style={{ width: '100%' }} placeholder="请输入库存" />
-          </Form.Item>
-          <Form.Item name="category" label="分类">
+    <MerchantGuard>
+      <div className={styles.products}>
+        <div className={styles.header}>
+          <h2 className={styles.pageTitle}>商品管理</h2>
+          <Space>
             <Select
-              placeholder="请选择分类"
-              loading={categoriesLoading}
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              options={categories.map((cat) => ({
-                value: cat.name,
-                label: cat.name,
-              }))}
-            />
-          </Form.Item>
-          <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
-            <Select
-              placeholder="请选择状态"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              style={{ width: 120 }}
               options={[
+                { value: 'all', label: '全部状态' },
                 { value: 'active', label: '在售' },
                 { value: 'inactive', label: '下架' },
+                { value: 'archived', label: '归档' },
               ]}
             />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              添加商品
+            </Button>
+          </Space>
+        </div>
+
+        <Card>
+          <Table
+            columns={columns}
+            dataSource={products || []}
+            rowKey="id"
+            loading={isLoading}
+            scroll={{ x: 900 }}
+            pagination={{
+              pageSize: 20,
+              showSizeChanger: true,
+              showTotal: (total) => `共 ${total} 条`,
+            }}
+          />
+        </Card>
+
+        <Modal
+          title={editingProduct ? '编辑商品' : '添加商品'}
+          open={modalVisible}
+          onOk={handleSubmit}
+          onCancel={() => setModalVisible(false)}
+          okText="保存"
+          cancelText="取消"
+          width={600}
+        >
+          <Form form={form} layout="vertical">
+            <Form.Item
+              name="name"
+              label="商品名称"
+              rules={[{ required: true, message: '请输入商品名称' }]}
+            >
+              <Input placeholder="请输入商品名称" />
+            </Form.Item>
+            <Form.Item name="description" label="商品描述">
+              <Input.TextArea rows={3} placeholder="请输入商品描述" />
+            </Form.Item>
+            <Form.Item
+              name="price"
+              label="价格"
+              rules={[
+                { required: true, message: '请输入价格' },
+                {
+                  validator: (_, value) => {
+                    if (value !== undefined && value <= 0) {
+                      return Promise.reject(new Error('价格必须大于0'));
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+              validateTrigger="onBlur"
+            >
+              <InputNumber
+                min={-Infinity}
+                precision={2}
+                style={{ width: '100%' }}
+                placeholder="请输入价格"
+              />
+            </Form.Item>
+            <Form.Item name="original_price" label="原价">
+              <InputNumber
+                precision={2}
+                style={{ width: '100%' }}
+                placeholder="请输入原价（可选）"
+              />
+            </Form.Item>
+            <Form.Item
+              name="stock"
+              label="库存"
+              rules={[
+                { required: true, message: '请输入库存' },
+                {
+                  validator: (_, value) => {
+                    if (value !== undefined && value < 0) {
+                      return Promise.reject(new Error('库存必须大于等于0'));
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+              validateTrigger="onBlur"
+            >
+              <InputNumber min={-Infinity} style={{ width: '100%' }} placeholder="请输入库存" />
+            </Form.Item>
+            <Form.Item name="category" label="分类">
+              <Select
+                placeholder="请选择分类"
+                loading={categoriesLoading}
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                options={categories.map((cat) => ({
+                  value: cat.name,
+                  label: cat.name,
+                }))}
+              />
+            </Form.Item>
+            <Form.Item
+              name="status"
+              label="状态"
+              rules={[{ required: true, message: '请选择状态' }]}
+            >
+              <Select
+                placeholder="请选择状态"
+                options={[
+                  { value: 'active', label: '在售' },
+                  { value: 'inactive', label: '下架' },
+                ]}
+              />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </div>
+    </MerchantGuard>
   );
 };
 

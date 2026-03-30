@@ -188,6 +188,8 @@ func RegisterMerchantRoutes(router *gin.RouterGroup) {
 		authMerchants.GET("/settlements", handlers.GetMerchantSettlements)
 		authMerchants.POST("/settlements", handlers.RequestSettlement)
 		authMerchants.GET("/settlements/:id", handlers.GetSettlementDetail)
+		authMerchants.POST("/documents", handlers.SubmitMerchantDocuments)
+		authMerchants.GET("/status", handlers.GetMerchantStatus)
 
 		apiKeys := authMerchants.Group("/api-keys")
 		{

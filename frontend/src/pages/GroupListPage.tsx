@@ -152,7 +152,9 @@ export const GroupListPage: React.FC = () => {
                         {group.sku_name && (
                           <Space size={4}>
                             <TagsOutlined style={{ fontSize: 12, color: '#999' }} />
-                            <Text type="secondary" style={{ fontSize: 12 }}>{group.sku_name}</Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {group.sku_name}
+                            </Text>
                           </Space>
                         )}
                       </Space>
@@ -163,18 +165,34 @@ export const GroupListPage: React.FC = () => {
                           <p style={{ margin: '8px 0' }}>
                             <Space>
                               <Text type="secondary">规格:</Text>
-                              <Tag color={group.sku_type === 'token_pack' ? 'blue' : group.sku_type === 'subscription' ? 'green' : 'orange'}>
-                                {group.sku_type === 'token_pack' ? 'Token包' : group.sku_type === 'subscription' ? '订阅' : '并发'}
+                              <Tag
+                                color={
+                                  group.sku_type === 'token_pack'
+                                    ? 'blue'
+                                    : group.sku_type === 'subscription'
+                                      ? 'green'
+                                      : 'orange'
+                                }
+                              >
+                                {group.sku_type === 'token_pack'
+                                  ? 'Token包'
+                                  : group.sku_type === 'subscription'
+                                    ? '订阅'
+                                    : '并发'}
                               </Tag>
                               {group.sku_specs && (
-                                <Text type="secondary" style={{ fontSize: 12 }}>{group.sku_specs}</Text>
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  {group.sku_specs}
+                                </Text>
                               )}
                             </Space>
                           </p>
                         )}
                         {group.group_discount_rate && (
                           <p style={{ margin: '8px 0' }}>
-                            <Tag color="red">拼团折扣 {(group.group_discount_rate * 100).toFixed(0)}%</Tag>
+                            <Tag color="red">
+                              拼团折扣 {(group.group_discount_rate * 100).toFixed(0)}%
+                            </Tag>
                           </p>
                         )}
                         <p style={{ margin: '8px 0' }}>目标人数: {group.target_count}人</p>

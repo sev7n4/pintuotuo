@@ -1,5 +1,18 @@
 import React from 'react';
-import { Table, Button, Space, Empty, InputNumber, Row, Col, Card, Statistic, message, Tag, Typography } from 'antd';
+import {
+  Table,
+  Button,
+  Space,
+  Empty,
+  InputNumber,
+  Row,
+  Col,
+  Card,
+  Statistic,
+  message,
+  Tag,
+  Typography,
+} from 'antd';
 import { DeleteOutlined, TagsOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '@stores/cartStore';
@@ -33,7 +46,9 @@ export const CartPage: React.FC = () => {
           {record.sku_name && (
             <Space size={4}>
               <TagsOutlined style={{ fontSize: 12, color: '#999' }} />
-              <Text type="secondary" style={{ fontSize: 12 }}>{record.sku_name}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {record.sku_name}
+              </Text>
             </Space>
           )}
         </Space>
@@ -55,7 +70,9 @@ export const CartPage: React.FC = () => {
           <Space direction="vertical" size={0}>
             <Tag color={config.color}>{config.text}</Tag>
             {record.sku_specs && (
-              <Text type="secondary" style={{ fontSize: 12 }}>{record.sku_specs}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {record.sku_specs}
+              </Text>
             )}
           </Space>
         );

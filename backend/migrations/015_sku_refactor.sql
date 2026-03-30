@@ -348,7 +348,9 @@ ON CONFLICT (user_id) DO NOTHING;
 -- Phase 4: 创建兼容视图（过渡期使用）
 -- ============================================================
 
-CREATE OR REPLACE VIEW products_v2 AS
+DROP VIEW IF EXISTS products_v2 CASCADE;
+
+CREATE VIEW products_v2 AS
 SELECT 
   s.id,
   s.sku_code as sku_code,

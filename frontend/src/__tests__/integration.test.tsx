@@ -442,14 +442,12 @@ describe('Integration Tests', () => {
     });
 
     const mockFetchReferralCode = jest.fn().mockResolvedValue('TESTCODE');
-    const mockFetchStats = jest
-      .fn()
-      .mockResolvedValue({
-        totalReferrals: 10,
-        totalRewards: 100,
-        pendingRewards: 20,
-        paidRewards: 80,
-      });
+    const mockFetchStats = jest.fn().mockResolvedValue({
+      totalReferrals: 10,
+      totalRewards: 100,
+      pendingRewards: 20,
+      paidRewards: 80,
+    });
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
@@ -1385,14 +1383,12 @@ describe('Integration Tests', () => {
 
   test('should handle concurrent user actions', async () => {
     const mockBindReferralCode = jest.fn().mockResolvedValue(undefined);
-    const mockFetchStats = jest
-      .fn()
-      .mockResolvedValue({
-        totalReferrals: 10,
-        totalRewards: 100,
-        pendingRewards: 20,
-        paidRewards: 80,
-      });
+    const mockFetchStats = jest.fn().mockResolvedValue({
+      totalReferrals: 10,
+      totalRewards: 100,
+      pendingRewards: 20,
+      paidRewards: 80,
+    });
 
     mockUseAuthStore.mockReturnValue({
       user: { id: 1, email: 'user@example.com', role: 'user' },
@@ -1663,14 +1659,12 @@ describe('Integration Tests', () => {
   test('should handle multiple store synchronization', async () => {
     const mockFetchCart = jest.fn().mockResolvedValue(undefined);
     const mockFetchReferralCode = jest.fn().mockResolvedValue('SYNC123');
-    const mockFetchStats = jest
-      .fn()
-      .mockResolvedValue({
-        totalReferrals: 5,
-        totalRewards: 50,
-        pendingRewards: 10,
-        paidRewards: 40,
-      });
+    const mockFetchStats = jest.fn().mockResolvedValue({
+      totalReferrals: 5,
+      totalRewards: 50,
+      pendingRewards: 10,
+      paidRewards: 40,
+    });
 
     mockUseAuthStore.mockReturnValue({
       user: { id: 1, email: 'user@example.com', role: 'user' },

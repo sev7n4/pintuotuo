@@ -377,7 +377,9 @@ export const ProductListPage: React.FC = () => {
       width: 100,
       render: (price: number, record: SKUWithSPU) => (
         <Space direction="vertical" size={0}>
-          <Text type="danger" strong>¥{price.toFixed(2)}</Text>
+          <Text type="danger" strong>
+            ¥{price.toFixed(2)}
+          </Text>
           {record.original_price && record.original_price > price && (
             <Text delete type="secondary" style={{ fontSize: 12 }}>
               ¥{record.original_price.toFixed(2)}
