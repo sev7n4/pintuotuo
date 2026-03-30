@@ -151,7 +151,7 @@ func GetMerchantProfile(c *gin.Context) {
 	}
 
 	if verifiedAt.Valid {
-		merchant.VerifiedAt = verifiedAt.Time
+		merchant.VerifiedAt = &verifiedAt.Time
 	}
 
 	if merchantJSON, err := json.Marshal(merchant); err == nil {
@@ -228,7 +228,7 @@ func UpdateMerchantProfile(c *gin.Context) {
 	}
 
 	if verifiedAt.Valid {
-		merchant.VerifiedAt = verifiedAt.Time
+		merchant.VerifiedAt = &verifiedAt.Time
 	}
 
 	ctx := context.Background()
