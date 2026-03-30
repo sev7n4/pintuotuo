@@ -11,10 +11,9 @@ import (
 )
 
 const (
-	roleAdmin             = "admin"
-	roleMerchant          = "merchant"
-	roleUser              = "user"
-	merchantStatusPending = "pending"
+	roleAdmin    = "admin"
+	roleMerchant = "merchant"
+	roleUser     = "user"
 )
 
 // GetAdminUsers retrieves all users (admin only)

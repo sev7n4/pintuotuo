@@ -15,7 +15,6 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
-const merchantStatusActive = "active"
 const productStatusActive = "active"
 
 // ListProducts retrieves product list with pagination
