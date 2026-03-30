@@ -73,13 +73,15 @@ const MerchantSKUs = () => {
   useEffect(() => {
     fetchMerchantSKUs()
     fetchAPIKeys()
-  }, [fetchMerchantSKUs, fetchAPIKeys])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (selectModalVisible) {
       fetchAvailableSKUs()
     }
-  }, [selectModalVisible, fetchAvailableSKUs])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectModalVisible])
 
   const handleSelectSKU = () => {
     setSelectedSKUs([])
