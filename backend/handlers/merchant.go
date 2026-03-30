@@ -669,27 +669,51 @@ func SubmitMerchantDocuments(c *gin.Context) {
 
 	var merchant models.Merchant
 	var reviewedAt sql.NullTime
-	err := db.QueryRow(
-		`UPDATE merchants SET 
-		 business_license_url = $1,
-		 id_card_front_url = $2,
-		 id_card_back_url = $3,
-		 attachments = $4,
-		 contact_name = COALESCE(NULLIF($5, ''), contact_name),
-		 contact_phone = COALESCE(NULLIF($6, ''), contact_phone),
-		 contact_email = COALESCE(NULLIF($7, ''), contact_email),
-		 address = COALESCE(NULLIF($8, ''), address),
-		 status = 'reviewing',
-		 updated_at = CURRENT_TIMESTAMP
-		 WHERE user_id = $9
-		 RETURNING id, user_id, company_name, business_license, business_license_url, id_card_front_url, id_card_back_url, attachments, contact_name, contact_phone, contact_email, address, description, logo_url, status, reviewed_at, created_at, updated_at`,
-		req.BusinessLicenseURL, req.IDCardFrontURL, req.IDCardBackURL, req.Attachments,
-		req.ContactName, req.ContactPhone, req.ContactEmail, req.Address, userIDInt,
-	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense,
-		&merchant.BusinessLicenseURL, &merchant.IDCardFrontURL, &merchant.IDCardBackURL, &merchant.Attachments,
-		&merchant.ContactName, &merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address,
-		&merchant.Description, &merchant.LogoURL, &merchant.Status, &reviewedAt,
-		&merchant.CreatedAt, &merchant.UpdatedAt)
+	var err error
+	if req.Attachments != "" {
+		err = db.QueryRow(
+			`UPDATE merchants SET 
+			 business_license_url = $1,
+			 id_card_front_url = $2,
+			 id_card_back_url = $3,
+			 attachments = $4::jsonb,
+			 contact_name = COALESCE(NULLIF($5, ''), contact_name),
+			 contact_phone = COALESCE(NULLIF($6, ''), contact_phone),
+			 contact_email = COALESCE(NULLIF($7, ''), contact_email),
+			 address = COALESCE(NULLIF($8, ''), address),
+			 status = 'reviewing',
+			 updated_at = CURRENT_TIMESTAMP
+			 WHERE user_id = $9
+			 RETURNING id, user_id, company_name, business_license, business_license_url, id_card_front_url, id_card_back_url, attachments, contact_name, contact_phone, contact_email, address, description, logo_url, status, reviewed_at, created_at, updated_at`,
+			req.BusinessLicenseURL, req.IDCardFrontURL, req.IDCardBackURL, req.Attachments,
+			req.ContactName, req.ContactPhone, req.ContactEmail, req.Address, userIDInt,
+		).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense,
+			&merchant.BusinessLicenseURL, &merchant.IDCardFrontURL, &merchant.IDCardBackURL, &merchant.Attachments,
+			&merchant.ContactName, &merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address,
+			&merchant.Description, &merchant.LogoURL, &merchant.Status, &reviewedAt,
+			&merchant.CreatedAt, &merchant.UpdatedAt)
+	} else {
+		err = db.QueryRow(
+			`UPDATE merchants SET 
+			 business_license_url = $1,
+			 id_card_front_url = $2,
+			 id_card_back_url = $3,
+			 contact_name = COALESCE(NULLIF($4, ''), contact_name),
+			 contact_phone = COALESCE(NULLIF($5, ''), contact_phone),
+			 contact_email = COALESCE(NULLIF($6, ''), contact_email),
+			 address = COALESCE(NULLIF($7, ''), address),
+			 status = 'reviewing',
+			 updated_at = CURRENT_TIMESTAMP
+			 WHERE user_id = $8
+			 RETURNING id, user_id, company_name, business_license, business_license_url, id_card_front_url, id_card_back_url, attachments, contact_name, contact_phone, contact_email, address, description, logo_url, status, reviewed_at, created_at, updated_at`,
+			req.BusinessLicenseURL, req.IDCardFrontURL, req.IDCardBackURL,
+			req.ContactName, req.ContactPhone, req.ContactEmail, req.Address, userIDInt,
+		).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense,
+			&merchant.BusinessLicenseURL, &merchant.IDCardFrontURL, &merchant.IDCardBackURL, &merchant.Attachments,
+			&merchant.ContactName, &merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address,
+			&merchant.Description, &merchant.LogoURL, &merchant.Status, &reviewedAt,
+			&merchant.CreatedAt, &merchant.UpdatedAt)
+	}
 
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
