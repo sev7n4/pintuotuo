@@ -169,8 +169,19 @@ export const MerchantAnalytics: React.FC = () => {
     if (searchText && !user.name.includes(searchText)) {
       return false;
     }
+    if (userType === 'new' && user.order_count > 5) {
+      return false;
+    }
+    if (userType === 'returning' && user.order_count <= 5) {
+      return false;
+    }
+    if (userType === 'vip' && user.total_spent < 3000) {
+      return false;
+    }
     return true;
   });
+
+  console.log('Filters:', { dateRange, userType });
 
   if (error) {
     return <Empty description={`错误: ${error}`} />;

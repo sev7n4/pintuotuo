@@ -102,13 +102,13 @@ const AdminMerchants = () => {
     });
   };
 
-  const columns = [
+  const columns: any[] = [
     {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
       width: 60,
-      fixed: 'left' as const,
+      fixed: 'left',
     },
     {
       title: '公司名称',
@@ -121,26 +121,26 @@ const AdminMerchants = () => {
       dataIndex: 'business_license',
       key: 'business_license',
       ellipsis: true,
-      responsive: ['md'] as const,
+      responsive: ['md'],
     },
     {
       title: '联系人',
       dataIndex: 'contact_name',
       key: 'contact_name',
-      responsive: ['lg'] as const,
+      responsive: ['lg'],
     },
     {
       title: '联系电话',
       dataIndex: 'contact_phone',
       key: 'contact_phone',
-      responsive: ['lg'] as const,
+      responsive: ['lg'],
     },
     {
       title: '联系邮箱',
       dataIndex: 'contact_email',
       key: 'contact_email',
       ellipsis: true,
-      responsive: ['xl'] as const,
+      responsive: ['xl'],
     },
     {
       title: '状态',
@@ -170,14 +170,14 @@ const AdminMerchants = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 140,
-      responsive: ['md'] as const,
+      responsive: ['md'],
       render: (date: string) => formatDate(date),
     },
     {
       title: '操作',
       key: 'action',
       width: 180,
-      fixed: 'right' as const,
+      fixed: 'right',
       render: (_: unknown, record: PendingMerchant) => (
         <Space size="small" wrap>
           <Tooltip title="查看详情">
