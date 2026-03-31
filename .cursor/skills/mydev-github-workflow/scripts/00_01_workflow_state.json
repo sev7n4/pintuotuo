@@ -1,5 +1,5 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": [
     "FE-MYTOKEN-TRANSFER-001",
     "FE-MYTOKEN-RECHARGE-MOCK-001",
@@ -9,12 +9,12 @@
     "LEGACY-TODO-API-ROUTING-001"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 140,
   "merged": false,
   "branch": "fix/my-token-transfer-recharge-ux",
   "local_validation": "partial",
   "ci_status": {
-    "cicd": "pending",
+    "cicd": "running",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
@@ -32,7 +32,7 @@
   "metadata": {
     "repo": "pintuotuo",
     "task": "my token transfer by email, mock recharge, responsive ui, ptd key copy",
-    "head": "pending",
-    "changed_files": 0
+    "head": "ba96d32",
+    "changed_files": 12
   }
 }
