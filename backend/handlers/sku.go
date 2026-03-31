@@ -210,30 +210,71 @@ func UpdateSPU(c *gin.Context) {
 		return
 	}
 
-	var req models.SPUCreateRequest
+	var req models.SPUUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
 	db := config.GetDB()
+
+	var name, modelProvider, modelName, modelVersion, modelTier, description, status interface{}
+	var contextWindow, maxOutputTokens interface{}
+	var baseComputePoints interface{}
+	var sortOrder interface{}
+
+	if req.Name != nil {
+		name = *req.Name
+	}
+	if req.ModelProvider != nil {
+		modelProvider = *req.ModelProvider
+	}
+	if req.ModelName != nil {
+		modelName = *req.ModelName
+	}
+	if req.ModelVersion != nil {
+		modelVersion = *req.ModelVersion
+	}
+	if req.ModelTier != nil {
+		modelTier = *req.ModelTier
+	}
+	if req.ContextWindow != nil {
+		contextWindow = *req.ContextWindow
+	}
+	if req.MaxOutputTokens != nil {
+		maxOutputTokens = *req.MaxOutputTokens
+	}
+	if req.BaseComputePoints != nil {
+		baseComputePoints = *req.BaseComputePoints
+	}
+	if req.Description != nil {
+		description = *req.Description
+	}
+	if req.Status != nil {
+		status = *req.Status
+	}
+	if req.SortOrder != nil {
+		sortOrder = *req.SortOrder
+	}
+
 	var spu models.SPU
 	err := db.QueryRow(
 		`UPDATE spus SET 
-		 name = COALESCE(NULLIF($1, ''), name), 
-		 model_provider = COALESCE(NULLIF($2, ''), model_provider),
-		 model_name = COALESCE(NULLIF($3, ''), model_name),
-		 model_version = COALESCE(NULLIF($4, ''), model_version),
-		 model_tier = COALESCE(NULLIF($5, ''), model_tier),
-		 context_window = CASE WHEN $6 > 0 THEN $6 ELSE context_window END,
-		 base_compute_points = CASE WHEN $7 > 0 THEN $7 ELSE base_compute_points END,
-		 description = COALESCE(NULLIF($8, ''), description),
-		 status = COALESCE(NULLIF($9, ''), status),
-		 sort_order = $10
-		 WHERE id = $11 
-		 RETURNING id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, base_compute_points, description, status, sort_order, created_at, updated_at`,
-		req.Name, req.ModelProvider, req.ModelName, req.ModelVersion, req.ModelTier, req.ContextWindow, req.BaseComputePoints, req.Description, req.Status, req.SortOrder, spuID,
-	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.BaseComputePoints, &spu.Description, &spu.Status, &spu.SortOrder, &spu.CreatedAt, &spu.UpdatedAt)
+		 name = COALESCE($1, name), 
+		 model_provider = COALESCE($2, model_provider),
+		 model_name = COALESCE($3, model_name),
+		 model_version = COALESCE($4, model_version),
+		 model_tier = COALESCE($5, model_tier),
+		 context_window = COALESCE($6, context_window),
+		 max_output_tokens = COALESCE($7, max_output_tokens),
+		 base_compute_points = COALESCE($8, base_compute_points),
+		 description = COALESCE($9, description),
+		 status = COALESCE($10, status),
+		 sort_order = COALESCE($11, sort_order)
+		 WHERE id = $12 
+		 RETURNING id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, max_output_tokens, base_compute_points, description, status, sort_order, created_at, updated_at`,
+		name, modelProvider, modelName, modelVersion, modelTier, contextWindow, maxOutputTokens, baseComputePoints, description, status, sortOrder, spuID,
+	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.MaxOutputTokens, &spu.BaseComputePoints, &spu.Description, &spu.Status, &spu.SortOrder, &spu.CreatedAt, &spu.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(

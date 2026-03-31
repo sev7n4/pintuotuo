@@ -232,8 +232,9 @@ func GetPendingMerchants(c *gin.Context) {
 	offset := (pageNum - 1) * perPageNum
 
 	rows, err := db.Query(
-		`SELECT id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, created_at, updated_at 
-			FROM merchants WHERE status IN ('pending', 'reviewing') ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+		`SELECT id, user_id, company_name, business_license, business_license_url, id_card_front_url, id_card_back_url, 
+		 contact_name, contact_phone, contact_email, address, description, status, rejection_reason, created_at, updated_at 
+		 FROM merchants WHERE status IN ('pending', 'reviewing') ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
 		perPageNum, offset,
 	)
 	if err != nil {
@@ -245,8 +246,9 @@ func GetPendingMerchants(c *gin.Context) {
 	var merchants []models.Merchant
 	for rows.Next() {
 		var m models.Merchant
-		if err := rows.Scan(&m.ID, &m.UserID, &m.CompanyName, &m.BusinessLicense, &m.ContactName,
-			&m.ContactPhone, &m.ContactEmail, &m.Address, &m.Description, &m.Status, &m.CreatedAt, &m.UpdatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.UserID, &m.CompanyName, &m.BusinessLicense, &m.BusinessLicenseURL,
+			&m.IDCardFrontURL, &m.IDCardBackURL, &m.ContactName,
+			&m.ContactPhone, &m.ContactEmail, &m.Address, &m.Description, &m.Status, &m.RejectionReason, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			continue
 		}
 		merchants = append(merchants, m)
@@ -257,7 +259,7 @@ func GetPendingMerchants(c *gin.Context) {
 	}
 
 	var total int
-	db.QueryRow("SELECT COUNT(*) FROM merchants WHERE status = 'pending'").Scan(&total)
+	db.QueryRow("SELECT COUNT(*) FROM merchants WHERE status IN ('pending', 'reviewing')").Scan(&total)
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":     0,

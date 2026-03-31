@@ -148,11 +148,11 @@ func GetAvailableSKUs(c *gin.Context) {
 	}
 
 	var merchantID int
-	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1 AND status = 'active'", userIDInt).Scan(&merchantID)
+	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MERCHANT_NOT_FOUND",
-			"商户不存在或未激活",
+			"商户不存在",
 			http.StatusNotFound,
 			err,
 		))
