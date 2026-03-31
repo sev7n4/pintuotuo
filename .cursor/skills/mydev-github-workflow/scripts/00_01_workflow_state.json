@@ -1,5 +1,5 @@
 {
-  "current_step": 8,
+  "current_step": 10,
   "current_fix_cases": [
     "FE-TOKEN-001",
     "FE-TOKEN-002",
@@ -7,12 +7,12 @@
     "LEGACY-TODO-API-ROUTING-001"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 139,
   "merged": false,
   "branch": "feature/token-page-recharge-fixes",
   "local_validation": "partial",
   "ci_status": {
-    "cicd": "pending",
+    "cicd": "running",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
@@ -32,11 +32,11 @@
     }
   ],
   "created_at": "2026-03-31T15:07:11Z",
-  "updated_at": "2026-04-01T09:30:00Z",
+  "updated_at": "2026-04-01T10:15:00Z",
   "metadata": {
     "repo": "pintuotuo",
     "task": "my token page capability completion",
-    "head": "29b7d12",
+    "head": "f3ea1e9",
     "changed_files": 5
   }
 }
