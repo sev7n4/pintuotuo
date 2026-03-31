@@ -183,16 +183,19 @@ const MerchantSettings = () => {
       const { file, onSuccess, onError } = options;
       try {
         const url = await uploadService.uploadFile(file as File, type);
-        const uploadFile = file as UploadFile;
-        uploadFile.url = url;
-        uploadFile.status = 'done';
-        setFileList([uploadFile]);
         onSuccess?.({ url });
       } catch (error) {
         onError?.(error as Error);
       }
     },
     onChange: (info) => {
+      const updatedFileList = info.fileList.map(file => {
+        if (file.status === 'done' && file.response?.url) {
+          return { ...file, url: file.response.url };
+        }
+        return file;
+      });
+      setFileList(updatedFileList);
       if (info.file.status === 'done') {
         message.success(`${info.file.name} 上传成功`);
       } else if (info.file.status === 'error') {
