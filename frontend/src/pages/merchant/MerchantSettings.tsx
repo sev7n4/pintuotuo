@@ -124,7 +124,8 @@ const MerchantSettings = () => {
       setSubmitting(true);
       const submitData = {
         ...values,
-        business_license_url: businessLicenseFileList[0].url || businessLicenseFileList[0].response?.url,
+        business_license_url:
+          businessLicenseFileList[0].url || businessLicenseFileList[0].response?.url,
         id_card_front_url: idCardFrontFileList[0]?.url || idCardFrontFileList[0]?.response?.url,
         id_card_back_url: idCardBackFileList[0]?.url || idCardBackFileList[0]?.response?.url,
       };
@@ -167,7 +168,11 @@ const MerchantSettings = () => {
     accept: '.jpg,.jpeg,.png,.gif,.webp',
     maxCount: 1,
     beforeUpload: (file) => {
-      const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/gif' || file.type === 'image/webp';
+      const isJpgOrPng =
+        file.type === 'image/jpeg' ||
+        file.type === 'image/png' ||
+        file.type === 'image/gif' ||
+        file.type === 'image/webp';
       if (!isJpgOrPng) {
         message.error('只能上传 JPG/PNG/GIF/WEBP 格式的图片');
         return false;
@@ -189,8 +194,8 @@ const MerchantSettings = () => {
       }
     },
     onChange: (info) => {
-      const updatedFileList = info.fileList.map(file => {
-        if (file.status === 'done' && file.response?.url) {
+      const updatedFileList = info.fileList.map((file) => {
+        if (file.response?.url) {
           return { ...file, url: file.response.url };
         }
         return file;
@@ -345,12 +350,14 @@ const MerchantSettings = () => {
           />
 
           <Form form={documentForm} layout="vertical" onFinish={handleDocumentSubmit}>
-            <Form.Item
-              label="营业执照"
-              required
-              tooltip="请上传清晰的营业执照照片"
-            >
-              <Upload {...createUploadProps('license', businessLicenseFileList, setBusinessLicenseFileList)}>
+            <Form.Item label="营业执照" required tooltip="请上传清晰的营业执照照片">
+              <Upload
+                {...createUploadProps(
+                  'license',
+                  businessLicenseFileList,
+                  setBusinessLicenseFileList
+                )}
+              >
                 {businessLicenseFileList.length === 0 && (
                   <div>
                     <UploadOutlined />
