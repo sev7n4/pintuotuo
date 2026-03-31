@@ -233,7 +233,7 @@ func GetPendingMerchants(c *gin.Context) {
 
 	rows, err := db.Query(
 		`SELECT id, user_id, company_name, business_license, business_license_url, id_card_front_url, id_card_back_url, 
-		 contact_name, contact_phone, contact_email, address, description, status, rejection_reason, created_at, updated_at 
+		 contact_name, contact_phone, contact_email, address, description, status, review_note AS rejection_reason, created_at, updated_at 
 		 FROM merchants WHERE status IN ('pending', 'reviewing') ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
 		perPageNum, offset,
 	)

@@ -103,8 +103,10 @@ const AdminSPUs = () => {
       const values = await form.validateFields();
       const data: SPUCreateRequest = {
         ...values,
-        spu_code: values.spu_code.toUpperCase(),
       };
+      if (typeof values.spu_code === 'string' && values.spu_code.trim()) {
+        data.spu_code = values.spu_code.toUpperCase();
+      }
 
       if (editingSPU) {
         await skuService.updateSPU(editingSPU.id, data);
