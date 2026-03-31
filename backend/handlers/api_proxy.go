@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,11 +31,13 @@ var providerBaseURLs = map[string]string{
 }
 
 type APIProxyRequest struct {
-	Provider string          `json:"provider" binding:"required"`
-	Model    string          `json:"model" binding:"required"`
-	Messages []ChatMessage   `json:"messages" binding:"required"`
-	Stream   bool            `json:"stream"`
-	Options  json.RawMessage `json:"options,omitempty"`
+	Provider      string          `json:"provider" binding:"required"`
+	Model         string          `json:"model" binding:"required"`
+	Messages      []ChatMessage   `json:"messages" binding:"required"`
+	Stream        bool            `json:"stream"`
+	Options       json.RawMessage `json:"options,omitempty"`
+	APIKeyID      *int            `json:"api_key_id,omitempty"`
+	MerchantSKUID *int            `json:"merchant_sku_id,omitempty"`
 }
 
 type ChatMessage struct {
@@ -111,11 +114,7 @@ func ProxyAPIRequest(c *gin.Context) {
 	}
 
 	var apiKey models.MerchantAPIKey
-	err = db.QueryRow(
-		"SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status FROM merchant_api_keys WHERE provider = $1 AND status = 'active' ORDER BY (quota_limit - quota_used) DESC LIMIT 1",
-		req.Provider,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
-
+	err = selectAPIKeyForRequest(db, req, &apiKey)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"API_KEY_NOT_FOUND",
@@ -324,6 +323,48 @@ func calculateTokenCost(provider, model string, inputTokens, outputTokens int) f
 	}
 
 	return float64(inputTokens)*inputRate + float64(outputTokens)*outputRate
+}
+
+func selectAPIKeyForRequest(db *sql.DB, req APIProxyRequest, apiKey *models.MerchantAPIKey) error {
+	if req.APIKeyID != nil && *req.APIKeyID > 0 {
+		err := db.QueryRow(
+			`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+			 FROM merchant_api_keys
+			 WHERE id = $1 AND provider = $2 AND status = 'active'`,
+			*req.APIKeyID, req.Provider,
+		).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
+		if err == nil {
+			return nil
+		}
+		if err != sql.ErrNoRows {
+			return err
+		}
+	}
+
+	if req.MerchantSKUID != nil && *req.MerchantSKUID > 0 {
+		err := db.QueryRow(
+			`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
+			 FROM merchant_skus ms
+			 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
+			 WHERE ms.id = $1 AND ms.status = 'active' AND mak.provider = $2 AND mak.status = 'active'`,
+			*req.MerchantSKUID, req.Provider,
+		).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
+		if err == nil {
+			return nil
+		}
+		if err != sql.ErrNoRows {
+			return err
+		}
+	}
+
+	return db.QueryRow(
+		`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+		 FROM merchant_api_keys
+		 WHERE provider = $1 AND status = 'active'
+		 ORDER BY (quota_limit - quota_used) DESC
+		 LIMIT 1`,
+		req.Provider,
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
 }
 
 func GetAPIProviders(c *gin.Context) {

@@ -15,7 +15,25 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
+func ensureAdmin(c *gin.Context) bool {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != roleAdmin {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Admin access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return false
+	}
+	return true
+}
+
 func ListSPUs(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")
 	provider := c.Query("provider")
@@ -126,6 +144,10 @@ func ListSPUs(c *gin.Context) {
 }
 
 func GetSPUByID(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	id := c.Param("id")
 	ctx := context.Background()
 
@@ -164,6 +186,10 @@ func GetSPUByID(c *gin.Context) {
 }
 
 func CreateSPU(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	var req models.SPUCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
@@ -203,6 +229,10 @@ func CreateSPU(c *gin.Context) {
 }
 
 func UpdateSPU(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	id := c.Param("id")
 	spuID := idToInt(id)
 	if spuID <= 0 {
@@ -294,6 +324,10 @@ func UpdateSPU(c *gin.Context) {
 }
 
 func DeleteSPU(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	id := c.Param("id")
 	spuID := idToInt(id)
 	if spuID <= 0 {
@@ -328,6 +362,10 @@ func DeleteSPU(c *gin.Context) {
 }
 
 func ListSKUs(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")
 	spuID := c.Query("spu_id")
@@ -502,6 +540,10 @@ func ListSKUs(c *gin.Context) {
 }
 
 func GetSKUByID(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	id := c.Param("id")
 	ctx := context.Background()
 
@@ -603,6 +645,10 @@ func GetSKUByID(c *gin.Context) {
 }
 
 func CreateSKU(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	var req models.SKUCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
@@ -685,6 +731,10 @@ func CreateSKU(c *gin.Context) {
 }
 
 func UpdateSKU(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	id := c.Param("id")
 	skuID := idToInt(id)
 	if skuID <= 0 {
@@ -738,6 +788,10 @@ func UpdateSKU(c *gin.Context) {
 }
 
 func DeleteSKU(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	id := c.Param("id")
 	skuID := idToInt(id)
 	if skuID <= 0 {
@@ -939,6 +993,10 @@ func GetUserSubscriptions(c *gin.Context) {
 }
 
 func GetModelProviders(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
 	ctx := context.Background()
 	cacheKey := "model_providers:all"
 
