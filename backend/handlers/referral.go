@@ -583,7 +583,7 @@ func PayReferralRewards(c *gin.Context) {
 			continue
 		}
 
-		if referrerID != userIDInt || status != "pending" {
+		if referrerID != userIDInt || status != paymentStatusPending {
 			continue
 		}
 

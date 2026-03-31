@@ -1,15 +1,17 @@
 {
   "current_step": 10,
   "current_fix_cases": [
-    "FE-TOKEN-001",
-    "FE-TOKEN-002",
-    "FE-TOKEN-003",
+    "FE-MYTOKEN-TRANSFER-001",
+    "FE-MYTOKEN-RECHARGE-MOCK-001",
+    "FE-MYTOKEN-RESPONSIVE-001",
+    "BE-TRANSFER-EMAIL-001",
+    "BE-RECHARGE-MOCK-001",
     "LEGACY-TODO-API-ROUTING-001"
   ],
   "retry_count": 0,
-  "pr_number": 139,
+  "pr_number": 140,
   "merged": false,
-  "branch": "feature/token-page-recharge-fixes",
+  "branch": "fix/my-token-transfer-recharge-ux",
   "local_validation": "partial",
   "ci_status": {
     "cicd": "running",
@@ -21,22 +23,16 @@
     {
       "step": 8,
       "error_type": "环境问题",
-      "message": "make test failed in frontend Jest with \"Cannot use import.meta outside a module\" (existing test runtime config issue)",
-      "timestamp": "2026-03-31T14:53:50Z"
-    },
-    {
-      "step": 8,
-      "error_type": "环境问题",
-      "message": "make test still fails due to Jest/import.meta runtime issue; frontend build passes",
-      "timestamp": "2026-04-01T09:30:00Z"
+      "message": "make test may fail: frontend Jest import.meta runtime (known); backend ./handlers tests pass; frontend npm run build passes",
+      "timestamp": "2026-04-01T12:00:00Z"
     }
   ],
   "created_at": "2026-03-31T15:07:11Z",
-  "updated_at": "2026-04-01T10:15:00Z",
+  "updated_at": "2026-04-01T12:00:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "my token page capability completion",
-    "head": "f3ea1e9",
-    "changed_files": 5
+    "task": "my token transfer by email, mock recharge, responsive ui, ptd key copy",
+    "head": "ba96d32",
+    "changed_files": 12
   }
 }

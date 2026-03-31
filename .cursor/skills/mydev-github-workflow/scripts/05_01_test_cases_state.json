@@ -1,39 +1,46 @@
 {
   "currentIssue": {
-    "id": "TOKEN-001",
-    "type": "enhancement",
+    "id": "TOKEN-UX-002",
+    "type": "fix",
     "module": "token",
-    "branch": "feature/token-page-recharge-fixes",
-    "title": "补齐我的Token页充值入口与交互缺陷"
+    "branch": "fix/my-token-transfer-recharge-ux",
+    "title": "我的Token转账支持邮箱、测试充值模拟支付与页面溢出修复"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-TOKEN-001",
-        "name": "token store should parse api key list payload for both array and wrapped response",
-        "feature": "MyToken Data Mapping",
-        "status": "implemented",
-        "file": "frontend/src/stores/tokenStore.ts"
+        "id": "UT-BE-RECHARGE-001",
+        "name": "mock recharge disabled returns 403 without ALLOW_TEST_RECHARGE",
+        "feature": "MockCompleteRechargeOrder",
+        "status": "passed",
+        "file": "backend/handlers/token_recharge_test.go"
+      },
+      {
+        "id": "UT-BE-TRANSFER-001",
+        "name": "transfer validates recipient email or id before db",
+        "feature": "TransferTokens",
+        "status": "passed",
+        "file": "backend/handlers/payment_and_token_test.go"
       }
     ],
     "integration": [
       {
-        "id": "IT-TOKEN-001",
-        "name": "my token page should create recharge order and display order list",
-        "feature": "Recharge Entry",
+        "id": "IT-MYTOKEN-001",
+        "name": "POST /tokens/transfer with recipient_email and mock-pay route registered",
+        "feature": "Token API",
         "status": "implemented",
-        "file": "frontend/src/pages/MyToken.tsx"
+        "file": "backend/routes/routes.go"
       }
     ],
     "e2e": [
       {
-        "id": "E2E-TOKEN-001",
-        "name": "user can view generated api key once and maintain key list",
-        "feature": "API Key UX",
+        "id": "E2E-MYTOKEN-001",
+        "name": "user completes transfer by email and mock recharge on staging flags",
+        "feature": "MyToken UI",
         "status": "ready",
         "file": "frontend/src/pages/MyToken.tsx"
       }
     ]
   },
-  "lastUpdated": "2026-04-01T09:30:00Z"
+  "lastUpdated": "2026-04-01T12:00:00Z"
 }

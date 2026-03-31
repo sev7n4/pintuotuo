@@ -136,6 +136,7 @@ func RegisterTokenRoutes(router *gin.RouterGroup) {
 		tokens.GET("/recharge/packages", handlers.GetRechargePackages)
 		tokens.POST("/recharge", handlers.CreateRechargeOrder)
 		tokens.GET("/recharge/orders", handlers.GetRechargeOrders)
+		tokens.POST("/recharge/orders/:id/mock-pay", handlers.MockCompleteRechargeOrder)
 		tokens.GET("/recharge/orders/:id", handlers.GetRechargeOrder)
 
 		keys := tokens.Group("/keys")

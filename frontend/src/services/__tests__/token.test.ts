@@ -66,7 +66,7 @@ describe('tokenService', () => {
 
     mockApi.post.mockResolvedValue(createMockResponse(mockResponse));
 
-    const result = await tokenService.transfer(mockRecipientId, mockAmount);
+    const result = await tokenService.transfer(mockAmount, { recipientId: mockRecipientId });
 
     expect(mockApi.post).toHaveBeenCalledWith('/tokens/transfer', {
       recipient_id: mockRecipientId,

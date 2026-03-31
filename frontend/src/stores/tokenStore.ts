@@ -1,6 +1,19 @@
 import { create } from 'zustand';
+import axios from 'axios';
 import { Token, TokenTransaction, UserAPIKey, RechargeOrder } from '@/types';
 import { tokenService } from '@/services/token';
+
+function getApiErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { message?: string; error?: string } | undefined;
+    if (data && typeof data === 'object') {
+      if (typeof data.message === 'string' && data.message) return data.message;
+      if (typeof data.error === 'string' && data.error) return data.error;
+    }
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
 
 interface TokenState {
   balance: Token | null;
@@ -20,7 +33,11 @@ interface TokenState {
     amount: number,
     method: 'alipay' | 'wechat' | 'balance'
   ) => Promise<RechargeOrder | null>;
-  transfer: (recipientId: number, amount: number) => Promise<boolean>;
+  transfer: (
+    amount: number,
+    opts: { recipientId?: number; recipientEmail?: string }
+  ) => Promise<boolean>;
+  mockCompleteRechargeOrder: (orderId: number) => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -38,8 +55,7 @@ export const useTokenStore = create<TokenState>((set) => ({
       const response = await tokenService.getBalance();
       set({ balance: response.data, isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '获取余额失败';
-      set({ error: message, isLoading: false });
+      set({ error: getApiErrorMessage(error, '获取余额失败'), isLoading: false });
     }
   },
 
@@ -49,8 +65,7 @@ export const useTokenStore = create<TokenState>((set) => ({
       const response = await tokenService.getConsumption();
       set({ transactions: response.data || [], isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '获取交易记录失败';
-      set({ error: message, isLoading: false });
+      set({ error: getApiErrorMessage(error, '获取交易记录失败'), isLoading: false });
     }
   },
 
@@ -62,8 +77,7 @@ export const useTokenStore = create<TokenState>((set) => ({
       const apiKeys = Array.isArray(payload) ? payload : payload?.data || [];
       set({ apiKeys, isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '获取API密钥失败';
-      set({ error: message, isLoading: false });
+      set({ error: getApiErrorMessage(error, '获取API密钥失败'), isLoading: false });
     }
   },
 
@@ -74,8 +88,7 @@ export const useTokenStore = create<TokenState>((set) => ({
       const rechargeOrders = response.data?.data?.data || [];
       set({ rechargeOrders, isLoading: false });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '获取充值订单失败';
-      set({ error: message, isLoading: false });
+      set({ error: getApiErrorMessage(error, '获取充值订单失败'), isLoading: false });
     }
   },
 
@@ -86,8 +99,7 @@ export const useTokenStore = create<TokenState>((set) => ({
       set({ isLoading: false });
       return response.data?.key || null;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '创建API密钥失败';
-      set({ error: message, isLoading: false });
+      set({ error: getApiErrorMessage(error, '创建API密钥失败'), isLoading: false });
       return null;
     }
   },
@@ -99,8 +111,7 @@ export const useTokenStore = create<TokenState>((set) => ({
       set({ isLoading: false });
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '删除API密钥失败';
-      set({ error: message, isLoading: false });
+      set({ error: getApiErrorMessage(error, '删除API密钥失败'), isLoading: false });
       return false;
     }
   },
@@ -112,21 +123,31 @@ export const useTokenStore = create<TokenState>((set) => ({
       set({ isLoading: false });
       return response.data?.data || null;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '创建充值订单失败';
-      set({ error: message, isLoading: false });
+      set({ error: getApiErrorMessage(error, '创建充值订单失败'), isLoading: false });
       return null;
     }
   },
 
-  transfer: async (recipientId, amount) => {
+  transfer: async (amount, opts) => {
     set({ isLoading: true, error: null });
     try {
-      await tokenService.transfer(recipientId, amount);
+      await tokenService.transfer(amount, opts);
       set({ isLoading: false });
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '转账失败';
-      set({ error: message, isLoading: false });
+      set({ error: getApiErrorMessage(error, '转账失败'), isLoading: false });
+      return false;
+    }
+  },
+
+  mockCompleteRechargeOrder: async (orderId) => {
+    set({ isLoading: true, error: null });
+    try {
+      await tokenService.mockCompleteRechargeOrder(orderId);
+      set({ isLoading: false });
+      return true;
+    } catch (error) {
+      set({ error: getApiErrorMessage(error, '模拟支付失败'), isLoading: false });
       return false;
     }
   },
