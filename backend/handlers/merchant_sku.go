@@ -15,6 +15,8 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
+const merchantSKUStatusInactive = "inactive"
+
 func ListMerchantSKUs(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -292,7 +294,7 @@ func CreateMerchantSKU(c *gin.Context) {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	if err == nil && existingStatus == "active" {
+	if err == nil && existingStatus == merchantStatusActive {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SKU_ALREADY_SELECTED",
 			"该SKU已选择",
@@ -301,13 +303,13 @@ func CreateMerchantSKU(c *gin.Context) {
 		))
 		return
 	}
-	if err == nil && existingStatus == "inactive" {
+	if err == nil && existingStatus == merchantSKUStatusInactive {
 		var reactivated models.MerchantSKUDetail
 		err = db.QueryRow(
-			`UPDATE merchant_skus SET status = 'active', api_key_id = $1, updated_at = CURRENT_TIMESTAMP
-			 WHERE id = $2
+			`UPDATE merchant_skus SET status = $1, api_key_id = $2, updated_at = CURRENT_TIMESTAMP
+			 WHERE id = $3
 			 RETURNING id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
-			req.APIKeyID, existingID,
+			merchantStatusActive, req.APIKeyID, existingID,
 		).Scan(&reactivated.ID, &reactivated.MerchantID, &reactivated.SKUID, &reactivated.APIKeyID, &reactivated.Status,
 			&reactivated.SalesCount, &reactivated.TotalSalesAmount, &reactivated.CreatedAt, &reactivated.UpdatedAt)
 		if err != nil {
