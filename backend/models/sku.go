@@ -196,6 +196,23 @@ type SPUCreateRequest struct {
 	SortOrder          int      `json:"sort_order"`
 }
 
+type SPUUpdateRequest struct {
+	Name               *string  `json:"name"`
+	ModelProvider      *string  `json:"model_provider"`
+	ModelName          *string  `json:"model_name"`
+	ModelVersion       *string  `json:"model_version"`
+	ModelTier          *string  `json:"model_tier"`
+	ContextWindow      *int     `json:"context_window"`
+	MaxOutputTokens    *int     `json:"max_output_tokens"`
+	SupportedFunctions []string `json:"supported_functions"`
+	BaseComputePoints  *float64 `json:"base_compute_points"`
+	Description        *string  `json:"description"`
+	Features           []string `json:"features"`
+	ThumbnailURL       *string  `json:"thumbnail_url"`
+	Status             *string  `json:"status"`
+	SortOrder          *int     `json:"sort_order"`
+}
+
 type SKUCreateRequest struct {
 	SPUID              int     `json:"spu_id" binding:"required"`
 	SKUCode            string  `json:"sku_code" binding:"required"`

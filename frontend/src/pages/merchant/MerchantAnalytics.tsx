@@ -14,6 +14,10 @@ import {
   Divider,
   Tag,
   Tabs,
+  DatePicker,
+  Select,
+  Button,
+  Input,
 } from 'antd';
 import {
   UserOutlined,
@@ -24,11 +28,14 @@ import {
   TrophyOutlined,
   TagOutlined,
   FireOutlined,
+  SearchOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
 import styles from './Merchant.module.css';
 
 const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
 
 interface UserStats {
   new_customers: number;
@@ -144,10 +151,26 @@ export const MerchantAnalytics: React.FC = () => {
   const [topUsers] = useState<TopUser[]>(mockTopUsers);
   const [userTags] = useState<UserTag[]>(mockUserTags);
   const [userSegments] = useState<UserSegment[]>(mockUserSegments);
+  const [dateRange, setDateRange] = useState<[string, string] | null>(null);
+  const [userType, setUserType] = useState<string>('all');
+  const [searchText, setSearchText] = useState('');
 
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
+
+  const handleReset = () => {
+    setDateRange(null);
+    setUserType('all');
+    setSearchText('');
+  };
+
+  const filteredTopUsers = topUsers.filter((user) => {
+    if (searchText && !user.name.includes(searchText)) {
+      return false;
+    }
+    return true;
+  });
 
   if (error) {
     return <Empty description={`错误: ${error}`} />;
@@ -155,13 +178,46 @@ export const MerchantAnalytics: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      <Title level={3} style={{ marginBottom: 24 }}>
-        <TeamOutlined style={{ marginRight: 8 }} />
-        用户分析
-      </Title>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} sm={12}>
+          <Title level={3} style={{ margin: 0 }}>
+            <TeamOutlined style={{ marginRight: 8 }} />
+            用户分析
+          </Title>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Space wrap style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <RangePicker
+              onChange={(_, dateStrings) => {
+                if (dateStrings[0] && dateStrings[1]) {
+                  setDateRange([dateStrings[0], dateStrings[1]]);
+                } else {
+                  setDateRange(null);
+                }
+              }}
+              placeholder={['开始日期', '结束日期']}
+              style={{ width: '100%' }}
+            />
+            <Select
+              value={userType}
+              onChange={setUserType}
+              style={{ width: 120 }}
+              options={[
+                { value: 'all', label: '全部用户' },
+                { value: 'new', label: '新用户' },
+                { value: 'returning', label: '复购用户' },
+                { value: 'vip', label: 'VIP用户' },
+              ]}
+            />
+            <Button icon={<ReloadOutlined />} onClick={handleReset}>
+              重置
+            </Button>
+          </Space>
+        </Col>
+      </Row>
 
       <Spin spinning={isLoading}>
-        <Row gutter={[24, 24]}>
+        <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic
@@ -220,7 +276,7 @@ export const MerchantAnalytics: React.FC = () => {
           </Col>
         </Row>
 
-        <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
           <Col xs={24} lg={12}>
             <Card title="用户地域分布 (Top 5)" extra={<EnvironmentOutlined />}>
               <List
@@ -269,11 +325,26 @@ export const MerchantAnalytics: React.FC = () => {
           </Col>
         </Row>
 
-        <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
           <Col xs={24}>
-            <Card title="消费TOP 5用户" extra={<TrophyOutlined />}>
+            <Card
+              title="消费TOP 5用户"
+              extra={
+                <Space>
+                  <Input
+                    placeholder="搜索用户"
+                    prefix={<SearchOutlined />}
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    style={{ width: 150 }}
+                    allowClear
+                  />
+                  <TrophyOutlined />
+                </Space>
+              }
+            >
               <List
-                dataSource={topUsers}
+                dataSource={filteredTopUsers}
                 renderItem={(item, index) => (
                   <List.Item>
                     <List.Item.Meta
@@ -314,7 +385,7 @@ export const MerchantAnalytics: React.FC = () => {
         <Card style={{ marginTop: 24 }}>
           <Title level={5}>用户行为分析</Title>
           <Divider />
-          <Row gutter={[24, 24]}>
+          <Row gutter={[16, 16]}>
             <Col xs={24} sm={8}>
               <Statistic title="平均访问时长" value={8.5} suffix="分钟" />
             </Col>
