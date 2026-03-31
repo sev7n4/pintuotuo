@@ -194,17 +194,16 @@ const MerchantSettings = () => {
       }
     },
     onChange: (info) => {
-      const updatedFileList = info.fileList.map((file) => {
-        if (file.response?.url) {
-          return { ...file, url: file.response.url };
-        }
-        return file;
-      });
-      setFileList(updatedFileList);
-      if (info.file.status === 'done') {
+      if (info.file.status === 'done' && info.file.response?.url) {
+        const updatedFile = { ...info.file, url: info.file.response.url };
+        setFileList([updatedFile as UploadFile]);
         message.success(`${info.file.name} 上传成功`);
       } else if (info.file.status === 'error') {
         message.error(`${info.file.name} 上传失败`);
+      } else if (info.file.status === 'removed') {
+        setFileList([]);
+      } else {
+        setFileList(info.fileList);
       }
     },
     onRemove: () => {
