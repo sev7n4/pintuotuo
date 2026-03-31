@@ -147,12 +147,26 @@ type Merchant struct {
 	Address            *string    `json:"address,omitempty"`
 	Description        *string    `json:"description,omitempty"`
 	LogoURL            *string    `json:"logo_url,omitempty"`
+	BusinessCategory   *string    `json:"business_category,omitempty"` // 经营类目
+	AdminNotes         *string    `json:"admin_notes,omitempty"`       // 管理员内部备注
 	Status             string     `json:"status"` // pending, reviewing, active, suspended, rejected
 	ReviewedAt         *time.Time `json:"reviewed_at,omitempty"`
 	ReviewNote         *string    `json:"review_note,omitempty"`
 	RejectionReason    *string    `json:"rejection_reason,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+// MerchantAuditLog is an admin action record for merchant review and metadata changes.
+type MerchantAuditLog struct {
+	ID                  int       `json:"id"`
+	MerchantID          int       `json:"merchant_id"`
+	AdminUserID         *int      `json:"admin_user_id,omitempty"`
+	AdminEmail          *string   `json:"admin_email,omitempty"`
+	Action              string    `json:"action"`
+	CompanyNameSnapshot *string   `json:"company_name_snapshot,omitempty"`
+	Reason              *string   `json:"reason,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 // MerchantAPIKey represents a merchant's API key for token托管

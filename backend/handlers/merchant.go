@@ -41,13 +41,14 @@ func RegisterMerchant(c *gin.Context) {
 	}
 
 	var req struct {
-		CompanyName     string `json:"company_name" binding:"required"`
-		BusinessLicense string `json:"business_license"`
-		ContactName     string `json:"contact_name"`
-		ContactPhone    string `json:"contact_phone"`
-		ContactEmail    string `json:"contact_email"`
-		Address         string `json:"address"`
-		Description     string `json:"description"`
+		CompanyName        string `json:"company_name" binding:"required"`
+		BusinessLicense    string `json:"business_license"`
+		BusinessCategory   string `json:"business_category"`
+		ContactName        string `json:"contact_name"`
+		ContactPhone       string `json:"contact_phone"`
+		ContactEmail       string `json:"contact_email"`
+		Address            string `json:"address"`
+		Description        string `json:"description"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -70,13 +71,13 @@ func RegisterMerchant(c *gin.Context) {
 
 	var merchant models.Merchant
 	err = db.QueryRow(
-		`INSERT INTO merchants (user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending') 
-		 RETURNING id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, created_at, updated_at`,
-		userIDInt, req.CompanyName, req.BusinessLicense, req.ContactName, req.ContactPhone, req.ContactEmail, req.Address, req.Description,
+		`INSERT INTO merchants (user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, business_category)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', NULLIF(TRIM($9), ''))
+		 RETURNING id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, business_category, created_at, updated_at`,
+		userIDInt, req.CompanyName, req.BusinessLicense, req.ContactName, req.ContactPhone, req.ContactEmail, req.Address, req.Description, req.BusinessCategory,
 	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense, &merchant.ContactName,
 		&merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address, &merchant.Description, &merchant.Status,
-		&merchant.CreatedAt, &merchant.UpdatedAt)
+		&merchant.BusinessCategory, &merchant.CreatedAt, &merchant.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
