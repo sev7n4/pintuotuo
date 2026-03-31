@@ -237,6 +237,9 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.POST("/users", handlers.CreateAdminUser)
 		admin.GET("/stats", handlers.GetAdminStats)
 		admin.GET("/merchants/pending", handlers.GetPendingMerchants)
+		admin.GET("/merchants/audit-logs", handlers.GetMerchantAuditLogs)
+		admin.GET("/merchants", handlers.GetAdminMerchants)
+		admin.PATCH("/merchants/:id", handlers.PatchAdminMerchant)
 		admin.POST("/merchants/:id/approve", handlers.ApproveMerchant)
 		admin.POST("/merchants/:id/reject", handlers.RejectMerchant)
 
