@@ -1,39 +1,39 @@
 {
   "currentIssue": {
-    "id": "USER-001",
+    "id": "TOKEN-001",
     "type": "enhancement",
-    "module": "user",
-    "branch": "main",
-    "title": "admin商户管理优化（审核记录、分类查询、信息维护）"
+    "module": "token",
+    "branch": "feature/token-page-recharge-fixes",
+    "title": "补齐我的Token页充值入口与交互缺陷"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-USER-001",
-        "name": "admin handlers should support merchant list filters and audit logs",
-        "feature": "Admin Merchant Management",
-        "status": "passed",
-        "file": "backend/handlers/admin_test.go"
+        "id": "UT-TOKEN-001",
+        "name": "token store should parse api key list payload for both array and wrapped response",
+        "feature": "MyToken Data Mapping",
+        "status": "implemented",
+        "file": "frontend/src/stores/tokenStore.ts"
       }
     ],
     "integration": [
       {
-        "id": "IT-USER-001",
-        "name": "admin merchant apis list/filter/audit should respond",
-        "feature": "Admin Merchant Management API",
-        "status": "passed",
-        "file": "backend/handlers/admin.go"
+        "id": "IT-TOKEN-001",
+        "name": "my token page should create recharge order and display order list",
+        "feature": "Recharge Entry",
+        "status": "implemented",
+        "file": "frontend/src/pages/MyToken.tsx"
       }
     ],
     "e2e": [
       {
-        "id": "E2E-USER-001",
-        "name": "admin can view audit records and filter merchants by category",
-        "feature": "Admin Merchant Management UI",
+        "id": "E2E-TOKEN-001",
+        "name": "user can view generated api key once and maintain key list",
+        "feature": "API Key UX",
         "status": "ready",
-        "file": "frontend/src/pages/admin/AdminMerchants.tsx"
+        "file": "frontend/src/pages/MyToken.tsx"
       }
     ]
   },
-  "lastUpdated": "2026-03-31T15:07:11Z"
+  "lastUpdated": "2026-04-01T09:30:00Z"
 }

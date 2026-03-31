@@ -126,11 +126,23 @@ export interface Token {
 export interface TokenTransaction {
   id: number;
   user_id: number;
-  type: 'purchase' | 'usage' | 'transfer' | 'reward' | 'refund';
+  type: 'purchase' | 'usage' | 'transfer' | 'reward' | 'refund' | 'recharge';
   amount: number;
   reason?: string;
   order_id?: number;
   created_at: string;
+}
+
+export interface RechargeOrder {
+  id: number;
+  user_id: number;
+  amount: number;
+  payment_method: 'alipay' | 'wechat' | 'balance';
+  payment_id?: number;
+  status: 'pending' | 'success' | 'failed';
+  out_trade_no: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserAPIKey {

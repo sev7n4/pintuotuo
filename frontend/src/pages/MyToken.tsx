@@ -10,6 +10,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Select,
   message,
   Statistic,
   Row,
@@ -39,39 +40,49 @@ const MyToken = () => {
     balance,
     transactions,
     apiKeys,
+    rechargeOrders,
     fetchBalance,
     fetchTransactions,
     fetchAPIKeys,
+    fetchRechargeOrders,
     createAPIKey,
     deleteAPIKey,
+    createRechargeOrder,
     transfer,
     isLoading,
+    error,
+    clearError,
   } = useTokenStore();
 
   const [createKeyModalVisible, setCreateKeyModalVisible] = useState(false);
   const [transferModalVisible, setTransferModalVisible] = useState(false);
+  const [rechargeModalVisible, setRechargeModalVisible] = useState(false);
   const [keyForm] = Form.useForm();
   const [transferForm] = Form.useForm();
+  const [rechargeForm] = Form.useForm();
   const [newKeyDisplay, setNewKeyDisplay] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBalance();
     fetchTransactions();
     fetchAPIKeys();
-  }, [fetchBalance, fetchTransactions, fetchAPIKeys]);
+    fetchRechargeOrders();
+  }, [fetchBalance, fetchTransactions, fetchAPIKeys, fetchRechargeOrders]);
 
   const handleCreateKey = async () => {
     try {
       const values = await keyForm.validateFields();
-      const success = await createAPIKey(values.name);
-      if (success) {
+      const key = await createAPIKey(values.name.trim());
+      if (key) {
         message.success('API密钥创建成功');
-        setCreateKeyModalVisible(false);
+        setNewKeyDisplay(key);
         keyForm.resetFields();
         fetchAPIKeys();
+      } else {
+        message.error(error || '创建失败');
       }
     } catch {
-      message.error('创建失败');
+      // no-op: 表单校验错误不弹全局错误
     }
   };
 
@@ -93,9 +104,28 @@ const MyToken = () => {
         transferForm.resetFields();
         fetchBalance();
         fetchTransactions();
+      } else {
+        message.error(error || '转账失败');
       }
     } catch {
-      message.error('转账失败');
+      // no-op: 表单校验错误不弹全局错误
+    }
+  };
+
+  const handleCreateRechargeOrder = async () => {
+    try {
+      const values = await rechargeForm.validateFields();
+      const order = await createRechargeOrder(values.amount, values.method);
+      if (order) {
+        message.success(`充值订单创建成功，订单号：${order.out_trade_no}`);
+        setRechargeModalVisible(false);
+        rechargeForm.resetFields();
+        fetchRechargeOrders();
+      } else {
+        message.error(error || '创建充值订单失败');
+      }
+    } catch {
+      // no-op: 表单校验错误不弹全局错误
     }
   };
 
@@ -110,6 +140,7 @@ const MyToken = () => {
     transfer: { color: 'blue', text: '转账' },
     reward: { color: 'purple', text: '奖励' },
     refund: { color: 'cyan', text: '退款' },
+    recharge: { color: 'geekblue', text: '充值' },
   };
 
   const transactionColumns = [
@@ -210,6 +241,49 @@ const MyToken = () => {
     },
   ];
 
+  const rechargeOrderColumns = [
+    {
+      title: '订单号',
+      dataIndex: 'out_trade_no',
+      key: 'out_trade_no',
+    },
+    {
+      title: '金额',
+      dataIndex: 'amount',
+      key: 'amount',
+      width: 120,
+      render: (amount: number) => <span>{amount.toLocaleString()}</span>,
+    },
+    {
+      title: '支付方式',
+      dataIndex: 'payment_method',
+      key: 'payment_method',
+      width: 120,
+      render: (method: string) => {
+        const methodMap: Record<string, string> = { alipay: '支付宝', wechat: '微信', balance: '余额' };
+        return methodMap[method] || method;
+      },
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 110,
+      render: (status: string) => {
+        const color = status === 'success' ? 'success' : status === 'failed' ? 'error' : 'processing';
+        const label = status === 'success' ? '成功' : status === 'failed' ? '失败' : '待支付';
+        return <Tag color={color}>{label}</Tag>;
+      },
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 180,
+      render: (date: string) => new Date(date).toLocaleString('zh-CN'),
+    },
+  ];
+
   return (
     <div className={styles.myToken}>
       <h2 className={styles.pageTitle}>我的Token</h2>
@@ -257,6 +331,16 @@ const MyToken = () => {
         <Space>
           <Button
             type="primary"
+            icon={<WalletOutlined />}
+            onClick={() => {
+              clearError();
+              setRechargeModalVisible(true);
+            }}
+          >
+            充值
+          </Button>
+          <Button
+            type="primary"
             icon={<SendOutlined />}
             onClick={() => setTransferModalVisible(true)}
           >
@@ -267,6 +351,8 @@ const MyToken = () => {
             onClick={() => {
               fetchBalance();
               fetchTransactions();
+              fetchAPIKeys();
+              fetchRechargeOrders();
             }}
           >
             刷新
@@ -291,6 +377,24 @@ const MyToken = () => {
               loading={isLoading}
               pagination={{ pageSize: 10 }}
               locale={{ emptyText: <Empty description="暂无交易记录" /> }}
+            />
+          </TabPane>
+
+          <TabPane
+            tab={
+              <span>
+                <WalletOutlined /> 充值订单
+              </span>
+            }
+            key="recharge"
+          >
+            <Table
+              columns={rechargeOrderColumns}
+              dataSource={rechargeOrders}
+              rowKey="id"
+              loading={isLoading}
+              pagination={{ pageSize: 10 }}
+              locale={{ emptyText: <Empty description="暂无充值订单" /> }}
             />
           </TabPane>
 
@@ -326,13 +430,20 @@ const MyToken = () => {
       <Modal
         title="创建API密钥"
         open={createKeyModalVisible}
-        onOk={handleCreateKey}
+        onOk={() => {
+          if (newKeyDisplay) {
+            setCreateKeyModalVisible(false);
+            setNewKeyDisplay(null);
+            return;
+          }
+          handleCreateKey();
+        }}
         onCancel={() => {
           setCreateKeyModalVisible(false);
           keyForm.resetFields();
           setNewKeyDisplay(null);
         }}
-        okText="创建"
+        okText={newKeyDisplay ? '我已保存' : '创建'}
         cancelText="取消"
       >
         {newKeyDisplay ? (
@@ -355,6 +466,43 @@ const MyToken = () => {
             </Form.Item>
           </Form>
         )}
+      </Modal>
+
+      <Modal
+        title="Token充值"
+        open={rechargeModalVisible}
+        onOk={handleCreateRechargeOrder}
+        onCancel={() => {
+          setRechargeModalVisible(false);
+          rechargeForm.resetFields();
+        }}
+        okText="创建充值订单"
+        cancelText="取消"
+      >
+        <Form form={rechargeForm} layout="vertical" initialValues={{ method: 'alipay' }}>
+          <Form.Item
+            name="amount"
+            label="充值金额"
+            rules={[
+              { required: true, message: '请输入充值金额' },
+              { type: 'number', min: 0.01, message: '金额必须大于0' },
+            ]}
+          >
+            <InputNumber min={0.01} precision={2} style={{ width: '100%' }} placeholder="请输入充值金额" />
+          </Form.Item>
+          <Form.Item name="method" label="支付方式" rules={[{ required: true, message: '请选择支付方式' }]}>
+            <Select
+              options={[
+                { label: '支付宝', value: 'alipay' },
+                { label: '微信', value: 'wechat' },
+                { label: '余额', value: 'balance' },
+              ]}
+            />
+          </Form.Item>
+          <Paragraph type="secondary">
+            创建订单后会进入“充值订单”列表。支付成功后系统会通过回调更新余额。
+          </Paragraph>
+        </Form>
       </Modal>
 
       <Modal
