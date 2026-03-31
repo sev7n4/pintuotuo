@@ -10,6 +10,7 @@ jest.mock('@/services/token', () => ({
     createAPIKey: jest.fn(),
     deleteAPIKey: jest.fn(),
     transfer: jest.fn(),
+    mockCompleteRechargeOrder: jest.fn(),
   },
 }));
 
@@ -23,6 +24,7 @@ describe('tokenStore', () => {
       balance: null,
       transactions: [],
       apiKeys: [],
+      rechargeOrders: [],
       isLoading: false,
       error: null,
     });
@@ -245,7 +247,7 @@ describe('tokenStore', () => {
     } as any);
 
     const store = useTokenStore.getState();
-    const success = await store.transfer(mockRecipientId, mockAmount);
+    const success = await store.transfer(mockAmount, { recipientId: mockRecipientId });
 
     const newState = useTokenStore.getState();
     expect(success).toBe(true);
@@ -258,7 +260,7 @@ describe('tokenStore', () => {
     mockTokenService.transfer.mockRejectedValue(new Error(errorMessage));
 
     const store = useTokenStore.getState();
-    const success = await store.transfer(2, 100);
+    const success = await store.transfer(100, { recipientId: 2 });
 
     const newState = useTokenStore.getState();
     expect(success).toBe(false);

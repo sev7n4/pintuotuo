@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/cache"
@@ -408,13 +410,31 @@ func TransferTokens(c *gin.Context) {
 		return
 	}
 
+	senderIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
 	var req struct {
-		RecipientID int     `json:"recipient_id" binding:"required"`
-		Amount      float64 `json:"amount" binding:"required,gt=0"`
+		RecipientID    int     `json:"recipient_id"`
+		RecipientEmail string  `json:"recipient_email"`
+		Amount         float64 `json:"amount" binding:"required,gt=0"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	email := strings.TrimSpace(req.RecipientEmail)
+	if email == "" && req.RecipientID <= 0 {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_REQUEST",
+			"请填写接收方注册邮箱或数字用户ID",
+			http.StatusBadRequest,
+			nil,
+		))
 		return
 	}
 
@@ -424,11 +444,82 @@ func TransferTokens(c *gin.Context) {
 		return
 	}
 
-	// Get sender balance
-	var senderBalance float64
-	err := db.QueryRow("SELECT balance FROM tokens WHERE user_id = $1", userID).Scan(&senderBalance)
+	var recipientID int
+	var err error
+
+	switch {
+	case email != "" && req.RecipientID != 0:
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_REQUEST",
+			"请只填写接收方注册邮箱或用户ID其中一项",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	case email != "":
+		err = db.QueryRow(
+			`SELECT id FROM users WHERE LOWER(email) = $1 AND status = 'active'`,
+			strings.ToLower(email),
+		).Scan(&recipientID)
+		if err == sql.ErrNoRows {
+			middleware.RespondWithError(c, apperrors.ErrUserNotFound)
+			return
+		}
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+	case req.RecipientID > 0:
+		err = db.QueryRow(
+			`SELECT id FROM users WHERE id = $1 AND status = 'active'`,
+			req.RecipientID,
+		).Scan(&recipientID)
+		if err == sql.ErrNoRows {
+			middleware.RespondWithError(c, apperrors.ErrUserNotFound)
+			return
+		}
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+	default:
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_REQUEST",
+			"请填写接收方注册邮箱或数字用户ID",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	if recipientID == senderIDInt {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_REQUEST",
+			"不能向自己的账户转账",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	tx, err := db.Begin()
 	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer tx.Rollback()
+
+	var senderBalance float64
+	err = tx.QueryRow(
+		`SELECT balance FROM tokens WHERE user_id = $1 FOR UPDATE`,
+		senderIDInt,
+	).Scan(&senderBalance)
+	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.ErrTokenNotFound)
+		return
+	}
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 
@@ -437,10 +528,9 @@ func TransferTokens(c *gin.Context) {
 		return
 	}
 
-	// Transfer tokens
-	_, err = db.Exec(
-		"UPDATE tokens SET balance = balance - $1 WHERE user_id = $2",
-		req.Amount, userID,
+	res, err := tx.Exec(
+		`UPDATE tokens SET balance = balance - $1, updated_at = NOW() WHERE user_id = $2 AND balance >= $1`,
+		req.Amount, senderIDInt,
 	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -451,11 +541,23 @@ func TransferTokens(c *gin.Context) {
 		))
 		return
 	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	if rows != 1 {
+		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
+		return
+	}
 
-	_, err = db.Exec(
-		"UPDATE tokens SET balance = balance + $1 WHERE user_id = $2",
-		req.Amount, req.RecipientID,
-	)
+	_, err = tx.Exec(`
+		INSERT INTO tokens (user_id, balance, total_used, total_earned)
+		VALUES ($1, $2, 0, 0)
+		ON CONFLICT (user_id) DO UPDATE SET
+			balance = tokens.balance + EXCLUDED.balance,
+			updated_at = NOW()
+	`, recipientID, req.Amount)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"TOKEN_TRANSFER_FAILED",
@@ -466,40 +568,47 @@ func TransferTokens(c *gin.Context) {
 		return
 	}
 
-	// Record transaction
-	_, insertErr := db.Exec(
-		"INSERT INTO token_transactions (user_id, type, amount, reason) VALUES ($1, $2, $3, $4)",
-		userID, "transfer", -req.Amount, "Transfer to user",
+	_, err = tx.Exec(
+		`INSERT INTO token_transactions (user_id, type, amount, reason) VALUES ($1, $2, $3, $4)`,
+		senderIDInt, "transfer", -req.Amount, "Transfer to user",
 	)
-	if insertErr != nil {
+	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"TOKEN_TRANSFER_FAILED",
 			"Failed to record sender transaction",
 			http.StatusInternalServerError,
-			insertErr,
+			err,
 		))
 		return
 	}
 
-	_, insertErr = db.Exec(
-		"INSERT INTO token_transactions (user_id, type, amount, reason) VALUES ($1, $2, $3, $4)",
-		req.RecipientID, "transfer", req.Amount, "Transfer from user",
+	_, err = tx.Exec(
+		`INSERT INTO token_transactions (user_id, type, amount, reason) VALUES ($1, $2, $3, $4)`,
+		recipientID, "transfer", req.Amount, "Transfer from user",
 	)
-	if insertErr != nil {
+	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"TOKEN_TRANSFER_FAILED",
 			"Failed to record recipient transaction",
 			http.StatusInternalServerError,
-			insertErr,
+			err,
 		))
 		return
 	}
 
-	// Invalidate token balance caches for both users
+	if err = tx.Commit(); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"TOKEN_TRANSFER_FAILED",
+			"Failed to commit transfer",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
 	ctx := context.Background()
-	senderIDInt, _ := userID.(int)
 	cache.Delete(ctx, cache.TokenBalanceKey(senderIDInt))
-	cache.Delete(ctx, cache.TokenBalanceKey(req.RecipientID))
+	cache.Delete(ctx, cache.TokenBalanceKey(recipientID))
 
 	c.JSON(http.StatusOK, gin.H{"message": "Transfer successful"})
 }

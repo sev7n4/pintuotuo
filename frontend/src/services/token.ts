@@ -6,8 +6,21 @@ export const tokenService = {
 
   getConsumption: () => api.get<TokenTransaction[]>('/tokens/consumption'),
 
-  transfer: (recipientId: number, amount: number) =>
-    api.post<{ message: string }>('/tokens/transfer', { recipient_id: recipientId, amount }),
+  transfer: (
+    amount: number,
+    opts: { recipientId?: number; recipientEmail?: string }
+  ) => {
+    const body: Record<string, unknown> = { amount };
+    if (opts.recipientEmail != null && opts.recipientEmail.trim() !== '') {
+      body.recipient_email = opts.recipientEmail.trim();
+    } else if (opts.recipientId != null && opts.recipientId > 0) {
+      body.recipient_id = opts.recipientId;
+    }
+    return api.post<{ message: string }>('/tokens/transfer', body);
+  },
+
+  mockCompleteRechargeOrder: (orderId: number) =>
+    api.post<APIResponse<RechargeOrder>>(`/tokens/recharge/orders/${orderId}/mock-pay`),
 
   getAPIKeys: () => api.get<UserAPIKey[] | APIResponse<UserAPIKey[]>>('/tokens/keys'),
 

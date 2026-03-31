@@ -200,3 +200,18 @@ func TestHandleRechargeCallback_MissingStatus(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
+
+func TestMockCompleteRechargeOrder_DisabledWithoutEnv(t *testing.T) {
+	t.Setenv("ALLOW_TEST_RECHARGE", "")
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+	c.Set("user_id", 1)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/tokens/recharge/orders/1/mock-pay", nil)
+
+	MockCompleteRechargeOrder(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+

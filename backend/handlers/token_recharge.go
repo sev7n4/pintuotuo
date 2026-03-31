@@ -1,15 +1,55 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 )
+
+// applyRechargeSuccessInTx marks a pending recharge successful, credits tokens (upsert),
+// and records token_transactions with column layout used across the codebase (reason).
+func applyRechargeSuccessInTx(tx *sql.Tx, order *RechargeOrder) error {
+	res, err := tx.Exec(
+		`UPDATE recharge_orders SET status = 'success', updated_at = NOW() WHERE id = $1 AND status = 'pending'`,
+		order.ID,
+	)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return fmt.Errorf("recharge order not pending or missing")
+	}
+
+	_, err = tx.Exec(`
+		INSERT INTO tokens (user_id, balance, total_used, total_earned)
+		VALUES ($1, $2, 0, $2)
+		ON CONFLICT (user_id) DO UPDATE SET
+			balance = tokens.balance + EXCLUDED.balance,
+			total_earned = tokens.total_earned + EXCLUDED.balance,
+			updated_at = NOW()
+	`, order.UserID, order.Amount)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(
+		`INSERT INTO token_transactions (user_id, type, amount, reason) VALUES ($1, 'recharge', $2, $3)`,
+		order.UserID, order.Amount, fmt.Sprintf("Recharge order #%d", order.ID),
+	)
+	return err
+}
 
 type RechargeRequest struct {
 	Amount float64 `json:"amount"`
@@ -362,38 +402,10 @@ func HandleRechargeCallback(c *gin.Context) {
 		}
 		defer tx.Rollback()
 
-		_, err = tx.Exec(
-			"UPDATE recharge_orders SET status = 'success', updated_at = NOW() WHERE id = $1",
-			order.ID,
-		)
-		if err != nil {
+		if err = applyRechargeSuccessInTx(tx, &order); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    "DATABASE_ERROR",
-				"message": "Failed to update recharge order",
-			})
-			return
-		}
-
-		_, err = tx.Exec(
-			"UPDATE tokens SET balance = balance + $1, updated_at = NOW() WHERE user_id = $2",
-			order.Amount, order.UserID,
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    "DATABASE_ERROR",
-				"message": "Failed to update token balance",
-			})
-			return
-		}
-
-		_, err = tx.Exec(
-			"INSERT INTO token_transactions (user_id, amount, type, description, created_at) VALUES ($1, $2, 'recharge', $3, NOW())",
-			order.UserID, order.Amount, fmt.Sprintf("Recharge order #%d", order.ID),
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    "DATABASE_ERROR",
-				"message": "Failed to create transaction record",
+				"message": "Failed to complete recharge",
 			})
 			return
 		}
@@ -407,6 +419,8 @@ func HandleRechargeCallback(c *gin.Context) {
 		}
 
 		order.Status = "success"
+		ctx := context.Background()
+		cache.Delete(ctx, cache.TokenBalanceKey(order.UserID))
 	} else if req.Status == "failed" {
 		_, err = db.Exec(
 			"UPDATE recharge_orders SET status = 'failed', updated_at = NOW() WHERE id = $1",
@@ -421,6 +435,119 @@ func HandleRechargeCallback(c *gin.Context) {
 		}
 		order.Status = "failed"
 	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    order,
+	})
+}
+
+// MockCompleteRechargeOrder completes a pending recharge without a real payment gateway.
+// Enabled only when ALLOW_TEST_RECHARGE=true (for staging / internal QA).
+func MockCompleteRechargeOrder(c *gin.Context) {
+	if os.Getenv("ALLOW_TEST_RECHARGE") != "true" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"code":    "FORBIDDEN",
+			"message": "Test recharge completion is not enabled (set ALLOW_TEST_RECHARGE=true)",
+		})
+		return
+	}
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"code":    "UNAUTHORIZED",
+			"message": "User not authenticated",
+		})
+		return
+	}
+
+	orderIDStr := c.Param("id")
+	orderID, err := strconv.Atoi(orderIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "INVALID_REQUEST",
+			"message": "Invalid order ID",
+		})
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    "DATABASE_ERROR",
+			"message": "Database connection error",
+		})
+		return
+	}
+
+	userIDInt, _ := userID.(int)
+	var order RechargeOrder
+	var paymentID sql.NullInt64
+	err = db.QueryRow(`
+		SELECT id, user_id, amount, payment_method, payment_id, status, out_trade_no, created_at, updated_at
+		FROM recharge_orders
+		WHERE id = $1 AND user_id = $2
+	`, orderID, userIDInt).Scan(
+		&order.ID, &order.UserID, &order.Amount, &order.PaymentMethod,
+		&paymentID, &order.Status, &order.OutTradeNo, &order.CreatedAt, &order.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{
+			"code":    "NOT_FOUND",
+			"message": "Recharge order not found",
+		})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    "DATABASE_ERROR",
+			"message": "Failed to fetch recharge order",
+		})
+		return
+	}
+	if paymentID.Valid {
+		order.PaymentID = int(paymentID.Int64)
+	}
+
+	if order.Status != "pending" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "INVALID_STATE",
+			"message": "Only pending orders can be completed",
+		})
+		return
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    "DATABASE_ERROR",
+			"message": "Failed to start transaction",
+		})
+		return
+	}
+	defer tx.Rollback()
+
+	if err = applyRechargeSuccessInTx(tx, &order); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    "DATABASE_ERROR",
+			"message": "Failed to complete recharge",
+		})
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    "DATABASE_ERROR",
+			"message": "Failed to commit transaction",
+		})
+		return
+	}
+
+	order.Status = "success"
+	ctx := context.Background()
+	cache.Delete(ctx, cache.TokenBalanceKey(order.UserID))
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
