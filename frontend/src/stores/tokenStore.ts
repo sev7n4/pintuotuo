@@ -1,19 +1,25 @@
 import { create } from 'zustand';
-import { Token, TokenTransaction, UserAPIKey } from '@/types';
+import { Token, TokenTransaction, UserAPIKey, RechargeOrder } from '@/types';
 import { tokenService } from '@/services/token';
 
 interface TokenState {
   balance: Token | null;
   transactions: TokenTransaction[];
   apiKeys: UserAPIKey[];
+  rechargeOrders: RechargeOrder[];
   isLoading: boolean;
   error: string | null;
 
   fetchBalance: () => Promise<void>;
   fetchTransactions: () => Promise<void>;
   fetchAPIKeys: () => Promise<void>;
-  createAPIKey: (name: string) => Promise<boolean>;
+  fetchRechargeOrders: () => Promise<void>;
+  createAPIKey: (name: string) => Promise<string | null>;
   deleteAPIKey: (id: number) => Promise<boolean>;
+  createRechargeOrder: (
+    amount: number,
+    method: 'alipay' | 'wechat' | 'balance'
+  ) => Promise<RechargeOrder | null>;
   transfer: (recipientId: number, amount: number) => Promise<boolean>;
   clearError: () => void;
 }
@@ -22,6 +28,7 @@ export const useTokenStore = create<TokenState>((set) => ({
   balance: null,
   transactions: [],
   apiKeys: [],
+  rechargeOrders: [],
   isLoading: false,
   error: null,
 
@@ -51,9 +58,23 @@ export const useTokenStore = create<TokenState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await tokenService.getAPIKeys();
-      set({ apiKeys: response.data?.data || [], isLoading: false });
+      const payload = response.data;
+      const apiKeys = Array.isArray(payload) ? payload : payload?.data || [];
+      set({ apiKeys, isLoading: false });
     } catch (error) {
       const message = error instanceof Error ? error.message : '获取API密钥失败';
+      set({ error: message, isLoading: false });
+    }
+  },
+
+  fetchRechargeOrders: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await tokenService.getRechargeOrders(1, 20);
+      const rechargeOrders = response.data?.data?.data || [];
+      set({ rechargeOrders, isLoading: false });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '获取充值订单失败';
       set({ error: message, isLoading: false });
     }
   },
@@ -61,13 +82,13 @@ export const useTokenStore = create<TokenState>((set) => ({
   createAPIKey: async (name) => {
     set({ isLoading: true, error: null });
     try {
-      await tokenService.createAPIKey(name);
+      const response = await tokenService.createAPIKey(name);
       set({ isLoading: false });
-      return true;
+      return response.data?.key || null;
     } catch (error) {
       const message = error instanceof Error ? error.message : '创建API密钥失败';
       set({ error: message, isLoading: false });
-      return false;
+      return null;
     }
   },
 
@@ -81,6 +102,19 @@ export const useTokenStore = create<TokenState>((set) => ({
       const message = error instanceof Error ? error.message : '删除API密钥失败';
       set({ error: message, isLoading: false });
       return false;
+    }
+  },
+
+  createRechargeOrder: async (amount, method) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await tokenService.createRechargeOrder(amount, method);
+      set({ isLoading: false });
+      return response.data?.data || null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '创建充值订单失败';
+      set({ error: message, isLoading: false });
+      return null;
     }
   },
 

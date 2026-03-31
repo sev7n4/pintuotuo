@@ -1,16 +1,18 @@
 {
-  "current_step": 10,
+  "current_step": 8,
   "current_fix_cases": [
-    "E2E-USER-001",
-    "IT-USER-001"
+    "FE-TOKEN-001",
+    "FE-TOKEN-002",
+    "FE-TOKEN-003",
+    "LEGACY-TODO-API-ROUTING-001"
   ],
   "retry_count": 0,
-  "pr_number": 137,
+  "pr_number": null,
   "merged": false,
-  "branch": "main",
-  "local_validation": "failed",
+  "branch": "feature/token-page-recharge-fixes",
+  "local_validation": "partial",
   "ci_status": {
-    "cicd": "running",
+    "cicd": "pending",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
@@ -21,14 +23,20 @@
       "error_type": "环境问题",
       "message": "make test failed in frontend Jest with \"Cannot use import.meta outside a module\" (existing test runtime config issue)",
       "timestamp": "2026-03-31T14:53:50Z"
+    },
+    {
+      "step": 8,
+      "error_type": "环境问题",
+      "message": "make test still fails due to Jest/import.meta runtime issue; frontend build passes",
+      "timestamp": "2026-04-01T09:30:00Z"
     }
   ],
   "created_at": "2026-03-31T15:07:11Z",
-  "updated_at": "2026-03-31T15:09:30Z",
+  "updated_at": "2026-04-01T09:30:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "admin merchant management optimization",
-    "head": "93becfb",
-    "changed_files": 9
+    "task": "my token page capability completion",
+    "head": "29b7d12",
+    "changed_files": 5
   }
 }
