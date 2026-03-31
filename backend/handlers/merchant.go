@@ -41,14 +41,14 @@ func RegisterMerchant(c *gin.Context) {
 	}
 
 	var req struct {
-		CompanyName        string `json:"company_name" binding:"required"`
-		BusinessLicense    string `json:"business_license"`
-		BusinessCategory   string `json:"business_category"`
-		ContactName        string `json:"contact_name"`
-		ContactPhone       string `json:"contact_phone"`
-		ContactEmail       string `json:"contact_email"`
-		Address            string `json:"address"`
-		Description        string `json:"description"`
+		CompanyName      string `json:"company_name" binding:"required"`
+		BusinessLicense  string `json:"business_license"`
+		BusinessCategory string `json:"business_category"`
+		ContactName      string `json:"contact_name"`
+		ContactPhone     string `json:"contact_phone"`
+		ContactEmail     string `json:"contact_email"`
+		Address          string `json:"address"`
+		Description      string `json:"description"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
