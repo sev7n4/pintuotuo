@@ -215,7 +215,7 @@ func GetAvailableSKUs(c *gin.Context) {
 		skus = append(skus, s)
 	}
 
-	rows2, err := db.Query("SELECT sku_id FROM merchant_skus WHERE merchant_id = $1", merchantID)
+	rows2, err := db.Query("SELECT sku_id FROM merchant_skus WHERE merchant_id = $1 AND status = 'active'", merchantID)
 	if err == nil {
 		defer rows2.Close()
 		selectedMap := make(map[int]bool)
@@ -282,19 +282,54 @@ func CreateMerchantSKU(c *gin.Context) {
 		return
 	}
 
-	var alreadyExists bool
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM merchant_skus WHERE merchant_id = $1 AND sku_id = $2)", merchantID, req.SKUID).Scan(&alreadyExists)
-	if err != nil {
+	var existingID int
+	var existingStatus string
+	err = db.QueryRow(
+		"SELECT id, status FROM merchant_skus WHERE merchant_id = $1 AND sku_id = $2",
+		merchantID, req.SKUID,
+	).Scan(&existingID, &existingStatus)
+	if err != nil && err != sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	if alreadyExists {
+	if err == nil && existingStatus == "active" {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SKU_ALREADY_SELECTED",
 			"该SKU已选择",
 			http.StatusBadRequest,
 			nil,
 		))
+		return
+	}
+	if err == nil && existingStatus == "inactive" {
+		var reactivated models.MerchantSKUDetail
+		err = db.QueryRow(
+			`UPDATE merchant_skus SET status = 'active', api_key_id = $1, updated_at = CURRENT_TIMESTAMP
+			 WHERE id = $2
+			 RETURNING id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
+			req.APIKeyID, existingID,
+		).Scan(&reactivated.ID, &reactivated.MerchantID, &reactivated.SKUID, &reactivated.APIKeyID, &reactivated.Status,
+			&reactivated.SalesCount, &reactivated.TotalSalesAmount, &reactivated.CreatedAt, &reactivated.UpdatedAt)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		err = db.QueryRow(
+			`SELECT s.sku_code, s.sku_type, s.retail_price, s.valid_days, s.group_enabled, sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier
+			 FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.id = $1`,
+			reactivated.SKUID,
+		).Scan(&reactivated.SKUCode, &reactivated.SKUType, &reactivated.RetailPrice, &reactivated.ValidDays, &reactivated.GroupEnabled,
+			&reactivated.SPUName, &reactivated.ModelProvider, &reactivated.ModelName, &reactivated.ModelTier)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		if reactivated.APIKeyID != nil && *reactivated.APIKeyID > 0 {
+			_ = db.QueryRow("SELECT name, provider FROM merchant_api_keys WHERE id = $1", *reactivated.APIKeyID).Scan(&reactivated.APIKeyName, &reactivated.APIKeyProvider)
+		}
+		ctx := context.Background()
+		cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, ""))
+		c.JSON(http.StatusOK, gin.H{"data": reactivated})
 		return
 	}
 

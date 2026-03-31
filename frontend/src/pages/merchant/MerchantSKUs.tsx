@@ -85,8 +85,7 @@ const MerchantSKUs = () => {
     if (selectModalVisible) {
       fetchAvailableSKUs();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectModalVisible]);
+  }, [selectModalVisible, providerFilter, typeFilter, fetchAvailableSKUs]);
 
   const handleSelectSKU = () => {
     setSelectedSKUs([]);
