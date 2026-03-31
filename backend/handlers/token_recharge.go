@@ -18,8 +18,8 @@ import (
 // and records token_transactions with column layout used across the codebase (reason).
 func applyRechargeSuccessInTx(tx *sql.Tx, order *RechargeOrder) error {
 	res, err := tx.Exec(
-		`UPDATE recharge_orders SET status = 'success', updated_at = NOW() WHERE id = $1 AND status = 'pending'`,
-		order.ID,
+		`UPDATE recharge_orders SET status = $1, updated_at = NOW() WHERE id = $2 AND status = $3`,
+		PaymentStatusSuccess, order.ID, paymentStatusPending,
 	)
 	if err != nil {
 		return err
@@ -145,7 +145,7 @@ func CreateRechargeOrder(c *gin.Context) {
 			UserID:        userID.(int),
 			Amount:        req.Amount,
 			PaymentMethod: req.Method,
-			Status:        "pending",
+			Status:        paymentStatusPending,
 			OutTradeNo:    outTradeNo,
 		},
 	})
@@ -381,7 +381,7 @@ func HandleRechargeCallback(c *gin.Context) {
 		return
 	}
 
-	if order.Status != "pending" {
+	if order.Status != paymentStatusPending {
 		c.JSON(http.StatusOK, gin.H{
 			"code":    0,
 			"message": "Order already processed",
@@ -390,7 +390,7 @@ func HandleRechargeCallback(c *gin.Context) {
 		return
 	}
 
-	if req.Status == "success" {
+	if req.Status == PaymentStatusSuccess {
 		var tx *sql.Tx
 		tx, err = db.Begin()
 		if err != nil {
@@ -418,7 +418,7 @@ func HandleRechargeCallback(c *gin.Context) {
 			return
 		}
 
-		order.Status = "success"
+		order.Status = PaymentStatusSuccess
 		ctx := context.Background()
 		cache.Delete(ctx, cache.TokenBalanceKey(order.UserID))
 	} else if req.Status == "failed" {
@@ -511,7 +511,7 @@ func MockCompleteRechargeOrder(c *gin.Context) {
 		order.PaymentID = int(paymentID.Int64)
 	}
 
-	if order.Status != "pending" {
+	if order.Status != paymentStatusPending {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "INVALID_STATE",
 			"message": "Only pending orders can be completed",
@@ -545,7 +545,7 @@ func MockCompleteRechargeOrder(c *gin.Context) {
 		return
 	}
 
-	order.Status = "success"
+	order.Status = PaymentStatusSuccess
 	ctx := context.Background()
 	cache.Delete(ctx, cache.TokenBalanceKey(order.UserID))
 
