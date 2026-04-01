@@ -1,20 +1,15 @@
 {
-  "current_step": 10,
+  "current_step": 9,
   "current_fix_cases": [
-    "FE-MYTOKEN-TRANSFER-001",
-    "FE-MYTOKEN-RECHARGE-MOCK-001",
-    "FE-MYTOKEN-RESPONSIVE-001",
-    "BE-TRANSFER-EMAIL-001",
-    "BE-RECHARGE-MOCK-001",
-    "LEGACY-TODO-API-ROUTING-001"
+    "FE-MERCHANT-SKU-FILTER-CACHE-001"
   ],
   "retry_count": 0,
-  "pr_number": 140,
+  "pr_number": null,
   "merged": false,
-  "branch": "fix/my-token-transfer-recharge-ux",
+  "branch": "fix/merchant-sku-cache-invalidation",
   "local_validation": "partial",
   "ci_status": {
-    "cicd": "running",
+    "cicd": "pending",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
@@ -23,16 +18,16 @@
     {
       "step": 8,
       "error_type": "环境问题",
-      "message": "make test may fail: frontend Jest import.meta runtime (known); backend ./handlers tests pass; frontend npm run build passes",
-      "timestamp": "2026-04-01T12:00:00Z"
+      "message": "make test failed due to pre-existing frontend Jest import.meta runtime issue; backend handlers tests passed",
+      "timestamp": "2026-04-01T16:46:00Z"
     }
   ],
   "created_at": "2026-03-31T15:07:11Z",
-  "updated_at": "2026-04-01T12:00:00Z",
+  "updated_at": "2026-04-01T16:46:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "my token transfer by email, mock recharge, responsive ui, ptd key copy",
-    "head": "ba96d32",
-    "changed_files": 12
+    "task": "fix merchant sku cache invalidation for status filtering refresh",
+    "head": "working",
+    "changed_files": 3
   }
 }
