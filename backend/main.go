@@ -87,6 +87,7 @@ func main() {
 		routes.RegisterReferralRoutes(v1)
 		routes.RegisterMerchantRoutes(v1)
 		routes.RegisterAPIRoutes(v1)
+		routes.RegisterOpenAICompatRoutes(v1)
 		routes.RegisterConsumptionRoutes(v1)
 		routes.RegisterNotificationRoutes(v1)
 		routes.RegisterAdminRoutes(v1)

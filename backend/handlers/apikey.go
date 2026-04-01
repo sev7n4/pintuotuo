@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
+	"github.com/pintuotuo/backend/utils"
 )
 
 const APIKeyListTTL = 5 * time.Minute
@@ -130,7 +130,7 @@ func CreateAPIKey(c *gin.Context) {
 	}
 
 	apiKey := "ptd_" + hex.EncodeToString(keyBytes)
-	keyHash := hashAPIKey(apiKey)
+	keyHash := utils.HashUserAPIKey(apiKey)
 
 	db := config.GetDB()
 	if db == nil {
@@ -281,10 +281,4 @@ func DeleteAPIKey(c *gin.Context) {
 	cache.Delete(context.Background(), APIKeyListKey(userIDInt))
 
 	c.JSON(http.StatusOK, gin.H{"message": "API key deleted successfully"})
-}
-
-// Helper function to hash API key
-func hashAPIKey(key string) string {
-	hash := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(hash[:])
 }

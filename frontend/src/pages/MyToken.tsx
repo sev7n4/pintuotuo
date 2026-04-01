@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Card,
   Tabs,
@@ -37,7 +37,20 @@ import styles from './MyToken.module.css';
 const { TabPane } = Tabs;
 const { Text, Paragraph } = Typography;
 
-const allowMockRecharge = import.meta.env.VITE_ALLOW_MOCK_RECHARGE === 'true';
+  const allowMockRecharge = import.meta.env.VITE_ALLOW_MOCK_RECHARGE === 'true';
+  const openAICompatBase = useMemo(() => openAICompatBaseURL(), []);
+
+function openAICompatBaseURL(): string {
+  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || '/api/v1';
+  const normalized = base.endsWith('/') ? base.slice(0, -1) : base;
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    return `${normalized}/openai/v1`;
+  }
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}${normalized}/openai/v1`;
+  }
+  return `${normalized}/openai/v1`;
+}
 
 const MyToken = () => {
   const {
@@ -478,6 +491,12 @@ const MyToken = () => {
             <Paragraph type="secondary" className={styles.hintParagraph}>
               此处生成的是本平台调用接口用的访问密钥（前缀一般为 <Text code>ptd_</Text>），用于请求拼坨陀 API（含模型代理等），
               <strong>不是</strong> OpenAI 等厂商控制台里的 <Text code>sk-...</Text>。调厂商接口由平台侧配置。
+            </Paragraph>
+            <Paragraph type="secondary" className={styles.hintParagraph}>
+              <strong>OpenAI 兼容：</strong>在支持自定义 Base URL 的客户端中，将 Base URL 设为{' '}
+              <Text code>{openAICompatBase}</Text>，API Key 填本平台密钥；请求 <Text code>POST /chat/completions</Text>。
+              模型可写 <Text code>厂商/模型</Text>（如 <Text code>zhipu/glm-4-flash</Text>）或常见模型名（如{' '}
+              <Text code>gpt-3.5-turbo</Text>，将按名称推断厂商）。流式（stream）暂未支持。
             </Paragraph>
             <div className={styles.tabHeader}>
               <Button

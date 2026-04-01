@@ -115,6 +115,10 @@ func ProxyAPIRequest(c *gin.Context) {
 		return
 	}
 
+	proxyAPIRequestCore(c, userIDInt, requestID, startTime, req, c.Request.URL.Path)
+}
+
+func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startTime time.Time, req APIProxyRequest, requestPath string) {
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -296,7 +300,7 @@ func ProxyAPIRequest(c *gin.Context) {
 			if err == nil {
 				_, err = tx.Exec(
 					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
-					userIDInt, apiKey.ID, requestID, req.Provider, req.Model, "POST", "/v1/chat/completions", resp.StatusCode, latency, inputTokens, outputTokens, cost,
+					userIDInt, apiKey.ID, requestID, req.Provider, req.Model, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost,
 				)
 			}
 

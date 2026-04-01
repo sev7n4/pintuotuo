@@ -12,6 +12,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestResolveOpenAICompatModel(t *testing.T) {
+	p, m := resolveOpenAICompatModel("openai/gpt-4o")
+	assert.Equal(t, "openai", p)
+	assert.Equal(t, "gpt-4o", m)
+
+	p, m = resolveOpenAICompatModel("zhipu/glm-4-flash")
+	assert.Equal(t, "zhipu", p)
+	assert.Equal(t, "glm-4-flash", m)
+
+	p, m = resolveOpenAICompatModel("gpt-3.5-turbo")
+	assert.Equal(t, "openai", p)
+	assert.Equal(t, "gpt-3.5-turbo", m)
+
+	p, m = resolveOpenAICompatModel("claude-3-sonnet-20240229")
+	assert.Equal(t, "anthropic", p)
+	assert.Equal(t, "claude-3-sonnet-20240229", m)
+
+	p, m = resolveOpenAICompatModel("gemini-pro")
+	assert.Equal(t, "google", p)
+	assert.Equal(t, "gemini-pro", m)
+
+	p, m = resolveOpenAICompatModel("glm-4-air")
+	assert.Equal(t, "zhipu", p)
+	assert.Equal(t, "glm-4-air", m)
+}
+
 func TestCalculateTokenCost(t *testing.T) {
 	// 测试OpenAI GPT-4 Turbo
 	cost := calculateTokenCost("openai", "gpt-4-turbo-preview", 1000, 1000)

@@ -58,6 +58,15 @@ func RegisterAPIRoutes(router *gin.RouterGroup) {
 	}
 }
 
+// RegisterOpenAICompatRoutes exposes OpenAI-SDK-friendly paths under /openai/v1 (full URL: /api/v1/openai/v1/...).
+func RegisterOpenAICompatRoutes(router *gin.RouterGroup) {
+	openai := router.Group("/openai/v1")
+	openai.Use(middleware.APIKeyOrJWTAuthMiddleware())
+	{
+		openai.POST("/chat/completions", handlers.OpenAIChatCompletions)
+	}
+}
+
 func RegisterConsumptionRoutes(router *gin.RouterGroup) {
 	consumption := router.Group("/consumption")
 	consumption.Use(middleware.AuthMiddleware())
