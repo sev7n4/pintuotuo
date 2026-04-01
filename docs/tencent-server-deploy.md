@@ -152,6 +152,34 @@ SSH 连接到服务器
 
 ---
 
+## 测试充值按钮开关（仅测试环境）
+
+若需要在「我的 Token」页面显示“模拟支付完成”按钮，请同时开启后端与前端两个开关，然后重建部署。
+
+### 1) 服务器 `.env` 增加（或更新）
+
+```bash
+ALLOW_TEST_RECHARGE=true
+VITE_ALLOW_MOCK_RECHARGE=true
+```
+
+说明：
+- `ALLOW_TEST_RECHARGE`：后端允许 `POST /api/v1/tokens/recharge/orders/:id/mock-pay`
+- `VITE_ALLOW_MOCK_RECHARGE`：前端构建时决定是否显示按钮（编译期变量）
+
+### 2) 重建并重启
+
+```bash
+cd /opt/pintuotuo
+docker-compose -f docker-compose.prod.yml up -d --build --force-recreate
+```
+
+### 3) 关闭按钮（恢复默认）
+
+将 `.env` 中上述变量改为 `false`（或删除），然后再次执行重建命令。
+
+---
+
 ## 故障排查
 
 ### 问题 1: `Permission denied (publickey)`
