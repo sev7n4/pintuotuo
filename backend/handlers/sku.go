@@ -1043,6 +1043,76 @@ func GetModelProviders(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": providers})
 }
 
+func PatchModelProvider(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	var req struct {
+		Name        *string `json:"name"`
+		APIBaseURL  *string `json:"api_base_url"`
+		APIFormat   *string `json:"api_format"`
+		BillingType *string `json:"billing_type"`
+		Status      *string `json:"status"`
+		SortOrder   *int    `json:"sort_order"`
+	}
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	if req.Status != nil {
+		if *req.Status != "active" && *req.Status != "inactive" {
+			middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+			return
+		}
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var p models.ModelProvider
+	err = db.QueryRow(
+		`UPDATE model_providers SET
+			name = COALESCE($1, name),
+			api_base_url = COALESCE($2, api_base_url),
+			api_format = COALESCE($3, api_format),
+			billing_type = COALESCE($4, billing_type),
+			status = COALESCE($5, status),
+			sort_order = COALESCE($6, sort_order),
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = $7
+		RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), status, sort_order, created_at, updated_at`,
+		req.Name, req.APIBaseURL, req.APIFormat, req.BillingType, req.Status, req.SortOrder, id,
+	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+	if err == sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MODEL_PROVIDER_NOT_FOUND",
+			"Model provider not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	cache.Delete(context.Background(), "model_providers:all")
+
+	c.JSON(http.StatusOK, gin.H{"data": p})
+}
+
 func ListPublicSKUs(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")

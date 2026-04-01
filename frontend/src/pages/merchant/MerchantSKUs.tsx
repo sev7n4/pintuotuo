@@ -44,6 +44,8 @@ const MerchantSKUs = () => {
   const [selectedSKUs, setSelectedSKUs] = useState<number[]>([]);
   const [selectedAPIKey, setSelectedAPIKey] = useState<number | undefined>();
   const [submitting, setSubmitting] = useState(false);
+  const [providerOptions, setProviderOptions] = useState<string[]>([]);
+  const [typeOptions, setTypeOptions] = useState<string[]>([]);
 
   const fetchMerchantSKUs = useCallback(async () => {
     setLoading(true);
@@ -76,14 +78,27 @@ const MerchantSKUs = () => {
   }, []);
 
   useEffect(() => {
-    fetchMerchantSKUs();
     fetchAPIKeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchAPIKeys]);
+
+  useEffect(() => {
+    fetchMerchantSKUs();
+  }, [fetchMerchantSKUs]);
 
   useEffect(() => {
     if (selectModalVisible) {
       fetchAvailableSKUs();
+      // 使用“无筛选”数据构造筛选项，避免筛选项被当前过滤结果反向限制
+      merchantSkuService
+        .getAvailableSKUs('', '')
+        .then((all) => {
+          setProviderOptions([...new Set(all.map((sku) => sku.model_provider))]);
+          setTypeOptions([...new Set(all.map((sku) => sku.sku_type))]);
+        })
+        .catch(() => {
+          setProviderOptions([]);
+          setTypeOptions([]);
+        });
     }
   }, [selectModalVisible, providerFilter, typeFilter, fetchAvailableSKUs]);
 
@@ -377,8 +392,8 @@ const MerchantSKUs = () => {
     }),
   };
 
-  const providers = [...new Set(availableSKUs.map((sku) => sku.model_provider))];
-  const types = [...new Set(availableSKUs.map((sku) => sku.sku_type))];
+  const providers = providerOptions;
+  const types = typeOptions;
 
   return (
     <MerchantGuard>

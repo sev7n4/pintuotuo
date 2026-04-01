@@ -23,11 +23,31 @@ import (
 
 const providerAnthropic = "anthropic"
 
-var providerBaseURLs = map[string]string{
-	"openai":    "https://api.openai.com/v1",
-	"anthropic": "https://api.anthropic.com/v1",
-	"google":    "https://generativelanguage.googleapis.com/v1",
-	"azure":     "https://YOUR_RESOURCE.openai.azure.com",
+type providerRuntimeConfig struct {
+	Code       string
+	Name       string
+	APIBaseURL string
+	APIFormat  string
+}
+
+func legacyProviderList() []map[string]interface{} {
+	return []map[string]interface{}{
+		{
+			"name":         "openai",
+			"display_name": "OpenAI",
+			"api_format":   "openai",
+		},
+		{
+			"name":         "anthropic",
+			"display_name": "Anthropic",
+			"api_format":   "anthropic",
+		},
+		{
+			"name":         "google",
+			"display_name": "Google AI",
+			"api_format":   "openai",
+		},
+	}
 }
 
 type APIProxyRequest struct {
@@ -136,8 +156,8 @@ func ProxyAPIRequest(c *gin.Context) {
 		return
 	}
 
-	baseURL, ok := providerBaseURLs[req.Provider]
-	if !ok {
+	providerCfg, err := getProviderRuntimeConfig(db, req.Provider)
+	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"UNSUPPORTED_PROVIDER",
 			fmt.Sprintf("Provider %s is not supported", req.Provider),
@@ -146,9 +166,24 @@ func ProxyAPIRequest(c *gin.Context) {
 		))
 		return
 	}
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	baseURL := strings.TrimRight(providerCfg.APIBaseURL, "/")
+	if baseURL == "" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"UNSUPPORTED_PROVIDER",
+			fmt.Sprintf("Provider %s is missing api_base_url", req.Provider),
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
 
 	endpoint := fmt.Sprintf("%s/chat/completions", baseURL)
-	if req.Provider == providerAnthropic {
+	if providerCfg.APIFormat == providerAnthropic {
 		endpoint = fmt.Sprintf("%s/messages", baseURL)
 	}
 
@@ -190,12 +225,11 @@ func ProxyAPIRequest(c *gin.Context) {
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	if req.Provider == "openai" || req.Provider == "azure" {
-		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", decryptedKey))
-	} else if req.Provider == "anthropic" {
+	switch providerCfg.APIFormat {
+	case "anthropic":
 		httpReq.Header.Set("x-api-key", decryptedKey)
 		httpReq.Header.Set("anthropic-version", "2023-06-01")
-	} else if req.Provider == "google" {
+	default:
 		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", decryptedKey))
 	}
 
@@ -325,6 +359,18 @@ func calculateTokenCost(provider, model string, inputTokens, outputTokens int) f
 	return float64(inputTokens)*inputRate + float64(outputTokens)*outputRate
 }
 
+func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeConfig, error) {
+	var cfg providerRuntimeConfig
+	err := db.QueryRow(
+		`SELECT code, name, COALESCE(api_base_url, ''), api_format
+		 FROM model_providers
+		 WHERE code = $1 AND status = 'active'
+		 LIMIT 1`,
+		providerCode,
+	).Scan(&cfg.Code, &cfg.Name, &cfg.APIBaseURL, &cfg.APIFormat)
+	return cfg, err
+}
+
 func selectAPIKeyForRequest(db *sql.DB, req APIProxyRequest, apiKey *models.MerchantAPIKey) error {
 	if req.APIKeyID != nil && *req.APIKeyID > 0 {
 		err := db.QueryRow(
@@ -368,33 +414,35 @@ func selectAPIKeyForRequest(db *sql.DB, req APIProxyRequest, apiKey *models.Merc
 }
 
 func GetAPIProviders(c *gin.Context) {
-	providers := []map[string]interface{}{
-		{
-			"name":         "openai",
-			"display_name": "OpenAI",
-			"models": []string{
-				"gpt-4-turbo-preview",
-				"gpt-4",
-				"gpt-3.5-turbo",
-			},
-		},
-		{
-			"name":         "anthropic",
-			"display_name": "Anthropic",
-			"models": []string{
-				"claude-3-opus-20240229",
-				"claude-3-sonnet-20240229",
-				"claude-3-haiku-20240307",
-			},
-		},
-		{
-			"name":         "google",
-			"display_name": "Google AI",
-			"models": []string{
-				"gemini-pro",
-				"gemini-pro-vision",
-			},
-		},
+	db := config.GetDB()
+	if db == nil {
+		c.JSON(http.StatusOK, legacyProviderList())
+		return
+	}
+
+	rows, err := db.Query(
+		`SELECT code, name, api_format FROM model_providers WHERE status = 'active' ORDER BY sort_order ASC`,
+	)
+	if err != nil {
+		c.JSON(http.StatusOK, legacyProviderList())
+		return
+	}
+	defer rows.Close()
+
+	providers := make([]map[string]interface{}, 0)
+	for rows.Next() {
+		var code, name, apiFormat string
+		if scanErr := rows.Scan(&code, &name, &apiFormat); scanErr != nil {
+			continue
+		}
+		providers = append(providers, map[string]interface{}{
+			"name":         code,
+			"display_name": name,
+			"api_format":   apiFormat,
+		})
+	}
+	if len(providers) == 0 {
+		providers = legacyProviderList()
 	}
 
 	c.JSON(http.StatusOK, providers)

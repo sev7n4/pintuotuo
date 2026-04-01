@@ -257,6 +257,7 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.DELETE("/skus/:id", handlers.DeleteSKU)
 
 		admin.GET("/model-providers", handlers.GetModelProviders)
+		admin.PATCH("/model-providers/:id", handlers.PatchModelProvider)
 	}
 }
 
