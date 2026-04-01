@@ -1,39 +1,46 @@
 {
   "currentIssue": {
-    "id": "MERCHANT-SKU-CACHE-001",
-    "type": "fix",
-    "module": "merchant-sku",
-    "branch": "fix/merchant-sku-cache-invalidation",
-    "title": "商户SKU状态筛选与上下架后列表刷新缓存失效修复"
+    "id": "OPENAI-COMPAT-001",
+    "type": "feat",
+    "module": "proxy",
+    "branch": "feat/openai-compat-c-end",
+    "title": "C端 OpenAI 兼容 /chat/completions 与 ptd_/ptt_ 平台密钥鉴权"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-BE-MERCHANT-SKU-001",
-        "name": "merchant sku handler tests pass after cache invalidation refactor",
-        "feature": "merchant sku cache invalidation",
+        "id": "UT-BE-OPENAI-MODEL-001",
+        "name": "resolveOpenAICompatModel maps provider/model and inference",
+        "feature": "openai_compat",
         "status": "passed",
-        "file": "backend/handlers/merchant_sku.go"
+        "file": "backend/handlers/api_proxy_test.go"
+      },
+      {
+        "id": "UT-BE-APIKEY-HASH-001",
+        "name": "HashUserAPIKey deterministic",
+        "feature": "utils apikey",
+        "status": "passed",
+        "file": "backend/utils/apikey_test.go"
       }
     ],
     "integration": [
       {
-        "id": "IT-MERCHANT-SKU-001",
-        "name": "status filtered list refreshes correctly after up/down operation",
-        "feature": "Merchant SKU API + cache",
+        "id": "IT-OPENAI-COMPAT-001",
+        "name": "POST /api/v1/openai/v1/chat/completions with Bearer platform key",
+        "feature": "OpenAI compat route",
         "status": "ready",
-        "file": "backend/handlers/merchant_sku.go"
+        "file": "backend/routes/routes.go"
       }
     ],
     "e2e": [
       {
-        "id": "E2E-MERCHANT-SKU-001",
-        "name": "merchant sku page toggles status and list updates under all filters",
-        "feature": "Merchant SKU page",
+        "id": "E2E-OPENAI-COMPAT-001",
+        "name": "MyToken shows OpenAI-compatible base URL hint",
+        "feature": "MyToken",
         "status": "ready",
-        "file": "frontend/src/pages/merchant/MerchantSKUs.tsx"
+        "file": "frontend/src/pages/MyToken.tsx"
       }
     ]
   },
-  "lastUpdated": "2026-04-01T16:40:00Z"
+  "lastUpdated": "2026-04-01T17:30:00Z"
 }

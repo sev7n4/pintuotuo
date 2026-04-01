@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -62,15 +63,15 @@ func setupAPIKeyTestDB() (*sql.DB, error) {
 
 func TestHashAPIKey(t *testing.T) {
 	key := "ptd_test_key"
-	hash1 := hashAPIKey(key)
-	hash2 := hashAPIKey(key)
+	hash1 := utils.HashUserAPIKey(key)
+	hash2 := utils.HashUserAPIKey(key)
 
 	// 相同密钥应该产生相同的哈希
 	assert.Equal(t, hash1, hash2)
 
 	// 不同密钥应该产生不同的哈希
 	differentKey := "ptd_different_key"
-	differentHash := hashAPIKey(differentKey)
+	differentHash := utils.HashUserAPIKey(differentKey)
 	assert.NotEqual(t, hash1, differentHash)
 
 	// 哈希长度应该是64个字符（sha256的十六进制表示）
