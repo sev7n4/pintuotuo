@@ -1043,6 +1043,50 @@ func GetModelProviders(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": providers})
 }
 
+// ListAllModelProviders returns every model_providers row (any status) for admin maintenance.
+// Not cached; use GetModelProviders for the active-only cached list used by dropdowns.
+func ListAllModelProviders(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	rows, err := db.Query(
+		`SELECT id, code, name, api_base_url, api_format, billing_type, cache_enabled, COALESCE(cache_discount_rate, 0), status, sort_order, created_at, updated_at
+		 FROM model_providers ORDER BY sort_order ASC, id ASC`,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer rows.Close()
+
+	var providers []models.ModelProvider
+	for rows.Next() {
+		var p models.ModelProvider
+		var apiBaseURL, billingType sql.NullString
+		err := rows.Scan(&p.ID, &p.Code, &p.Name, &apiBaseURL, &p.APIFormat, &billingType, &p.CacheEnabled, &p.CacheDiscount, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		if apiBaseURL.Valid {
+			p.APIBaseURL = apiBaseURL.String
+		}
+		if billingType.Valid {
+			p.BillingType = billingType.String
+		}
+		providers = append(providers, p)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": providers})
+}
+
 func PatchModelProvider(c *gin.Context) {
 	if !ensureAdmin(c) {
 		return

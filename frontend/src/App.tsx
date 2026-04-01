@@ -53,6 +53,7 @@ import AdminOrders from '@pages/admin/AdminOrders';
 import AdminSettings from '@pages/admin/AdminSettings';
 import AdminSPUs from '@pages/admin/AdminSPUs';
 import AdminSKUs from '@pages/admin/AdminSKUs';
+import AdminModelProviders from '@pages/admin/AdminModelProviders';
 
 function App() {
   return (
@@ -143,6 +144,7 @@ function App() {
             <Route path="settings" element={<AdminSettings />} />
             <Route path="spus" element={<AdminSPUs />} />
             <Route path="skus" element={<AdminSKUs />} />
+            <Route path="model-providers" element={<AdminModelProviders />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -1,46 +1,43 @@
 {
   "currentIssue": {
-    "id": "OPENAI-COMPAT-001",
-    "type": "feat",
-    "module": "proxy",
-    "branch": "main",
-    "title": "C端 OpenAI 兼容 /chat/completions 与 ptd_/ptt_ 平台密钥鉴权"
+    "id": "ADMIN-MODEL-PROVIDERS-001",
+    "type": "feature",
+    "module": "admin sku",
+    "branch": "feature/admin-model-providers-maintenance",
+    "title": "管理端 model_providers 列表与 PATCH 维护入口"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-BE-OPENAI-MODEL-001",
-        "name": "resolveOpenAICompatModel maps provider/model and inference",
-        "feature": "openai_compat",
+        "id": "UT-BE-ADMIN-MP-001",
+        "name": "ListAllModelProviders rejects without admin role",
+        "feature": "ListAllModelProviders",
         "status": "passed",
-        "file": "backend/handlers/api_proxy_test.go"
+        "file": "backend/handlers/admin_test.go"
       },
       {
-        "id": "UT-BE-APIKEY-HASH-001",
-        "name": "HashUserAPIKey deterministic",
-        "feature": "utils apikey",
+        "id": "UT-BE-ADMIN-MP-002",
+        "name": "ListAllModelProviders rejects non-admin user_role",
+        "feature": "ListAllModelProviders",
         "status": "passed",
-        "file": "backend/utils/apikey_test.go"
+        "file": "backend/handlers/admin_test.go"
+      },
+      {
+        "id": "UT-BE-ADMIN-MP-003",
+        "name": "ListAllModelProviders returns data when DB available",
+        "feature": "ListAllModelProviders",
+        "status": "passed",
+        "file": "backend/handlers/admin_test.go"
       }
     ],
-    "integration": [
-      {
-        "id": "IT-OPENAI-COMPAT-001",
-        "name": "POST /api/v1/openai/v1/chat/completions with Bearer platform key",
-        "feature": "OpenAI compat route",
-        "status": "passed",
-        "file": "backend/routes/routes.go"
-      }
-    ],
-    "e2e": [
-      {
-        "id": "E2E-OPENAI-COMPAT-001",
-        "name": "MyToken shows OpenAI-compatible base URL hint",
-        "feature": "MyToken",
-        "status": "passed",
-        "file": "frontend/src/pages/MyToken.tsx"
-      }
-    ]
+    "integration": [],
+    "e2e": []
   },
-  "lastUpdated": "2026-04-01T19:05:00Z"
+  "statistics": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "pending": 0
+  },
+  "lastUpdated": "2026-04-01T20:00:00Z"
 }
