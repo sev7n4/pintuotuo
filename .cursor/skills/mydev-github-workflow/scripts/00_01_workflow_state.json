@@ -1,15 +1,15 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": [
     "FE-MERCHANT-SKU-FILTER-CACHE-001"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 143,
   "merged": false,
   "branch": "fix/merchant-sku-cache-invalidation",
   "local_validation": "partial",
   "ci_status": {
-    "cicd": "pending",
+    "cicd": "running",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
@@ -23,11 +23,11 @@
     }
   ],
   "created_at": "2026-03-31T15:07:11Z",
-  "updated_at": "2026-04-01T16:46:00Z",
+  "updated_at": "2026-04-01T16:50:00Z",
   "metadata": {
     "repo": "pintuotuo",
     "task": "fix merchant sku cache invalidation for status filtering refresh",
-    "head": "working",
+    "head": "4b75239",
     "changed_files": 3
   }
 }
