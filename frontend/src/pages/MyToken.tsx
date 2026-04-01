@@ -291,7 +291,11 @@ const MyToken = () => {
       key: 'payment_method',
       width: 120,
       render: (method: string) => {
-        const methodMap: Record<string, string> = { alipay: '支付宝', wechat: '微信', balance: '余额' };
+        const methodMap: Record<string, string> = {
+          alipay: '支付宝',
+          wechat: '微信',
+          balance: '余额',
+        };
         return methodMap[method] || method;
       },
     },
@@ -301,7 +305,8 @@ const MyToken = () => {
       key: 'status',
       width: 110,
       render: (status: string) => {
-        const color = status === 'success' ? 'success' : status === 'failed' ? 'error' : 'processing';
+        const color =
+          status === 'success' ? 'success' : status === 'failed' ? 'error' : 'processing';
         const label = status === 'success' ? '成功' : status === 'failed' ? '失败' : '待支付';
         return <Tag color={color}>{label}</Tag>;
       },
@@ -476,8 +481,10 @@ const MyToken = () => {
             key="apikeys"
           >
             <Paragraph type="secondary" className={styles.hintParagraph}>
-              此处生成的是本平台调用接口用的访问密钥（前缀一般为 <Text code>ptd_</Text>），用于请求拼坨陀 API（含模型代理等），
-              <strong>不是</strong> OpenAI 等厂商控制台里的 <Text code>sk-...</Text>。调厂商接口由平台侧配置。
+              此处生成的是本平台调用接口用的访问密钥（前缀一般为 <Text code>ptd_</Text>
+              ），用于请求拼坨陀 API（含模型代理等），
+              <strong>不是</strong> OpenAI 等厂商控制台里的 <Text code>sk-...</Text>
+              。调厂商接口由平台侧配置。
             </Paragraph>
             <div className={styles.tabHeader}>
               <Button
@@ -568,9 +575,18 @@ const MyToken = () => {
               { type: 'number', min: 0.01, message: '金额必须大于0' },
             ]}
           >
-            <InputNumber min={0.01} precision={2} style={{ width: '100%' }} placeholder="请输入充值金额" />
+            <InputNumber
+              min={0.01}
+              precision={2}
+              style={{ width: '100%' }}
+              placeholder="请输入充值金额"
+            />
           </Form.Item>
-          <Form.Item name="method" label="支付方式" rules={[{ required: true, message: '请选择支付方式' }]}>
+          <Form.Item
+            name="method"
+            label="支付方式"
+            rules={[{ required: true, message: '请选择支付方式' }]}
+          >
             <Select
               options={[
                 { label: '支付宝', value: 'alipay' },
@@ -580,8 +596,8 @@ const MyToken = () => {
             />
           </Form.Item>
           <Paragraph type="secondary">
-            创建订单后会出现在「充值订单」列表。正式环境需跳转第三方支付；测试环境可同时开启服务端 ALLOW_TEST_RECHARGE 与前端
-            VITE_ALLOW_MOCK_RECHARGE 后在列表中使用「模拟支付完成」。
+            创建订单后会出现在「充值订单」列表。正式环境需跳转第三方支付；测试环境可同时开启服务端
+            ALLOW_TEST_RECHARGE 与前端 VITE_ALLOW_MOCK_RECHARGE 后在列表中使用「模拟支付完成」。
           </Paragraph>
         </Form>
       </Modal>
