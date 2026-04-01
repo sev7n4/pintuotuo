@@ -1,18 +1,18 @@
 {
-  "current_step": 10,
+  "current_step": 14,
   "current_fix_cases": [
     "FE-OPENAI-COMPAT-C-001"
   ],
   "retry_count": 1,
   "pr_number": 144,
-  "merged": false,
-  "branch": "feat/openai-compat-c-end",
+  "merged": true,
+  "branch": "main",
   "local_validation": "partial",
   "ci_status": {
-    "cicd": "pending_recheck_after_fix",
-    "integration": "pending",
-    "e2e": "pending",
-    "deploy": "pending"
+    "cicd": "success",
+    "integration": "success",
+    "e2e": "success",
+    "deploy": "success"
   },
   "error_history": [
     {
@@ -26,14 +26,22 @@
       "error_type": "代码错误",
       "message": "CI: golangci goconst/govet on api_proxy/openai_compat; ESLint rules-of-hooks on MyToken — fixed",
       "timestamp": "2026-04-01T18:10:00Z"
+    },
+    {
+      "step": 11,
+      "error_type": "环境问题",
+      "message": "E2E job exceeded 15m timeout — fixed by ci(e2e): timeout-minutes 30",
+      "timestamp": "2026-04-01T19:00:00Z"
     }
   ],
   "created_at": "2026-03-31T15:07:11Z",
-  "updated_at": "2026-04-01T18:20:00Z",
+  "updated_at": "2026-04-01T19:05:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "OpenAI-compatible chat completions + platform API key auth for C-end clients",
-    "head": "724bcee",
-    "changed_files": 11
+    "task": "OpenAI-compatible chat/completions + platform API key auth for C-end clients",
+    "head": "b3ec8e0",
+    "changed_files": 14,
+    "deploy_run": "23860736670",
+    "prod_smoke": "health 200; POST /api/v1/openai/v1/chat/completions without key returns 401"
   }
 }
