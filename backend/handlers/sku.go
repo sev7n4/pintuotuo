@@ -200,7 +200,7 @@ func CreateSPU(c *gin.Context) {
 		req.BaseComputePoints = 1.0
 	}
 	if req.Status == "" {
-		req.Status = "active"
+		req.Status = merchantStatusActive
 	}
 
 	db := config.GetDB()
@@ -666,7 +666,7 @@ func CreateSKU(c *gin.Context) {
 	}
 
 	if req.Status == "" {
-		req.Status = "active"
+		req.Status = merchantStatusActive
 	}
 	if req.Stock == 0 {
 		req.Stock = -1
@@ -1068,7 +1068,7 @@ func PatchModelProvider(c *gin.Context) {
 	}
 
 	if req.Status != nil {
-		if *req.Status != "active" && *req.Status != "inactive" {
+		if *req.Status != merchantStatusActive && *req.Status != merchantSKUStatusInactive {
 			middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 			return
 		}
