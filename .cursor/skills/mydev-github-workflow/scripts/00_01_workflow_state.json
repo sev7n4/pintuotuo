@@ -9,7 +9,7 @@
   "branch": "feat/openai-compat-c-end",
   "local_validation": "partial",
   "ci_status": {
-    "cicd": "running",
+    "cicd": "pending_recheck_after_fix",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
@@ -29,11 +29,11 @@
     }
   ],
   "created_at": "2026-03-31T15:07:11Z",
-  "updated_at": "2026-04-01T17:30:00Z",
+  "updated_at": "2026-04-01T18:20:00Z",
   "metadata": {
     "repo": "pintuotuo",
     "task": "OpenAI-compatible chat completions + platform API key auth for C-end clients",
-    "head": "608bf49",
+    "head": "724bcee",
     "changed_files": 11
   }
 }
