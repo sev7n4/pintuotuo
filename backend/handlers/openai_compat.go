@@ -50,14 +50,14 @@ func respondOpenAIError(c *gin.Context, status int, message string) {
 // Clients should set base URL to {API_ORIGIN}/api/v1/openai/v1 (OpenAI SDK: baseURL + "/chat/completions").
 // Authentication: Bearer platform API key (ptd_* / ptt_*) or existing JWT (same as /proxy/chat).
 func OpenAIChatCompletions(c *gin.Context) {
-	bodyBytes, err := io.ReadAll(c.Request.Body)
-	if err != nil {
+	bodyBytes, readErr := io.ReadAll(c.Request.Body)
+	if readErr != nil {
 		respondOpenAIError(c, http.StatusBadRequest, "Failed to read request body")
 		return
 	}
 
 	var raw map[string]interface{}
-	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+	if unmarshalErr := json.Unmarshal(bodyBytes, &raw); unmarshalErr != nil {
 		respondOpenAIError(c, http.StatusBadRequest, "Invalid JSON body")
 		return
 	}
@@ -72,20 +72,20 @@ func OpenAIChatCompletions(c *gin.Context) {
 		respondOpenAIError(c, http.StatusBadRequest, "messages is required")
 		return
 	}
-	messagesJSON, err := json.Marshal(msgsRaw)
-	if err != nil {
+	messagesJSON, marshalErr := json.Marshal(msgsRaw)
+	if marshalErr != nil {
 		respondOpenAIError(c, http.StatusBadRequest, "messages is invalid")
 		return
 	}
 	var messages []ChatMessage
-	if err := json.Unmarshal(messagesJSON, &messages); err != nil || len(messages) == 0 {
+	if msgErr := json.Unmarshal(messagesJSON, &messages); msgErr != nil || len(messages) == 0 {
 		respondOpenAIError(c, http.StatusBadRequest, "messages must be a non-empty array")
 		return
 	}
 
 	stream := false
-	if s, ok := raw["stream"].(bool); ok {
-		stream = s
+	if streamVal, streamOk := raw["stream"].(bool); streamOk {
+		stream = streamVal
 	}
 	if stream {
 		respondOpenAIError(c, http.StatusBadRequest, "Streaming is not supported yet; set stream to false")
@@ -97,11 +97,12 @@ func OpenAIChatCompletions(c *gin.Context) {
 	delete(raw, "stream")
 	var options json.RawMessage
 	if len(raw) > 0 {
-		options, err = json.Marshal(raw)
-		if err != nil {
+		optBytes, optErr := json.Marshal(raw)
+		if optErr != nil {
 			respondOpenAIError(c, http.StatusBadRequest, "Invalid optional parameters")
 			return
 		}
+		options = optBytes
 	}
 
 	provider, modelName := resolveOpenAICompatModel(modelVal)

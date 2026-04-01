@@ -230,7 +230,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	switch providerCfg.APIFormat {
-	case "anthropic":
+	case providerAnthropic:
 		httpReq.Header.Set("x-api-key", decryptedKey)
 		httpReq.Header.Set("anthropic-version", "2023-06-01")
 	default:
@@ -337,7 +337,7 @@ func calculateTokenCost(provider, model string, inputTokens, outputTokens int) f
 			inputRate = 0.001 / 1000
 			outputRate = 0.002 / 1000
 		}
-	case "anthropic":
+	case providerAnthropic:
 		switch {
 		case strings.Contains(model, "claude-3-opus"):
 			inputRate = 0.015 / 1000

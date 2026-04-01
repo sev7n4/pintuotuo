@@ -37,9 +37,6 @@ import styles from './MyToken.module.css';
 const { TabPane } = Tabs;
 const { Text, Paragraph } = Typography;
 
-  const allowMockRecharge = import.meta.env.VITE_ALLOW_MOCK_RECHARGE === 'true';
-  const openAICompatBase = useMemo(() => openAICompatBaseURL(), []);
-
 function openAICompatBaseURL(): string {
   const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || '/api/v1';
   const normalized = base.endsWith('/') ? base.slice(0, -1) : base;
@@ -53,6 +50,9 @@ function openAICompatBaseURL(): string {
 }
 
 const MyToken = () => {
+  const allowMockRecharge = import.meta.env.VITE_ALLOW_MOCK_RECHARGE === 'true';
+  const openAICompatBase = useMemo(() => openAICompatBaseURL(), []);
+
   const {
     balance,
     transactions,
