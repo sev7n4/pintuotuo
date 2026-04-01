@@ -1,17 +1,17 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": [
     "UT-BE-ADMIN-MP-001",
     "UT-BE-ADMIN-MP-002",
     "UT-BE-ADMIN-MP-003"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 146,
   "merged": false,
   "branch": "feature/admin-model-providers-maintenance",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "pending",
+    "cicd": "running",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
@@ -23,6 +23,7 @@
     "repo": "pintuotuo",
     "task": "管理端模型厂商维护：GET /admin/model-providers/all + 页面 /admin/model-providers",
     "issue_type": "feature",
-    "skill": "mydev-github-workflow"
+    "skill": "mydev-github-workflow",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/146"
   }
 }
