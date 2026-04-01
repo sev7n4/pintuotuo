@@ -455,3 +455,46 @@ func TestRejectMerchant_WithDatabase(t *testing.T) {
 
 	assert.NotEqual(t, http.StatusForbidden, w.Code)
 }
+
+func TestListAllModelProviders_MissingRole(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/admin/model-providers/all", nil)
+
+	ListAllModelProviders(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestListAllModelProviders_NonAdmin(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/admin/model-providers/all", nil)
+	c.Set("user_role", "user")
+
+	ListAllModelProviders(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestListAllModelProviders_WithDatabase(t *testing.T) {
+	if config.GetDB() == nil {
+		t.Skip("跳过需要数据库连接的测试")
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/admin/model-providers/all", nil)
+	c.Set("user_role", "admin")
+
+	ListAllModelProviders(c)
+
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var body map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &body)
+	assert.NoError(t, err)
+	assert.Contains(t, body, "data")
+}

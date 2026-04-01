@@ -13,6 +13,7 @@ import {
   CloseOutlined,
   DatabaseOutlined,
   TagsOutlined,
+  ApiOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -49,6 +50,11 @@ const menuItems = [
     key: '/admin/skus',
     icon: <TagsOutlined />,
     label: 'SKU管理',
+  },
+  {
+    key: '/admin/model-providers',
+    icon: <ApiOutlined />,
+    label: '模型厂商',
   },
   {
     key: '/admin/orders',

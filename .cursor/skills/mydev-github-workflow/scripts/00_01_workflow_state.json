@@ -1,47 +1,28 @@
 {
-  "current_step": 14,
+  "current_step": 9,
   "current_fix_cases": [
-    "FE-OPENAI-COMPAT-C-001"
+    "UT-BE-ADMIN-MP-001",
+    "UT-BE-ADMIN-MP-002",
+    "UT-BE-ADMIN-MP-003"
   ],
-  "retry_count": 1,
-  "pr_number": 144,
-  "merged": true,
-  "branch": "main",
-  "local_validation": "partial",
+  "retry_count": 0,
+  "pr_number": null,
+  "merged": false,
+  "branch": "feature/admin-model-providers-maintenance",
+  "local_validation": "passed",
   "ci_status": {
-    "cicd": "success",
-    "integration": "success",
-    "e2e": "success",
-    "deploy": "success"
+    "cicd": "pending",
+    "integration": "pending",
+    "e2e": "pending",
+    "deploy": "pending"
   },
-  "error_history": [
-    {
-      "step": 8,
-      "error_type": "环境问题",
-      "message": "make test may fail on frontend Jest import.meta; backend go test ./... passed; frontend npm run build passed",
-      "timestamp": "2026-04-01T17:30:00Z"
-    },
-    {
-      "step": 11,
-      "error_type": "代码错误",
-      "message": "CI: golangci goconst/govet on api_proxy/openai_compat; ESLint rules-of-hooks on MyToken — fixed",
-      "timestamp": "2026-04-01T18:10:00Z"
-    },
-    {
-      "step": 11,
-      "error_type": "环境问题",
-      "message": "E2E job exceeded 15m timeout — fixed by ci(e2e): timeout-minutes 30",
-      "timestamp": "2026-04-01T19:00:00Z"
-    }
-  ],
-  "created_at": "2026-03-31T15:07:11Z",
-  "updated_at": "2026-04-01T19:05:00Z",
+  "error_history": [],
+  "created_at": "2026-04-01T20:00:00Z",
+  "updated_at": "2026-04-01T20:15:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "OpenAI-compatible chat/completions + platform API key auth for C-end clients",
-    "head": "b3ec8e0",
-    "changed_files": 14,
-    "deploy_run": "23860736670",
-    "prod_smoke": "health 200; POST /api/v1/openai/v1/chat/completions without key returns 401"
+    "task": "管理端模型厂商维护：GET /admin/model-providers/all + 页面 /admin/model-providers",
+    "issue_type": "feature",
+    "skill": "mydev-github-workflow"
   }
 }

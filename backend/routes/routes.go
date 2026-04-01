@@ -265,6 +265,7 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.PUT("/skus/:id", handlers.UpdateSKU)
 		admin.DELETE("/skus/:id", handlers.DeleteSKU)
 
+		admin.GET("/model-providers/all", handlers.ListAllModelProviders)
 		admin.GET("/model-providers", handlers.GetModelProviders)
 		admin.PATCH("/model-providers/:id", handlers.PatchModelProvider)
 	}
