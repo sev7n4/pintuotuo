@@ -1,15 +1,15 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": [
     "FE-OPENAI-COMPAT-C-001"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 144,
   "merged": false,
   "branch": "feat/openai-compat-c-end",
   "local_validation": "partial",
   "ci_status": {
-    "cicd": "pending",
+    "cicd": "running",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
@@ -27,7 +27,7 @@
   "metadata": {
     "repo": "pintuotuo",
     "task": "OpenAI-compatible chat completions + platform API key auth for C-end clients",
-    "head": "working",
+    "head": "608bf49",
     "changed_files": 11
   }
 }
