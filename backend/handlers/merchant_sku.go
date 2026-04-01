@@ -17,6 +17,16 @@ import (
 
 const merchantSKUStatusInactive = "inactive"
 
+func invalidateMerchantSKUCache(ctx context.Context, merchantID int) {
+	// invalidate all status-filtered sku list cache
+	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, ""))
+	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, "all"))
+	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, merchantStatusActive))
+	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, merchantSKUStatusInactive))
+	// invalidate all available sku filter cache
+	_ = cache.InvalidatePatterns(ctx, cache.AvailableSKUsKey(merchantID, "*", "*"))
+}
+
 func ListMerchantSKUs(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -330,7 +340,7 @@ func CreateMerchantSKU(c *gin.Context) {
 			_ = db.QueryRow("SELECT name, provider FROM merchant_api_keys WHERE id = $1", *reactivated.APIKeyID).Scan(&reactivated.APIKeyName, &reactivated.APIKeyProvider)
 		}
 		ctx := context.Background()
-		cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, ""))
+		invalidateMerchantSKUCache(ctx, merchantID)
 		c.JSON(http.StatusOK, gin.H{"data": reactivated})
 		return
 	}
@@ -387,7 +397,7 @@ func CreateMerchantSKU(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, ""))
+	invalidateMerchantSKUCache(ctx, merchantID)
 
 	c.JSON(http.StatusCreated, gin.H{"data": merchantSKU})
 }
@@ -491,7 +501,7 @@ func UpdateMerchantSKU(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, ""))
+	invalidateMerchantSKUCache(ctx, merchantID)
 
 	c.JSON(http.StatusOK, gin.H{"data": merchantSKU})
 }
@@ -552,7 +562,7 @@ func DeleteMerchantSKU(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, ""))
+	invalidateMerchantSKUCache(ctx, merchantID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "SKU已下架"})
 }
