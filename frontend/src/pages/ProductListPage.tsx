@@ -21,7 +21,6 @@ import {
 } from 'antd';
 import {
   SearchOutlined,
-  SortAscendingOutlined,
   FireOutlined,
   ClockCircleOutlined,
   ThunderboltOutlined,

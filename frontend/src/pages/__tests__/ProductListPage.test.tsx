@@ -38,7 +38,7 @@ jest.mock('antd', () => ({
                       item[col.dataIndex as string],
                       item
                     )
-                  : item[col.dataIndex as string]}
+                  : (item[col.dataIndex as string] as React.ReactNode)}
               </div>
             ))}
           </div>
