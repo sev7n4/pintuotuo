@@ -103,12 +103,13 @@ COMMENT ON VIEW products_v2 IS '商品兼容视图，用于旧API兼容';
 INSERT INTO skus (spu_id, sku_code, sku_type, token_amount, compute_points, retail_price, original_price, stock, valid_days, status, group_enabled, min_group_size, max_group_size)
 SELECT 
   sp.id,
-  'SKU-' || UPPER(s.spu_code) || '-DEFAULT',
+  'SKU-' || UPPER(sp.spu_code) || '-DEFAULT',
   'token_pack',
   NULL,
   NULL,
-  p.base_compute_points * 1000,
+  sp.base_compute_points * 1000,
   1.0,
+  -1,
   365,
   'active',
   true,
