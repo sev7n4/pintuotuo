@@ -62,8 +62,17 @@ CREATE TABLE IF NOT EXISTS merchant_stats (
     UNIQUE(merchant_id, stat_date)
 );
 
--- Add merchant_id to products table
-ALTER TABLE products ADD COLUMN IF NOT EXISTS merchant_id INTEGER REFERENCES merchants(id) ON DELETE SET NULL;
+-- Add merchant_id to products table (legacy products 表可能已被后续迁移移除)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'products'
+  ) THEN
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS merchant_id INTEGER REFERENCES merchants(id) ON DELETE SET NULL;
+    CREATE INDEX IF NOT EXISTS idx_products_merchant ON products(merchant_id);
+  END IF;
+END $$;
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_merchants_user ON merchants(user_id);
@@ -74,7 +83,6 @@ CREATE INDEX IF NOT EXISTS idx_merchant_settlements_merchant ON merchant_settlem
 CREATE INDEX IF NOT EXISTS idx_merchant_settlements_status ON merchant_settlements(status);
 CREATE INDEX IF NOT EXISTS idx_merchant_stats_merchant ON merchant_stats(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_merchant_stats_date ON merchant_stats(stat_date);
-CREATE INDEX IF NOT EXISTS idx_products_merchant ON products(merchant_id);
 
 -- Add merchant profile fields to users table
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_merchant BOOLEAN DEFAULT FALSE;

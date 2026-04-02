@@ -1,5 +1,4 @@
 module.exports = {
-  preset: 'ts-jest',
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.ts?(x)', '**/?(*.)+(spec|test).ts?(x)'],
@@ -14,6 +13,7 @@ module.exports = {
     '/node_modules/',
     '/dist/',
   ],
+  setupFiles: ['<rootDir>/jest-env-setup.cjs'],
   setupFilesAfterEnv: ['<rootDir>/src/setup-tests.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
@@ -28,22 +28,6 @@ module.exports = {
     '^.+\\.(css|sass|scss)$': '<rootDir>/__mocks__/styleMock.js',
   },
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: {
-        jsx: 'react-jsx',
-        isolatedModules: true,
-      },
-    }],
-  },
-  globals: {
-    'import.meta': {
-      env: {
-        VITE_API_BASE_URL: '/api/v1',
-        MODE: 'test',
-        DEV: false,
-        PROD: false,
-        SSR: false,
-      },
-    },
+    '^.+\\.tsx?$': 'babel-jest',
   },
 }
