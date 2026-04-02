@@ -11,9 +11,9 @@
   "branch": "feature/catalog-products-sku-migration",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "running",
-    "integration": "pending",
-    "e2e": "pending",
+    "cicd": "success",
+    "integration": "success",
+    "e2e": "success",
     "deploy": "pending"
   },
   "error_history": [
@@ -41,6 +41,7 @@
     "closed_pr": 147,
     "deleted_branch": "feature/admin-model-providers-maintenance",
     "validation_note": "Step8: go test ./... -short; npm run type-check && npm run lint",
-    "next_action": "monitor_ci_pr_148"
+    "next_action": "step_12_merge_pr_148_if_approved",
+    "last_ci_run": "23881216756"
   }
 }
