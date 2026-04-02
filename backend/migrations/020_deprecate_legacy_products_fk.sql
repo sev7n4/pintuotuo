@@ -1,6 +1,6 @@
 -- Deprecate legacy products table as source of truth: allow SKU-only orders/groups/cart rows.
 -- Safe when no production data depends on products(id) FK integrity.
--- Version: 019
+-- Version: 020
 -- Date: 2026-04-02
 
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_product_id_fkey;

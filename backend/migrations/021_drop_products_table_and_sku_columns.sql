@@ -1,6 +1,6 @@
 -- 物理移除 legacy products 表；收藏/浏览/秒杀关联列统一为 sku_id；购物车仅保留 sku_id。
--- 依赖：019 已解除 orders/groups/cart_items 对 products 的外键。
--- Version: 020
+-- 依赖：020_deprecate_legacy_products_fk 已解除 orders/groups/cart_items 对 products 的外键。
+-- Version: 021
 -- Date: 2026-04-02
 
 DROP VIEW IF EXISTS products_v2 CASCADE;
