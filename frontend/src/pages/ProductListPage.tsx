@@ -60,7 +60,7 @@ interface ProductFilters {
 interface FlashSaleProduct {
   id: number;
   flash_sale_id: number;
-  product_id: number;
+  sku_id: number;
   product_name: string;
   flash_price: number;
   original_price: number;
@@ -77,7 +77,7 @@ interface FlashSale {
   start_time: string;
   end_time: string;
   status: string;
-  products: FlashSaleProduct[];
+  skus: FlashSaleProduct[];
 }
 
 const sortTypeMap: Record<string, { title: string; icon: React.ReactNode }> = {
@@ -244,7 +244,7 @@ export const ProductListPage: React.FC = () => {
   };
 
   const handleBuyFlashProduct = (product: FlashSaleProduct) => {
-    navigate(`/products/${product.product_id}?flash_sale_id=${product.flash_sale_id}`);
+    navigate(`/catalog/${product.sku_id}?flash_sale_id=${product.flash_sale_id}`);
   };
 
   const displayProducts = isSpecialSort ? localProducts : products;
@@ -256,7 +256,7 @@ export const ProductListPage: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       render: (text: string, record: Product) => (
-        <a onClick={() => navigate(`/products/${record.id}`)}>{text}</a>
+        <a onClick={() => navigate(`/catalog/${record.id}`)}>{text}</a>
       ),
     },
     {
@@ -298,10 +298,10 @@ export const ProductListPage: React.FC = () => {
       key: 'action',
       render: (_: any, record: Product) => (
         <Space>
-          <Button type="link" size="small" onClick={() => navigate(`/products/${record.id}`)}>
+          <Button type="link" size="small" onClick={() => navigate(`/catalog/${record.id}`)}>
             详情
           </Button>
-          <Button type="link" size="small" onClick={() => navigate(`/products/${record.id}/cart`)}>
+          <Button type="link" size="small" onClick={() => navigate(`/cart`)}>
             加购
           </Button>
         </Space>
@@ -420,7 +420,7 @@ export const ProductListPage: React.FC = () => {
 
   const handleSearch = (value: string) => {
     if (value.trim()) {
-      navigate(`/products?search=${encodeURIComponent(value.trim())}`);
+      navigate(`/catalog?search=${encodeURIComponent(value.trim())}`);
     }
   };
 
@@ -499,7 +499,7 @@ export const ProductListPage: React.FC = () => {
                   <Space direction="vertical">
                     <Title level={4}>暂无进行中的秒杀活动</Title>
                     <Text type="secondary">敬请期待下一场秒杀！</Text>
-                    <Button type="primary" onClick={() => navigate('/products')}>
+                    <Button type="primary" onClick={() => navigate('/catalog')}>
                       浏览商品
                     </Button>
                   </Space>
@@ -520,7 +520,7 @@ export const ProductListPage: React.FC = () => {
                   style={{ marginBottom: 16 }}
                 >
                   <Row gutter={[16, 16]}>
-                    {sale.products.map((product) => {
+                    {sale.skus.map((product) => {
                       const stockPercent =
                         ((product.stock_limit - product.stock_sold) / product.stock_limit) * 100;
                       return (

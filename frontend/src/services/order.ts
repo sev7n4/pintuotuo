@@ -2,7 +2,7 @@ import api from './api';
 import { Order, APIResponse, PaginatedResponse } from '@/types';
 
 interface CreateOrderRequest {
-  product_id: number;
+  sku_id: number;
   group_id?: number;
   quantity: number;
 }

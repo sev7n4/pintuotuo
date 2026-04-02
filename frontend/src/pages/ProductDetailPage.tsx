@@ -101,26 +101,24 @@ export const ProductDetailPage: React.FC = () => {
     if (product?.group_prices?.length) {
       setSelectedGroupPrice(product.group_prices[0]);
     }
-    if (product?.id) {
-      loadSKUs(product.id);
+    if (product?.spu_id) {
+      loadSKUs(product.spu_id, product.id);
     }
   }, [product]);
 
-  const loadSKUs = async (productId: number) => {
+  const loadSKUs = async (spuId: number, currentSkuId: number) => {
     setSkuLoading(true);
     try {
       const response = await skuService.getPublicSKUs({
         page: 1,
-        per_page: 20,
+        per_page: 50,
+        spu_id: spuId,
       });
       const apiResponse = response.data;
-      const productSKUs = (apiResponse.data || []).filter(
-        (sku: SKUWithSPU) => sku.spu_id === productId
-      );
+      const productSKUs = apiResponse.data || [];
       setSKUs(productSKUs);
-      if (productSKUs.length > 0) {
-        setSelectedSKU(productSKUs[0]);
-      }
+      const match = productSKUs.find((sku: SKUWithSPU) => sku.id === currentSkuId);
+      setSelectedSKU(match || productSKUs[0] || null);
     } catch {
       setSKUs([]);
     } finally {
@@ -187,7 +185,8 @@ export const ProductDetailPage: React.FC = () => {
     }
     try {
       const deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      const orderId = await createGroup(product.id, currentGroupPrice.min_members, deadline);
+      const skuId = selectedSKU?.id ?? product.id;
+      const orderId = await createGroup(skuId, currentGroupPrice.min_members, deadline);
       if (orderId) {
         message.success('拼团已创建，请完成支付！');
         navigate(`/payment/${orderId}`);
@@ -258,7 +257,7 @@ export const ProductDetailPage: React.FC = () => {
   return (
     <div style={{ padding: '20px', maxWidth: 900, margin: '0 auto' }}>
       <Space style={{ marginBottom: '20px' }}>
-        <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/products')}>
+        <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/catalog')}>
           返回列表
         </Button>
       </Space>

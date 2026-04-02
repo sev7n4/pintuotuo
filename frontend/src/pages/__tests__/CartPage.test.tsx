@@ -126,7 +126,7 @@ describe('CartPage Component', () => {
     const mockItems = [
       {
         id: 1,
-        product_id: 101,
+        sku_id: 101,
         quantity: 2,
         product: {
           id: 101,
@@ -136,7 +136,7 @@ describe('CartPage Component', () => {
       },
       {
         id: 2,
-        product_id: 102,
+        sku_id: 102,
         quantity: 1,
         product: {
           id: 102,
@@ -177,7 +177,7 @@ describe('CartPage Component', () => {
     const mockItems = [
       {
         id: 1,
-        product_id: 101,
+        sku_id: 101,
         quantity: 2,
         product: {
           id: 101,
@@ -221,7 +221,7 @@ describe('CartPage Component', () => {
     const mockItems = [
       {
         id: 1,
-        product_id: 101,
+        sku_id: 101,
         quantity: 2,
         product: {
           id: 101,
@@ -265,7 +265,7 @@ describe('CartPage Component', () => {
     const mockItems = [
       {
         id: 1,
-        product_id: 101,
+        sku_id: 101,
         quantity: 2,
         product: {
           id: 101,
@@ -300,14 +300,14 @@ describe('CartPage Component', () => {
     });
 
     // 验证导航函数被调用
-    expect(mockNavigate).toHaveBeenCalledWith('/products');
+    expect(mockNavigate).toHaveBeenCalledWith('/catalog');
   });
 
   test('navigates to checkout page', async () => {
     const mockItems = [
       {
         id: 1,
-        product_id: 101,
+        sku_id: 101,
         quantity: 2,
         product: {
           id: 101,
@@ -349,7 +349,7 @@ describe('CartPage Component', () => {
     const mockItems = [
       {
         id: 1,
-        product_id: 101,
+        sku_id: 101,
         quantity: 2,
         product: {
           id: 101,
@@ -384,6 +384,6 @@ describe('CartPage Component', () => {
     });
 
     // 验证导航函数被调用
-    expect(mockNavigate).toHaveBeenCalledWith('/products/101');
+    expect(mockNavigate).toHaveBeenCalledWith('/catalog/101');
   });
 });

@@ -135,7 +135,7 @@ export const OrderListPage: React.FC = () => {
 
   const handleBuyAgain = async (order: Order) => {
     try {
-      const product = await fetchProductByID(order.product_id);
+      const product = await fetchProductByID(order.sku_id ?? order.product_id);
       if (product) {
         addItem(product, order.quantity);
         message.success('已添加到购物车');

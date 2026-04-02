@@ -3,7 +3,7 @@ import { APIResponse, Product } from '@/types';
 
 export interface FavoriteItem {
   id: number;
-  product_id: number;
+  sku_id: number;
   product: Product;
   created_at: string;
 }
@@ -18,7 +18,7 @@ export interface FavoriteListResponse {
 
 export interface BrowseHistoryItem {
   id: number;
-  product_id: number;
+  sku_id: number;
   product: Product;
   view_count: number;
   viewed_at: string;
@@ -38,15 +38,15 @@ export const favoriteService = {
       params: { page, page_size: pageSize },
     }),
 
-  addFavorite: (productId: number) =>
-    api.post<APIResponse<{ id: number; product_id: number }>>('/favorites', {
-      product_id: productId,
+  addFavorite: (skuId: number) =>
+    api.post<APIResponse<{ id: number; sku_id: number }>>('/favorites', {
+      sku_id: skuId,
     }),
 
-  removeFavorite: (productId: number) => api.delete<APIResponse<null>>(`/favorites/${productId}`),
+  removeFavorite: (skuId: number) => api.delete<APIResponse<null>>(`/favorites/${skuId}`),
 
-  checkFavorite: (productId: number) =>
-    api.get<APIResponse<{ is_favorite: boolean }>>(`/favorites/check/${productId}`),
+  checkFavorite: (skuId: number) =>
+    api.get<APIResponse<{ is_favorite: boolean }>>(`/favorites/check/${skuId}`),
 };
 
 export const browseHistoryService = {
@@ -55,13 +55,12 @@ export const browseHistoryService = {
       params: { page, page_size: pageSize },
     }),
 
-  addHistory: (productId: number) =>
+  addHistory: (skuId: number) =>
     api.post<APIResponse<null>>('/browse-history', {
-      product_id: productId,
+      sku_id: skuId,
     }),
 
   clearHistory: () => api.delete<APIResponse<null>>('/browse-history'),
 
-  removeHistoryItem: (productId: number) =>
-    api.delete<APIResponse<null>>(`/browse-history/${productId}`),
+  removeHistoryItem: (skuId: number) => api.delete<APIResponse<null>>(`/browse-history/${skuId}`),
 };

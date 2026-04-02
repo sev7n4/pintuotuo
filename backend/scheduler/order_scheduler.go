@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"sync"
 	"time"
@@ -71,7 +72,7 @@ func (s *OrderScheduler) cancelExpiredOrders() {
 	defer tx.Rollback()
 
 	rows, err := tx.QueryContext(ctx, `
-		SELECT o.id, o.product_id, o.quantity 
+		SELECT o.id, o.sku_id, o.quantity 
 		FROM orders o 
 		WHERE o.status = 'pending' 
 		AND o.created_at < $1`,
@@ -83,15 +84,15 @@ func (s *OrderScheduler) cancelExpiredOrders() {
 	}
 
 	type orderInfo struct {
-		id        int
-		productID int
-		quantity  int
+		id       int
+		skuID    sql.NullInt64
+		quantity int
 	}
 
 	var orders []orderInfo
 	for rows.Next() {
 		var o orderInfo
-		if err := rows.Scan(&o.id, &o.productID, &o.quantity); err != nil {
+		if err := rows.Scan(&o.id, &o.skuID, &o.quantity); err != nil {
 			log.Printf("Scheduler: failed to scan order: %v", err)
 			continue
 		}
@@ -115,12 +116,14 @@ func (s *OrderScheduler) cancelExpiredOrders() {
 			continue
 		}
 
-		_, err = tx.ExecContext(ctx,
-			"UPDATE products SET stock = stock + $1 WHERE id = $2",
-			o.quantity, o.productID,
-		)
-		if err != nil {
-			log.Printf("Scheduler: failed to restore stock for order %d: %v", o.id, err)
+		if o.skuID.Valid && o.skuID.Int64 > 0 {
+			_, err = tx.ExecContext(ctx,
+				"UPDATE skus SET stock = CASE WHEN stock = -1 THEN -1 ELSE stock + $1 END WHERE id = $2",
+				o.quantity, o.skuID.Int64,
+			)
+			if err != nil {
+				log.Printf("Scheduler: failed to restore stock for order %d: %v", o.id, err)
+			}
 		}
 	}
 
@@ -151,11 +154,12 @@ func (s *OrderScheduler) CancelOrderManually(orderID int) error {
 	}
 	defer tx.Rollback()
 
-	var productID, quantity int
+	var skuID sql.NullInt64
+	var quantity int
 	err = tx.QueryRowContext(ctx,
-		"SELECT product_id, quantity FROM orders WHERE id = $1 AND status = 'pending'",
+		"SELECT sku_id, quantity FROM orders WHERE id = $1 AND status = 'pending'",
 		orderID,
-	).Scan(&productID, &quantity)
+	).Scan(&skuID, &quantity)
 	if err != nil {
 		return apperrors.ErrOrderNotFound
 	}
@@ -173,17 +177,19 @@ func (s *OrderScheduler) CancelOrderManually(orderID int) error {
 		)
 	}
 
-	_, err = tx.ExecContext(ctx,
-		"UPDATE products SET stock = stock + $1 WHERE id = $2",
-		quantity, productID,
-	)
-	if err != nil {
-		return apperrors.NewAppError(
-			"STOCK_RESTORE_FAILED",
-			"Failed to restore stock",
-			500,
-			err,
+	if skuID.Valid && skuID.Int64 > 0 {
+		_, err = tx.ExecContext(ctx,
+			"UPDATE skus SET stock = CASE WHEN stock = -1 THEN -1 ELSE stock + $1 END WHERE id = $2",
+			quantity, skuID.Int64,
 		)
+		if err != nil {
+			return apperrors.NewAppError(
+				"STOCK_RESTORE_FAILED",
+				"Failed to restore stock",
+				500,
+				err,
+			)
+		}
 	}
 
 	return tx.Commit()

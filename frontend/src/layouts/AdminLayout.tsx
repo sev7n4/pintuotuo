@@ -14,6 +14,7 @@ import {
   DatabaseOutlined,
   TagsOutlined,
   ApiOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -55,6 +56,11 @@ const menuItems = [
     key: '/admin/model-providers',
     icon: <ApiOutlined />,
     label: '模型厂商',
+  },
+  {
+    key: '/admin/flash-sales',
+    icon: <ThunderboltOutlined />,
+    label: '秒杀配置',
   },
   {
     key: '/admin/orders',

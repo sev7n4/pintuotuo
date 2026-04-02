@@ -38,7 +38,7 @@ describe('ProductService', () => {
 
       const result = await productService.listProducts({ page: 1, per_page: 20 });
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/products', {
+      expect(mockedApi.get).toHaveBeenCalledWith('/catalog', {
         params: { page: 1, per_page: 20 },
       });
       expect(result.data.data?.total).toBe(2);
@@ -55,7 +55,7 @@ describe('ProductService', () => {
 
       await productService.listProducts();
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/products', { params: undefined });
+      expect(mockedApi.get).toHaveBeenCalledWith('/catalog', { params: undefined });
     });
   });
 
@@ -81,7 +81,7 @@ describe('ProductService', () => {
 
       const result = await productService.getProductByID(1);
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/products/1');
+      expect(mockedApi.get).toHaveBeenCalledWith('/catalog/1');
       expect(result.data.data?.name).toBe('Test Product');
     });
   });
@@ -103,7 +103,7 @@ describe('ProductService', () => {
 
       const result = await productService.searchProducts('test');
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/products/search', {
+      expect(mockedApi.get).toHaveBeenCalledWith('/catalog/search', {
         params: { q: 'test' },
       });
       expect(result.data.data?.total).toBe(1);
@@ -137,7 +137,7 @@ describe('ProductService', () => {
         stock: 100,
       });
 
-      expect(mockedApi.post).toHaveBeenCalledWith('/products/merchants', {
+      expect(mockedApi.post).toHaveBeenCalledWith('/catalog/merchants', {
         name: 'New Product',
         description: 'Description',
         price: 99.99,
@@ -185,7 +185,7 @@ describe('ProductService', () => {
 
       await productService.deleteProduct(1);
 
-      expect(mockedApi.delete).toHaveBeenCalledWith('/products/merchants/1');
+      expect(mockedApi.delete).toHaveBeenCalledWith('/catalog/merchants/1');
     });
   });
 });

@@ -21,6 +21,7 @@ type User struct {
 type Product struct {
 	ID            int       `json:"id"`
 	MerchantID    int       `json:"merchant_id"`
+	SpuID         int       `json:"spu_id,omitempty"`
 	Name          string    `json:"name"`
 	Description   string    `json:"description"`
 	Price         float64   `json:"price"`
@@ -227,11 +228,11 @@ type CartItem struct {
 
 // CartResponse represents the cart response with product details
 type CartResponse struct {
-	ID        int     `json:"id"`
-	ProductID int     `json:"product_id"`
-	Product   Product `json:"product"`
-	GroupID   int     `json:"group_id,omitempty"`
-	Quantity  int     `json:"quantity"`
+	ID       int     `json:"id"`
+	SKUID    int     `json:"sku_id"`
+	Product  Product `json:"product"`
+	GroupID  int     `json:"group_id,omitempty"`
+	Quantity int     `json:"quantity"`
 }
 
 // CartSummary represents the cart summary
@@ -252,7 +253,7 @@ type Favorite struct {
 // FavoriteResponse represents a favorite with product details
 type FavoriteResponse struct {
 	ID        int     `json:"id"`
-	ProductID int     `json:"product_id"`
+	SKUID     int     `json:"sku_id"`
 	Product   Product `json:"product"`
 	CreatedAt string  `json:"created_at"`
 }
@@ -270,7 +271,7 @@ type BrowseHistory struct {
 // BrowseHistoryResponse represents a browse history item with product details
 type BrowseHistoryResponse struct {
 	ID        int     `json:"id"`
-	ProductID int     `json:"product_id"`
+	SKUID     int     `json:"sku_id"`
 	Product   Product `json:"product"`
 	ViewCount int     `json:"view_count"`
 	ViewedAt  string  `json:"viewed_at"`

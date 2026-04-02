@@ -6,10 +6,7 @@ export const tokenService = {
 
   getConsumption: () => api.get<TokenTransaction[]>('/tokens/consumption'),
 
-  transfer: (
-    amount: number,
-    opts: { recipientId?: number; recipientEmail?: string }
-  ) => {
+  transfer: (amount: number, opts: { recipientId?: number; recipientEmail?: string }) => {
     const body: Record<string, unknown> = { amount };
     if (opts.recipientEmail != null && opts.recipientEmail.trim() !== '') {
       body.recipient_email = opts.recipientEmail.trim();
@@ -25,7 +22,10 @@ export const tokenService = {
   getAPIKeys: () => api.get<UserAPIKey[] | APIResponse<UserAPIKey[]>>('/tokens/keys'),
 
   createAPIKey: (name: string) =>
-    api.post<{ id: number; key: string; name: string; status: 'active' | 'inactive' }>('/tokens/keys', { name }),
+    api.post<{ id: number; key: string; name: string; status: 'active' | 'inactive' }>(
+      '/tokens/keys',
+      { name }
+    ),
 
   updateAPIKey: (id: number, data: Partial<UserAPIKey>) =>
     api.put<UserAPIKey>(`/tokens/keys/${id}`, data),

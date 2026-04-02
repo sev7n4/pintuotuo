@@ -12,6 +12,8 @@ export interface User {
 export interface Product {
   id: number;
   merchant_id: number;
+  /** SPU id，用于加载同系列 SKU */
+  spu_id?: number;
   name: string;
   description: string;
   price: number;
@@ -75,6 +77,7 @@ export interface Order {
   id: number;
   user_id: number;
   product_id: number;
+  sku_id?: number;
   group_id: number | null;
   quantity: number;
   unit_price: number;
@@ -319,11 +322,10 @@ export interface APIKeyUsage {
 // Cart item type
 export interface CartItem {
   id: string;
-  product_id: number;
+  sku_id: number;
   product: Product;
   quantity: number;
   group_id?: number;
-  sku_id?: number;
   sku_name?: string;
   sku_type?: string;
   sku_specs?: string;

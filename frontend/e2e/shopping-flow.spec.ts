@@ -7,8 +7,8 @@ test.describe('Shopping Flow E2E Tests', () => {
   });
 
   test('should navigate to product list', async ({ page }) => {
-    await page.goto('/products');
-    await expect(page).toHaveURL(/.*products/, { timeout: 5000 });
+    await page.goto('/catalog');
+    await expect(page).toHaveURL(/.*catalog/, { timeout: 5000 });
   });
 
   test('should view cart page', async ({ page }) => {

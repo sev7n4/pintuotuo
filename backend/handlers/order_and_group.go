@@ -40,10 +40,10 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	if req.ProductID == 0 && req.SKUID == 0 {
+	if req.SKUID <= 0 {
 		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MISSING_PRODUCT_OR_SKU",
-			"product_id or sku_id is required",
+			"MISSING_SKU",
+			"sku_id is required",
 			http.StatusBadRequest,
 			nil,
 		))
@@ -56,53 +56,37 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	var skuID, spuID, productID int
+	var skuID, spuID int
 	var retailPrice, wholesalePrice float64
 	var stock int
 	var skuType string
 
-	if req.SKUID > 0 {
-		var groupEnabled bool
-		var minGroupSize, maxGroupSize int
-		var groupDiscountRate sql.NullFloat64
-		err := db.QueryRow(
-			`SELECT s.id, s.spu_id, s.retail_price, s.wholesale_price, s.stock, s.sku_type,
-				s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate
-			 FROM skus s JOIN spus sp ON s.spu_id = sp.id 
-			 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
-			req.SKUID,
-		).Scan(&skuID, &spuID, &retailPrice, &wholesalePrice, &stock, &skuType,
-			&groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate)
-		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-			return
-		}
-
-		if req.GroupID > 0 && !groupEnabled {
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"SKU_GROUP_NOT_ENABLED",
-				"This SKU does not support group purchase",
-				http.StatusBadRequest,
-				nil,
-			))
-			return
-		}
-
-		productID = 0
-		skuID = req.SKUID
-	} else {
-		err := db.QueryRow(
-			`SELECT s.id, s.spu_id, s.retail_price, s.stock, s.sku_type 
-			 FROM products_v2 s WHERE s.id = $1 AND s.status = 'active'`,
-			req.ProductID,
-		).Scan(&skuID, &spuID, &retailPrice, &stock, &skuType)
-		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-			return
-		}
-		wholesalePrice = retailPrice
-		productID = req.ProductID
+	var groupEnabled bool
+	var minGroupSize, maxGroupSize int
+	var groupDiscountRate sql.NullFloat64
+	err := db.QueryRow(
+		`SELECT s.id, s.spu_id, s.retail_price, s.wholesale_price, s.stock, s.sku_type,
+			s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate
+		 FROM skus s JOIN spus sp ON s.spu_id = sp.id 
+		 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
+		req.SKUID,
+	).Scan(&skuID, &spuID, &retailPrice, &wholesalePrice, &stock, &skuType,
+		&groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
 	}
+
+	if req.GroupID > 0 && !groupEnabled {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SKU_GROUP_NOT_ENABLED",
+			"This SKU does not support group purchase",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+	skuID = req.SKUID
 
 	if stock != -1 && stock < req.Quantity {
 		middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
@@ -121,46 +105,24 @@ func CreateOrder(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
-	if skuID > 0 {
-		result, execErr := tx.Exec(
-			"UPDATE skus SET stock = stock - $1 WHERE id = $2 AND (stock = -1 OR stock >= $1)",
-			req.Quantity, skuID,
-		)
-		if execErr != nil {
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"STOCK_UPDATE_FAILED",
-				"Failed to update stock",
-				http.StatusInternalServerError,
-				execErr,
-			))
-			return
-		}
+	result, execErr := tx.Exec(
+		"UPDATE skus SET stock = stock - $1 WHERE id = $2 AND (stock = -1 OR stock >= $1)",
+		req.Quantity, skuID,
+	)
+	if execErr != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"STOCK_UPDATE_FAILED",
+			"Failed to update stock",
+			http.StatusInternalServerError,
+			execErr,
+		))
+		return
+	}
 
-		rowsAffected, _ := result.RowsAffected()
-		if rowsAffected == 0 {
-			middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
-			return
-		}
-	} else if productID > 0 {
-		result, execErr := tx.Exec(
-			"UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1",
-			req.Quantity, productID,
-		)
-		if execErr != nil {
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"STOCK_UPDATE_FAILED",
-				"Failed to update stock",
-				http.StatusInternalServerError,
-				execErr,
-			))
-			return
-		}
-
-		rowsAffected, _ := result.RowsAffected()
-		if rowsAffected == 0 {
-			middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
-			return
-		}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
+		return
 	}
 
 	var order models.Order
@@ -177,14 +139,14 @@ func CreateOrder(c *gin.Context) {
 		groupID = nil
 	}
 
+	var pid interface{}
+	pid = nil
 	err = tx.QueryRow(
 		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
 		 RETURNING id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at`,
-		userID, productID, skuID, spuID, groupID, req.Quantity, unitPrice, totalPrice, orderStatusPending,
+		userID, pid, skuID, spuID, groupID, req.Quantity, unitPrice, totalPrice, orderStatusPending,
 	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.SKUID, &order.SPUID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
-
-	fmt.Printf("ORDER DEBUG: userID=%d, productID=%d, skuID=%d, spuID=%d, groupID=%v, quantity=%d, unit_price=%.2f, total=%.2f, err=%v\n", userID, productID, skuID, spuID, groupID, req.Quantity, unitPrice, totalPrice, err)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -427,11 +389,6 @@ func CancelOrder(c *gin.Context) {
 			"UPDATE skus SET stock = stock + $1 WHERE id = $2",
 			orderInfo.quantity, orderInfo.skuID.Int64,
 		)
-	} else {
-		_, err = tx.Exec(
-			"UPDATE products SET stock = stock + $1 WHERE id = $2",
-			orderInfo.quantity, orderInfo.productID,
-		)
 	}
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -482,10 +439,10 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
-	if req.ProductID == 0 && req.SKUID == 0 {
+	if req.SKUID <= 0 {
 		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MISSING_PRODUCT_OR_SKU",
-			"product_id or sku_id is required",
+			"MISSING_SKU",
+			"sku_id is required",
 			http.StatusBadRequest,
 			nil,
 		))
@@ -503,65 +460,52 @@ func CreateGroup(c *gin.Context) {
 		return
 	}
 
-	var skuID, spuID, productID int
+	var skuID, spuID int
 	var retailPrice float64
 	var groupEnabled bool
 	var minGroupSize, maxGroupSize int
 	var groupDiscountRate sql.NullFloat64
 
-	if req.SKUID > 0 {
-		err := db.QueryRow(
-			`SELECT s.id, s.spu_id, s.retail_price, s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate
-			 FROM skus s JOIN spus sp ON s.spu_id = sp.id 
-			 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
-			req.SKUID,
-		).Scan(&skuID, &spuID, &retailPrice, &groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate)
-		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-			return
-		}
-
-		if !groupEnabled {
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"SKU_GROUP_NOT_ENABLED",
-				"This SKU does not support group purchase",
-				http.StatusBadRequest,
-				nil,
-			))
-			return
-		}
-
-		if req.TargetCount < minGroupSize || req.TargetCount > maxGroupSize {
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"INVALID_GROUP_SIZE",
-				fmt.Sprintf("Group size must be between %d and %d", minGroupSize, maxGroupSize),
-				http.StatusBadRequest,
-				nil,
-			))
-			return
-		}
-		skuID = req.SKUID
-	} else {
-		err := db.QueryRow(
-			"SELECT id, price FROM products WHERE id = $1 AND status = 'active'",
-			req.ProductID,
-		).Scan(&productID, &retailPrice)
-		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-			return
-		}
-		groupEnabled = true
-		minGroupSize = 2
-		maxGroupSize = 10
-		productID = req.ProductID
+	err := db.QueryRow(
+		`SELECT s.id, s.spu_id, s.retail_price, s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate
+		 FROM skus s JOIN spus sp ON s.spu_id = sp.id 
+		 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
+		req.SKUID,
+	).Scan(&skuID, &spuID, &retailPrice, &groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
 	}
 
+	if !groupEnabled {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SKU_GROUP_NOT_ENABLED",
+			"This SKU does not support group purchase",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	if req.TargetCount < minGroupSize || req.TargetCount > maxGroupSize {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_GROUP_SIZE",
+			fmt.Sprintf("Group size must be between %d and %d", minGroupSize, maxGroupSize),
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+	skuID = req.SKUID
+
 	var group models.Group
-	err := db.QueryRow(
+	var nilPID interface{}
+	nilPID = nil
+	err = db.QueryRow(
 		`INSERT INTO groups (product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
 		 RETURNING id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at`,
-		productID, skuID, spuID, userID, req.TargetCount, 1, groupStatusActive, req.Deadline,
+		nilPID, skuID, spuID, userID, req.TargetCount, 1, groupStatusActive, req.Deadline,
 	).Scan(&group.ID, &group.ProductID, &group.SKUID, &group.SPUID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
@@ -583,7 +527,7 @@ func CreateGroup(c *gin.Context) {
 	err = db.QueryRow(
 		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-		userID, productID, skuID, spuID, group.ID, 1, groupPrice, groupPrice, orderStatusPending,
+		userID, nilPID, skuID, spuID, group.ID, 1, groupPrice, groupPrice, orderStatusPending,
 	).Scan(&orderID)
 
 	if err != nil {
@@ -680,8 +624,8 @@ func ListGroups(c *gin.Context) {
 	})
 }
 
-// GetGroupsByProduct retrieves active groups for a specific product
-func GetGroupsByProduct(c *gin.Context) {
+// GetGroupsBySKU retrieves active groups for a specific SKU (catalog :id is SKU id).
+func GetGroupsBySKU(c *gin.Context) {
 	productID := c.Param("id")
 	productIDNum, err := strconv.Atoi(productID)
 	if err != nil {
@@ -697,7 +641,7 @@ func GetGroupsByProduct(c *gin.Context) {
 
 	rows, err := db.Query(
 		`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at 
-		 FROM groups WHERE product_id = $1 AND status = $2 AND deadline > NOW() ORDER BY created_at DESC`,
+		 FROM groups WHERE sku_id = $1 AND status = $2 AND deadline > NOW() ORDER BY created_at DESC`,
 		productIDNum, "active",
 	)
 	if err != nil {
@@ -839,38 +783,38 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
-	var unitPrice float64
-	if group.SKUID > 0 {
-		var retailPrice float64
-		var groupDiscountRate sql.NullFloat64
-		err = db.QueryRow(
-			`SELECT s.retail_price, s.group_discount_rate 
-			 FROM skus s WHERE s.id = $1 AND s.status = 'active'`,
-			group.SKUID,
-		).Scan(&retailPrice, &groupDiscountRate)
-		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-			return
-		}
-		unitPrice = retailPrice
-		if groupDiscountRate.Valid && groupDiscountRate.Float64 > 0 {
-			unitPrice = retailPrice * (1 - groupDiscountRate.Float64)
-		}
-	} else {
-		var product models.Product
-		err = db.QueryRow("SELECT price FROM products WHERE id = $1", group.ProductID).Scan(&product.Price)
-		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-			return
-		}
-		unitPrice = product.Price
+	if group.SKUID <= 0 {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"GROUP_MISSING_SKU",
+			"group has no sku_id",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+	var retailPrice float64
+	var groupDiscountRate sql.NullFloat64
+	err = db.QueryRow(
+		`SELECT s.retail_price, s.group_discount_rate 
+		 FROM skus s WHERE s.id = $1 AND s.status = 'active'`,
+		group.SKUID,
+	).Scan(&retailPrice, &groupDiscountRate)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
+	}
+	unitPrice := retailPrice
+	if groupDiscountRate.Valid && groupDiscountRate.Float64 > 0 {
+		unitPrice = retailPrice * (1 - groupDiscountRate.Float64)
 	}
 
+	var nilPID interface{}
+	nilPID = nil
 	var orderID int
 	err = db.QueryRow(
 		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-		userID, group.ProductID, group.SKUID, group.SPUID, group.ID, 1, unitPrice, unitPrice, orderStatusPending,
+		userID, nilPID, group.SKUID, group.SPUID, group.ID, 1, unitPrice, unitPrice, orderStatusPending,
 	).Scan(&orderID)
 
 	if err != nil {

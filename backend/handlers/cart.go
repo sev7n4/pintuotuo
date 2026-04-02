@@ -30,22 +30,14 @@ func GetCart(c *gin.Context) {
 	}
 
 	query := `
-		SELECT ci.id, ci.product_id, ci.sku_id, ci.spu_id, ci.group_id, ci.quantity,
-			   COALESCE(p.id, pv.id) as prod_id,
-			   COALESCE(p.merchant_id, pv.merchant_id) as merchant_id,
-			   COALESCE(p.name, pv.name) as name,
-			   COALESCE(p.description, pv.description) as description,
-			   COALESCE(p.price, pv.price) as price,
-			   COALESCE(p.original_price, pv.original_price) as original_price,
-			   COALESCE(p.stock, pv.stock) as stock,
-			   COALESCE(p.sold_count, pv.sold_count) as sold_count,
-			   COALESCE(p.category, pv.category) as category,
-			   COALESCE(p.status, pv.status) as status,
-			   COALESCE(p.created_at, pv.created_at) as created_at,
-			   COALESCE(p.updated_at, pv.updated_at) as updated_at
+		SELECT ci.id, ci.sku_id, ci.group_id, ci.quantity,
+			   s.id, COALESCE(s.merchant_id, 0), s.spu_id, sp.name || ' · ' || s.sku_code, COALESCE(sp.description, ''),
+			   s.retail_price, COALESCE(s.original_price, s.retail_price),
+			   CASE WHEN s.stock = -1 THEN 999999 ELSE s.stock END, COALESCE(s.sales_count, 0), COALESCE(sp.model_tier, ''),
+			   s.status, s.created_at, s.updated_at
 		FROM cart_items ci
-		LEFT JOIN products p ON ci.product_id = p.id
-		LEFT JOIN products_v2 pv ON ci.sku_id = pv.id
+		JOIN skus s ON ci.sku_id = s.id
+		JOIN spus sp ON s.spu_id = sp.id
 		WHERE ci.user_id = $1
 		ORDER BY ci.created_at DESC
 	`
@@ -66,11 +58,11 @@ func GetCart(c *gin.Context) {
 	for rows.Next() {
 		var item models.CartResponse
 		var product models.Product
-		var groupID, skuID, spuID sql.NullInt64
+		var groupID sql.NullInt64
 
 		err := rows.Scan(
-			&item.ID, &item.ProductID, &skuID, &spuID, &groupID, &item.Quantity,
-			&product.ID, &product.MerchantID, &product.Name, &product.Description,
+			&item.ID, &item.SKUID, &groupID, &item.Quantity,
+			&product.ID, &product.MerchantID, &product.SpuID, &product.Name, &product.Description,
 			&product.Price, &product.OriginalPrice, &product.Stock, &product.SoldCount,
 			&product.Category, &product.Status, &product.CreatedAt, &product.UpdatedAt,
 		)
@@ -112,24 +104,15 @@ func AddToCart(c *gin.Context) {
 	}
 
 	var req struct {
-		ProductID int `json:"product_id"`
-		SKUID     int `json:"sku_id"`
-		Quantity  int `json:"quantity"`
-		GroupID   int `json:"group_id,omitempty"`
+		SKUID    int `json:"sku_id" binding:"required"`
+		Quantity int `json:"quantity"`
+		GroupID  int `json:"group_id,omitempty"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "INVALID_REQUEST",
 			"message": "Invalid request body",
-		})
-		return
-	}
-
-	if req.ProductID == 0 && req.SKUID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"code":    "INVALID_REQUEST",
-			"message": "product_id or sku_id is required",
 		})
 		return
 	}
@@ -152,33 +135,23 @@ func AddToCart(c *gin.Context) {
 	}
 
 	var spuID int
-	if req.SKUID > 0 {
-		err := db.QueryRow(
-			`SELECT s.spu_id FROM skus s JOIN spus sp ON s.spu_id = sp.id 
-			 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
-			req.SKUID,
-		).Scan(&spuID)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":    "SKU_NOT_FOUND",
-				"message": "SKU not found or inactive",
-			})
-			return
-		}
+	err := db.QueryRow(
+		`SELECT s.spu_id FROM skus s JOIN spus sp ON s.spu_id = sp.id 
+		 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
+		req.SKUID,
+	).Scan(&spuID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "SKU_NOT_FOUND",
+			"message": "SKU not found or inactive",
+		})
+		return
 	}
 
 	var existingID int
 	var existingQty int
-	var checkQuery string
-	var err error
-
-	if req.SKUID > 0 {
-		checkQuery = `SELECT id, quantity FROM cart_items WHERE user_id = $1 AND sku_id = $2 AND (group_id = $3 OR (group_id IS NULL AND $3 = 0))`
-		err = db.QueryRow(checkQuery, userID, req.SKUID, req.GroupID).Scan(&existingID, &existingQty)
-	} else {
-		checkQuery = `SELECT id, quantity FROM cart_items WHERE user_id = $1 AND product_id = $2 AND sku_id IS NULL AND (group_id = $3 OR (group_id IS NULL AND $3 = 0))`
-		err = db.QueryRow(checkQuery, userID, req.ProductID, req.GroupID).Scan(&existingID, &existingQty)
-	}
+	checkQuery := `SELECT id, quantity FROM cart_items WHERE user_id = $1 AND sku_id = $2 AND (group_id = $3 OR (group_id IS NULL AND $3 = 0))`
+	err = db.QueryRow(checkQuery, userID, req.SKUID, req.GroupID).Scan(&existingID, &existingQty)
 
 	if err == nil {
 		updateQuery := `UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2`
@@ -194,34 +167,22 @@ func AddToCart(c *gin.Context) {
 			"code":    0,
 			"message": "Cart item updated",
 			"data": gin.H{
-				"id":         existingID,
-				"product_id": req.ProductID,
-				"sku_id":     req.SKUID,
-				"quantity":   existingQty + req.Quantity,
-				"group_id":   req.GroupID,
+				"id":       existingID,
+				"sku_id":   req.SKUID,
+				"quantity": existingQty + req.Quantity,
+				"group_id": req.GroupID,
 			},
 		})
 		return
 	}
 
-	var insertQuery string
-	var newID int
-
-	if req.SKUID > 0 {
-		insertQuery = `
+	insertQuery := `
 			INSERT INTO cart_items (user_id, sku_id, spu_id, group_id, quantity, created_at, updated_at)
 			VALUES ($1, $2, $3, NULLIF($4, 0), $5, NOW(), NOW())
 			RETURNING id
 		`
-		err = db.QueryRow(insertQuery, userID, req.SKUID, spuID, req.GroupID, req.Quantity).Scan(&newID)
-	} else {
-		insertQuery = `
-			INSERT INTO cart_items (user_id, product_id, group_id, quantity, created_at, updated_at)
-			VALUES ($1, $2, NULLIF($3, 0), $4, NOW(), NOW())
-			RETURNING id
-		`
-		err = db.QueryRow(insertQuery, userID, req.ProductID, req.GroupID, req.Quantity).Scan(&newID)
-	}
+	var newID int
+	err = db.QueryRow(insertQuery, userID, req.SKUID, spuID, req.GroupID, req.Quantity).Scan(&newID)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -235,11 +196,10 @@ func AddToCart(c *gin.Context) {
 		"code":    0,
 		"message": "Item added to cart",
 		"data": gin.H{
-			"id":         newID,
-			"product_id": req.ProductID,
-			"sku_id":     req.SKUID,
-			"quantity":   req.Quantity,
-			"group_id":   req.GroupID,
+			"id":       newID,
+			"sku_id":   req.SKUID,
+			"quantity": req.Quantity,
+			"group_id": req.GroupID,
 		},
 	})
 }

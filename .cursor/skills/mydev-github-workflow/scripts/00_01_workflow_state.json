@@ -1,32 +1,30 @@
 {
-  "current_step": 10,
+  "current_step": 9,
   "current_fix_cases": [
-    "UT-BE-ADMIN-MP-001",
-    "UT-BE-ADMIN-MP-002",
-    "UT-BE-ADMIN-MP-003"
+    "UT-BE-CATALOG-020",
+    "FE-CATALOG-ROUTE",
+    "FE-ADMIN-FLASH-SKU"
   ],
   "retry_count": 0,
-  "pr_number": 146,
+  "pr_number": null,
   "merged": false,
   "branch": "feature/admin-model-providers-maintenance",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "success",
-    "integration": "success",
-    "e2e": "success",
+    "cicd": "pending",
+    "integration": "pending",
+    "e2e": "pending",
     "deploy": "pending"
   },
   "error_history": [],
-  "created_at": "2026-04-01T20:00:00Z",
-  "updated_at": "2026-04-01T20:35:00Z",
+  "created_at": "2026-04-02T10:00:00Z",
+  "updated_at": "2026-04-02T12:00:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "管理端模型厂商维护：GET /admin/model-providers/all + 页面 /admin/model-providers",
+    "task": "DROP products 表 + /catalog 路由 + 秒杀 SKU id + Admin 秒杀页",
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/146",
-    "ci_run_cicd": "23863867639",
-    "ci_note": "PR 146: Backend/Frontend/E2E/Integration all pass (2026-04-01)",
-    "next_action": "merge_pr_when_ready"
+    "validation_note": "backend go test ./... OK；frontend tsc OK；make format + make lint OK（eslint 既有 hooks 警告）。未跑全量 npm test（import.meta 既有问题）。",
+    "next_action": "git_push_then_gh_pr_create_step_10_ci"
   }
 }

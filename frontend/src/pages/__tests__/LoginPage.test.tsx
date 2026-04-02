@@ -48,7 +48,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         <MemoryRouter initialEntries={['/login']}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/products" element={<div>Products Page</div>} />
+            <Route path="/catalog" element={<div>Products Page</div>} />
             <Route path="/merchant/dashboard" element={<div>Merchant Dashboard</div>} />
             <Route path="/admin" element={<div>Admin Dashboard</div>} />
           </Routes>
@@ -537,7 +537,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         <MemoryRouter initialEntries={['/login']}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/products" element={<div>Products Page</div>} />
+            <Route path="/catalog" element={<div>Products Page</div>} />
           </Routes>
         </MemoryRouter>
       );
@@ -594,7 +594,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         <MemoryRouter initialEntries={['/login']}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/products" element={<div>Products Page</div>} />
+            <Route path="/catalog" element={<div>Products Page</div>} />
           </Routes>
         </MemoryRouter>
       );
@@ -674,7 +674,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         <MemoryRouter initialEntries={['/login']}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/products" element={<div>Products Page</div>} />
+            <Route path="/catalog" element={<div>Products Page</div>} />
           </Routes>
         </MemoryRouter>
       );
@@ -721,7 +721,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         <MemoryRouter initialEntries={['/login']}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/products" element={<div>Products Page</div>} />
+            <Route path="/catalog" element={<div>Products Page</div>} />
           </Routes>
         </MemoryRouter>
       );

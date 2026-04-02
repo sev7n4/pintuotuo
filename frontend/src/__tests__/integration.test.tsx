@@ -185,7 +185,7 @@ describe('Integration Tests', () => {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/referral" element={<ReferralPage />} />
-          <Route path="/products" element={<div>Products Page</div>} />
+          <Route path="/catalog" element={<div>Products Page</div>} />
           <Route path="/*" element={<Navigate to="/login" />} />
         </Routes>
       </MemoryRouter>
@@ -250,7 +250,7 @@ describe('Integration Tests', () => {
         <Routes>
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/referral" element={<ReferralPage />} />
-          <Route path="/products" element={<div>Products Page</div>} />
+          <Route path="/catalog" element={<div>Products Page</div>} />
           <Route path="/*" element={<Navigate to="/register" />} />
         </Routes>
       </MemoryRouter>
@@ -950,7 +950,7 @@ describe('Integration Tests', () => {
       <MemoryRouter initialEntries={['/login']}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/products" element={<div>Products Page</div>} />
+          <Route path="/catalog" element={<div>Products Page</div>} />
           <Route path="/*" element={<Navigate to="/login" />} />
         </Routes>
       </MemoryRouter>

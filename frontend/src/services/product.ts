@@ -21,44 +21,44 @@ interface CreateProductRequest {
 
 export const productService = {
   // Get home page data
-  getHomeData: () => api.get<HomeData>('/products/home'),
+  getHomeData: () => api.get<HomeData>('/catalog/home'),
 
   // Get hot products
   getHotProducts: (limit?: number) =>
-    api.get<APIResponse<Product[]>>('/products/hot', { params: { limit } }),
+    api.get<APIResponse<Product[]>>('/catalog/hot', { params: { limit } }),
 
   // Get new products
   getNewProducts: (limit?: number) =>
-    api.get<APIResponse<Product[]>>('/products/new', { params: { limit } }),
+    api.get<APIResponse<Product[]>>('/catalog/new', { params: { limit } }),
 
   // Get categories
-  getCategories: () => api.get<APIResponse<Category[]>>('/products/categories'),
+  getCategories: () => api.get<APIResponse<Category[]>>('/catalog/categories'),
 
   // List products
   listProducts: (filters?: ProductFilters) =>
-    api.get<APIResponse<PaginatedResponse<Product>>>('/products', { params: filters }),
+    api.get<APIResponse<PaginatedResponse<Product>>>('/catalog', { params: filters }),
 
   // Get product by ID
-  getProductByID: (id: number) => api.get<APIResponse<Product>>(`/products/${id}`),
+  getProductByID: (id: number) => api.get<APIResponse<Product>>(`/catalog/${id}`),
 
   // Get active groups for a product
   getProductGroups: (productId: number) =>
-    api.get<APIResponse<Group[]>>(`/products/${productId}/groups`),
+    api.get<APIResponse<Group[]>>(`/catalog/${productId}/groups`),
 
   // Search products
   searchProducts: (query: string, page?: number, perPage?: number) =>
-    api.get<APIResponse<PaginatedResponse<Product>>>('/products/search', {
+    api.get<APIResponse<PaginatedResponse<Product>>>('/catalog/search', {
       params: { q: query, page, per_page: perPage },
     }),
 
   // Create product (merchant)
   createProduct: (data: CreateProductRequest) =>
-    api.post<APIResponse<Product>>('/products/merchants', data),
+    api.post<APIResponse<Product>>('/catalog/merchants', data),
 
   // Update product (merchant)
   updateProduct: (id: number, data: Partial<CreateProductRequest>) =>
-    api.put<APIResponse<Product>>(`/products/merchants/${id}`, data),
+    api.put<APIResponse<Product>>(`/catalog/merchants/${id}`, data),
 
   // Delete product (merchant)
-  deleteProduct: (id: number) => api.delete<APIResponse<void>>(`/products/merchants/${id}`),
+  deleteProduct: (id: number) => api.delete<APIResponse<void>>(`/catalog/merchants/${id}`),
 };
