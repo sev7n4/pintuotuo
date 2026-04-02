@@ -1,31 +1,33 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": [
     "UT-BE-CATALOG-020",
     "FE-CATALOG-ROUTE",
     "FE-ADMIN-FLASH-SKU"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 148,
   "merged": false,
   "branch": "feature/catalog-products-sku-migration",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "pending",
+    "cicd": "running",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
   },
   "error_history": [],
   "created_at": "2026-04-02T14:00:00Z",
-  "updated_at": "2026-04-02T14:30:00Z",
+  "updated_at": "2026-04-02T14:35:00Z",
   "metadata": {
     "repo": "pintuotuo",
     "task": "DROP products 表 + /catalog 路由 + 秒杀 SKU id + Admin 秒杀页",
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "validation_note": "Step8: go test ./... + npm run type-check；从 main 新建 feature/catalog-products-sku-migration，cherry-pick catalog 提交并修正迁移序号 020/021",
-    "supersedes_pr": 147,
-    "next_action": "push_and_create_pr_step_10_ci"
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/148",
+    "closed_pr": 147,
+    "deleted_branch": "feature/admin-model-providers-maintenance",
+    "validation_note": "Step8: go test ./... + npm run type-check；迁移重命名为 020/021",
+    "next_action": "monitor_ci_pr_148"
   }
 }
