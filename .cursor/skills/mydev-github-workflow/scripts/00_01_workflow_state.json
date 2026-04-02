@@ -1,10 +1,10 @@
 {
   "current_step": 10,
-  "current_fix_cases": ["GROUP-DISCOUNT-NORMALIZE", "PRODUCT-DETAIL-GROUP-PRICES"],
+  "current_fix_cases": ["GROUP-NULL-PRODUCT-ID-500"],
   "retry_count": 0,
-  "pr_number": 157,
+  "pr_number": 158,
   "merged": false,
-  "branch": "fix/group-discount-display",
+  "branch": "fix/groups-null-product-id",
   "local_validation": "passed",
   "ci_status": {
     "cicd": "pending",
@@ -14,15 +14,15 @@
   },
   "error_history": [],
   "created_at": "2026-04-02T16:00:00Z",
-  "updated_at": "2026-04-02T22:00:00Z",
+  "updated_at": "2026-04-03T01:30:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "拼团折扣率百分比/小数统一 + 详情页档位与占位价修复",
-    "issue_type": "fix",
+    "task": "修复 POST /groups 与 GET /catalog/:id/groups 500：groups.product_id NULL 扫描",
+    "issue_type": "bugfix",
     "skill": "mydev-github-workflow",
-    "validation_note": "本地 make test 通过；PR #157 已创建，待 CI 全绿",
+    "validation_note": "make test 通过；PR #158 已创建",
     "next_action": "monitor_ci",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/157",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/158",
     "deploy_run_id": null
   }
 }
