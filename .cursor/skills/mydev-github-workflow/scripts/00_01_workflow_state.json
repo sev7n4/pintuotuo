@@ -7,7 +7,7 @@
   "retry_count": 0,
   "pr_number": null,
   "merged": false,
-  "branch": "feature/merchant-sku-nav-my-services",
+  "branch": "feature/merchant-sku-nav-my-services-v2",
   "local_validation": "passed",
   "ci_status": {
     "cicd": "pending",
@@ -17,13 +17,13 @@
   },
   "error_history": [],
   "created_at": "2026-04-02T14:00:00Z",
-  "updated_at": "2026-04-02T14:00:00Z",
+  "updated_at": "2026-04-02T17:05:00Z",
   "metadata": {
     "repo": "pintuotuo",
     "task": "商户仅保留 SKU 管理入口；C端我的服务独立页与下拉菜单",
     "issue_type": "enhancement",
     "skill": "mydev-github-workflow",
     "validation_note": "Step8: npm run type-check；配置/导航为主可跳过 TDD",
-    "next_action": "push_and_pr_ci"
+    "next_action": "create_new_pr_and_monitor_ci"
   }
 }
