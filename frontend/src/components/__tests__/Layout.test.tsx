@@ -63,7 +63,7 @@ describe('Layout Component', () => {
     // 检查主导航（与 Layout 组件一致）
     expect(screen.getByText('首页')).toBeInTheDocument();
     expect(screen.getByText('分类')).toBeInTheDocument();
-    expect(screen.getByText('购物车')).toBeInTheDocument();
+    expect(screen.queryByText('购物车')).not.toBeInTheDocument();
 
     // 检查登录/注册链接
     expect(screen.getByText('登录')).toBeInTheDocument();

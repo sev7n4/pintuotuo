@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, message, Badge } from 'antd';
+import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, message } from 'antd';
 import {
   UserOutlined,
   LogoutOutlined,
@@ -10,7 +10,6 @@ import {
   CustomerServiceOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
-import { useCartStore } from '@/stores/cartStore';
 import './Layout.css';
 
 const { Header, Content, Footer } = AntLayout;
@@ -19,7 +18,6 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAuthenticated, fetchUser } = useAuthStore();
-  const { items } = useCartStore();
 
   useEffect(() => {
     if (isAuthenticated && !user) {
@@ -27,13 +25,12 @@ export default function Layout() {
     }
   }, [isAuthenticated, user, fetchUser]);
 
-  const cartItemCount = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
-
   const getSelectedTab = () => {
     const path = location.pathname;
     if (path === '/') return 'home';
     if (path === '/categories' || path.startsWith('/catalog')) return 'category';
-    if (path === '/cart') return 'cart';
+    // 购物车入口迁移到商品页内，顶部导航不再单独占位
+    if (path === '/cart' || path === '/checkout') return 'category';
     if (
       path.startsWith('/orders') ||
       path.startsWith('/groups') ||
@@ -64,17 +61,6 @@ export default function Layout() {
       key: 'category',
       label: <Link to="/categories">分类</Link>,
       icon: <AppstoreOutlined />,
-    },
-    {
-      key: 'cart',
-      label: (
-        <Link to="/cart">
-          <Badge count={cartItemCount} size="small" offset={[6, 0]}>
-            购物车
-          </Badge>
-        </Link>
-      ),
-      icon: <ShoppingCartOutlined />,
     },
   ];
 

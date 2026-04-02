@@ -343,7 +343,7 @@ const MerchantSettings = () => {
         <Card title="提交审核资料" className={styles.card}>
           <Alert
             type="info"
-            message="提交审核资料后，我们将在1-3个工作日内完成审核。审核通过后即可使用商品管理和SKU管理功能。"
+            message="提交审核资料后，我们将在1-3个工作日内完成审核。审核通过后即可使用选品与SKU管理等商家功能。"
             showIcon
             style={{ marginBottom: 24 }}
           />

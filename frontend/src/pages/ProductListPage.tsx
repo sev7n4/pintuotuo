@@ -19,6 +19,8 @@ import {
   Progress,
   Statistic,
   Tabs,
+  FloatButton,
+  Badge,
 } from 'antd';
 import {
   SearchOutlined,
@@ -35,6 +37,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProductStore } from '@stores/productStore';
 import { useAuthStore } from '@stores/authStore';
+import { useCartStore } from '@stores/cartStore';
 import { productService } from '@/services/product';
 import { skuService } from '@/services/sku';
 import api from '@/services/api';
@@ -93,6 +96,7 @@ export const ProductListPage: React.FC = () => {
   const { products, total, filters, isLoading, error, fetchProducts, setFilters, searchProducts } =
     useProductStore();
   const { user } = useAuthStore();
+  const { items } = useCartStore();
 
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -428,6 +432,8 @@ export const ProductListPage: React.FC = () => {
     setFilters({ page, per_page: pageSize });
     fetchProducts({ page, per_page: pageSize });
   };
+
+  const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleSort = (field: SortField) => {
     const newOrder = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
@@ -839,6 +845,14 @@ export const ProductListPage: React.FC = () => {
           )}
         </TabPane>
       </Tabs>
+      <Badge count={cartItemCount} size="small">
+        <FloatButton
+          icon={<ShoppingCartOutlined />}
+          tooltip={<div>购物车</div>}
+          onClick={() => navigate('/cart')}
+          style={{ right: 24, bottom: 24 }}
+        />
+      </Badge>
     </div>
   );
 };

@@ -226,6 +226,7 @@ describe('ProductDetailPage', () => {
 
     expect(screen.getByText('这是一个测试商品')).toBeInTheDocument();
     expect(screen.getByText('定价信息')).toBeInTheDocument();
+    expect(screen.getByText('优惠权益')).toBeInTheDocument();
     expect(screen.getByText('单独购买')).toBeInTheDocument();
     expect(screen.getByText('拼团购买')).toBeInTheDocument();
   });
