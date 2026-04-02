@@ -19,6 +19,7 @@ import {
   Col,
   Modal,
   Badge,
+  Alert,
 } from 'antd';
 import {
   ShoppingCartOutlined,
@@ -200,7 +201,7 @@ export const ProductDetailPage: React.FC = () => {
 
   const handleShare = () => {
     if (!product) return;
-    const shareUrl = `${window.location.origin}/products/${product.id}`;
+    const shareUrl = `${window.location.origin}/catalog/${product.id}`;
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard
         .writeText(shareUrl)
@@ -234,6 +235,45 @@ export const ProductDetailPage: React.FC = () => {
   const calculateDiscount = () => {
     if (!product || !selectedGroupPrice) return 0;
     return Math.round((1 - selectedGroupPrice.price_per_person / product.price) * 100);
+  };
+
+  const buildSkuSummary = (sku: SKUWithSPU) => {
+    const parts: string[] = [];
+    if (sku.token_amount) parts.push(`${sku.token_amount.toLocaleString()} tokens`);
+    if (sku.subscription_period) {
+      const periodMap: Record<string, string> = { monthly: '月度', quarterly: '季度', yearly: '年度' };
+      parts.push(periodMap[sku.subscription_period] || sku.subscription_period);
+    }
+    if (sku.concurrent_requests) parts.push(`${sku.concurrent_requests} 并发`);
+    if (sku.valid_days) parts.push(`${sku.valid_days}天有效期`);
+    return parts.join(' · ');
+  };
+
+  const getPromotionHighlights = () => {
+    const sku = selectedSKU;
+    if (!sku) return [];
+    const promoLabels: string[] = [];
+    const dynamic = sku as SKUWithSPU & {
+      promotion_labels?: string[];
+      coupons?: Array<{ name?: string }>;
+      new_user_offer?: string;
+      full_reduction?: string;
+    };
+    if (Array.isArray(dynamic.promotion_labels)) promoLabels.push(...dynamic.promotion_labels);
+    if (Array.isArray(dynamic.coupons)) {
+      dynamic.coupons.forEach((coupon) => {
+        if (coupon?.name) promoLabels.push(coupon.name);
+      });
+    }
+    if (dynamic.new_user_offer) promoLabels.push(dynamic.new_user_offer);
+    if (dynamic.full_reduction) promoLabels.push(dynamic.full_reduction);
+    if (sku.original_price && sku.original_price > sku.retail_price) {
+      promoLabels.push(`直降 ¥${(sku.original_price - sku.retail_price).toFixed(2)}`);
+    }
+    if (sku.group_enabled) {
+      promoLabels.push(`支持${sku.min_group_size}-${sku.max_group_size}人拼团`);
+    }
+    return Array.from(new Set(promoLabels)).slice(0, 4);
   };
 
   if (error) {
@@ -366,27 +406,12 @@ export const ProductDetailPage: React.FC = () => {
                                   : '并发'}
                             </Tag>
                             <Text strong>{sku.spu_name}</Text>
+                            <Tag color="geekblue">{sku.sku_code}</Tag>
                           </Space>
                           <Space size="small">
-                            {sku.token_amount && (
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                {sku.token_amount.toLocaleString()} tokens
-                              </Text>
-                            )}
-                            {sku.subscription_period && (
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                {sku.subscription_period === 'monthly'
-                                  ? '月度'
-                                  : sku.subscription_period === 'yearly'
-                                    ? '年度'
-                                    : '季度'}
-                              </Text>
-                            )}
-                            {sku.concurrent_requests && (
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                {sku.concurrent_requests} 并发
-                              </Text>
-                            )}
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {buildSkuSummary(sku)}
+                            </Text>
                           </Space>
                         </Space>
                       </Col>
@@ -520,6 +545,28 @@ export const ProductDetailPage: React.FC = () => {
 
         <Divider />
 
+        <Alert
+          type="info"
+          showIcon
+          message="优惠权益"
+          description={
+            <Space wrap>
+              {getPromotionHighlights().length > 0 ? (
+                getPromotionHighlights().map((label) => (
+                  <Tag key={label} color="magenta">
+                    {label}
+                  </Tag>
+                ))
+              ) : (
+                <Text type="secondary">当前套餐暂无活动优惠，后续可关注商家券与拼团优惠。</Text>
+              )}
+            </Space>
+          }
+          style={{ marginBottom: 24 }}
+        />
+
+        <Divider />
+
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <div>
             <span>购买数量: </span>
@@ -578,6 +625,9 @@ export const ProductDetailPage: React.FC = () => {
             )}
             <Button size="large" icon={<ShareAltOutlined />} onClick={handleShare}>
               分享
+            </Button>
+            <Button size="large" onClick={() => navigate('/cart')}>
+              查看购物车
             </Button>
           </Space>
         </Space>
