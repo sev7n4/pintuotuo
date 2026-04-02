@@ -46,20 +46,46 @@ jobs:
 
           rm -f ~/.ssh/deploy_key
 
+      # 1) /api/v1/health：进程存活（必选，标准项）
+      # 2) catalog：Repository variable DEPLOY_VERIFY_CATALOG_SKU_ID 有值时断言 GET /catalog/{id}；
+      #    未设置时断言 GET /catalog 列表（空列表也应 200）。二者二选一，不作为「替代 health」。
       - name: Verify deployment
+        env:
+          VERIFY_SKU_ID: ${{ vars.DEPLOY_VERIFY_CATALOG_SKU_ID }}
         run: |
-          echo "Waiting for backend to be ready..."
-          for i in {1..10}; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.TENCENT_CLOUD_IP }}:8080/api/v1/catalog/1 2>/dev/null || echo "000")
+          set -e
+          BASE="http://${{ secrets.TENCENT_CLOUD_IP }}:8080"
+          echo "=== 1) 进程健康检查: GET /api/v1/health（必选）==="
+          OK=0
+          for i in $(seq 1 10); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${BASE}/api/v1/health" 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Backend API is healthy (HTTP $HTTP_CODE)"
-              exit 0
+              echo "✅ Health OK (HTTP $HTTP_CODE)"
+              OK=1
+              break
             fi
-            echo "Attempt $i: Backend not ready (HTTP $HTTP_CODE), waiting..."
+            echo "Attempt $i: health HTTP $HTTP_CODE, waiting..."
             sleep 10
           done
-          echo "❌ Backend API did not become healthy after 100 seconds"
-          exit 1
+          if [ "$OK" != "1" ]; then
+            echo "❌ /api/v1/health 未在约 100s 内返回 200"
+            exit 1
+          fi
+
+          echo "=== 2) Catalog 断言（health 通过后再执行；列表或固定 SKU 二选一）==="
+          if [ -n "$VERIFY_SKU_ID" ]; then
+            echo "使用仓库变量 DEPLOY_VERIFY_CATALOG_SKU_ID=$VERIFY_SKU_ID → GET /api/v1/catalog/${VERIFY_SKU_ID}"
+            C_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${BASE}/api/v1/catalog/${VERIFY_SKU_ID}" 2>/dev/null || echo "000")
+          else
+            echo "未设置 DEPLOY_VERIFY_CATALOG_SKU_ID → GET /api/v1/catalog?page=1&per_page=1（列表）"
+            C_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${BASE}/api/v1/catalog?page=1&per_page=1" 2>/dev/null || echo "000")
+          fi
+          if [ "$C_CODE" = "200" ]; then
+            echo "✅ Catalog 断言通过 (HTTP $C_CODE)"
+          else
+            echo "❌ Catalog 断言失败 (HTTP $C_CODE)。可在 GitHub Repository variables 中设置 DEPLOY_VERIFY_CATALOG_SKU_ID 为环境中存在的 SKU id。"
+            exit 1
+          fi
 
       - name: Notify deployment status
         if: always()
