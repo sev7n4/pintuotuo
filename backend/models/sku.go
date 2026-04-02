@@ -127,10 +127,12 @@ type SKU struct {
 
 type SKUWithSPU struct {
 	SKU
-	SPUName       string `json:"spu_name"`
-	ModelProvider string `json:"model_provider"`
-	ModelName     string `json:"model_name"`
-	ModelTier     string `json:"model_tier"`
+	SPUName            string   `json:"spu_name"`
+	ModelProvider      string   `json:"model_provider"`
+	ModelName          string   `json:"model_name"`
+	ModelTier          string   `json:"model_tier"`
+	SPUTotalSalesCount int64    `json:"spu_total_sales_count,omitempty"`
+	SPUAverageRating   *float64 `json:"spu_average_rating,omitempty"`
 }
 
 type ComputePointAccount struct {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Card,
   Button,
@@ -20,6 +20,7 @@ import {
   Modal,
   Badge,
   Alert,
+  Progress,
 } from 'antd';
 import {
   ShoppingCartOutlined,
@@ -74,6 +75,39 @@ const defaultGroupPrices: GroupPrice[] = [
   { min_members: 5, price_per_person: 50, discount_percent: 50 },
 ];
 
+function buildGroupPricesFromSku(sku: SKUWithSPU | null): GroupPrice[] {
+  if (!sku?.group_enabled) return [];
+  const retail = sku.retail_price;
+  const rate = Math.min(1, Math.max(0, sku.group_discount_rate ?? 0));
+  const perPerson = retail * (1 - rate);
+  const discountPct = rate > 0 ? Math.round(rate * 100) : 0;
+  const pick: number[] = [];
+  for (const n of [2, 5]) {
+    if (n >= sku.min_group_size && n <= sku.max_group_size) pick.push(n);
+  }
+  if (pick.length === 0) {
+    pick.push(sku.min_group_size);
+    if (sku.max_group_size !== sku.min_group_size) pick.push(sku.max_group_size);
+  }
+  return [...new Set(pick)]
+    .sort((a, b) => a - b)
+    .map((min_members) => ({
+      min_members,
+      price_per_person: Number(perPerson.toFixed(2)),
+      discount_percent: discountPct,
+    }));
+}
+
+function formatCountdown(deadline: Date): string {
+  const now = Date.now();
+  const ms = Math.max(0, deadline.getTime() - now);
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -91,6 +125,7 @@ export const ProductDetailPage: React.FC = () => {
   const [skus, setSKUs] = useState<SKUWithSPU[]>([]);
   const [selectedSKU, setSelectedSKU] = useState<SKUWithSPU | null>(null);
   const [skuLoading, setSkuLoading] = useState(false);
+  const [groupModalTick, setGroupModalTick] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -99,13 +134,26 @@ export const ProductDetailPage: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    if (product?.group_prices?.length) {
-      setSelectedGroupPrice(product.group_prices[0]);
-    }
     if (product?.spu_id) {
       loadSKUs(product.spu_id, product.id);
     }
   }, [product]);
+
+  useEffect(() => {
+    const skuTiers = buildGroupPricesFromSku(selectedSKU);
+    if (skuTiers.length > 0) {
+      setSelectedGroupPrice((prev) => {
+        const match = skuTiers.find((t) => t.min_members === prev?.min_members);
+        return match ?? skuTiers[0];
+      });
+      return;
+    }
+    if (product?.group_prices?.length) {
+      setSelectedGroupPrice(product.group_prices[0]);
+    } else {
+      setSelectedGroupPrice(defaultGroupPrices[0] ?? null);
+    }
+  }, [selectedSKU?.id, selectedSKU?.group_enabled, product?.id, product?.group_prices]);
 
   const loadSKUs = async (spuId: number, currentSkuId: number) => {
     setSkuLoading(true);
@@ -135,11 +183,11 @@ export const ProductDetailPage: React.FC = () => {
     }
   };
 
-  const loadActiveGroups = async () => {
+  const loadActiveGroups = useCallback(async () => {
     if (!id) return;
     setGroupsLoading(true);
     try {
-      const response = await productService.getProductGroups(parseInt(id));
+      const response = await productService.getProductGroups(parseInt(id, 10));
       if (response.data.code === 0 && response.data.data) {
         setActiveGroups(response.data.data);
       }
@@ -148,7 +196,20 @@ export const ProductDetailPage: React.FC = () => {
     } finally {
       setGroupsLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id || purchaseMode !== 'group') return undefined;
+    void loadActiveGroups();
+    const interval = setInterval(() => void loadActiveGroups(), 10000);
+    return () => clearInterval(interval);
+  }, [id, purchaseMode, loadActiveGroups]);
+
+  useEffect(() => {
+    if (!showGroupsModal) return undefined;
+    const t = setInterval(() => setGroupModalTick((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [showGroupsModal]);
 
   const handleJoinGroup = async (group: Group) => {
     setJoiningGroupId(group.id);
@@ -243,7 +304,11 @@ export const ProductDetailPage: React.FC = () => {
     const parts: string[] = [];
     if (sku.token_amount) parts.push(`${sku.token_amount.toLocaleString()} tokens`);
     if (sku.subscription_period) {
-      const periodMap: Record<string, string> = { monthly: '月度', quarterly: '季度', yearly: '年度' };
+      const periodMap: Record<string, string> = {
+        monthly: '月度',
+        quarterly: '季度',
+        yearly: '年度',
+      };
       parts.push(periodMap[sku.subscription_period] || sku.subscription_period);
     }
     if (sku.concurrent_requests) parts.push(`${sku.concurrent_requests} 并发`);
@@ -299,9 +364,18 @@ export const ProductDetailPage: React.FC = () => {
     );
   }
 
-  const groupPrices = product.group_prices || defaultGroupPrices;
-  const rating = product.rating || 4.8;
-  const reviewCount = product.review_count || 1000;
+  const skuGroupTiers = buildGroupPricesFromSku(selectedSKU);
+  const groupPrices =
+    skuGroupTiers.length > 0
+      ? skuGroupTiers
+      : product.group_prices?.length
+        ? product.group_prices
+        : defaultGroupPrices;
+
+  const displaySoldCount = Number(selectedSKU?.sales_count ?? product?.sold_count ?? 0);
+  const displayRating = selectedSKU?.spu_average_rating ?? product?.rating ?? 4.8;
+  const reviewCount = product?.review_count ?? 1000;
+  const rating = displayRating;
 
   return (
     <div style={{ padding: '20px', maxWidth: 900, margin: '0 auto' }}>
@@ -333,10 +407,10 @@ export const ProductDetailPage: React.FC = () => {
 
           <Col xs={24} md={12}>
             <Title level={3}>{product.name}</Title>
-            <Space style={{ marginBottom: 16 }}>
-              <Tag color="blue">已拼 {(product.sold_count || 100000).toLocaleString()} 件</Tag>
+            <Space style={{ marginBottom: 16 }} wrap>
+              <Tag color="blue">已拼 {displaySoldCount.toLocaleString()} 件</Tag>
               <Tag color="gold">
-                ⭐ {rating}/5.0 ({reviewCount}+ 评)
+                ⭐ {Number(rating).toFixed(1)}/5.0 ({reviewCount}+ 评)
               </Tag>
             </Space>
 
@@ -471,7 +545,9 @@ export const ProductDetailPage: React.FC = () => {
                     prefix="¥"
                     valueStyle={{ color: '#333', fontSize: 24 }}
                   />
-                <Text type="secondary">直接下单，预计到手 ¥{estimatedFinalPrice().toFixed(2)}</Text>
+                  <Text type="secondary">
+                    直接下单，预计到手 ¥{estimatedFinalPrice().toFixed(2)}
+                  </Text>
                 </Space>
               </Card>
             </Col>
@@ -502,7 +578,9 @@ export const ProductDetailPage: React.FC = () => {
                       </Text>
                     }
                   />
-                  <Text type="success">预计到手 ¥{estimatedFinalPrice().toFixed(2)}，立省 {calculateDiscount()}%</Text>
+                  <Text type="success">
+                    预计到手 ¥{estimatedFinalPrice().toFixed(2)}，立省 {calculateDiscount()}%
+                  </Text>
                 </Space>
               </Card>
             </Col>
@@ -511,6 +589,15 @@ export const ProductDetailPage: React.FC = () => {
 
         {purchaseMode === 'group' && (
           <div style={{ marginBottom: 24 }}>
+            {(selectedSKU?.is_promoted || selectedSKU?.group_enabled) && (
+              <Alert
+                type="warning"
+                showIcon
+                message="大促特惠 · 拼团省更多"
+                description="以下人数为常用成团档位，具体以支付页与 SKU 配置为准。"
+                style={{ marginBottom: 16 }}
+              />
+            )}
             <Title level={5}>选择拼团规则</Title>
             <Space direction="vertical" style={{ width: '100%' }}>
               {groupPrices.map((gp) => (
@@ -572,7 +659,8 @@ export const ProductDetailPage: React.FC = () => {
                 )}
               </Space>
               <Text strong>
-                预计到手价：<span style={{ color: '#cf1322' }}>¥{estimatedFinalPrice().toFixed(2)}</span>
+                预计到手价：
+                <span style={{ color: '#cf1322' }}>¥{estimatedFinalPrice().toFixed(2)}</span>
               </Text>
             </Space>
           }
@@ -610,10 +698,18 @@ export const ProductDetailPage: React.FC = () => {
               </Button>
             ) : (
               <Space style={{ flex: 1, display: 'flex', gap: 8 }} direction="vertical">
-                <Card size="small" style={{ width: '100%', background: '#f6ffed', borderColor: '#b7eb8f' }}>
+                <Card
+                  size="small"
+                  style={{ width: '100%', background: '#f6ffed', borderColor: '#b7eb8f' }}
+                >
                   <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                     <Text>当前可加入团数：{activeGroups.length}</Text>
-                    <Text type="success">拼团每人最高省 ¥{((selectedSKU?.retail_price || product.price) - estimatedFinalPrice()).toFixed(2)}</Text>
+                    <Text type="success">
+                      拼团每人最高省 ¥
+                      {(
+                        (selectedSKU?.retail_price || product.price) - estimatedFinalPrice()
+                      ).toFixed(2)}
+                    </Text>
                   </Space>
                 </Card>
                 <Space style={{ width: '100%', justifyContent: 'space-between' }}>
@@ -763,13 +859,10 @@ export const ProductDetailPage: React.FC = () => {
                 itemLayout="horizontal"
                 dataSource={activeGroups}
                 renderItem={(group) => {
+                  void groupModalTick;
                   const remainingSlots = group.target_count - group.current_count;
                   const deadline = new Date(group.deadline);
-                  const now = new Date();
-                  const hoursLeft = Math.max(
-                    0,
-                    Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60))
-                  );
+                  const pct = Math.round((100 * group.current_count) / group.target_count);
 
                   return (
                     <List.Item
@@ -780,13 +873,29 @@ export const ProductDetailPage: React.FC = () => {
                           loading={joiningGroupId === group.id}
                           onClick={() => handleJoinGroup(group)}
                         >
-                          加入 ({remainingSlots}位)
+                          立即参团 (差{remainingSlots}人)
                         </Button>,
                       ]}
                     >
                       <List.Item.Meta
                         avatar={
-                          <Avatar icon={<TeamOutlined />} style={{ background: '#1890ff' }} />
+                          <Avatar.Group maxCount={4} size="small">
+                            {Array.from({ length: group.current_count }).map((_, i) => (
+                              <Avatar
+                                key={i}
+                                style={{ backgroundColor: '#1890ff' }}
+                                icon={<UserOutlined />}
+                              />
+                            ))}
+                            {Array.from({ length: remainingSlots }).map((_, i) => (
+                              <Avatar
+                                key={`e-${i}`}
+                                style={{ backgroundColor: '#f0f0f0', color: '#bbb' }}
+                              >
+                                +
+                              </Avatar>
+                            ))}
+                          </Avatar.Group>
                         }
                         title={
                           <Space>
@@ -795,13 +904,19 @@ export const ProductDetailPage: React.FC = () => {
                           </Space>
                         }
                         description={
-                          <Space direction="vertical" size="small">
+                          <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                            <Progress percent={pct} size="small" status="active" />
                             <Text type="secondary">
-                              <UserOutlined /> 已参与 {group.current_count} 人，还差{' '}
-                              {remainingSlots} 人
+                              已拼 {group.current_count}/{group.target_count}，成团价每人再省 ¥
+                              {(
+                                (selectedSKU?.retail_price || product.price) -
+                                (selectedGroupPrice?.price_per_person ||
+                                  groupPrices[0]?.price_per_person ||
+                                  0)
+                              ).toFixed(2)}
                             </Text>
                             <Text type="secondary">
-                              <ClockCircleOutlined /> 剩余 {hoursLeft} 小时
+                              <ClockCircleOutlined /> 剩余 {formatCountdown(deadline)}
                             </Text>
                           </Space>
                         }

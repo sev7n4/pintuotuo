@@ -21,6 +21,13 @@ jest.mock('@/stores/orderStore');
 jest.mock('@/stores/cartStore');
 jest.mock('@/stores/merchantStore');
 
+const mockGetPublicSKUs = jest.fn();
+jest.mock('@/services/sku', () => ({
+  skuService: {
+    getPublicSKUs: (...args: unknown[]) => mockGetPublicSKUs(...args),
+  },
+}));
+
 jest.mock('../pages/merchant/MerchantDashboard.module.css', () => ({}));
 jest.mock('../components/Layout.css', () => ({}));
 
@@ -66,9 +73,50 @@ const mockUseOrderStore = useOrderStore as jest.MockedFunction<typeof useOrderSt
 const mockUseCartStore = useCartStore as jest.MockedFunction<typeof useCartStore>;
 const mockUseMerchantStore = useMerchantStore as jest.MockedFunction<typeof useMerchantStore>;
 
+function mockSkuRow(spuName: string, id = 1) {
+  return {
+    id,
+    spu_id: id,
+    sku_code: `S-${id}`,
+    sku_type: 'token_pack' as const,
+    is_unlimited: false,
+    valid_days: 365,
+    retail_price: 88,
+    stock: 10,
+    group_enabled: false,
+    min_group_size: 2,
+    max_group_size: 5,
+    is_trial: false,
+    status: 'active',
+    is_promoted: false,
+    sales_count: 0,
+    created_at: '',
+    updated_at: '',
+    spu_name: spuName,
+    model_provider: 't',
+    model_name: 'm',
+    model_tier: 'lite',
+    token_amount: 1000,
+  };
+}
+
 describe('Page Navigation Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetPublicSKUs.mockResolvedValue({
+      data: { data: [], total: 0, page: 1, per_page: 20 },
+    });
+    mockUseCartStore.mockReturnValue({
+      items: [],
+      total: 0,
+      isLoading: false,
+      error: null,
+      addItem: jest.fn(),
+      removeItem: jest.fn(),
+      updateQuantity: jest.fn(),
+      clear: jest.fn(),
+      getTotal: jest.fn().mockReturnValue(0),
+    });
   });
 
   describe('User Registration Navigation', () => {
@@ -241,6 +289,18 @@ describe('Page Navigation Integration Tests', () => {
 
   describe('Product Navigation', () => {
     test('should navigate from product list to product detail', async () => {
+      mockGetPublicSKUs.mockResolvedValue({
+        data: {
+          data: [
+            mockSkuRow('测试产品', 1),
+            { ...mockSkuRow('另一个产品', 2), retail_price: 199.99 },
+          ],
+          total: 2,
+          page: 1,
+          per_page: 20,
+        },
+      });
+
       const mockFetchProducts = jest.fn().mockResolvedValue(undefined);
       const mockFetchProductByID = jest.fn().mockResolvedValue({
         id: 1,
@@ -266,25 +326,8 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       mockUseProductStore.mockReturnValue({
-        products: [
-          {
-            id: 1,
-            name: '测试产品',
-            description: '描述',
-            price: 99.99,
-            stock: 100,
-            status: 'active',
-          },
-          {
-            id: 2,
-            name: '另一个产品',
-            description: '描述2',
-            price: 199.99,
-            stock: 50,
-            status: 'active',
-          },
-        ],
-        total: 2,
+        products: [],
+        total: 0,
         filters: { page: 1, per_page: 20 },
         isLoading: false,
         error: null,
@@ -325,6 +368,15 @@ describe('Page Navigation Integration Tests', () => {
     });
 
     test('should display product list with correct columns', async () => {
+      mockGetPublicSKUs.mockResolvedValue({
+        data: {
+          data: [{ ...mockSkuRow('产品A', 1), retail_price: 50 }],
+          total: 1,
+          page: 1,
+          per_page: 20,
+        },
+      });
+
       mockUseAuthStore.mockReturnValue({
         user: { id: 1, email: 'user@example.com', role: 'user' },
         token: 'test-token',
@@ -340,10 +392,8 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       mockUseProductStore.mockReturnValue({
-        products: [
-          { id: 1, name: '产品A', description: '描述A', price: 50, stock: 10, status: 'active' },
-        ],
-        total: 1,
+        products: [],
+        total: 0,
         filters: { page: 1, per_page: 20 },
         isLoading: false,
         error: null,
@@ -365,7 +415,7 @@ describe('Page Navigation Integration Tests', () => {
       await waitFor(() => {
         expect(screen.getByText('产品A')).toBeInTheDocument();
         expect(screen.getByText('¥50.00')).toBeInTheDocument();
-        expect(screen.getByText('上架')).toBeInTheDocument();
+        expect(screen.getByText('Token包')).toBeInTheDocument();
       });
     });
 
@@ -940,6 +990,15 @@ describe('Page Navigation Integration Tests', () => {
 
   describe('Cross-Page Navigation Flow', () => {
     test('should navigate from product list to cart flow', async () => {
+      mockGetPublicSKUs.mockResolvedValue({
+        data: {
+          data: [mockSkuRow('跨页测试产品', 1)],
+          total: 1,
+          page: 1,
+          per_page: 20,
+        },
+      });
+
       mockUseAuthStore.mockReturnValue({
         user: { id: 1, email: 'user@example.com', role: 'user' },
         token: 'test-token',
@@ -955,17 +1014,8 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       mockUseProductStore.mockReturnValue({
-        products: [
-          {
-            id: 1,
-            name: '跨页测试产品',
-            description: '描述',
-            price: 88,
-            stock: 10,
-            status: 'active',
-          },
-        ],
-        total: 1,
+        products: [],
+        total: 0,
         filters: { page: 1, per_page: 20 },
         isLoading: false,
         error: null,
@@ -990,8 +1040,7 @@ describe('Page Navigation Integration Tests', () => {
         expect(screen.getByText('跨页测试产品')).toBeInTheDocument();
       });
 
-      const addToCartButton = screen.getAllByText('加购')[0];
-      expect(addToCartButton).toBeInTheDocument();
+      expect(screen.getByText('详情')).toBeInTheDocument();
     });
 
     test('should navigate from order list to payment flow', async () => {
@@ -1048,6 +1097,15 @@ describe('Page Navigation Integration Tests', () => {
     });
 
     test('should handle complete user journey from registration to order', async () => {
+      mockGetPublicSKUs.mockResolvedValue({
+        data: {
+          data: [mockSkuRow('旅程产品', 1)],
+          total: 1,
+          page: 1,
+          per_page: 20,
+        },
+      });
+
       mockUseAuthStore.mockReturnValue({
         user: { id: 1, email: 'journey@example.com', role: 'user' },
         token: 'journey-token',
@@ -1063,17 +1121,8 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       mockUseProductStore.mockReturnValue({
-        products: [
-          {
-            id: 1,
-            name: '旅程产品',
-            description: '完整流程测试',
-            price: 199,
-            stock: 50,
-            status: 'active',
-          },
-        ],
-        total: 1,
+        products: [],
+        total: 0,
         filters: { page: 1, per_page: 20 },
         isLoading: false,
         error: null,

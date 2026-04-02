@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Table,
   Input,
@@ -11,54 +11,32 @@ import {
   Row,
   Col,
   Select,
-  Slider,
-  Dropdown,
   Typography,
   Card,
   Grid,
   Progress,
   Statistic,
-  Tabs,
   FloatButton,
   Badge,
 } from 'antd';
 import {
   SearchOutlined,
-  PlusOutlined,
-  FilterOutlined,
-  SortAscendingOutlined,
   FireOutlined,
   ClockCircleOutlined,
   ThunderboltOutlined,
   ShoppingCartOutlined,
-  AppstoreOutlined,
-  TagsOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useProductStore } from '@stores/productStore';
-import { useAuthStore } from '@stores/authStore';
 import { useCartStore } from '@stores/cartStore';
-import { productService } from '@/services/product';
 import { skuService } from '@/services/sku';
 import api from '@/services/api';
-import type { Product } from '@/types';
 import type { SKUWithSPU } from '@/types/sku';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
-const { TabPane } = Tabs;
-
-type SortField = 'price' | 'stock' | 'created_at';
-type SortOrder = 'asc' | 'desc';
-
-interface ProductFilters {
-  minPrice?: number;
-  maxPrice?: number;
-  category?: string;
-  status?: string;
-}
 
 interface FlashSaleProduct {
   id: number;
@@ -87,30 +65,37 @@ const sortTypeMap: Record<string, { title: string; icon: React.ReactNode }> = {
   hot: { title: '热销爆款', icon: <FireOutlined style={{ color: '#ff4d4f' }} /> },
   new: { title: '新品上架', icon: <ClockCircleOutlined style={{ color: '#1890ff' }} /> },
   flash: { title: '限时秒杀', icon: <ThunderboltOutlined style={{ color: '#faad14' }} /> },
+  group: { title: '超值拼团', icon: <GiftOutlined style={{ color: '#52c41a' }} /> },
 };
+
+function parseNum(s: string | null): number | undefined {
+  if (s == null || s === '') return undefined;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseIntParam(s: string | null): number | undefined {
+  if (s == null || s === '') return undefined;
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 export const ProductListPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const screens = useBreakpoint();
-  const { products, total, filters, isLoading, error, fetchProducts, setFilters, searchProducts } =
-    useProductStore();
-  const { user } = useAuthStore();
   const { items } = useCartStore();
 
-  const [sortField, setSortField] = useState<SortField>('created_at');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [productFilters, setProductFilters] = useState<ProductFilters>({});
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
-  const [localLoading, setLocalLoading] = useState(false);
-  const [localProducts, setLocalProducts] = useState<Product[]>([]);
   const [flashSales, setFlashSales] = useState<FlashSale[]>([]);
   const [flashLoading, setFlashLoading] = useState(false);
   const [countdown, setCountdown] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'products' | 'skus'>('products');
+
   const [skus, setSKUs] = useState<SKUWithSPU[]>([]);
   const [skuTotal, setSkuTotal] = useState(0);
   const [skuLoading, setSkuLoading] = useState(false);
+  const [skuPage, setSkuPage] = useState(1);
+  const skuPerPage = 20;
+
   const [skuFilters, setSkuFilters] = useState<{
     type?: string;
     provider?: string;
@@ -119,52 +104,65 @@ export const ProductListPage: React.FC = () => {
 
   const sortParam = searchParams.get('sort');
   const flashParam = searchParams.get('flash');
-  const categoryParam = searchParams.get('category');
-  const searchParam = searchParams.get('search');
+  const searchParam = searchParams.get('search') || searchParams.get('q');
+  const groupCatalog =
+    searchParams.get('group_enabled') === 'true' || searchParams.get('group_enabled') === '1';
 
-  const isSpecialSort = sortParam === 'hot' || sortParam === 'new';
   const isFlashSale = flashParam === 'true';
-  const pageTitle = isFlashSale
-    ? '限时秒杀'
-    : sortParam
-      ? sortTypeMap[sortParam]?.title
-      : '商品列表';
-  const pageIcon = isFlashSale
-    ? sortTypeMap['flash'].icon
-    : sortParam
-      ? sortTypeMap[sortParam]?.icon
-      : null;
 
-  useEffect(() => {
-    if (isFlashSale) {
-      loadFlashSales();
-      return;
+  const pageTitle = useMemo(() => {
+    if (isFlashSale) return '限时秒杀';
+    if (groupCatalog) return sortTypeMap.group.title;
+    if (sortParam && sortTypeMap[sortParam]) return sortTypeMap[sortParam].title;
+    return 'SKU套餐';
+  }, [isFlashSale, groupCatalog, sortParam]);
+
+  const pageIcon = useMemo(() => {
+    if (isFlashSale) return sortTypeMap.flash.icon;
+    if (groupCatalog) return sortTypeMap.group.icon;
+    if (sortParam && sortTypeMap[sortParam]) return sortTypeMap[sortParam].icon;
+    return null;
+  }, [isFlashSale, groupCatalog, sortParam]);
+
+  const loadFlashSales = async () => {
+    setFlashLoading(true);
+    try {
+      const response = await api.get('/flash-sales/active');
+      const data = (response.data as { data?: FlashSale[] })?.data || [];
+      setFlashSales(data);
+    } catch {
+      setFlashSales([]);
+    } finally {
+      setFlashLoading(false);
     }
+  };
 
-    if (sortParam === 'hot') {
-      loadHotProducts();
-    } else if (sortParam === 'new') {
-      loadNewProducts();
-    } else if (searchParam) {
-      searchProducts(searchParam);
-    } else {
-      fetchProducts();
-    }
-  }, [sortParam, flashParam, searchParam]);
-
-  useEffect(() => {
-    if (activeTab === 'skus') {
-      loadSKUs();
-    }
-  }, [activeTab, skuFilters]);
-
-  const loadSKUs = async () => {
+  const loadSKUs = useCallback(async () => {
+    if (isFlashSale) return;
     setSkuLoading(true);
     try {
+      const sortRaw = searchParams.get('sort') || undefined;
+      const sort =
+        sortRaw && ['hot', 'new', 'price_asc', 'price_desc'].includes(sortRaw)
+          ? (sortRaw as 'hot' | 'new' | 'price_asc' | 'price_desc')
+          : undefined;
+
       const response = await skuService.getPublicSKUs({
-        page: filters.page,
-        per_page: filters.per_page,
-        ...skuFilters,
+        page: skuPage,
+        per_page: skuPerPage,
+        q: searchParam || undefined,
+        category: searchParams.get('category') || undefined,
+        provider: skuFilters.provider || searchParams.get('provider') || undefined,
+        tier: skuFilters.tier || searchParams.get('tier') || undefined,
+        model_name: searchParams.get('model_name') || undefined,
+        type: skuFilters.type || searchParams.get('type') || undefined,
+        group_enabled:
+          groupCatalog || searchParams.get('group_enabled') === 'true' ? true : undefined,
+        price_min: parseNum(searchParams.get('price_min')),
+        price_max: parseNum(searchParams.get('price_max')),
+        valid_days_min: parseIntParam(searchParams.get('valid_days_min')),
+        valid_days_max: parseIntParam(searchParams.get('valid_days_max')),
+        sort,
       });
       const apiResponse = response.data;
       setSKUs(apiResponse.data || []);
@@ -175,14 +173,32 @@ export const ProductListPage: React.FC = () => {
     } finally {
       setSkuLoading(false);
     }
-  };
+  }, [
+    isFlashSale,
+    searchParams,
+    skuPage,
+    skuFilters.provider,
+    skuFilters.tier,
+    skuFilters.type,
+    searchParam,
+    groupCatalog,
+  ]);
 
   useEffect(() => {
-    if (categoryParam) {
-      setProductFilters((prev) => ({ ...prev, category: categoryParam }));
-      fetchProducts({ category: categoryParam } as any);
+    if (isFlashSale) {
+      loadFlashSales();
     }
-  }, [categoryParam]);
+  }, [isFlashSale]);
+
+  useEffect(() => {
+    setSkuPage(1);
+  }, [searchParams.toString()]);
+
+  useEffect(() => {
+    if (!isFlashSale) {
+      loadSKUs();
+    }
+  }, [isFlashSale, loadSKUs]);
 
   useEffect(() => {
     if (!isFlashSale || flashSales.length === 0) return;
@@ -208,118 +224,19 @@ export const ProductListPage: React.FC = () => {
     return () => clearInterval(timer);
   }, [isFlashSale, flashSales]);
 
-  const loadFlashSales = async () => {
-    setFlashLoading(true);
-    try {
-      const response = await api.get('/flash-sales/active');
-      const data = (response.data as any)?.data || [];
-      setFlashSales(data);
-    } catch {
-      setFlashSales([]);
-    } finally {
-      setFlashLoading(false);
-    }
-  };
-
-  const loadHotProducts = async () => {
-    setLocalLoading(true);
-    try {
-      const response = await productService.getHotProducts(50);
-      const apiResponse = response.data;
-      setLocalProducts(apiResponse.data || []);
-    } catch {
-      setLocalProducts([]);
-    } finally {
-      setLocalLoading(false);
-    }
-  };
-
-  const loadNewProducts = async () => {
-    setLocalLoading(true);
-    try {
-      const response = await productService.getNewProducts(50);
-      const apiResponse = response.data;
-      setLocalProducts(apiResponse.data || []);
-    } catch {
-      setLocalProducts([]);
-    } finally {
-      setLocalLoading(false);
-    }
-  };
-
   const handleBuyFlashProduct = (product: FlashSaleProduct) => {
     navigate(`/catalog/${product.sku_id}?flash_sale_id=${product.flash_sale_id}`);
   };
 
-  const displayProducts = isSpecialSort ? localProducts : products;
-  const displayLoading = isFlashSale ? flashLoading : isSpecialSort ? localLoading : isLoading;
-
-  const columns = [
-    {
-      title: '产品名称',
-      dataIndex: 'name',
-      key: 'name',
-      render: (text: string, record: Product) => (
-        <a onClick={() => navigate(`/catalog/${record.id}`)}>{text}</a>
-      ),
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      width: screens.md ? 200 : 100,
-      ellipsis: true,
-    },
-    {
-      title: '价格',
-      dataIndex: 'price',
-      key: 'price',
-      render: (price: number) => <Text type="danger">¥{price.toFixed(2)}</Text>,
-      width: 100,
-    },
-    ...(screens.md
-      ? [
-          {
-            title: '库存',
-            dataIndex: 'stock',
-            key: 'stock',
-            width: 80,
-          },
-        ]
-      : []),
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => (
-        <Tag color={status === 'active' ? 'green' : 'red'}>
-          {status === 'active' ? '上架' : '下架'}
-        </Tag>
-      ),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      render: (_: any, record: Product) => (
-        <Space>
-          <Button type="link" size="small" onClick={() => navigate(`/catalog/${record.id}`)}>
-            详情
-          </Button>
-          <Button type="link" size="small" onClick={() => navigate(`/cart`)}>
-            加购
-          </Button>
-        </Space>
-      ),
-    },
-  ];
+  const displayLoading = isFlashSale ? flashLoading : skuLoading;
 
   const skuColumns = [
     {
-      title: 'SKU名称',
+      title: 'SKU / SPU',
       dataIndex: 'spu_name',
       key: 'spu_name',
       render: (text: string, record: SKUWithSPU) => (
-        <a onClick={() => navigate(`/skus/${record.id}`)}>{text}</a>
+        <a onClick={() => navigate(`/catalog/${record.id}`)}>{text}</a>
       ),
     },
     {
@@ -356,19 +273,22 @@ export const ProductListPage: React.FC = () => {
       title: '规格',
       key: 'specs',
       width: 150,
-      render: (_: any, record: SKUWithSPU) => {
+      render: (_: unknown, record: SKUWithSPU) => {
         if (record.sku_type === 'token_pack') {
           return <Text>{record.token_amount?.toLocaleString()} tokens</Text>;
-        } else if (record.sku_type === 'subscription') {
+        }
+        if (record.sku_type === 'subscription') {
           const periodMap: Record<string, string> = {
             monthly: '月度',
             quarterly: '季度',
             yearly: '年度',
           };
           return <Text>{periodMap[record.subscription_period || 'monthly'] || '月度'}</Text>;
-        } else if (record.sku_type === 'concurrent') {
+        }
+        if (record.sku_type === 'concurrent') {
           return <Text>{record.concurrent_requests} 并发</Text>;
-        } else if (record.sku_type === 'trial') {
+        }
+        if (record.sku_type === 'trial') {
           return <Text>{record.trial_duration_days}天试用</Text>;
         }
         return null;
@@ -393,10 +313,31 @@ export const ProductListPage: React.FC = () => {
       ),
     },
     {
+      title: '已售',
+      key: 'sold',
+      width: 90,
+      render: (_: unknown, record: SKUWithSPU) => (
+        <Text>{Number(record.sales_count ?? 0).toLocaleString()}</Text>
+      ),
+    },
+    {
+      title: '评分',
+      key: 'rating',
+      width: 100,
+      render: (_: unknown, record: SKUWithSPU) => {
+        const r = record.spu_average_rating;
+        return r != null && r > 0 ? (
+          <Text>{Number(r).toFixed(1)}/5</Text>
+        ) : (
+          <Text type="secondary">—</Text>
+        );
+      },
+    },
+    {
       title: '拼团',
       key: 'group',
       width: 80,
-      render: (_: any, record: SKUWithSPU) =>
+      render: (_: unknown, record: SKUWithSPU) =>
         record.group_enabled ? (
           <Tag color="red">
             {record.min_group_size}-{record.max_group_size}人
@@ -409,13 +350,10 @@ export const ProductListPage: React.FC = () => {
       title: '操作',
       key: 'action',
       width: 120,
-      render: (_: any, record: SKUWithSPU) => (
+      render: (_: unknown, record: SKUWithSPU) => (
         <Space>
-          <Button type="link" size="small" onClick={() => navigate(`/skus/${record.id}`)}>
+          <Button type="link" size="small" onClick={() => navigate(`/catalog/${record.id}`)}>
             详情
-          </Button>
-          <Button type="link" size="small" onClick={() => navigate(`/skus/${record.id}/cart`)}>
-            加购
           </Button>
         </Space>
       ),
@@ -423,54 +361,53 @@ export const ProductListPage: React.FC = () => {
   ];
 
   const handleSearch = (value: string) => {
-    if (value.trim()) {
-      navigate(`/catalog?search=${encodeURIComponent(value.trim())}`);
+    const q = value.trim();
+    if (!q) {
+      navigate('/catalog');
+      return;
     }
+    const next = new URLSearchParams(searchParams);
+    next.set('q', q);
+    next.delete('search');
+    navigate(`/catalog?${next.toString()}`);
   };
 
-  const handlePageChange = (page: number, pageSize: number) => {
-    setFilters({ page, per_page: pageSize });
-    fetchProducts({ page, per_page: pageSize });
+  const handlePageChange = (page: number) => {
+    setSkuPage(page);
   };
 
   const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  const handleSort = (field: SortField) => {
-    const newOrder = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
-    setSortField(field);
-    setSortOrder(newOrder);
-
-    fetchProducts({
-      ...filters,
-      sort_field: field,
-      sort_order: newOrder,
-    } as any);
-  };
-
-  const handleFilterChange = (key: keyof ProductFilters, value: any) => {
-    setProductFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const applyFilters = () => {
-    fetchProducts({
-      ...filters,
-      ...productFilters,
-      sort_field: sortField,
-      sort_order: sortOrder,
-    } as any);
-  };
-
-  const resetFilters = () => {
-    setProductFilters({});
-    setPriceRange([0, 10000]);
-    setSortField('created_at');
-    setSortOrder('desc');
-    fetchProducts();
-  };
-
-  if (error) {
-    return <Empty description={`错误: ${error}`} />;
-  }
+  const catalogEmptyDescription = useMemo(() => {
+    if (groupCatalog) {
+      return (
+        <Space direction="vertical">
+          <Title level={4}>暂无可拼团的 SKU</Title>
+          <Text type="secondary">可调整筛选条件或稍后再试</Text>
+          <Button type="link" onClick={() => navigate('/catalog')}>
+            浏览全部 SKU
+          </Button>
+        </Space>
+      );
+    }
+    if (sortParam === 'hot') {
+      return (
+        <Space direction="vertical">
+          <Title level={4}>热销活动下暂无 SKU</Title>
+          <Text type="secondary">敬请期待后续上架</Text>
+        </Space>
+      );
+    }
+    if (sortParam === 'new') {
+      return (
+        <Space direction="vertical">
+          <Title level={4}>新品活动下暂无 SKU</Title>
+          <Text type="secondary">敬请期待后续上架</Text>
+        </Space>
+      );
+    }
+    return '暂无 SKU 数据';
+  }, [groupCatalog, sortParam, navigate]);
 
   if (isFlashSale) {
     return (
@@ -506,7 +443,7 @@ export const ProductListPage: React.FC = () => {
                     <Title level={4}>暂无进行中的秒杀活动</Title>
                     <Text type="secondary">敬请期待下一场秒杀！</Text>
                     <Button type="primary" onClick={() => navigate('/catalog')}>
-                      浏览商品
+                      浏览 SKU 套餐
                     </Button>
                   </Space>
                 }
@@ -597,102 +534,18 @@ export const ProductListPage: React.FC = () => {
             ))
           )}
         </Spin>
+
+        <Badge count={cartItemCount} size="small">
+          <FloatButton
+            icon={<ShoppingCartOutlined />}
+            tooltip={<div>购物车</div>}
+            onClick={() => navigate('/cart')}
+            style={{ right: 24, bottom: 24 }}
+          />
+        </Badge>
       </div>
     );
   }
-
-  const filterDropdownItems = [
-    {
-      key: 'price',
-      label: (
-        <div style={{ padding: '8px', width: 250 }}>
-          <div style={{ marginBottom: 8 }}>价格区间</div>
-          <Slider
-            range
-            min={0}
-            max={10000}
-            value={priceRange}
-            onChange={(value) => setPriceRange(value as [number, number])}
-            onAfterChange={(value) => {
-              handleFilterChange('minPrice', value[0]);
-              handleFilterChange('maxPrice', value[1]);
-            }}
-          />
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>¥{priceRange[0]}</span>
-            <span>¥{priceRange[1]}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'status',
-      label: (
-        <div style={{ padding: '8px' }}>
-          <div style={{ marginBottom: 8 }}>状态筛选</div>
-          <Select
-            style={{ width: '100%' }}
-            placeholder="选择状态"
-            allowClear
-            onChange={(value) => handleFilterChange('status', value)}
-          >
-            <Option value="active">上架</Option>
-            <Option value="inactive">下架</Option>
-          </Select>
-        </div>
-      ),
-    },
-    {
-      key: 'actions',
-      label: (
-        <Space style={{ padding: '8px' }}>
-          <Button type="primary" size="small" onClick={applyFilters}>
-            应用筛选
-          </Button>
-          <Button size="small" onClick={resetFilters}>
-            重置
-          </Button>
-        </Space>
-      ),
-    },
-  ];
-
-  const sortDropdownItems = [
-    {
-      key: 'price_asc',
-      label: '价格从低到高',
-      onClick: () => handleSort('price'),
-    },
-    {
-      key: 'price_desc',
-      label: '价格从高到低',
-      onClick: () => {
-        setSortField('price');
-        setSortOrder('desc');
-      },
-    },
-    {
-      key: 'stock_asc',
-      label: '库存从少到多',
-      onClick: () => handleSort('stock'),
-    },
-    {
-      key: 'stock_desc',
-      label: '库存从多到少',
-      onClick: () => {
-        setSortField('stock');
-        setSortOrder('desc');
-      },
-    },
-    {
-      key: 'created_desc',
-      label: '最新发布',
-      onClick: () => {
-        setSortField('created_at');
-        setSortOrder('desc');
-      },
-    },
-  ];
 
   return (
     <div style={{ padding: screens.xs ? 12 : 24 }}>
@@ -707,144 +560,102 @@ export const ProductListPage: React.FC = () => {
         </Col>
       </Row>
 
-      <Tabs
-        activeKey={activeTab}
-        onChange={(key) => setActiveTab(key as 'products' | 'skus')}
-        style={{ marginBottom: 16 }}
-      >
-        <TabPane
-          tab={
-            <span>
-              <AppstoreOutlined />
-              商品
-            </span>
-          }
-          key="products"
-        >
-          <Row gutter={16} style={{ marginBottom: '20px' }}>
-            <Col flex="auto">
-              <Input.Search
-                placeholder="搜索产品..."
-                prefix={<SearchOutlined />}
-                onSearch={handleSearch}
-                defaultValue={searchParam || ''}
-                style={{ width: '100%' }}
-              />
-            </Col>
-            {!isSpecialSort && (
-              <Col>
-                <Space>
-                  <Dropdown menu={{ items: filterDropdownItems }} trigger={['click']}>
-                    <Button icon={<FilterOutlined />}>筛选</Button>
-                  </Dropdown>
-                  <Dropdown menu={{ items: sortDropdownItems }} trigger={['click']}>
-                    <Button icon={<SortAscendingOutlined />}>排序</Button>
-                  </Dropdown>
-                  {user?.role === 'merchant' && (
-                    <Button type="primary" icon={<PlusOutlined />}>
-                      发布产品
-                    </Button>
-                  )}
-                </Space>
-              </Col>
-            )}
-          </Row>
-
-          <Spin spinning={displayLoading}>
-            <Table
-              columns={columns}
-              dataSource={displayProducts}
-              rowKey="id"
-              pagination={false}
-              scroll={{ x: 600 }}
-              locale={{ emptyText: '暂无数据' }}
-              size={screens.xs ? 'small' : 'middle'}
+      <Row gutter={16} style={{ marginBottom: 20 }}>
+        <Col flex="auto">
+          <Input.Search
+            placeholder="搜索 SKU / 模型 / 关键词..."
+            prefix={<SearchOutlined />}
+            onSearch={handleSearch}
+            defaultValue={searchParam || ''}
+            allowClear
+            style={{ width: '100%' }}
+          />
+        </Col>
+        <Col>
+          <Space wrap>
+            <Select
+              placeholder="类型"
+              allowClear
+              style={{ width: 120 }}
+              value={skuFilters.type}
+              onChange={(value) => setSkuFilters((prev) => ({ ...prev, type: value || undefined }))}
+            >
+              <Option value="token_pack">Token包</Option>
+              <Option value="subscription">订阅</Option>
+              <Option value="concurrent">并发</Option>
+              <Option value="trial">试用</Option>
+            </Select>
+            <Select
+              placeholder="厂商"
+              allowClear
+              style={{ width: 120 }}
+              value={skuFilters.provider}
+              onChange={(value) =>
+                setSkuFilters((prev) => ({ ...prev, provider: value || undefined }))
+              }
+            >
+              <Option value="openai">OpenAI</Option>
+              <Option value="anthropic">Anthropic</Option>
+              <Option value="google">Google</Option>
+              <Option value="deepseek">DeepSeek</Option>
+              <Option value="zhipu">智谱</Option>
+            </Select>
+            <Select
+              placeholder="层级"
+              allowClear
+              style={{ width: 100 }}
+              value={skuFilters.tier}
+              onChange={(value) => setSkuFilters((prev) => ({ ...prev, tier: value || undefined }))}
+            >
+              <Option value="pro">Pro</Option>
+              <Option value="lite">Lite</Option>
+              <Option value="mini">Mini</Option>
+              <Option value="vision">Vision</Option>
+            </Select>
+            <Select
+              placeholder="排序"
+              allowClear
+              style={{ width: 140 }}
+              value={sortParam || undefined}
+              onChange={(value) => {
+                const next = new URLSearchParams(searchParams);
+                if (value) next.set('sort', value);
+                else next.delete('sort');
+                navigate(`/catalog?${next.toString()}`);
+              }}
+              options={[
+                { label: '热销', value: 'hot' },
+                { label: '最新', value: 'new' },
+                { label: '价格↑', value: 'price_asc' },
+                { label: '价格↓', value: 'price_desc' },
+              ]}
             />
-          </Spin>
+          </Space>
+        </Col>
+      </Row>
 
-          {!isSpecialSort && total > 0 && (
-            <Pagination
-              current={filters.page}
-              pageSize={filters.per_page}
-              total={total}
-              onChange={handlePageChange}
-              style={{ marginTop: '20px', textAlign: 'right' }}
-            />
-          )}
-        </TabPane>
+      <Spin spinning={skuLoading}>
+        <Table
+          columns={skuColumns}
+          dataSource={skus}
+          rowKey="id"
+          pagination={false}
+          scroll={{ x: 800 }}
+          locale={{ emptyText: <Empty description={catalogEmptyDescription} /> }}
+          size={screens.xs ? 'small' : 'middle'}
+        />
+      </Spin>
 
-        <TabPane
-          tab={
-            <span>
-              <TagsOutlined />
-              SKU套餐
-            </span>
-          }
-          key="skus"
-        >
-          <Row gutter={16} style={{ marginBottom: '20px' }}>
-            <Col flex="auto">
-              <Space>
-                <Select
-                  placeholder="类型"
-                  allowClear
-                  style={{ width: 120 }}
-                  onChange={(value) => setSkuFilters((prev) => ({ ...prev, type: value }))}
-                >
-                  <Option value="token_pack">Token包</Option>
-                  <Option value="subscription">订阅</Option>
-                  <Option value="concurrent">并发</Option>
-                  <Option value="trial">试用</Option>
-                </Select>
-                <Select
-                  placeholder="厂商"
-                  allowClear
-                  style={{ width: 120 }}
-                  onChange={(value) => setSkuFilters((prev) => ({ ...prev, provider: value }))}
-                >
-                  <Option value="openai">OpenAI</Option>
-                  <Option value="anthropic">Anthropic</Option>
-                  <Option value="google">Google</Option>
-                  <Option value="deepseek">DeepSeek</Option>
-                </Select>
-                <Select
-                  placeholder="层级"
-                  allowClear
-                  style={{ width: 100 }}
-                  onChange={(value) => setSkuFilters((prev) => ({ ...prev, tier: value }))}
-                >
-                  <Option value="pro">Pro</Option>
-                  <Option value="lite">Lite</Option>
-                  <Option value="mini">Mini</Option>
-                  <Option value="vision">Vision</Option>
-                </Select>
-              </Space>
-            </Col>
-          </Row>
+      {skuTotal > 0 && (
+        <Pagination
+          current={skuPage}
+          pageSize={skuPerPage}
+          total={skuTotal}
+          onChange={handlePageChange}
+          style={{ marginTop: 20, textAlign: 'right' }}
+        />
+      )}
 
-          <Spin spinning={skuLoading}>
-            <Table
-              columns={skuColumns}
-              dataSource={skus}
-              rowKey="id"
-              pagination={false}
-              scroll={{ x: 800 }}
-              locale={{ emptyText: '暂无SKU数据' }}
-              size={screens.xs ? 'small' : 'middle'}
-            />
-          </Spin>
-
-          {skuTotal > 0 && (
-            <Pagination
-              current={filters.page}
-              pageSize={filters.per_page}
-              total={skuTotal}
-              onChange={handlePageChange}
-              style={{ marginTop: '20px', textAlign: 'right' }}
-            />
-          )}
-        </TabPane>
-      </Tabs>
       <Badge count={cartItemCount} size="small">
         <FloatButton
           icon={<ShoppingCartOutlined />}

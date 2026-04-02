@@ -129,6 +129,10 @@ export interface SKU {
   model_provider?: string;
   model_name?: string;
   model_tier?: string;
+  /** SPU 维度累计销量（公开列表/详情由后端 JOIN 返回） */
+  spu_total_sales_count?: number;
+  /** SPU 维度评分，详情页可与 SKU 销量组合展示 */
+  spu_average_rating?: number;
 }
 
 export interface SKUWithSPU extends SKU {
