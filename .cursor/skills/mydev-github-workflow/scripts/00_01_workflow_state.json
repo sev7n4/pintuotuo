@@ -1,5 +1,5 @@
 {
-  "current_step": 8,
+  "current_step": 9,
   "current_fix_cases": [
     "UT-BE-CATALOG-020",
     "FE-CATALOG-ROUTE",
@@ -9,7 +9,7 @@
   "pr_number": null,
   "merged": false,
   "branch": "feature/catalog-products-sku-migration",
-  "local_validation": "pending",
+  "local_validation": "passed",
   "ci_status": {
     "cicd": "pending",
     "integration": "pending",
@@ -18,13 +18,14 @@
   },
   "error_history": [],
   "created_at": "2026-04-02T14:00:00Z",
-  "updated_at": "2026-04-02T14:00:00Z",
+  "updated_at": "2026-04-02T14:30:00Z",
   "metadata": {
     "repo": "pintuotuo",
     "task": "DROP products 表 + /catalog 路由 + 秒杀 SKU id + Admin 秒杀页",
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "validation_note": "从 main 新建分支 feature/catalog-products-sku-migration，cherry-pick 本次修复",
-    "next_action": "local_validation_then_push_pr"
+    "validation_note": "Step8: go test ./... + npm run type-check；从 main 新建 feature/catalog-products-sku-migration，cherry-pick catalog 提交并修正迁移序号 020/021",
+    "supersedes_pr": 147,
+    "next_action": "push_and_create_pr_step_10_ci"
   }
 }
