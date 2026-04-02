@@ -39,6 +39,7 @@ import { productService } from '@services/product';
 import { skuService } from '@services/sku';
 import type { Product, GroupPrice, ProductReview, Group } from '@/types';
 import type { SKUWithSPU } from '@/types/sku';
+import { normalizeGroupDiscountRate } from '@/utils/groupDiscount';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -70,17 +71,36 @@ const mockReviews: ProductReview[] = [
   },
 ];
 
-const defaultGroupPrices: GroupPrice[] = [
-  { min_members: 2, price_per_person: 60, discount_percent: 40 },
-  { min_members: 5, price_per_person: 50, discount_percent: 50 },
-];
+/** 加载失败或未返回 SKU 时：用零售价占位各档位，避免写死 demo 价；折扣为 0。 */
+function buildRetailOnlyGroupTiers(
+  retail: number,
+  minGroupSize = 2,
+  maxGroupSize = 10
+): GroupPrice[] {
+  if (retail <= 0) return [];
+  const pick: number[] = [];
+  for (const n of [2, 5]) {
+    if (n >= minGroupSize && n <= maxGroupSize) pick.push(n);
+  }
+  if (pick.length === 0) {
+    pick.push(minGroupSize);
+    if (maxGroupSize !== minGroupSize) pick.push(maxGroupSize);
+  }
+  return [...new Set(pick)]
+    .sort((a, b) => a - b)
+    .map((min_members) => ({
+      min_members,
+      price_per_person: Number(retail.toFixed(2)),
+      discount_percent: 0,
+    }));
+}
 
 function buildGroupPricesFromSku(sku: SKUWithSPU | null): GroupPrice[] {
   if (!sku?.group_enabled) return [];
   const retail = sku.retail_price;
-  const rate = Math.min(1, Math.max(0, sku.group_discount_rate ?? 0));
+  const rate = normalizeGroupDiscountRate(sku.group_discount_rate);
   const perPerson = retail * (1 - rate);
-  const discountPct = rate > 0 ? Math.round(rate * 100) : 0;
+  const discountPct = retail > 0 ? Math.max(0, Math.round((1 - perPerson / retail) * 100)) : 0;
   const pick: number[] = [];
   for (const n of [2, 5]) {
     if (n >= sku.min_group_size && n <= sku.max_group_size) pick.push(n);
@@ -96,6 +116,15 @@ function buildGroupPricesFromSku(sku: SKUWithSPU | null): GroupPrice[] {
       price_per_person: Number(perPerson.toFixed(2)),
       discount_percent: discountPct,
     }));
+}
+
+function resolveGroupPrices(sku: SKUWithSPU | null, product: Product): GroupPrice[] {
+  const skuGroupTiers = buildGroupPricesFromSku(sku);
+  if (skuGroupTiers.length > 0) return skuGroupTiers;
+  if (product.group_prices?.length) return product.group_prices;
+  if (sku && !sku.group_enabled) return [];
+  const retail = sku?.retail_price ?? product.price ?? 0;
+  return buildRetailOnlyGroupTiers(retail);
 }
 
 function formatCountdown(deadline: Date): string {
@@ -140,24 +169,43 @@ export const ProductDetailPage: React.FC = () => {
   }, [product]);
 
   useEffect(() => {
-    const skuTiers = buildGroupPricesFromSku(selectedSKU);
-    if (skuTiers.length > 0) {
+    if (!product) return;
+    const tiers = resolveGroupPrices(selectedSKU, product);
+    if (tiers.length > 0) {
       setSelectedGroupPrice((prev) => {
-        const match = skuTiers.find((t) => t.min_members === prev?.min_members);
-        return match ?? skuTiers[0];
+        const match = tiers.find((t) => t.min_members === prev?.min_members);
+        return match ?? tiers[0];
       });
-      return;
-    }
-    if (product?.group_prices?.length) {
-      setSelectedGroupPrice(product.group_prices[0]);
     } else {
-      setSelectedGroupPrice(defaultGroupPrices[0] ?? null);
+      setSelectedGroupPrice(null);
     }
-  }, [selectedSKU?.id, selectedSKU?.group_enabled, product?.id, product?.group_prices]);
+  }, [
+    selectedSKU?.id,
+    selectedSKU?.group_enabled,
+    selectedSKU?.retail_price,
+    selectedSKU?.group_discount_rate,
+    selectedSKU?.min_group_size,
+    selectedSKU?.max_group_size,
+    product?.id,
+    product?.price,
+    product?.group_prices,
+  ]);
 
   const loadSKUs = async (spuId: number, currentSkuId: number) => {
     setSkuLoading(true);
+    let primary: SKUWithSPU | null = null;
     try {
+      try {
+        const one = await skuService.getPublicSKU(currentSkuId);
+        const body = one.data as { data?: SKUWithSPU };
+        if (body?.data) {
+          primary = body.data;
+          setSelectedSKU(primary);
+        }
+      } catch {
+        /* 单 SKU 预取失败时仍尝试列表接口 */
+      }
+
       const response = await skuService.getPublicSKUs({
         page: 1,
         per_page: 50,
@@ -167,9 +215,12 @@ export const ProductDetailPage: React.FC = () => {
       const productSKUs = apiResponse.data || [];
       setSKUs(productSKUs);
       const match = productSKUs.find((sku: SKUWithSPU) => sku.id === currentSkuId);
-      setSelectedSKU(match || productSKUs[0] || null);
+      setSelectedSKU(match || primary || productSKUs[0] || null);
     } catch {
       setSKUs([]);
+      if (!primary) {
+        setSelectedSKU(null);
+      }
     } finally {
       setSkuLoading(false);
     }
@@ -293,13 +344,6 @@ export const ProductDetailPage: React.FC = () => {
     }
   };
 
-  const calculateDiscount = () => {
-    if (!selectedGroupPrice) return 0;
-    const basePrice = selectedSKU?.retail_price || product?.price;
-    if (!basePrice) return 0;
-    return Math.round((1 - selectedGroupPrice.price_per_person / basePrice) * 100);
-  };
-
   const buildSkuSummary = (sku: SKUWithSPU) => {
     const parts: string[] = [];
     if (sku.token_amount) parts.push(`${sku.token_amount.toLocaleString()} tokens`);
@@ -343,13 +387,6 @@ export const ProductDetailPage: React.FC = () => {
     return Array.from(new Set(promoLabels)).slice(0, 4);
   };
 
-  const estimatedFinalPrice = () => {
-    const skuPrice = selectedSKU?.retail_price || product?.price || 0;
-    if (!skuPrice) return 0;
-    if (purchaseMode === 'group' && selectedGroupPrice) return selectedGroupPrice.price_per_person;
-    return skuPrice;
-  };
-
   if (error) {
     return <Empty description={`错误: ${error}`} />;
   }
@@ -364,13 +401,23 @@ export const ProductDetailPage: React.FC = () => {
     );
   }
 
-  const skuGroupTiers = buildGroupPricesFromSku(selectedSKU);
-  const groupPrices =
-    skuGroupTiers.length > 0
-      ? skuGroupTiers
-      : product.group_prices?.length
-        ? product.group_prices
-        : defaultGroupPrices;
+  const groupPrices = resolveGroupPrices(selectedSKU, product);
+  const effectiveGroupTier = selectedGroupPrice ?? groupPrices[0] ?? null;
+
+  const estimatedFinalPrice = () => {
+    const skuPrice = selectedSKU?.retail_price || product.price || 0;
+    if (!skuPrice) return 0;
+    if (purchaseMode === 'group') {
+      return effectiveGroupTier?.price_per_person ?? skuPrice;
+    }
+    return skuPrice;
+  };
+
+  const calculateDiscount = () => {
+    const basePrice = selectedSKU?.retail_price || product.price;
+    if (!basePrice || !effectiveGroupTier) return 0;
+    return Math.max(0, Math.round((1 - effectiveGroupTier.price_per_person / basePrice) * 100));
+  };
 
   const displaySoldCount = Number(selectedSKU?.sales_count ?? product?.sold_count ?? 0);
   const displayRating = selectedSKU?.spu_average_rating ?? product?.rating ?? 4.8;
@@ -569,7 +616,11 @@ export const ProductDetailPage: React.FC = () => {
                     <Tag color="green">推荐</Tag>
                   </Space>
                   <Statistic
-                    value={selectedGroupPrice?.price_per_person || groupPrices[0].price_per_person}
+                    value={
+                      effectiveGroupTier?.price_per_person ??
+                      selectedSKU?.retail_price ??
+                      product.price
+                    }
                     prefix="¥"
                     valueStyle={{ color: '#52c41a', fontSize: 24 }}
                     suffix={
@@ -579,7 +630,8 @@ export const ProductDetailPage: React.FC = () => {
                     }
                   />
                   <Text type="success">
-                    预计到手 ¥{estimatedFinalPrice().toFixed(2)}，立省 {calculateDiscount()}%
+                    预计到手 ¥{estimatedFinalPrice().toFixed(2)}
+                    {calculateDiscount() > 0 ? `，立省 ${calculateDiscount()}%` : ''}
                   </Text>
                 </Space>
               </Card>
@@ -589,7 +641,16 @@ export const ProductDetailPage: React.FC = () => {
 
         {purchaseMode === 'group' && (
           <div style={{ marginBottom: 24 }}>
-            {(selectedSKU?.is_promoted || selectedSKU?.group_enabled) && (
+            {groupPrices.length === 0 && (
+              <Alert
+                type="info"
+                showIcon
+                message="当前规格不支持拼团"
+                description="请选择支持拼团的 SKU 规格，或使用单独购买。"
+                style={{ marginBottom: 16 }}
+              />
+            )}
+            {(selectedSKU?.is_promoted || selectedSKU?.group_enabled) && groupPrices.length > 0 && (
               <Alert
                 type="warning"
                 showIcon
@@ -598,7 +659,7 @@ export const ProductDetailPage: React.FC = () => {
                 style={{ marginBottom: 16 }}
               />
             )}
-            <Title level={5}>选择拼团规则</Title>
+            {groupPrices.length > 0 && <Title level={5}>选择拼团规则</Title>}
             <Space direction="vertical" style={{ width: '100%' }}>
               {groupPrices.map((gp) => (
                 <Card
@@ -733,10 +794,14 @@ export const ProductDetailPage: React.FC = () => {
                     size="large"
                     icon={<TeamOutlined />}
                     onClick={handleGroupPurchase}
-                    disabled={product.stock === 0}
+                    disabled={product.stock === 0 || groupPrices.length === 0}
                     style={{ flex: 1, background: '#1890ff', borderColor: '#1890ff' }}
                   >
-                    {product.stock === 0 ? '暂无库存' : '发起拼团并支付'}
+                    {product.stock === 0
+                      ? '暂无库存'
+                      : groupPrices.length === 0
+                        ? '当前规格不可拼团'
+                        : '发起拼团并支付'}
                   </Button>
                 </Space>
               </Space>
