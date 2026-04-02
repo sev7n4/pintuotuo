@@ -135,7 +135,12 @@ export const OrderListPage: React.FC = () => {
 
   const handleBuyAgain = async (order: Order) => {
     try {
-      const product = await fetchProductByID(order.sku_id ?? order.product_id);
+      const catalogId = order.sku_id ?? order.product_id;
+      if (catalogId == null) {
+        message.error('无法再次购买：订单缺少 SKU 信息');
+        return;
+      }
+      const product = await fetchProductByID(catalogId);
       if (product) {
         addItem(product, order.quantity);
         message.success('已添加到购物车');
@@ -358,7 +363,9 @@ export const OrderListPage: React.FC = () => {
         {selectedOrder && (
           <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
             <Descriptions.Item label="订单号">{selectedOrder.id}</Descriptions.Item>
-            <Descriptions.Item label="产品ID">{selectedOrder.product_id}</Descriptions.Item>
+            <Descriptions.Item label="SKU / 产品">
+              {selectedOrder.sku_id ?? selectedOrder.product_id ?? '—'}
+            </Descriptions.Item>
             <Descriptions.Item label="数量">{selectedOrder.quantity}</Descriptions.Item>
             <Descriptions.Item label="单价">
               ¥{(selectedOrder.total_price / selectedOrder.quantity).toFixed(2)}

@@ -1,10 +1,10 @@
 {
   "current_step": 10,
-  "current_fix_cases": ["GROUP-NULL-PRODUCT-ID-500"],
-  "retry_count": 0,
-  "pr_number": 158,
+  "current_fix_cases": ["ORDER-GET-404-NULL-PRODUCT-ID"],
+  "retry_count": 1,
+  "pr_number": 159,
   "merged": false,
-  "branch": "fix/groups-null-product-id",
+  "branch": "fix/orders-get-by-id-null-product",
   "local_validation": "passed",
   "ci_status": {
     "cicd": "pending",
@@ -12,17 +12,24 @@
     "e2e": "pending",
     "deploy": "pending"
   },
-  "error_history": [],
+  "error_history": [
+    {
+      "step": 11,
+      "error_type": "code",
+      "message": "PR159 首轮 Frontend Build 失败：OrderListPage handleBuyAgain 中 fetchProductByID(sku_id??product_id) 类型含 null；已收窄并提示",
+      "timestamp": "2026-04-03T10:00:00+08:00"
+    }
+  ],
   "created_at": "2026-04-02T16:00:00Z",
-  "updated_at": "2026-04-03T01:30:00Z",
+  "updated_at": "2026-04-03T10:05:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "修复 POST /groups 与 GET /catalog/:id/groups 500：groups.product_id NULL 扫描",
+    "task": "GET /orders/:id 404 + CI tsc 修复",
     "issue_type": "bugfix",
     "skill": "mydev-github-workflow",
-    "validation_note": "make test 通过；PR #158 已创建",
+    "validation_note": "make test + npm run type-check 通过；已 push 重跑 CI",
     "next_action": "monitor_ci",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/158",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/159",
     "deploy_run_id": null
   }
 }
