@@ -5,12 +5,12 @@
     "FE-MY-SERVICES-NAV"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 151,
   "merged": false,
   "branch": "feature/merchant-sku-nav-my-services",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "pending",
+    "cicd": "running",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
@@ -24,6 +24,7 @@
     "issue_type": "enhancement",
     "skill": "mydev-github-workflow",
     "validation_note": "Step8: npm run type-check；配置/导航为主可跳过 TDD",
-    "next_action": "push_and_pr_ci"
+    "next_action": "monitor_ci_pr_151",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/151"
   }
 }
