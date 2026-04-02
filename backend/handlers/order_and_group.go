@@ -141,12 +141,13 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	var pid interface{} = nil
+	var productID sql.NullInt64
 	err = tx.QueryRow(
 		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
 		 RETURNING id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at`,
 		userID, pid, skuID, spuID, groupID, req.Quantity, unitPrice, totalPrice, orderStatusPending,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &order.SKUID, &order.SPUID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	).Scan(&order.ID, &order.UserID, &productID, &order.SKUID, &order.SPUID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -157,6 +158,7 @@ func CreateOrder(c *gin.Context) {
 		))
 		return
 	}
+	applyNullOrderProductID(&order, productID)
 
 	if err := tx.Commit(); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -218,12 +220,13 @@ func ListOrders(c *gin.Context) {
 	var orders []models.Order
 	for rows.Next() {
 		var o models.Order
-		var skuID, spuID sql.NullInt64
-		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &skuID, &spuID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+		var productID, skuID, spuID sql.NullInt64
+		err := rows.Scan(&o.ID, &o.UserID, &productID, &skuID, &spuID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
+		applyNullOrderProductID(&o, productID)
 		if skuID.Valid {
 			o.SKUID = int(skuID.Int64)
 		}
@@ -282,16 +285,17 @@ func GetOrderByID(c *gin.Context) {
 	}
 
 	var order models.Order
-	var skuID, spuID sql.NullInt64
+	var productID, skuID, spuID sql.NullInt64
 	err := db.QueryRow(
 		`SELECT id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at 
 		 FROM orders WHERE id = $1 AND user_id = $2`, id, userID,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &skuID, &spuID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	).Scan(&order.ID, &order.UserID, &productID, &skuID, &spuID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
 	}
 
+	applyNullOrderProductID(&order, productID)
 	if skuID.Valid {
 		order.SKUID = int(skuID.Int64)
 	}
@@ -328,7 +332,7 @@ func CancelOrder(c *gin.Context) {
 
 	var orderInfo struct {
 		status    string
-		productID int
+		productID sql.NullInt64
 		skuID     sql.NullInt64
 		quantity  int
 	}
@@ -360,12 +364,12 @@ func CancelOrder(c *gin.Context) {
 	defer tx.Rollback()
 
 	var order models.Order
-	var skuIDNull, spuIDNull sql.NullInt64
+	var productID, skuIDNull, spuIDNull sql.NullInt64
 	err = tx.QueryRow(
 		`UPDATE orders SET status = $1 WHERE id = $2 AND user_id = $3 
 		 RETURNING id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at`,
 		"canceled", id, userID,
-	).Scan(&order.ID, &order.UserID, &order.ProductID, &skuIDNull, &spuIDNull, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	).Scan(&order.ID, &order.UserID, &productID, &skuIDNull, &spuIDNull, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -377,6 +381,7 @@ func CancelOrder(c *gin.Context) {
 		return
 	}
 
+	applyNullOrderProductID(&order, productID)
 	if skuIDNull.Valid {
 		order.SKUID = int(skuIDNull.Int64)
 	}
@@ -596,12 +601,13 @@ func ListGroups(c *gin.Context) {
 	var groups []models.Group
 	for rows.Next() {
 		var g models.Group
-		var skuID, spuID sql.NullInt64
-		err := rows.Scan(&g.ID, &g.ProductID, &skuID, &spuID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
+		var productID, skuID, spuID sql.NullInt64
+		err := rows.Scan(&g.ID, &productID, &skuID, &spuID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
+		applyNullProductID(&g, productID)
 		if skuID.Valid {
 			g.SKUID = int(skuID.Int64)
 		}
@@ -696,18 +702,19 @@ func GetGroupByID(c *gin.Context) {
 	}
 
 	var group models.Group
-	var skuID, spuID sql.NullInt64
+	var productID, skuID, spuID sql.NullInt64
 	err := db.QueryRow(
 		`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at 
 		 FROM groups WHERE id = $1`,
 		id,
-	).Scan(&group.ID, &group.ProductID, &skuID, &spuID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
+	).Scan(&group.ID, &productID, &skuID, &spuID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
 		return
 	}
 
+	applyNullProductID(&group, productID)
 	if skuID.Valid {
 		group.SKUID = int(skuID.Int64)
 	}

@@ -358,7 +358,9 @@ export const OrderListPage: React.FC = () => {
         {selectedOrder && (
           <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
             <Descriptions.Item label="订单号">{selectedOrder.id}</Descriptions.Item>
-            <Descriptions.Item label="产品ID">{selectedOrder.product_id}</Descriptions.Item>
+            <Descriptions.Item label="SKU / 产品">
+              {selectedOrder.sku_id ?? selectedOrder.product_id ?? '—'}
+            </Descriptions.Item>
             <Descriptions.Item label="数量">{selectedOrder.quantity}</Descriptions.Item>
             <Descriptions.Item label="单价">
               ¥{(selectedOrder.total_price / selectedOrder.quantity).toFixed(2)}

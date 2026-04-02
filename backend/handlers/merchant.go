@@ -532,13 +532,14 @@ func GetMerchantOrders(c *gin.Context) {
 	var orders []OrderWithProduct
 	for rows.Next() {
 		var o OrderWithProduct
-		var skuID, spuID sql.NullInt64
-		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &skuID, &spuID, &o.GroupID, &o.Quantity, &o.TotalPrice,
+		var productID, skuID, spuID sql.NullInt64
+		err := rows.Scan(&o.ID, &o.UserID, &productID, &skuID, &spuID, &o.GroupID, &o.Quantity, &o.TotalPrice,
 			&o.Status, &o.CreatedAt, &o.UpdatedAt, &o.ProductName)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
+		applyNullOrderProductID(&o.Order, productID)
 		if skuID.Valid {
 			o.SKUID = int(skuID.Int64)
 		}

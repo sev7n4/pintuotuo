@@ -76,7 +76,8 @@ export interface HomeData {
 export interface Order {
   id: number;
   user_id: number;
-  product_id: number;
+  /** 纯 SKU 订单可为空 */
+  product_id?: number | null;
   sku_id?: number;
   group_id: number | null;
   quantity: number;
@@ -99,7 +100,7 @@ export interface Order {
 // Group purchase related types
 export interface Group {
   id: number;
-  product_id: number;
+  product_id?: number | null;
   sku_id?: number;
   spu_id?: number;
   creator_id: number;

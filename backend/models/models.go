@@ -38,7 +38,7 @@ type Product struct {
 type Order struct {
 	ID         int         `json:"id"`
 	UserID     int         `json:"user_id"`
-	ProductID  int         `json:"product_id"`
+	ProductID  *int        `json:"product_id,omitempty"` // NULL for SKU-only orders (migration 020)
 	SKUID      int         `json:"sku_id,omitempty"`
 	SPUID      int         `json:"spu_id,omitempty"`
 	GroupID    interface{} `json:"group_id"` // Can be NULL
