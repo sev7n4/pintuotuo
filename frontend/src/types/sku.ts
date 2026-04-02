@@ -115,6 +115,14 @@ export interface SKU {
   trial_duration_days?: number;
   status: string;
   is_promoted: boolean;
+  promotion_labels?: string[];
+  new_user_offer?: string;
+  full_reduction?: string;
+  coupons?: Array<{
+    name: string;
+    threshold?: number;
+    discount?: number;
+  }>;
   sales_count: number;
   created_at: string;
   updated_at: string;

@@ -233,8 +233,10 @@ export const ProductDetailPage: React.FC = () => {
   };
 
   const calculateDiscount = () => {
-    if (!product || !selectedGroupPrice) return 0;
-    return Math.round((1 - selectedGroupPrice.price_per_person / product.price) * 100);
+    if (!selectedGroupPrice) return 0;
+    const basePrice = selectedSKU?.retail_price || product?.price;
+    if (!basePrice) return 0;
+    return Math.round((1 - selectedGroupPrice.price_per_person / basePrice) * 100);
   };
 
   const buildSkuSummary = (sku: SKUWithSPU) => {
@@ -274,6 +276,13 @@ export const ProductDetailPage: React.FC = () => {
       promoLabels.push(`支持${sku.min_group_size}-${sku.max_group_size}人拼团`);
     }
     return Array.from(new Set(promoLabels)).slice(0, 4);
+  };
+
+  const estimatedFinalPrice = () => {
+    const skuPrice = selectedSKU?.retail_price || product?.price || 0;
+    if (!skuPrice) return 0;
+    if (purchaseMode === 'group' && selectedGroupPrice) return selectedGroupPrice.price_per_person;
+    return skuPrice;
   };
 
   if (error) {
@@ -458,11 +467,11 @@ export const ProductDetailPage: React.FC = () => {
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Text type="secondary">单独购买</Text>
                   <Statistic
-                    value={product.price}
+                    value={selectedSKU?.retail_price || product.price}
                     prefix="¥"
                     valueStyle={{ color: '#333', fontSize: 24 }}
                   />
-                  <Text type="secondary">原价购买，立即发货</Text>
+                <Text type="secondary">直接下单，预计到手 ¥{estimatedFinalPrice().toFixed(2)}</Text>
                 </Space>
               </Card>
             </Col>
@@ -493,7 +502,7 @@ export const ProductDetailPage: React.FC = () => {
                       </Text>
                     }
                   />
-                  <Text type="success">节省 {calculateDiscount()}%</Text>
+                  <Text type="success">预计到手 ¥{estimatedFinalPrice().toFixed(2)}，立省 {calculateDiscount()}%</Text>
                 </Space>
               </Card>
             </Col>
@@ -529,7 +538,7 @@ export const ProductDetailPage: React.FC = () => {
                     <Col>
                       <Space>
                         <Text delete type="secondary">
-                          ¥{product.price}
+                          ¥{(selectedSKU?.retail_price || product.price).toFixed(2)}
                         </Text>
                         <Text strong style={{ color: '#52c41a', fontSize: 18 }}>
                           ¥{gp.price_per_person}/人
@@ -550,16 +559,21 @@ export const ProductDetailPage: React.FC = () => {
           showIcon
           message="优惠权益"
           description={
-            <Space wrap>
-              {getPromotionHighlights().length > 0 ? (
-                getPromotionHighlights().map((label) => (
-                  <Tag key={label} color="magenta">
-                    {label}
-                  </Tag>
-                ))
-              ) : (
-                <Text type="secondary">当前套餐暂无活动优惠，后续可关注商家券与拼团优惠。</Text>
-              )}
+            <Space direction="vertical" style={{ width: '100%' }} size={8}>
+              <Space wrap>
+                {getPromotionHighlights().length > 0 ? (
+                  getPromotionHighlights().map((label) => (
+                    <Tag key={label} color="magenta">
+                      {label}
+                    </Tag>
+                  ))
+                ) : (
+                  <Text type="secondary">当前套餐暂无活动优惠，后续可关注商家券与拼团优惠。</Text>
+                )}
+              </Space>
+              <Text strong>
+                预计到手价：<span style={{ color: '#cf1322' }}>¥{estimatedFinalPrice().toFixed(2)}</span>
+              </Text>
             </Space>
           }
           style={{ marginBottom: 24 }}
@@ -595,32 +609,40 @@ export const ProductDetailPage: React.FC = () => {
                 {product.stock === 0 ? '暂无库存' : '加入购物车'}
               </Button>
             ) : (
-              <Space style={{ flex: 1, display: 'flex', gap: 8 }}>
-                <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
+              <Space style={{ flex: 1, display: 'flex', gap: 8 }} direction="vertical">
+                <Card size="small" style={{ width: '100%', background: '#f6ffed', borderColor: '#b7eb8f' }}>
+                  <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                    <Text>当前可加入团数：{activeGroups.length}</Text>
+                    <Text type="success">拼团每人最高省 ¥{((selectedSKU?.retail_price || product.price) - estimatedFinalPrice()).toFixed(2)}</Text>
+                  </Space>
+                </Card>
+                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
+                    <Button
+                      type="primary"
+                      size="large"
+                      icon={<TeamOutlined />}
+                      onClick={() => {
+                        loadActiveGroups();
+                        setShowGroupsModal(true);
+                      }}
+                      disabled={product.stock === 0}
+                      style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                    >
+                      立即加入团
+                    </Button>
+                  </Badge>
                   <Button
                     type="primary"
                     size="large"
                     icon={<TeamOutlined />}
-                    onClick={() => {
-                      loadActiveGroups();
-                      setShowGroupsModal(true);
-                    }}
+                    onClick={handleGroupPurchase}
                     disabled={product.stock === 0}
-                    style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                    style={{ flex: 1, background: '#1890ff', borderColor: '#1890ff' }}
                   >
-                    加入拼团
+                    {product.stock === 0 ? '暂无库存' : '发起拼团并支付'}
                   </Button>
-                </Badge>
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<TeamOutlined />}
-                  onClick={handleGroupPurchase}
-                  disabled={product.stock === 0}
-                  style={{ flex: 1, background: '#1890ff', borderColor: '#1890ff' }}
-                >
-                  {product.stock === 0 ? '暂无库存' : '发起拼团'}
-                </Button>
+                </Space>
               </Space>
             )}
             <Button size="large" icon={<ShareAltOutlined />} onClick={handleShare}>
