@@ -1,8 +1,8 @@
 {
-  "current_step": 8,
+  "current_step": 10,
   "current_fix_cases": ["GROUP-DISCOUNT-NORMALIZE", "PRODUCT-DETAIL-GROUP-PRICES"],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 157,
   "merged": false,
   "branch": "fix/group-discount-display",
   "local_validation": "passed",
@@ -20,9 +20,9 @@
     "task": "拼团折扣率百分比/小数统一 + 详情页档位与占位价修复",
     "issue_type": "fix",
     "skill": "mydev-github-workflow",
-    "validation_note": "本地 make test 通过；待 push PR 与 CI",
-    "next_action": "push_and_open_pr",
-    "pr_url": null,
+    "validation_note": "本地 make test 通过；PR #157 已创建，待 CI 全绿",
+    "next_action": "monitor_ci",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/157",
     "deploy_run_id": null
   }
 }
