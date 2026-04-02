@@ -1,8 +1,8 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": ["GROUP-NULL-PRODUCT-ID-500"],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 158,
   "merged": false,
   "branch": "fix/groups-null-product-id",
   "local_validation": "passed",
@@ -20,9 +20,9 @@
     "task": "修复 POST /groups 与 GET /catalog/:id/groups 500：groups.product_id NULL 扫描",
     "issue_type": "bugfix",
     "skill": "mydev-github-workflow",
-    "validation_note": "make test 通过",
-    "next_action": "push_and_open_pr",
-    "pr_url": null,
+    "validation_note": "make test 通过；PR #158 已创建",
+    "next_action": "monitor_ci",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/158",
     "deploy_run_id": null
   }
 }
