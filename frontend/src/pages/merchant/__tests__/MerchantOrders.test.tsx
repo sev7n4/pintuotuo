@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 jest.mock('@/stores/merchantStore', () => ({
@@ -89,8 +89,9 @@ describe('MerchantOrders', () => {
         </MemoryRouter>
       );
     });
-    expect(screen.getByText('订单ID')).toBeInTheDocument();
-    expect(screen.getByText('商品名称')).toBeInTheDocument();
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByText('订单ID').length).toBeGreaterThan(0);
+    expect(within(table).getAllByText('商品名称').length).toBeGreaterThan(0);
     expect(screen.getByText('Test Product')).toBeInTheDocument();
     expect(screen.getByText('Another Product')).toBeInTheDocument();
   });

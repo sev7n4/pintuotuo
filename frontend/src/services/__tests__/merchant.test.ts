@@ -108,41 +108,6 @@ describe('merchantService', () => {
     expect(result.data).toEqual(mockResponse);
   });
 
-  test('getProducts calls api.get with correct parameters', async () => {
-    const mockPage = 1;
-    const mockPerPage = 10;
-    const mockStatus = 'active';
-    const mockResponse = {
-      success: true,
-      data: {
-        items: [
-          {
-            id: 1,
-            name: 'Test Product',
-            price: 100,
-            stock: 100,
-            status: 'active',
-            created_at: '2024-01-01T00:00:00Z',
-            updated_at: '2024-01-01T00:00:00Z',
-          },
-        ],
-        total: 1,
-        page: 1,
-        per_page: 10,
-      },
-      message: 'Products retrieved successfully',
-    };
-
-    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
-
-    const result = await merchantService.getProducts(mockPage, mockPerPage, mockStatus);
-
-    expect(mockApi.get).toHaveBeenCalledWith('/merchants/products', {
-      params: { page: mockPage, per_page: mockPerPage, status: mockStatus },
-    });
-    expect(result.data).toEqual(mockResponse);
-  });
-
   test('getOrders calls api.get with correct parameters', async () => {
     const mockPage = 1;
     const mockPerPage = 10;

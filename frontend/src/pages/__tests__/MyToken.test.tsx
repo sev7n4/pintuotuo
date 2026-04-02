@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import MyToken from '../MyToken';
 import { useTokenStore } from '@/stores/tokenStore';
@@ -20,6 +20,10 @@ const mockFetchAPIKeys = jest.fn();
 const mockCreateAPIKey = jest.fn();
 const mockDeleteAPIKey = jest.fn();
 const mockTransfer = jest.fn();
+const mockFetchRechargeOrders = jest.fn();
+const mockCreateRechargeOrder = jest.fn();
+const mockMockCompleteRechargeOrder = jest.fn();
+const mockClearError = jest.fn();
 
 describe('MyToken', () => {
   beforeEach(() => {
@@ -28,13 +32,19 @@ describe('MyToken', () => {
       balance: 1000,
       transactions: [],
       apiKeys: [],
+      rechargeOrders: [],
       fetchBalance: mockFetchBalance,
       fetchTransactions: mockFetchTransactions,
       fetchAPIKeys: mockFetchAPIKeys,
+      fetchRechargeOrders: mockFetchRechargeOrders,
       createAPIKey: mockCreateAPIKey,
       deleteAPIKey: mockDeleteAPIKey,
+      createRechargeOrder: mockCreateRechargeOrder,
+      mockCompleteRechargeOrder: mockMockCompleteRechargeOrder,
       transfer: mockTransfer,
       isLoading: false,
+      error: null,
+      clearError: mockClearError,
     });
   });
 
@@ -47,7 +57,7 @@ describe('MyToken', () => {
       );
     });
 
-    expect(screen.getByText('我的代币')).toBeInTheDocument();
+    expect(screen.getByText('我的Token')).toBeInTheDocument();
   });
 
   it('displays balance statistic', async () => {
@@ -59,7 +69,7 @@ describe('MyToken', () => {
       );
     });
 
-    expect(screen.getByText('代币余额')).toBeInTheDocument();
+    expect(screen.getByText('当前余额')).toBeInTheDocument();
   });
 
   it('shows tabs for different sections', async () => {
@@ -112,8 +122,12 @@ describe('MyToken', () => {
       );
     });
 
+    await act(async () => {
+      fireEvent.click(screen.getByText('API密钥'));
+    });
+
     const createButtons = screen.getAllByRole('button');
-    const createButton = createButtons.find((btn) => btn.textContent?.includes('创建'));
+    const createButton = createButtons.find((btn) => btn.textContent?.includes('创建密钥'));
     expect(createButton).toBeInTheDocument();
   });
 
@@ -136,6 +150,10 @@ describe('MyToken', () => {
           <MyToken />
         </MemoryRouter>
       );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('API密钥'));
     });
 
     expect(screen.getByText('暂无API密钥')).toBeInTheDocument();

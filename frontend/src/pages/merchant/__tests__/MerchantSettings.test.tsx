@@ -92,6 +92,6 @@ describe('MerchantSettings', () => {
       );
     });
     expect(screen.getByText('认证状态')).toBeInTheDocument();
-    expect(screen.getByText('已认证')).toBeInTheDocument();
+    expect(screen.getByText('已审核')).toBeInTheDocument();
   });
 });

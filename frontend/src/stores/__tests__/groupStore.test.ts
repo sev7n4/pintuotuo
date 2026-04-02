@@ -133,7 +133,7 @@ describe('GroupStore', () => {
         data: {
           code: 0,
           message: 'success',
-          data: mockGroup,
+          data: { group: mockGroup, order_id: 100 },
         },
       };
 
@@ -171,7 +171,7 @@ describe('GroupStore', () => {
         data: {
           code: 0,
           message: 'success',
-          data: updatedGroup,
+          data: { group: updatedGroup, order_id: 200 },
         },
       };
 

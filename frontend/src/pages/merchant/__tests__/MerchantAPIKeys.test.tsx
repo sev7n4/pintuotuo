@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 jest.mock('@/stores/merchantStore', () => ({
@@ -88,8 +88,9 @@ describe('MerchantAPIKeys', () => {
         </MemoryRouter>
       );
     });
-    expect(screen.getByText('名称')).toBeInTheDocument();
-    expect(screen.getByText('提供商')).toBeInTheDocument();
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByText('名称').length).toBeGreaterThan(0);
+    expect(within(table).getAllByText('提供商').length).toBeGreaterThan(0);
     expect(screen.getByText('Production Key')).toBeInTheDocument();
     expect(screen.getByText('Test Key')).toBeInTheDocument();
   });

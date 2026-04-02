@@ -346,8 +346,8 @@ describe('ProductDetailPage', () => {
       expect(screen.getByText('测试商品')).toBeInTheDocument();
     });
 
-    const groupButton = screen.getByRole('button', { name: /立即拼团/ });
-    fireEvent.click(groupButton);
+    const startGroupButton = screen.getByRole('button', { name: /发起拼团/ });
+    fireEvent.click(startGroupButton);
 
     await waitFor(() => {
       expect(mockCreateGroup).toHaveBeenCalled();
