@@ -1,46 +1,31 @@
 {
   "current_step": 10,
   "current_fix_cases": [
-    "UT-BE-CATALOG-020",
-    "FE-CATALOG-ROUTE",
-    "FE-ADMIN-FLASH-SKU"
+    "CI-DEPLOY-VERIFY-HEALTH-CATALOG"
   ],
-  "retry_count": 2,
-  "pr_number": 148,
+  "retry_count": 0,
+  "pr_number": 149,
   "merged": false,
-  "branch": "feature/catalog-products-sku-migration",
+  "branch": "fix/deploy-verify-health-endpoint",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "running",
-    "integration": "pending",
-    "e2e": "pending",
+    "cicd": "success",
+    "integration": "success",
+    "e2e": "success",
     "deploy": "pending"
   },
-  "error_history": [
-    {
-      "step": 10,
-      "error_type": "code_error",
-      "message": "E2E: psql 全量迁移与 Go RunMigrations 冲突导致 products 缺失；Frontend Jest 需 Babel 处理 import.meta.env",
-      "timestamp": "2026-04-02T10:40:00Z"
-    },
-    {
-      "step": 10,
-      "error_type": "code_error",
-      "message": "E2E: 016_sku_migration.sql INSERT 误用别名 s/p 且 stock/valid_days 列错位",
-      "timestamp": "2026-04-02T10:48:00Z"
-    }
-  ],
+  "error_history": [],
   "created_at": "2026-04-02T14:00:00Z",
-  "updated_at": "2026-04-02T10:48:00Z",
+  "updated_at": "2026-04-02T12:00:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "DROP products 表 + /catalog 路由 + 秒杀 SKU id + Admin 秒杀页",
-    "issue_type": "feature",
+    "task": "部署流水线：health 必选 + catalog 列表或 DEPLOY_VERIFY_CATALOG_SKU_ID",
+    "issue_type": "fix",
     "skill": "mydev-github-workflow",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/148",
-    "closed_pr": 147,
-    "deleted_branch": "feature/admin-model-providers-maintenance",
-    "validation_note": "Step8: go test ./... -short; npm run type-check && npm run lint",
-    "next_action": "monitor_ci_pr_148"
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/149",
+    "parent_pr_merged": 148,
+    "validation_note": "Step8: 仅 .github/workflows 变更，跳过 TDD；工作区 clean",
+    "next_action": "step_12_merge_pr_149",
+    "last_ci_run": "23881776637"
   }
 }
