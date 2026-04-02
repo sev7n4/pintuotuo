@@ -15,6 +15,7 @@ import (
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/utils"
 )
 
 const orderStatusPending = "pending"
@@ -517,10 +518,7 @@ func CreateGroup(c *gin.Context) {
 	}
 
 	var orderID int
-	var groupPrice float64 = retailPrice
-	if groupDiscountRate.Valid && groupDiscountRate.Float64 > 0 {
-		groupPrice = retailPrice * (1 - groupDiscountRate.Float64)
-	}
+	groupPrice := retailPrice * (1 - utils.NormalizeGroupDiscountRateNull(groupDiscountRate))
 
 	err = db.QueryRow(
 		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
@@ -801,10 +799,7 @@ func JoinGroup(c *gin.Context) {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
 	}
-	unitPrice := retailPrice
-	if groupDiscountRate.Valid && groupDiscountRate.Float64 > 0 {
-		unitPrice = retailPrice * (1 - groupDiscountRate.Float64)
-	}
+	unitPrice := retailPrice * (1 - utils.NormalizeGroupDiscountRateNull(groupDiscountRate))
 
 	var nilPID interface{} = nil
 	var orderID int
