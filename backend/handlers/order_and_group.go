@@ -139,8 +139,7 @@ func CreateOrder(c *gin.Context) {
 		groupID = nil
 	}
 
-	var pid interface{}
-	pid = nil
+	var pid interface{} = nil
 	err = tx.QueryRow(
 		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
@@ -499,8 +498,7 @@ func CreateGroup(c *gin.Context) {
 	skuID = req.SKUID
 
 	var group models.Group
-	var nilPID interface{}
-	nilPID = nil
+	var nilPID interface{} = nil
 	err = db.QueryRow(
 		`INSERT INTO groups (product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
@@ -808,8 +806,7 @@ func JoinGroup(c *gin.Context) {
 		unitPrice = retailPrice * (1 - groupDiscountRate.Float64)
 	}
 
-	var nilPID interface{}
-	nilPID = nil
+	var nilPID interface{} = nil
 	var orderID int
 	err = db.QueryRow(
 		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 

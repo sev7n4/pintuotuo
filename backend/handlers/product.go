@@ -21,7 +21,7 @@ const productStatusActive = "active"
 func ListProducts(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")
-	status := c.DefaultQuery("status", "active")
+	status := c.DefaultQuery("status", productStatusActive)
 
 	pageNum, _ := strconv.Atoi(page)
 	perPageNum, _ := strconv.Atoi(perPage)
