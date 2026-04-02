@@ -8,6 +8,9 @@ on:
       - 'docs/**'
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  # 手动重跑 CI（PR 未自动触发时可从 Actions 页选择分支运行）
+  workflow_dispatch:
 
 permissions:
   contents: read
