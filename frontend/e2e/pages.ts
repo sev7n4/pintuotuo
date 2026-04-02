@@ -81,8 +81,9 @@ export class MerchantSKUsPage {
   }
 
   async expectSKUsPageVisible() {
+    // 侧栏菜单与页面标题文案相同，全局 getByText 会触发 strict mode violation
     await expect(
-      this.page.getByText('选品与SKU管理').or(this.page.locator('.ant-card-head-title:has-text("SKU")'))
+      this.page.locator('.ant-layout-content').getByText('选品与SKU管理', { exact: true })
     ).toBeVisible();
   }
 

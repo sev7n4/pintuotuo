@@ -24,7 +24,9 @@ test.describe('Merchant Dashboard', () => {
     await loginPage.expectLoginSuccess();
 
     await page.goto('/merchant/skus');
-    await expect(page.getByText('选品与SKU管理')).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.locator('.ant-layout-content').getByText('选品与SKU管理', { exact: true })
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test('legacy /merchant/products redirects to SKU page', async ({ page }) => {
@@ -34,7 +36,9 @@ test.describe('Merchant Dashboard', () => {
 
     await page.goto('/merchant/products');
     await page.waitForURL(/\/merchant\/skus/, { timeout: 10000 });
-    await expect(page.getByText('选品与SKU管理')).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.locator('.ant-layout-content').getByText('选品与SKU管理', { exact: true })
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('should display merchant orders', async ({ page }) => {
