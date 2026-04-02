@@ -1,8 +1,10 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": [
     "FE-MERCHANT-SKU-SINGLE-ENTRY",
-    "FE-MY-SERVICES-NAV"
+    "FE-MY-SERVICES-NAV",
+    "E2E-SKU-STRICT-LOCATOR",
+    "E2E-AUTH-REFRESH-HYDRATION"
   ],
   "retry_count": 0,
   "pr_number": 151,
@@ -10,21 +12,22 @@
   "branch": "feature/merchant-sku-nav-my-services",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "running",
-    "integration": "pending",
-    "e2e": "pending",
+    "cicd": "last_pull_request_sha_7a6487c",
+    "integration": "last_pull_request_sha_7a6487c",
+    "e2e": "last_pull_request_sha_7a6487c_failed_then_fixed_locally",
     "deploy": "pending"
   },
   "error_history": [],
   "created_at": "2026-04-02T14:00:00Z",
-  "updated_at": "2026-04-02T14:00:00Z",
+  "updated_at": "2026-04-02T16:55:00Z",
   "metadata": {
     "repo": "pintuotuo",
     "task": "商户仅保留 SKU 管理入口；C端我的服务独立页与下拉菜单",
     "issue_type": "enhancement",
     "skill": "mydev-github-workflow",
-    "validation_note": "Step8: npm run type-check；配置/导航为主可跳过 TDD",
-    "next_action": "monitor_ci_pr_151",
+    "validation_note": "Step8 曾对 aa45ccc 前改动执行 make test + type-check。约束[4]：应用 gh api …/commits/{head}/check-runs 或 Actions 核对 PR 最新 SHA；勿改 .github/workflows。",
+    "ci_investigation_note": "gh run list --event pull_request 显示最近一次为 7a6487c；fdf9203/aa45ccc/ba2e35e 后未见新 synchronize，需在 GitHub 网页查 PR Checks/Actions 是否延迟或未挂钩。此前 gh workflow run 仅补跑 Integration+E2E，不替代 PR 上 CI/CD Pipeline。",
+    "next_action": "以非空提交触发 synchronize 并监控 CI/CD→Integration→E2E",
     "pr_url": "https://github.com/sev7n4/pintuotuo/pull/151"
   }
 }
