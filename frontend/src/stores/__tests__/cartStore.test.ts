@@ -38,7 +38,7 @@ describe('CartStore', () => {
 
       const newState = useCartStore.getState();
       expect(newState.items).toHaveLength(1);
-      expect(newState.items[0].product_id).toBe(1);
+      expect(newState.items[0].sku_id).toBe(1);
       expect(newState.items[0].quantity).toBe(2);
       expect(newState.total).toBe(199.98);
     });

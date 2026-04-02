@@ -150,12 +150,12 @@ func (s *SettlementScheduler) generateMonthlySettlements(db *sql.DB) {
 	periodEnd := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	rows, err := db.Query(
-		`SELECT DISTINCT p.merchant_id 
-		 FROM products p 
-		 JOIN orders o ON o.product_id = p.id 
+		`SELECT DISTINCT s.merchant_id 
+		 FROM skus s 
+		 JOIN orders o ON o.sku_id = s.id 
 		 WHERE o.status = 'completed' 
 		 AND o.updated_at >= $1 AND o.updated_at < $2
-		 AND p.merchant_id IS NOT NULL`,
+		 AND s.merchant_id IS NOT NULL`,
 		periodStart, periodEnd,
 	)
 	if err != nil {
@@ -187,9 +187,9 @@ func (s *SettlementScheduler) generateMonthlySettlements(db *sql.DB) {
 
 		var totalSales float64
 		db.QueryRow(
-			`SELECT COALESCE(SUM(total_price), 0) FROM orders o 
-			 JOIN products p ON o.product_id = p.id 
-			 WHERE p.merchant_id = $1 AND o.status = 'completed' 
+			`SELECT COALESCE(SUM(o.total_price), 0) FROM orders o 
+			 JOIN skus s ON o.sku_id = s.id 
+			 WHERE s.merchant_id = $1 AND o.status = 'completed' 
 			 AND o.updated_at >= $2 AND o.updated_at < $3`,
 			merchantID, periodStart, periodEnd,
 		).Scan(&totalSales)

@@ -504,7 +504,7 @@ describe('ProductListPage Component', () => {
     });
 
     // 验证导航函数被调用
-    expect(mockNavigate).toHaveBeenCalledWith('/products/1');
+    expect(mockNavigate).toHaveBeenCalledWith('/catalog/1');
   });
 
   test('navigates to add to cart page', async () => {
@@ -550,6 +550,6 @@ describe('ProductListPage Component', () => {
     });
 
     // 验证导航函数被调用
-    expect(mockNavigate).toHaveBeenCalledWith('/products/1/cart');
+    expect(mockNavigate).toHaveBeenCalledWith('/cart');
   });
 });

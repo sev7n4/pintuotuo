@@ -153,7 +153,7 @@ const CategoryPage = () => {
             dataSource={filteredProducts}
             renderItem={(product: any) => (
               <List.Item>
-                <Link to={`/products/${product.id}`}>
+                <Link to={`/catalog/${product.id}`}>
                   <Card hoverable className={styles.productCard}>
                     <div className={styles.productImage}>
                       {product.image_url ? (

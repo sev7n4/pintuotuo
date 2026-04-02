@@ -292,19 +292,19 @@ func GetMerchantStats(c *gin.Context) {
 	var totalSales, monthSales float64
 	var totalOrders, monthOrders int
 
-	if err := db.QueryRow("SELECT COUNT(*) FROM products WHERE merchant_id = $1", merchantID).Scan(&totalProducts); err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get product count", http.StatusInternalServerError, err))
+	if err := db.QueryRow("SELECT COUNT(*) FROM merchant_skus WHERE merchant_id = $1", merchantID).Scan(&totalProducts); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get SKU shelf count", http.StatusInternalServerError, err))
 		return
 	}
-	if err := db.QueryRow("SELECT COUNT(*) FROM products WHERE merchant_id = $1 AND status = 'active'", merchantID).Scan(&activeProducts); err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get active product count", http.StatusInternalServerError, err))
+	if err := db.QueryRow("SELECT COUNT(*) FROM merchant_skus WHERE merchant_id = $1 AND status = 'active'", merchantID).Scan(&activeProducts); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get active SKU count", http.StatusInternalServerError, err))
 		return
 	}
 
 	if err := db.QueryRow(
-		`SELECT COALESCE(SUM(total_price), 0) FROM orders o
-		 JOIN products p ON o.product_id = p.id
-		 WHERE p.merchant_id = $1 AND o.status IN ('paid', 'completed')`,
+		`SELECT COALESCE(SUM(o.total_price), 0) FROM orders o
+		 JOIN merchant_skus ms ON ms.sku_id = o.sku_id AND ms.merchant_id = $1
+		 WHERE o.status IN ('paid', 'completed')`,
 		merchantID,
 	).Scan(&totalSales); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get total sales", http.StatusInternalServerError, err))
@@ -312,9 +312,9 @@ func GetMerchantStats(c *gin.Context) {
 	}
 
 	if err := db.QueryRow(
-		`SELECT COALESCE(SUM(total_price), 0) FROM orders o
-		 JOIN products p ON o.product_id = p.id
-		 WHERE p.merchant_id = $1 AND o.status IN ('paid', 'completed') AND o.created_at >= $2`,
+		`SELECT COALESCE(SUM(o.total_price), 0) FROM orders o
+		 JOIN merchant_skus ms ON ms.sku_id = o.sku_id AND ms.merchant_id = $1
+		 WHERE o.status IN ('paid', 'completed') AND o.created_at >= $2`,
 		merchantID, time.Now().AddDate(0, -1, 0),
 	).Scan(&monthSales); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get month sales", http.StatusInternalServerError, err))
@@ -323,8 +323,8 @@ func GetMerchantStats(c *gin.Context) {
 
 	if err := db.QueryRow(
 		`SELECT COUNT(*) FROM orders o
-		 JOIN products p ON o.product_id = p.id
-		 WHERE p.merchant_id = $1 AND o.status IN ('paid', 'completed')`,
+		 JOIN merchant_skus ms ON ms.sku_id = o.sku_id AND ms.merchant_id = $1
+		 WHERE o.status IN ('paid', 'completed')`,
 		merchantID,
 	).Scan(&totalOrders); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get order count", http.StatusInternalServerError, err))
@@ -333,8 +333,8 @@ func GetMerchantStats(c *gin.Context) {
 
 	if err := db.QueryRow(
 		`SELECT COUNT(*) FROM orders o
-		 JOIN products p ON o.product_id = p.id
-		 WHERE p.merchant_id = $1 AND o.status IN ('paid', 'completed') AND o.created_at >= $2`,
+		 JOIN merchant_skus ms ON ms.sku_id = o.sku_id AND ms.merchant_id = $1
+		 WHERE o.status IN ('paid', 'completed') AND o.created_at >= $2`,
 		merchantID, time.Now().AddDate(0, -1, 0),
 	).Scan(&monthOrders); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError("QUERY_ERROR", "Failed to get month order count", http.StatusInternalServerError, err))
@@ -399,17 +399,21 @@ func GetMerchantProducts(c *gin.Context) {
 
 	offset := (pageNum - 1) * perPageNum
 
+	base := `SELECT s.id, ms.merchant_id, s.spu_id, sp.name || ' · ' || s.sku_code, COALESCE(sp.description, ''),
+		s.retail_price, COALESCE(s.original_price, s.retail_price),
+		CASE WHEN s.stock = -1 THEN 999999 ELSE s.stock END, COALESCE(ms.sales_count, 0), COALESCE(sp.model_tier, ''),
+		ms.status, ms.created_at, ms.updated_at
+		FROM merchant_skus ms
+		JOIN skus s ON s.id = ms.sku_id
+		JOIN spus sp ON sp.id = s.spu_id
+		WHERE ms.merchant_id = $1`
 	var rows *sql.Rows
 	if status != "" && status != allProductStatus {
-		rows, err = db.Query(
-			`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price), stock, COALESCE(sold_count, 0), COALESCE(category, ''), status, created_at, updated_at 
-			 FROM products WHERE merchant_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
+		rows, err = db.Query(base+` AND ms.status = $2 ORDER BY ms.created_at DESC LIMIT $3 OFFSET $4`,
 			merchantID, status, perPageNum, offset,
 		)
 	} else {
-		rows, err = db.Query(
-			`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price), stock, COALESCE(sold_count, 0), COALESCE(category, ''), status, created_at, updated_at 
-			 FROM products WHERE merchant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+		rows, err = db.Query(base+` ORDER BY ms.created_at DESC LIMIT $2 OFFSET $3`,
 			merchantID, perPageNum, offset,
 		)
 	}
@@ -423,7 +427,7 @@ func GetMerchantProducts(c *gin.Context) {
 	var products []models.Product
 	for rows.Next() {
 		var p models.Product
-		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
+		err := rows.Scan(&p.ID, &p.MerchantID, &p.SpuID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
 			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -434,9 +438,9 @@ func GetMerchantProducts(c *gin.Context) {
 
 	var total int
 	if status != "" && status != allProductStatus {
-		db.QueryRow("SELECT COUNT(*) FROM products WHERE merchant_id = $1 AND status = $2", merchantID, status).Scan(&total)
+		db.QueryRow("SELECT COUNT(*) FROM merchant_skus WHERE merchant_id = $1 AND status = $2", merchantID, status).Scan(&total)
 	} else {
-		db.QueryRow("SELECT COUNT(*) FROM products WHERE merchant_id = $1", merchantID).Scan(&total)
+		db.QueryRow("SELECT COUNT(*) FROM merchant_skus WHERE merchant_id = $1", merchantID).Scan(&total)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -495,23 +499,21 @@ func GetMerchantOrders(c *gin.Context) {
 
 	offset := (pageNum - 1) * perPageNum
 
+	orderSel := `SELECT o.id, o.user_id, o.product_id, o.sku_id, o.spu_id, o.group_id, o.quantity, o.total_price, o.status, o.created_at, o.updated_at,
+		sp.name || ' · ' || s.sku_code AS product_name
+		FROM orders o
+		JOIN merchant_skus ms ON ms.sku_id = o.sku_id AND ms.merchant_id = $1
+		JOIN skus s ON s.id = o.sku_id
+		JOIN spus sp ON sp.id = s.spu_id`
 	var rows *sql.Rows
 	if status != "" && status != allProductStatus {
 		rows, err = db.Query(
-			`SELECT o.id, o.user_id, o.product_id, o.group_id, o.quantity, o.total_price, o.status, o.created_at, o.updated_at, p.name as product_name
-			 FROM orders o 
-			 JOIN products p ON o.product_id = p.id 
-			 WHERE p.merchant_id = $1 AND o.status = $2 
-			 ORDER BY o.created_at DESC LIMIT $3 OFFSET $4`,
+			orderSel+` WHERE o.status = $2 ORDER BY o.created_at DESC LIMIT $3 OFFSET $4`,
 			merchantID, status, perPageNum, offset,
 		)
 	} else {
 		rows, err = db.Query(
-			`SELECT o.id, o.user_id, o.product_id, o.group_id, o.quantity, o.total_price, o.status, o.created_at, o.updated_at, p.name as product_name
-			 FROM orders o 
-			 JOIN products p ON o.product_id = p.id 
-			 WHERE p.merchant_id = $1 
-			 ORDER BY o.created_at DESC LIMIT $2 OFFSET $3`,
+			orderSel+` ORDER BY o.created_at DESC LIMIT $2 OFFSET $3`,
 			merchantID, perPageNum, offset,
 		)
 	}
@@ -530,11 +532,18 @@ func GetMerchantOrders(c *gin.Context) {
 	var orders []OrderWithProduct
 	for rows.Next() {
 		var o OrderWithProduct
-		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &o.GroupID, &o.Quantity, &o.TotalPrice,
+		var skuID, spuID sql.NullInt64
+		err := rows.Scan(&o.ID, &o.UserID, &o.ProductID, &skuID, &spuID, &o.GroupID, &o.Quantity, &o.TotalPrice,
 			&o.Status, &o.CreatedAt, &o.UpdatedAt, &o.ProductName)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
+		}
+		if skuID.Valid {
+			o.SKUID = int(skuID.Int64)
+		}
+		if spuID.Valid {
+			o.SPUID = int(spuID.Int64)
 		}
 		orders = append(orders, o)
 	}
@@ -542,12 +551,12 @@ func GetMerchantOrders(c *gin.Context) {
 	var total int
 	if status != "" && status != allProductStatus {
 		db.QueryRow(
-			`SELECT COUNT(*) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.merchant_id = $1 AND o.status = $2`,
+			`SELECT COUNT(*) FROM orders o JOIN merchant_skus ms ON ms.sku_id = o.sku_id AND ms.merchant_id = $1 WHERE o.status = $2`,
 			merchantID, status,
 		).Scan(&total)
 	} else {
 		db.QueryRow(
-			`SELECT COUNT(*) FROM orders o JOIN products p ON o.product_id = p.id WHERE p.merchant_id = $1`,
+			`SELECT COUNT(*) FROM orders o JOIN merchant_skus ms ON ms.sku_id = o.sku_id AND ms.merchant_id = $1`,
 			merchantID,
 		).Scan(&total)
 	}

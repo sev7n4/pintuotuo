@@ -105,7 +105,7 @@ describe('Page Navigation Integration Tests', () => {
         <MemoryRouter initialEntries={['/register']}>
           <Routes>
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/products" element={<ProductListPage />} />
+            <Route path="/catalog" element={<ProductListPage />} />
             <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
             <Route path="/*" element={<Navigate to="/register" />} />
           </Routes>
@@ -174,7 +174,7 @@ describe('Page Navigation Integration Tests', () => {
         <MemoryRouter initialEntries={['/register']}>
           <Routes>
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/products" element={<ProductListPage />} />
+            <Route path="/catalog" element={<ProductListPage />} />
             <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
             <Route path="/*" element={<Navigate to="/register" />} />
           </Routes>
@@ -309,11 +309,11 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       render(
-        <MemoryRouter initialEntries={['/products']}>
+        <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
-            <Route path="/products" element={<ProductListPage />} />
-            <Route path="/products/:id" element={<ProductDetailPage />} />
-            <Route path="/*" element={<Navigate to="/products" />} />
+            <Route path="/catalog" element={<ProductListPage />} />
+            <Route path="/catalog/:id" element={<ProductDetailPage />} />
+            <Route path="/*" element={<Navigate to="/catalog" />} />
           </Routes>
         </MemoryRouter>
       );
@@ -356,10 +356,10 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       render(
-        <MemoryRouter initialEntries={['/products']}>
+        <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
-            <Route path="/products" element={<ProductListPage />} />
-            <Route path="/*" element={<Navigate to="/products" />} />
+            <Route path="/catalog" element={<ProductListPage />} />
+            <Route path="/*" element={<Navigate to="/catalog" />} />
           </Routes>
         </MemoryRouter>
       );
@@ -422,7 +422,7 @@ describe('Page Navigation Integration Tests', () => {
       render(
         <MemoryRouter initialEntries={['/products/1']}>
           <Routes>
-            <Route path="/products/:id" element={<ProductDetailPage />} />
+            <Route path="/catalog/:id" element={<ProductDetailPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/*" element={<Navigate to="/products/1" />} />
           </Routes>
@@ -950,12 +950,12 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       render(
-        <MemoryRouter initialEntries={['/products']}>
+        <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
-            <Route path="/products" element={<ProductListPage />} />
-            <Route path="/products/:id" element={<ProductDetailPage />} />
+            <Route path="/catalog" element={<ProductListPage />} />
+            <Route path="/catalog/:id" element={<ProductDetailPage />} />
             <Route path="/cart" element={<CartPage />} />
-            <Route path="/*" element={<Navigate to="/products" />} />
+            <Route path="/*" element={<Navigate to="/catalog" />} />
           </Routes>
         </MemoryRouter>
       );
@@ -1103,12 +1103,12 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       render(
-        <MemoryRouter initialEntries={['/products']}>
+        <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
-            <Route path="/products" element={<ProductListPage />} />
+            <Route path="/catalog" element={<ProductListPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/orders" element={<OrderListPage />} />
-            <Route path="/*" element={<Navigate to="/products" />} />
+            <Route path="/*" element={<Navigate to="/catalog" />} />
           </Routes>
         </MemoryRouter>
       );
@@ -1148,7 +1148,7 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       render(
-        <MemoryRouter initialEntries={['/products']}>
+        <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
             <Route path="/" element={<Layout />}>
               <Route path="products" element={<ProductListPage />} />
@@ -1190,7 +1190,7 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       render(
-        <MemoryRouter initialEntries={['/products']}>
+        <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
             <Route path="/" element={<Layout />}>
               <Route path="products" element={<ProductListPage />} />
@@ -1232,7 +1232,7 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       render(
-        <MemoryRouter initialEntries={['/products']}>
+        <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
             <Route path="/" element={<Layout />}>
               <Route path="products" element={<ProductListPage />} />
@@ -1276,7 +1276,7 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       render(
-        <MemoryRouter initialEntries={['/products']}>
+        <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
             <Route path="/" element={<Layout />}>
               <Route path="products" element={<ProductListPage />} />
@@ -1402,7 +1402,7 @@ describe('Page Navigation Integration Tests', () => {
         <MemoryRouter initialEntries={['/checkout']}>
           <Routes>
             <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/products" element={<div>产品列表</div>} />
+            <Route path="/catalog" element={<div>产品列表</div>} />
           </Routes>
         </MemoryRouter>
       );
@@ -1452,7 +1452,7 @@ describe('Page Navigation Integration Tests', () => {
           <Routes>
             <Route path="/payment/:id" element={<PaymentPage />} />
             <Route path="/orders" element={<div>订单列表</div>} />
-            <Route path="/products" element={<div>产品列表</div>} />
+            <Route path="/catalog" element={<div>产品列表</div>} />
           </Routes>
         </MemoryRouter>
       );
@@ -1506,7 +1506,7 @@ describe('Page Navigation Integration Tests', () => {
           <Routes>
             <Route path="/payment/:id" element={<PaymentPage />} />
             <Route path="/orders" element={<div>订单列表</div>} />
-            <Route path="/products" element={<div>产品列表</div>} />
+            <Route path="/catalog" element={<div>产品列表</div>} />
           </Routes>
         </MemoryRouter>
       );
@@ -1574,7 +1574,7 @@ describe('Page Navigation Integration Tests', () => {
           <Routes>
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/products" element={<ProductListPage />} />
+            <Route path="/catalog" element={<ProductListPage />} />
           </Routes>
         </MemoryRouter>
       );

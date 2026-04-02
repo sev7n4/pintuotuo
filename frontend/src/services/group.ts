@@ -2,7 +2,7 @@ import api from './api';
 import { Group, APIResponse, PaginatedResponse } from '@/types';
 
 export interface CreateGroupRequest {
-  product_id: number;
+  sku_id: number;
   target_count: number;
   deadline: string;
 }

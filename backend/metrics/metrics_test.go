@@ -53,7 +53,7 @@ func TestRecordHTTPRequest(t *testing.T) {
 	// This should not panic or error
 	RecordHTTPRequest(
 		"GET",
-		"/api/v1/products",
+		"/api/v1/catalog",
 		200,
 		0.125,
 		1024,
@@ -94,7 +94,7 @@ func TestRecordDatabaseQuery(t *testing.T) {
 
 	// Test various query types
 	queryTypes := []string{"SELECT", "INSERT", "UPDATE", "DELETE"}
-	tables := []string{"users", "orders", "products", "payments"}
+	tables := []string{"users", "orders", "skus", "payments"}
 
 	for _, queryType := range queryTypes {
 		for _, table := range tables {
@@ -212,7 +212,7 @@ func TestConcurrentMetricsRecording(t *testing.T) {
 		go func() {
 			RecordHTTPRequest(
 				"GET",
-				"/api/v1/products",
+				"/api/v1/catalog",
 				200,
 				0.05,
 				512,

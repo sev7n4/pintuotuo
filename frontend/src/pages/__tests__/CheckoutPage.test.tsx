@@ -35,7 +35,7 @@ const mockCreateOrder = jest.fn();
 const mockCartItems = [
   {
     id: '1',
-    product_id: 1,
+    sku_id: 1,
     quantity: 2,
     group_id: null,
     product: {
@@ -54,7 +54,7 @@ const mockCartItems = [
   },
   {
     id: '2',
-    product_id: 2,
+    sku_id: 2,
     quantity: 1,
     group_id: null,
     product: {
@@ -131,7 +131,7 @@ describe('CheckoutPage', () => {
     const goShoppingButton = screen.getByRole('button', { name: /去购物/i });
     fireEvent.click(goShoppingButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/products');
+    expect(mockNavigate).toHaveBeenCalledWith('/catalog');
   });
 
   it('calls createOrder and clears cart on successful checkout', async () => {

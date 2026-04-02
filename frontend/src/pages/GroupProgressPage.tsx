@@ -148,7 +148,7 @@ export const GroupProgressPage: React.FC = () => {
           title="拼团失败"
           subTitle="拼团时间已过，未能成功成团"
           extra={[
-            <Button type="primary" key="retry" onClick={() => navigate('/products')}>
+            <Button type="primary" key="retry" onClick={() => navigate('/catalog')}>
               重新购买
             </Button>,
             <Button key="home" onClick={() => navigate('/')}>

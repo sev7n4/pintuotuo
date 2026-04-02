@@ -55,10 +55,10 @@ export default function HistoryPage() {
     }
   };
 
-  const handleRemove = async (productId: number) => {
+  const handleRemove = async (skuId: number) => {
     try {
-      await browseHistoryService.removeHistoryItem(productId);
-      setHistory(history.filter((item) => item.product_id !== productId));
+      await browseHistoryService.removeHistoryItem(skuId);
+      setHistory(history.filter((item) => item.sku_id !== skuId));
       setTotal(total - 1);
       message.success('已删除该记录');
     } catch {
@@ -83,7 +83,7 @@ export default function HistoryPage() {
   };
 
   const handleViewProduct = (productId: number) => {
-    navigate(`/products/${productId}`);
+    navigate(`/catalog/${productId}`);
   };
 
   if (!isAuthenticated) {
@@ -158,7 +158,7 @@ export default function HistoryPage() {
                         />
                       </div>
                     }
-                    onClick={() => handleViewProduct(item.product_id)}
+                    onClick={() => handleViewProduct(item.sku_id)}
                   >
                     <Card.Meta
                       title={<div className={styles.productName}>{item.product.name}</div>}
@@ -193,7 +193,7 @@ export default function HistoryPage() {
                           title="确定删除该记录？"
                           onConfirm={(e) => {
                             e?.stopPropagation();
-                            handleRemove(item.product_id);
+                            handleRemove(item.sku_id);
                           }}
                           onCancel={(e) => e?.stopPropagation()}
                           okText="确定"

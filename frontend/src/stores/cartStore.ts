@@ -19,7 +19,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   addItem: (product, quantity, groupId) => {
     set((state) => {
       const existingItem = state.items.find(
-        (item) => item.product_id === product.id && item.group_id === groupId
+        (item) => item.sku_id === product.id && item.group_id === groupId
       );
 
       let newItems: CartItem[];
@@ -32,7 +32,7 @@ export const useCartStore = create<CartState>((set, get) => ({
           ...state.items,
           {
             id: `${product.id}-${groupId || 0}-${Date.now()}`,
-            product_id: product.id,
+            sku_id: product.id,
             product,
             quantity,
             group_id: groupId,

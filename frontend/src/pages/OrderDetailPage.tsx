@@ -36,9 +36,10 @@ export const OrderDetailPage: React.FC = () => {
   }, [id, fetchOrderByID]);
 
   useEffect(() => {
-    if (currentOrder?.product_id) {
+    const catalogId = currentOrder?.sku_id ?? currentOrder?.product_id;
+    if (catalogId) {
       const loadProduct = async () => {
-        const p = await fetchProductByID(currentOrder.product_id);
+        const p = await fetchProductByID(catalogId);
         setProduct(p);
       };
       loadProduct();

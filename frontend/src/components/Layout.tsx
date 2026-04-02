@@ -33,7 +33,7 @@ export default function Layout() {
   const getSelectedTab = () => {
     const path = location.pathname;
     if (path === '/') return 'home';
-    if (path === '/categories' || path.startsWith('/products')) return 'category';
+    if (path === '/categories' || path.startsWith('/catalog')) return 'category';
     if (path === '/cart') return 'cart';
     if (
       path.startsWith('/orders') ||

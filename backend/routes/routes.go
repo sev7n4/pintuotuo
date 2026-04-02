@@ -76,19 +76,20 @@ func RegisterConsumptionRoutes(router *gin.RouterGroup) {
 	}
 }
 
-func RegisterProductRoutes(router *gin.RouterGroup) {
-	products := router.Group("/products")
+// RegisterCatalogRoutes registers marketplace catalog APIs (SKU 粒度，替代 legacy /products)。
+func RegisterCatalogRoutes(router *gin.RouterGroup) {
+	catalog := router.Group("/catalog")
 	{
-		products.GET("", handlers.ListProducts)
-		products.GET("/home", handlers.GetHomeData)
-		products.GET("/hot", handlers.GetHotProducts)
-		products.GET("/new", handlers.GetNewProducts)
-		products.GET("/categories", handlers.GetCategories)
-		products.GET("/search", handlers.SearchProducts)
-		products.GET("/:id", handlers.GetProductByID)
-		products.GET("/:id/groups", handlers.GetGroupsByProduct)
+		catalog.GET("", handlers.ListProducts)
+		catalog.GET("/home", handlers.GetHomeData)
+		catalog.GET("/hot", handlers.GetHotProducts)
+		catalog.GET("/new", handlers.GetNewProducts)
+		catalog.GET("/categories", handlers.GetCategories)
+		catalog.GET("/search", handlers.SearchProducts)
+		catalog.GET("/:id", handlers.GetProductByID)
+		catalog.GET("/:id/groups", handlers.GetGroupsBySKU)
 
-		merchants := products.Group("/merchants")
+		merchants := catalog.Group("/merchants")
 		merchants.Use(middleware.AuthMiddleware())
 		{
 			merchants.POST("", handlers.CreateProduct)
@@ -275,7 +276,7 @@ func RegisterFlashSaleRoutes(router *gin.RouterGroup) {
 	flashSales := router.Group("/flash-sales")
 	{
 		flashSales.GET("/active", handlers.GetActiveFlashSales)
-		flashSales.GET("/:id/products", handlers.GetFlashSaleProducts)
+		flashSales.GET("/:id/skus", handlers.GetFlashSaleProducts)
 	}
 
 	authFlashSales := router.Group("/flash-sales")
@@ -292,8 +293,8 @@ func RegisterFavoriteRoutes(router *gin.RouterGroup) {
 	{
 		favorites.GET("", handlers.GetFavorites)
 		favorites.POST("", handlers.AddFavorite)
-		favorites.DELETE("/:product_id", handlers.RemoveFavorite)
-		favorites.GET("/check/:product_id", handlers.CheckFavorite)
+		favorites.DELETE("/:sku_id", handlers.RemoveFavorite)
+		favorites.GET("/check/:sku_id", handlers.CheckFavorite)
 	}
 }
 
@@ -304,7 +305,7 @@ func RegisterBrowseHistoryRoutes(router *gin.RouterGroup) {
 		history.GET("", handlers.GetBrowseHistory)
 		history.POST("", handlers.AddBrowseHistory)
 		history.DELETE("", handlers.ClearBrowseHistory)
-		history.DELETE("/:product_id", handlers.RemoveBrowseHistoryItem)
+		history.DELETE("/:sku_id", handlers.RemoveBrowseHistoryItem)
 	}
 }
 

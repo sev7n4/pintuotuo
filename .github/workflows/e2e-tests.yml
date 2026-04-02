@@ -86,22 +86,9 @@ jobs:
           rm -rf dist
           npm run build
 
-      - name: Run database migrations
-        working-directory: ./backend
-        env:
-          DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
-        run: |
-          for f in migrations/*.sql; do
-            echo "Running migration: $f"
-            psql "$DATABASE_URL" -f "$f" || echo "Migration $f completed with warnings"
-          done
-
-      - name: Seed test data
-        working-directory: ./backend
-        env:
-          DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
-        run: |
-          psql "$DATABASE_URL" -f ../scripts/db/seed_test_data.sql
+      # 迁移仅由 backend 启动时的 db.RunMigrations 执行（与 schema_migrations 一致）。
+      # 切勿再用 psql 全量跑 migrations/*.sql：会先于 Go 执行 021 等脚本并 DROP products，
+      # 随后 Go 误将 001 标为已执行，导致「users 存在、products 不存在」的坏状态。
 
       - name: Start backend server
         working-directory: ./backend
@@ -125,6 +112,13 @@ jobs:
           echo "Backend failed to start. Logs:"
           cat /tmp/backend.log
           exit 1
+
+      - name: Seed test data
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
+        run: |
+          psql "$DATABASE_URL" -f ../scripts/db/seed_test_data.sql
 
       - name: Start frontend preview server
         working-directory: ./frontend
