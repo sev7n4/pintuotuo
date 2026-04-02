@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   LoginPage,
   MerchantDashboardPage,
-  MerchantProductsPage,
+  MerchantSKUsPage,
   MerchantOrdersPage,
   MerchantSettlementsPage,
   MerchantAPIKeysPage,
@@ -55,114 +55,57 @@ test.describe('商家管理界面 - 权限与认证', () => {
   });
 });
 
-test.describe('商家管理界面 - 商品管理', () => {
+test.describe('商家管理界面 - 选品与SKU管理', () => {
   let loginPage: LoginPage;
-  let productsPage: MerchantProductsPage;
+  let skusPage: MerchantSKUsPage;
 
   test.beforeEach(async ({ page }) => {
     loginPage = new LoginPage(page);
-    productsPage = new MerchantProductsPage(page);
+    skusPage = new MerchantSKUsPage(page);
     await loginPage.goto();
     await loginPage.login('merchant@example.com', 'merchant123456');
     await loginPage.expectLoginSuccess();
   });
 
-  test('PROD-001: 创建商品 - 正常流程', async ({ page }) => {
-    await productsPage.goto();
-    await productsPage.expectProductsPageVisible();
-
-    await productsPage.clickAddProduct();
-    await productsPage.fillProductForm({
-      name: `测试商品 ${Date.now()}`,
-      description: '这是一个E2E测试商品',
-      price: 99.99,
-      stock: 100,
-    });
-    await productsPage.submitProduct();
-
-    await expect(page.locator('.ant-message')).toBeVisible({ timeout: 5000 });
+  test('SKU-001: 选品与SKU管理页可访问', async () => {
+    await skusPage.goto();
+    await skusPage.expectSKUsPageVisible();
   });
 
-  test('PROD-002: 创建商品 - 价格为负数应验证失败', async ({ page }) => {
-    await productsPage.goto();
-    await productsPage.expectProductsPageVisible();
-
-    await productsPage.clickAddProduct();
-    await productsPage.fillProductForm({
-      name: '测试商品负价格',
-      description: '测试负价格',
-      price: -10,
-      stock: 100,
-    });
-    await productsPage.submitProduct();
-
-    await expect(page.locator('.ant-form-item-explain-error').filter({ hasText: '价格必须大于0' }).first()).toBeVisible({ timeout: 5000 });
-  });
-
-  test('PROD-003: 创建商品 - 库存为负数应验证失败', async ({ page }) => {
-    await productsPage.goto();
-    await productsPage.expectProductsPageVisible();
-
-    await productsPage.clickAddProduct();
-    await productsPage.fillProductForm({
-      name: '测试商品负库存',
-      description: '测试负库存',
-      price: 99.99,
-      stock: -10,
-    });
-    await productsPage.submitProduct();
-
-    await expect(page.locator('.ant-form-item-explain-error').filter({ hasText: '库存必须大于等于0' }).first()).toBeVisible({ timeout: 5000 });
-  });
-
-  test('PROD-004: 编辑商品 - 修改所有字段', async ({ page }) => {
-    await productsPage.goto();
-    await productsPage.expectProductsPageVisible();
-
-    const productCount = await productsPage.getProductCount();
-    if (productCount > 0) {
-      await productsPage.editProduct('测试商品');
-      await productsPage.fillProductForm({
-        name: '更新后的商品名称',
-        description: '更新后的描述',
-        price: 199.99,
-        stock: 200,
+  test('SKU-002: 可打开选择商品上架弹窗', async ({ page }) => {
+    await skusPage.goto();
+    await skusPage.expectSKUsPageVisible();
+    const btn = page.getByRole('button', { name: /选择商品上架/ });
+    if (await btn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await skusPage.openSelectSkuModal();
+      await expect(page.locator('.ant-modal-title').filter({ hasText: '选择要上架' })).toBeVisible({
+        timeout: 5000,
       });
-      await productsPage.submitProduct();
-      await expect(page.locator('.ant-message')).toBeVisible({ timeout: 5000 });
     } else {
       test.skip();
     }
   });
 
-  test('PROD-005: 删除商品 - 确认删除', async ({ page }) => {
-    await productsPage.goto();
-    await productsPage.expectProductsPageVisible();
-
-    const initialCount = await productsPage.getProductCount();
-    if (initialCount > 0) {
-      await productsPage.deleteProduct('测试商品');
-      const finalCount = await productsPage.getProductCount();
-      expect(finalCount).toBeLessThanOrEqual(initialCount);
+  test('SKU-007: 状态筛选 - 在售', async ({ page }) => {
+    await skusPage.goto();
+    await skusPage.expectSKUsPageVisible();
+    const hasFilter = await page.locator('.ant-card .ant-select').first().isVisible().catch(() => false);
+    if (hasFilter) {
+      await skusPage.filterByStatus('在售');
     } else {
       test.skip();
     }
   });
 
-  test('PROD-007: 状态筛选 - 在售商品', async ({ page }) => {
-    await productsPage.goto();
-    await productsPage.expectProductsPageVisible();
-
-    await productsPage.filterByStatus('在售');
-    await page.waitForTimeout(500);
-  });
-
-  test('PROD-008: 状态筛选 - 下架商品', async ({ page }) => {
-    await productsPage.goto();
-    await productsPage.expectProductsPageVisible();
-
-    await productsPage.filterByStatus('下架');
-    await page.waitForTimeout(500);
+  test('SKU-008: 状态筛选 - 下架', async ({ page }) => {
+    await skusPage.goto();
+    await skusPage.expectSKUsPageVisible();
+    const hasFilter = await page.locator('.ant-card .ant-select').first().isVisible().catch(() => false);
+    if (hasFilter) {
+      await skusPage.filterByStatus('下架');
+    } else {
+      test.skip();
+    }
   });
 });
 
@@ -349,21 +292,10 @@ test.describe('商家管理界面 - 边界与异常', () => {
     await loginPage.expectLoginSuccess();
   });
 
-  test('EDGE-004: 特殊字符输入应正确处理', async ({ page }) => {
-    const productsPage = new MerchantProductsPage(page);
-    await productsPage.goto();
-    await productsPage.expectProductsPageVisible();
-
-    await productsPage.clickAddProduct();
-    await productsPage.fillProductForm({
-      name: '<script>alert("xss")</script>测试商品',
-      description: '测试特殊字符 & < > " \' / \\',
-      price: 99.99,
-      stock: 100,
-    });
-    await productsPage.submitProduct();
-
-    await page.waitForTimeout(1000);
+  test('EDGE-004: SKU管理页无异常脚本注入', async ({ page }) => {
+    const skusPage = new MerchantSKUsPage(page);
+    await skusPage.goto();
+    await skusPage.expectSKUsPageVisible();
     const xssElement = page.locator('script:has-text("alert")');
     expect(await xssElement.count()).toBe(0);
   });

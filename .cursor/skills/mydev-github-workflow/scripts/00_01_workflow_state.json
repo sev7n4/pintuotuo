@@ -1,32 +1,29 @@
 {
-  "current_step": 14,
+  "current_step": 9,
   "current_fix_cases": [
-    "CI-DEPLOY-VERIFY-HEALTH-CATALOG"
+    "FE-MERCHANT-SKU-SINGLE-ENTRY",
+    "FE-MY-SERVICES-NAV"
   ],
   "retry_count": 0,
-  "pr_number": 149,
-  "merged": true,
-  "branch": "fix/deploy-verify-health-endpoint",
+  "pr_number": null,
+  "merged": false,
+  "branch": "feature/merchant-sku-nav-my-services",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "success",
-    "integration": "success",
-    "e2e": "success",
-    "deploy": "success"
+    "cicd": "pending",
+    "integration": "pending",
+    "e2e": "pending",
+    "deploy": "pending"
   },
   "error_history": [],
   "created_at": "2026-04-02T14:00:00Z",
-  "updated_at": "2026-04-02T12:30:00Z",
+  "updated_at": "2026-04-02T14:00:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "部署流水线：health 必选 + catalog 列表或 DEPLOY_VERIFY_CATALOG_SKU_ID",
-    "issue_type": "fix",
+    "task": "商户仅保留 SKU 管理入口；C端我的服务独立页与下拉菜单",
+    "issue_type": "enhancement",
     "skill": "mydev-github-workflow",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/149",
-    "merged_commit": "fc82011",
-    "parent_feature_pr": 148,
-    "validation_note": "Step8: 仅 workflow 变更跳过 TDD；Step10 CI 全绿；Step12 已合并；Step13 deploy-tencent run 23881915295 success",
-    "next_action": "idle",
-    "last_deploy_run": "23881915295"
+    "validation_note": "Step8: npm run type-check；配置/导航为主可跳过 TDD",
+    "next_action": "push_and_pr_ci"
   }
 }
