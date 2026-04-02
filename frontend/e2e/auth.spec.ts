@@ -93,8 +93,14 @@ test.describe('Login Flow', () => {
   test('should persist login state after page refresh', async ({ page }) => {
     await loginPage.login('demo@example.com', 'demo123456');
     await page.waitForURL(/.*\//, { timeout: 15000 });
-    
+
+    // 刷新后 isAuthenticated 先有 token，user 需等 /users/me 拉取后才渲染下拉（见 Layout.tsx）
+    const userMe = page.waitForResponse(
+      (resp) => resp.url().includes('/users/me') && resp.ok(),
+      { timeout: 20000 }
+    );
     await page.reload();
+    await userMe;
     await expect(page.locator('[data-testid="user-dropdown"]')).toBeVisible({ timeout: 10000 });
   });
 });

@@ -43,12 +43,11 @@ jest.mock('antd', () => ({
       <div data-testid="search-input">
         <input type="text" placeholder={placeholder} data-testid="search-input-field" />
         <button
-          onClick={() =>
-            onSearch(
-              (document.querySelector('[data-testid="search-input-field"]') as HTMLInputElement)
-                .value
-            )
-          }
+          type="button"
+          onClick={(e) => {
+            const input = e.currentTarget.parentElement?.querySelector('input') as { value?: string } | null;
+            onSearch(input?.value ?? '');
+          }}
         >
           搜索
         </button>
@@ -403,9 +402,12 @@ describe('ProductListPage Component', () => {
       fireEvent.click(searchButton);
     });
 
-    // 验证搜索函数被调用
+    // 卖场搜索通过 URL ?search= 触发，由 useEffect 再调 searchProducts
     await waitFor(() => {
-      expect(mockSearchProducts).toHaveBeenCalledWith('测试');
+      expect(mockNavigate).toHaveBeenCalled();
+      const path = mockNavigate.mock.calls[0][0] as string;
+      expect(path).toContain('search=');
+      expect(decodeURIComponent(path.split('search=')[1] || '')).toBe('测试');
     });
   });
 

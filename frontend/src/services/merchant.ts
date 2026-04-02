@@ -4,7 +4,6 @@ import {
   MerchantStats,
   MerchantSettlement,
   MerchantOrder,
-  Product,
   MerchantAPIKey,
   APIKeyUsage,
   PaginatedResponse,
@@ -27,11 +26,6 @@ export const merchantService = {
   updateProfile: (data: Partial<Merchant>) => api.put<Merchant>('/merchants/profile', data),
 
   getStats: () => api.get<MerchantStats>('/merchants/stats'),
-
-  getProducts: (page?: number, perPage?: number, status?: string) =>
-    api.get<APIResponse<PaginatedResponse<Product>>>('/merchants/products', {
-      params: { page, per_page: perPage, status },
-    }),
 
   getOrders: (page?: number, perPage?: number, status?: string) =>
     api.get<APIResponse<PaginatedResponse<MerchantOrder>>>('/merchants/orders', {

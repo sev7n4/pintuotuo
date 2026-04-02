@@ -7,7 +7,6 @@ jest.mock('@/services/merchant', () => ({
     getProfile: jest.fn(),
     updateProfile: jest.fn(),
     getStats: jest.fn(),
-    getProducts: jest.fn(),
     getOrders: jest.fn(),
     getSettlements: jest.fn(),
     requestSettlement: jest.fn(),
@@ -28,7 +27,6 @@ describe('merchantStore', () => {
     useMerchantStore.setState({
       profile: null,
       stats: null,
-      products: [],
       orders: [],
       settlements: [],
       apiKeys: [],
@@ -151,43 +149,6 @@ describe('merchantStore', () => {
 
     const newState = useMerchantStore.getState();
     expect(newState.stats).toBe(null);
-    expect(newState.isLoading).toBe(false);
-    expect(newState.error).toBe(errorMessage);
-  });
-
-  test('fetchProducts 成功获取商品列表', async () => {
-    const mockProducts = [
-      { id: 1, name: '商品1', price: 100, status: 'active' },
-      { id: 2, name: '商品2', price: 200, status: 'active' },
-    ];
-
-    mockMerchantService.getProducts.mockResolvedValue({
-      data: {
-        total: 2,
-        page: 1,
-        per_page: 20,
-        data: mockProducts,
-      },
-    } as any);
-
-    const store = useMerchantStore.getState();
-    await store.fetchProducts();
-
-    const newState = useMerchantStore.getState();
-    expect(newState.products).toEqual(mockProducts);
-    expect(newState.isLoading).toBe(false);
-    expect(newState.error).toBe(null);
-  });
-
-  test('fetchProducts 获取商品列表失败', async () => {
-    const errorMessage = '获取商品列表失败';
-    mockMerchantService.getProducts.mockRejectedValue(new Error(errorMessage));
-
-    const store = useMerchantStore.getState();
-    await store.fetchProducts();
-
-    const newState = useMerchantStore.getState();
-    expect(newState.products).toEqual([]);
     expect(newState.isLoading).toBe(false);
     expect(newState.error).toBe(errorMessage);
   });

@@ -3,16 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Avatar, List, Button, Divider, Tag, Space, Statistic } from 'antd';
 import {
   UserOutlined,
-  WalletOutlined,
-  HeartOutlined,
-  HistoryOutlined,
   SettingOutlined,
   SafetyOutlined,
   RightOutlined,
   TrophyOutlined,
-  BarChartOutlined,
-  ShoppingCartOutlined,
-  TeamOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './MyPage.module.css';
@@ -48,45 +42,6 @@ const MyPage = () => {
   const userLevel = user
     ? getUserLevel(user.created_at)
     : { level: 1, name: '新用户', progress: 0 };
-
-  const menuItems = [
-    {
-      title: '我的订单',
-      icon: <ShoppingCartOutlined />,
-      link: '/orders',
-      color: '#1890ff',
-    },
-    {
-      title: '我的Token',
-      icon: <WalletOutlined />,
-      link: '/my-tokens',
-      color: '#52c41a',
-    },
-    {
-      title: '我的收藏',
-      icon: <HeartOutlined />,
-      link: '/favorites',
-      color: '#ff4d4f',
-    },
-    {
-      title: '浏览历史',
-      icon: <HistoryOutlined />,
-      link: '/history',
-      color: '#722ed1',
-    },
-    {
-      title: '消费明细',
-      icon: <BarChartOutlined />,
-      link: '/consumption',
-      color: '#13c2c2',
-    },
-    {
-      title: '邀请好友',
-      icon: <TeamOutlined />,
-      link: '/referral',
-      color: '#faad14',
-    },
-  ];
 
   const settingItems = [
     {
@@ -170,23 +125,11 @@ const MyPage = () => {
         </Row>
       </Card>
 
-      <Card className={styles.menuCard} title="我的服务">
-        <Row gutter={[16, 16]}>
-          {menuItems.map((item) => (
-            <Col xs={12} sm={6} key={item.title}>
-              <div className={styles.menuItem} onClick={() => handleMenuClick(item.link)}>
-                <div
-                  className={styles.menuIcon}
-                  style={{ backgroundColor: item.color + '20', color: item.color }}
-                >
-                  {item.icon}
-                </div>
-                <span className={styles.menuTitle}>{item.title}</span>
-              </div>
-            </Col>
-          ))}
-        </Row>
-      </Card>
+      <div className={styles.servicesEntry}>
+        <Button type="primary" ghost onClick={() => navigate('/my/services')}>
+          进入我的服务
+        </Button>
+      </div>
 
       <Card className={styles.settingCard} title="设置">
         <List

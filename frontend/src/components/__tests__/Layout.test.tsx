@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import Layout from '../Layout';
 import { useAuthStore } from '@/stores/authStore';
+import { useCartStore } from '@/stores/cartStore';
 
 // 模拟 message
 jest.mock('antd', () => ({
@@ -16,12 +17,25 @@ jest.mock('../Layout.css', () => ({}));
 
 // 模拟 useAuthStore
 jest.mock('@/stores/authStore');
+jest.mock('@/stores/cartStore');
 
 const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>;
+const mockUseCartStore = useCartStore as jest.MockedFunction<typeof useCartStore>;
 
 describe('Layout Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseCartStore.mockReturnValue({
+      items: [],
+      total: 0,
+      isLoading: false,
+      error: null,
+      addItem: jest.fn(),
+      removeItem: jest.fn(),
+      updateQuantity: jest.fn(),
+      clear: jest.fn(),
+      getTotal: jest.fn().mockReturnValue(0),
+    });
   });
 
   test('renders Layout with login/register links when not authenticated', () => {
@@ -46,14 +60,10 @@ describe('Layout Component', () => {
       </MemoryRouter>
     );
 
-    // 检查导航链接
+    // 检查主导航（与 Layout 组件一致）
     expect(screen.getByText('首页')).toBeInTheDocument();
-    expect(screen.getByText('商品')).toBeInTheDocument();
-    expect(screen.getByText('订单')).toBeInTheDocument();
-    expect(screen.getByText('拼团')).toBeInTheDocument();
-    expect(screen.getByText('我的Token')).toBeInTheDocument();
-    expect(screen.getByText('消费明细')).toBeInTheDocument();
-    expect(screen.getByText('邀请返利')).toBeInTheDocument();
+    expect(screen.getByText('分类')).toBeInTheDocument();
+    expect(screen.getByText('购物车')).toBeInTheDocument();
 
     // 检查登录/注册链接
     expect(screen.getByText('登录')).toBeInTheDocument();

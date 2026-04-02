@@ -18,38 +18,27 @@ test.describe('Merchant Dashboard', () => {
     await expect(page.getByRole('heading', { name: '数据概览' })).toBeVisible();
   });
 
-  test('should display merchant products', async ({ page }) => {
+  test('should display merchant SKU management', async ({ page }) => {
     await loginPage.goto();
     await loginPage.login('merchant@example.com', 'merchant123456');
     await loginPage.expectLoginSuccess();
-    
-    await page.goto('/merchant/products');
-    await expect(page.getByRole('heading', { name: '商品管理' }).or(page.locator('h2:has-text("商品")'))).toBeVisible();
+
+    await page.goto('/merchant/skus');
+    await expect(
+      page.locator('.ant-layout-content').getByText('选品与SKU管理', { exact: true })
+    ).toBeVisible({ timeout: 15000 });
   });
 
-  test('should create new product', async ({ page }) => {
+  test('legacy /merchant/products redirects to SKU page', async ({ page }) => {
     await loginPage.goto();
     await loginPage.login('merchant@example.com', 'merchant123456');
     await loginPage.expectLoginSuccess();
-    
+
     await page.goto('/merchant/products');
-    await page.waitForLoadState('networkidle');
-    
-    const addButton = page.locator('button:has-text("添加商品")');
-    await expect(addButton).toBeVisible({ timeout: 10000 });
-    await addButton.click();
-    
-    const modal = page.locator('.ant-modal-content');
-    await expect(modal).toBeVisible({ timeout: 5000 });
-    
-    await page.getByPlaceholder('请输入商品名称').fill('测试商品E2E');
-    await page.getByPlaceholder('请输入商品描述').fill('这是一个E2E测试商品');
-    await page.getByPlaceholder('请输入价格').fill('99.99');
-    await page.getByPlaceholder('请输入库存').fill('100');
-    
-    const saveButton = modal.locator('button:has-text("保")');
-    await saveButton.click();
-    await page.waitForTimeout(1000);
+    await page.waitForURL(/\/merchant\/skus/, { timeout: 10000 });
+    await expect(
+      page.locator('.ant-layout-content').getByText('选品与SKU管理', { exact: true })
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('should display merchant orders', async ({ page }) => {

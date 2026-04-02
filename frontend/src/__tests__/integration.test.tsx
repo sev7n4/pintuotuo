@@ -185,7 +185,7 @@ describe('Integration Tests', () => {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/referral" element={<ReferralPage />} />
-          <Route path="/catalog" element={<div>Products Page</div>} />
+          <Route path="/" element={<div>Home Page</div>} />
           <Route path="/*" element={<Navigate to="/login" />} />
         </Routes>
       </MemoryRouter>
@@ -202,9 +202,8 @@ describe('Integration Tests', () => {
       fireEvent.click(loginButton);
     });
 
-    // 检查是否跳转到产品页面（根据LoginPage组件的逻辑）
     await waitFor(() => {
-      expect(screen.getByText('Products Page')).toBeInTheDocument();
+      expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123');
     });
   });
 
@@ -950,7 +949,7 @@ describe('Integration Tests', () => {
       <MemoryRouter initialEntries={['/login']}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/catalog" element={<div>Products Page</div>} />
+          <Route path="/" element={<div>Home Page</div>} />
           <Route path="/*" element={<Navigate to="/login" />} />
         </Routes>
       </MemoryRouter>

@@ -2,8 +2,12 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import OrderListPage from '../OrderListPage';
 import { useOrderStore } from '@/stores/orderStore';
+import { useCartStore } from '@/stores/cartStore';
+import { useProductStore } from '@/stores/productStore';
 
 jest.mock('@/stores/orderStore');
+jest.mock('@/stores/cartStore');
+jest.mock('@/stores/productStore');
 
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
@@ -86,6 +90,8 @@ jest.mock('antd', () => ({
 }));
 
 const mockUseOrderStore = useOrderStore as jest.MockedFunction<typeof useOrderStore>;
+const mockUseCartStore = useCartStore as jest.MockedFunction<typeof useCartStore>;
+const mockUseProductStore = useProductStore as jest.MockedFunction<typeof useProductStore>;
 const mockUseNavigate = useNavigate as jest.MockedFunction<typeof useNavigate>;
 
 describe('OrderListPage Component', () => {
@@ -94,6 +100,28 @@ describe('OrderListPage Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseNavigate.mockReturnValue(mockNavigate);
+    mockUseCartStore.mockReturnValue({
+      items: [],
+      total: 0,
+      isLoading: false,
+      error: null,
+      addItem: jest.fn(),
+      removeItem: jest.fn(),
+      updateQuantity: jest.fn(),
+      clear: jest.fn(),
+      getTotal: jest.fn().mockReturnValue(0),
+    });
+    mockUseProductStore.mockReturnValue({
+      products: [],
+      total: 0,
+      filters: { page: 1, per_page: 20 },
+      isLoading: false,
+      error: null,
+      fetchProducts: jest.fn(),
+      setFilters: jest.fn(),
+      searchProducts: jest.fn(),
+      fetchProductByID: jest.fn(),
+    });
   });
 
   test('renders OrderListPage with title', async () => {
@@ -131,7 +159,7 @@ describe('OrderListPage Component', () => {
       );
     });
 
-    expect(screen.getByText('订单列表')).toBeInTheDocument();
+    expect(screen.getByText('我的订单')).toBeInTheDocument();
   });
 
   test('shows loading state when fetching orders', async () => {
@@ -650,7 +678,7 @@ describe('TC-ORDER-005: 订单状态显示', () => {
       );
     });
 
-    expect(screen.getByText('待支付')).toBeInTheDocument();
+    expect(screen.getAllByText('待支付').length).toBeGreaterThan(0);
   });
 
   test('should display correct status label for paid orders', async () => {
@@ -688,7 +716,7 @@ describe('TC-ORDER-005: 订单状态显示', () => {
       );
     });
 
-    expect(screen.getByText('已支付')).toBeInTheDocument();
+    expect(screen.getAllByText('已支付').length).toBeGreaterThan(0);
   });
 
   test('should display correct status label for cancelled orders', async () => {
@@ -726,7 +754,7 @@ describe('TC-ORDER-005: 订单状态显示', () => {
       );
     });
 
-    expect(screen.getByText('已取消')).toBeInTheDocument();
+    expect(screen.getAllByText('已取消').length).toBeGreaterThan(0);
   });
 });
 

@@ -3,7 +3,6 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Avatar, Dropdown, message, Spin, Drawer, Button } from 'antd';
 import {
   ShopOutlined,
-  AppstoreOutlined,
   ShoppingCartOutlined,
   WalletOutlined,
   SettingOutlined,
@@ -30,14 +29,9 @@ const menuItems = [
     label: '数据概览',
   },
   {
-    key: '/merchant/products',
-    icon: <AppstoreOutlined />,
-    label: '商品管理',
-  },
-  {
     key: '/merchant/skus',
     icon: <ShopOutlined />,
-    label: 'SKU管理',
+    label: '选品与SKU管理',
   },
   {
     key: '/merchant/orders',
