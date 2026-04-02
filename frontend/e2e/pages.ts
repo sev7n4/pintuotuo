@@ -71,82 +71,36 @@ export class MerchantDashboardPage {
   }
 }
 
-export class MerchantProductsPage {
+/** 商户选品与 SKU 管理（唯一入口 /merchant/skus） */
+export class MerchantSKUsPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/merchant/products');
+    await this.page.goto('/merchant/skus');
     await this.page.waitForLoadState('networkidle');
   }
 
-  async expectProductsPageVisible() {
-    await expect(this.page.getByRole('heading', { name: '商品管理' }).or(this.page.locator('h2:has-text("商品")'))).toBeVisible();
+  async expectSKUsPageVisible() {
+    await expect(
+      this.page.getByText('选品与SKU管理').or(this.page.locator('.ant-card-head-title:has-text("SKU")'))
+    ).toBeVisible();
   }
 
-  async clickAddProduct() {
-    await this.page.locator('button:has-text("添加商品")').click();
+  /** 打开「选择商品上架」弹窗（平台 SKU 选品） */
+  async openSelectSkuModal() {
+    await this.page.getByRole('button', { name: /选择商品上架/ }).click();
     await this.page.waitForSelector('.ant-modal-content', { timeout: 10000 });
-  }
-
-  async fillProductForm(data: {
-    name: string;
-    description: string;
-    price: number;
-    stock: number;
-    category?: string;
-    status?: string;
-  }) {
-    await this.page.getByPlaceholder('请输入商品名称').fill(data.name);
-    await this.page.getByPlaceholder('请输入商品描述').fill(data.description);
-    
-    const priceInput = this.page.getByPlaceholder('请输入价格');
-    await priceInput.fill(data.price.toString());
-    await priceInput.press('Tab');
-    
-    const stockInput = this.page.getByPlaceholder('请输入库存');
-    await stockInput.fill(data.stock.toString());
-    await stockInput.press('Tab');
-    
-    await this.page.waitForTimeout(300);
-    
-    if (data.category) {
-      await this.page.locator('.ant-select').first().click();
-      await this.page.getByText(data.category).click();
-    }
-    
-    if (data.status) {
-      await this.page.locator('.ant-select').nth(1).click();
-      await this.page.getByText(data.status).click();
-    }
-  }
-
-  async submitProduct() {
-    const modal = this.page.locator('.ant-modal-content');
-    await modal.locator('button:has-text("保")').click();
-    await this.page.waitForTimeout(1000);
-  }
-
-  async editProduct(name: string) {
-    const row = this.page.locator('.ant-table-row').filter({ hasText: name });
-    await row.locator('button:has-text("编辑")').click();
-    await this.page.waitForSelector('.ant-modal-content', { timeout: 10000 });
-  }
-
-  async deleteProduct(name: string) {
-    const row = this.page.locator('.ant-table-row').filter({ hasText: name });
-    await row.locator('button:has-text("删除")').click();
-    await this.page.locator('button:has-text("确定")').click();
-    await this.page.waitForTimeout(500);
   }
 
   async filterByStatus(status: string) {
-    await this.page.locator('.ant-select').first().click();
-    await this.page.getByText(status).click();
+    const card = this.page.locator('.ant-card').first();
+    await card.locator('.ant-select').first().click();
+    await this.page.getByText(status, { exact: true }).click();
     await this.page.waitForTimeout(500);
   }
 
-  async getProductCount() {
-    return await this.page.locator('.ant-table-row').count();
+  async getTableRowCount() {
+    return await this.page.locator('.ant-table-tbody .ant-table-row').count();
   }
 }
 

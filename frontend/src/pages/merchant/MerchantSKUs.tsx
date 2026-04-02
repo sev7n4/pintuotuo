@@ -402,7 +402,7 @@ const MerchantSKUs = () => {
           title={
             <Space>
               <ShopOutlined />
-              <span>商品管理 (SKU)</span>
+              <span>选品与SKU管理</span>
             </Space>
           }
           extra={

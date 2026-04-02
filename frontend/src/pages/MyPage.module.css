@@ -7,6 +7,10 @@
   margin-bottom: 16px;
 }
 
+.servicesEntry {
+  margin-bottom: 16px;
+}
+
 .userInfo {
   display: flex;
   align-items: center;

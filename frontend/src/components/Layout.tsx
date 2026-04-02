@@ -7,8 +7,7 @@ import {
   HomeOutlined,
   AppstoreOutlined,
   ShoppingCartOutlined,
-  HeartOutlined,
-  HistoryOutlined,
+  CustomerServiceOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
@@ -45,6 +44,7 @@ export default function Layout() {
       return 'orders';
     if (
       path === '/my' ||
+      path === '/my/services' ||
       path === '/profile' ||
       path === '/referral' ||
       path === '/favorites' ||
@@ -90,8 +90,7 @@ export default function Layout() {
 
   const userMenuItems = [
     { key: 'my', label: '我的主页', icon: <UserOutlined /> },
-    { key: 'favorites', label: '我的收藏', icon: <HeartOutlined /> },
-    { key: 'history', label: '浏览历史', icon: <HistoryOutlined /> },
+    { key: 'services', label: '我的服务', icon: <CustomerServiceOutlined /> },
     { type: 'divider' as const },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
   ];
@@ -106,11 +105,8 @@ export default function Layout() {
       case 'my':
         navigate('/my');
         break;
-      case 'favorites':
-        navigate('/favorites');
-        break;
-      case 'history':
-        navigate('/history');
+      case 'services':
+        navigate('/my/services');
         break;
     }
   };

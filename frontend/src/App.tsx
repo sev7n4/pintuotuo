@@ -27,13 +27,13 @@ import AboutPage from '@pages/AboutPage';
 import UserAgreementPage from '@pages/UserAgreementPage';
 import PrivacyPolicyPage from '@pages/PrivacyPolicyPage';
 import MyPage from '@pages/MyPage';
+import MyServicesPage from '@pages/MyServicesPage';
 import CategoryPage from '@pages/CategoryPage';
 import FavoritesPage from '@pages/FavoritesPage';
 import HistoryPage from '@pages/HistoryPage';
 
 // Merchant Pages
 import MerchantDashboard from '@pages/merchant/MerchantDashboard';
-import MerchantProducts from '@pages/merchant/MerchantProducts';
 import MerchantSKUs from '@pages/merchant/MerchantSKUs';
 import MerchantOrders from '@pages/merchant/MerchantOrders';
 import MerchantSettings from '@pages/merchant/MerchantSettings';
@@ -108,8 +108,9 @@ function App() {
             {/* Profile */}
             <Route path="/profile" element={<Profile />} />
 
-            {/* My Page */}
+            {/* My Page（个人主页）；我的服务为同级独立页 */}
             <Route path="/my" element={<MyPage />} />
+            <Route path="/my/services" element={<MyServicesPage />} />
 
             {/* Favorites */}
             <Route path="/favorites" element={<FavoritesPage />} />
@@ -130,7 +131,7 @@ function App() {
           {/* Merchant routes */}
           <Route path="/merchant" element={<MerchantLayout />}>
             <Route index element={<MerchantDashboard />} />
-            <Route path="products" element={<MerchantProducts />} />
+            <Route path="products" element={<Navigate to="/merchant/skus" replace />} />
             <Route path="skus" element={<MerchantSKUs />} />
             <Route path="orders" element={<MerchantOrders />} />
             <Route path="settlements" element={<MerchantSettlements />} />
