@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/cache"
@@ -1160,8 +1162,22 @@ func PatchModelProvider(c *gin.Context) {
 func ListPublicSKUs(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")
-	spuID := c.Query("spu_id")
-	skuType := c.Query("type")
+	spuID := strings.TrimSpace(c.Query("spu_id"))
+	skuType := strings.TrimSpace(c.Query("type"))
+	q := strings.TrimSpace(c.Query("q"))
+	if q == "" {
+		q = strings.TrimSpace(c.Query("search"))
+	}
+	provider := strings.TrimSpace(c.Query("provider"))
+	tier := strings.TrimSpace(c.Query("tier"))
+	modelName := strings.TrimSpace(c.Query("model_name"))
+	category := strings.TrimSpace(c.Query("category"))
+	groupEnabled := strings.TrimSpace(c.Query("group_enabled"))
+	priceMinStr := strings.TrimSpace(c.Query("price_min"))
+	priceMaxStr := strings.TrimSpace(c.Query("price_max"))
+	validMinStr := strings.TrimSpace(c.Query("valid_days_min"))
+	validMaxStr := strings.TrimSpace(c.Query("valid_days_max"))
+	sortParam := strings.TrimSpace(c.Query("sort"))
 
 	pageNum, _ := strconv.Atoi(page)
 	perPageNum, _ := strconv.Atoi(perPage)
@@ -1176,27 +1192,103 @@ func ListPublicSKUs(c *gin.Context) {
 	offset := (pageNum - 1) * perPageNum
 	db := config.GetDB()
 
-	query := `SELECT s.id, s.spu_id, s.sku_code, s.sku_type, s.token_amount, s.compute_points, 
-		s.subscription_period, s.is_unlimited, s.valid_days, s.retail_price, s.original_price, 
-		s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
-		s.is_trial, s.trial_duration_days, s.is_promoted, s.sales_count,
-		sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier
-		FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.status = 'active' AND sp.status = 'active'`
+	where := "s.status = 'active' AND sp.status = 'active'"
 	args := []interface{}{}
 	argPos := 1
 
 	if spuID != "" {
-		query += " AND s.spu_id = $" + strconv.Itoa(argPos)
+		where += fmt.Sprintf(" AND s.spu_id = $%d", argPos)
 		args = append(args, idToInt(spuID))
 		argPos++
 	}
 	if skuType != "" {
-		query += " AND s.sku_type = $" + strconv.Itoa(argPos)
+		where += fmt.Sprintf(" AND s.sku_type = $%d", argPos)
 		args = append(args, skuType)
 		argPos++
 	}
+	if provider != "" {
+		where += fmt.Sprintf(" AND sp.model_provider = $%d", argPos)
+		args = append(args, provider)
+		argPos++
+	}
+	if tier != "" {
+		where += fmt.Sprintf(" AND sp.model_tier = $%d", argPos)
+		args = append(args, tier)
+		argPos++
+	}
+	if modelName != "" {
+		pattern := "%" + modelName + "%"
+		where += fmt.Sprintf(" AND sp.model_name ILIKE $%d", argPos)
+		args = append(args, pattern)
+		argPos++
+	}
+	if category != "" {
+		pattern := "%" + category + "%"
+		where += fmt.Sprintf(" AND sp.name ILIKE $%d", argPos)
+		args = append(args, pattern)
+		argPos++
+	}
+	if q != "" {
+		pattern := "%" + q + "%"
+		where += fmt.Sprintf(" AND (sp.name ILIKE $%d OR sp.model_name ILIKE $%d OR s.sku_code ILIKE $%d)", argPos, argPos+1, argPos+2)
+		args = append(args, pattern, pattern, pattern)
+		argPos += 3
+	}
+	if groupEnabled == "true" || groupEnabled == "1" {
+		where += " AND s.group_enabled = true"
+	}
+	if priceMinStr != "" {
+		if v, err := strconv.ParseFloat(priceMinStr, 64); err == nil {
+			where += fmt.Sprintf(" AND s.retail_price >= $%d", argPos)
+			args = append(args, v)
+			argPos++
+		}
+	}
+	if priceMaxStr != "" {
+		if v, err := strconv.ParseFloat(priceMaxStr, 64); err == nil {
+			where += fmt.Sprintf(" AND s.retail_price <= $%d", argPos)
+			args = append(args, v)
+			argPos++
+		}
+	}
+	if validMinStr != "" {
+		if v, err := strconv.Atoi(validMinStr); err == nil {
+			where += fmt.Sprintf(" AND s.valid_days >= $%d", argPos)
+			args = append(args, v)
+			argPos++
+		}
+	}
+	if validMaxStr != "" {
+		if v, err := strconv.Atoi(validMaxStr); err == nil {
+			where += fmt.Sprintf(" AND s.valid_days <= $%d", argPos)
+			args = append(args, v)
+			argPos++
+		}
+	}
 
-	query += " ORDER BY s.is_promoted DESC, s.sales_count DESC, s.created_at DESC LIMIT $" + strconv.Itoa(argPos) + " OFFSET $" + strconv.Itoa(argPos+1)
+	orderClause := "s.is_promoted DESC, s.sales_count DESC, s.created_at DESC"
+	switch sortParam {
+	case "hot":
+		orderClause = "s.sales_count DESC, s.created_at DESC"
+	case "new":
+		orderClause = "s.created_at DESC"
+	case "price_asc":
+		orderClause = "s.retail_price ASC NULLS LAST, s.id ASC"
+	case "price_desc":
+		orderClause = "s.retail_price DESC NULLS LAST, s.id DESC"
+	}
+
+	selectCols := `SELECT s.id, s.spu_id, s.sku_code, s.sku_type, s.token_amount, s.compute_points, 
+		s.subscription_period, s.is_unlimited, s.valid_days, s.retail_price, s.original_price, 
+		s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
+		s.is_trial, s.trial_duration_days, s.is_promoted, s.sales_count,
+		sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier,
+		sp.total_sales_count, sp.average_rating`
+
+	query := fmt.Sprintf(`%s
+		FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE %s
+		ORDER BY %s LIMIT $%d OFFSET $%d`,
+		selectCols, where, orderClause, argPos, argPos+1)
 	args = append(args, perPageNum, offset)
 
 	rows, err := db.Query(query, args...)
@@ -1215,12 +1307,15 @@ func ListPublicSKUs(c *gin.Context) {
 		var originalPrice sql.NullFloat64
 		var groupDiscountRate sql.NullFloat64
 		var trialDurationDays sql.NullInt64
+		var spTotalSales sql.NullInt64
+		var spAvgRating sql.NullFloat64
 
 		err := rows.Scan(&s.ID, &s.SPUID, &s.SKUCode, &s.SKUType, &tokenAmount, &computePoints,
 			&subscriptionPeriod, &s.IsUnlimited, &s.ValidDays, &s.RetailPrice, &originalPrice,
 			&s.GroupEnabled, &s.MinGroupSize, &s.MaxGroupSize, &groupDiscountRate,
 			&s.IsTrial, &trialDurationDays, &s.IsPromoted, &s.SalesCount,
-			&s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier)
+			&s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier,
+			&spTotalSales, &spAvgRating)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -1244,12 +1339,23 @@ func ListPublicSKUs(c *gin.Context) {
 		if trialDurationDays.Valid {
 			s.TrialDurationDays = int(trialDurationDays.Int64)
 		}
+		if spTotalSales.Valid {
+			s.SPUTotalSalesCount = spTotalSales.Int64
+		}
+		if spAvgRating.Valid {
+			r := spAvgRating.Float64
+			s.SPUAverageRating = &r
+		}
 
 		skus = append(skus, s)
 	}
 
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE %s", where)
 	var total int
-	db.QueryRow("SELECT COUNT(*) FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.status = 'active' AND sp.status = 'active'").Scan(&total)
+	if err := db.QueryRow(countQuery, args[:len(args)-2]...).Scan(&total); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"total":    total,
@@ -1276,12 +1382,16 @@ func GetPublicSKUByID(c *gin.Context) {
 	var groupDiscountRate sql.NullFloat64
 	var trialDurationDays sql.NullInt64
 
+	var spTotalSales sql.NullInt64
+	var spAvgRating sql.NullFloat64
+
 	err := db.QueryRow(
 		`SELECT s.id, s.spu_id, s.sku_code, s.sku_type, s.token_amount, s.compute_points, 
 		s.subscription_period, s.is_unlimited, s.valid_days, s.retail_price, s.original_price, 
 		s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
 		s.is_trial, s.trial_duration_days, s.is_promoted, s.sales_count,
-		sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier
+		sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier,
+		sp.total_sales_count, sp.average_rating
 		FROM skus s JOIN spus sp ON s.spu_id = sp.id 
 		WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
 		skuID,
@@ -1289,7 +1399,8 @@ func GetPublicSKUByID(c *gin.Context) {
 		&subscriptionPeriod, &s.IsUnlimited, &s.ValidDays, &s.RetailPrice, &originalPrice,
 		&s.GroupEnabled, &s.MinGroupSize, &s.MaxGroupSize, &groupDiscountRate,
 		&s.IsTrial, &trialDurationDays, &s.IsPromoted, &s.SalesCount,
-		&s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier)
+		&s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier,
+		&spTotalSales, &spAvgRating)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
@@ -1313,6 +1424,13 @@ func GetPublicSKUByID(c *gin.Context) {
 	}
 	if trialDurationDays.Valid {
 		s.TrialDurationDays = int(trialDurationDays.Int64)
+	}
+	if spTotalSales.Valid {
+		s.SPUTotalSalesCount = spTotalSales.Int64
+	}
+	if spAvgRating.Valid {
+		r := spAvgRating.Float64
+		s.SPUAverageRating = &r
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": s})

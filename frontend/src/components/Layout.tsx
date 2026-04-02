@@ -5,8 +5,6 @@ import {
   UserOutlined,
   LogoutOutlined,
   HomeOutlined,
-  AppstoreOutlined,
-  ShoppingCartOutlined,
   CustomerServiceOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
@@ -25,54 +23,13 @@ export default function Layout() {
     }
   }, [isAuthenticated, user, fetchUser]);
 
-  const getSelectedTab = () => {
-    const path = location.pathname;
-    if (path === '/') return 'home';
-    if (path === '/categories' || path.startsWith('/catalog')) return 'category';
-    // 购物车入口迁移到商品页内，顶部导航不再单独占位
-    if (path === '/cart' || path === '/checkout') return 'category';
-    if (
-      path.startsWith('/orders') ||
-      path.startsWith('/groups') ||
-      path.startsWith('/payment') ||
-      path === '/my-tokens' ||
-      path === '/consumption'
-    )
-      return 'orders';
-    if (
-      path === '/my' ||
-      path === '/my/services' ||
-      path === '/profile' ||
-      path === '/referral' ||
-      path === '/favorites' ||
-      path === '/history'
-    )
-      return 'my';
-    return 'home';
-  };
-
-  const baseTabItems = [
+  const tabItems = [
     {
       key: 'home',
       label: <Link to="/">首页</Link>,
       icon: <HomeOutlined />,
     },
-    {
-      key: 'category',
-      label: <Link to="/categories">分类</Link>,
-      icon: <AppstoreOutlined />,
-    },
   ];
-
-  const authTabItems = [
-    {
-      key: 'orders',
-      label: <Link to="/orders">订单</Link>,
-      icon: <ShoppingCartOutlined />,
-    },
-  ];
-
-  const tabItems = isAuthenticated ? [...baseTabItems, ...authTabItems] : baseTabItems;
 
   const userMenuItems = [
     { key: 'my', label: '我的主页', icon: <UserOutlined /> },
@@ -105,7 +62,7 @@ export default function Layout() {
         </Link>
         <Menu
           mode="horizontal"
-          selectedKeys={[getSelectedTab()]}
+          selectedKeys={location.pathname === '/' ? ['home'] : []}
           items={tabItems}
           className="layout-menu"
         />
