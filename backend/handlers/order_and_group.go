@@ -500,12 +500,13 @@ func CreateGroup(c *gin.Context) {
 
 	var group models.Group
 	var nilPID interface{} = nil
+	var productID sql.NullInt64
 	err = db.QueryRow(
 		`INSERT INTO groups (product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
 		 RETURNING id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at`,
 		nilPID, skuID, spuID, userID, req.TargetCount, 1, groupStatusActive, req.Deadline,
-	).Scan(&group.ID, &group.ProductID, &group.SKUID, &group.SPUID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
+	).Scan(&group.ID, &productID, &group.SKUID, &group.SPUID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -516,6 +517,7 @@ func CreateGroup(c *gin.Context) {
 		))
 		return
 	}
+	applyNullProductID(&group, productID)
 
 	var orderID int
 	groupPrice := retailPrice * (1 - utils.NormalizeGroupDiscountRateNull(groupDiscountRate))
@@ -649,12 +651,13 @@ func GetGroupsBySKU(c *gin.Context) {
 	var groups []models.Group
 	for rows.Next() {
 		var g models.Group
-		var skuID, spuID sql.NullInt64
-		err := rows.Scan(&g.ID, &g.ProductID, &skuID, &spuID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
+		var productID, skuID, spuID sql.NullInt64
+		err := rows.Scan(&g.ID, &productID, &skuID, &spuID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
+		applyNullProductID(&g, productID)
 		if skuID.Valid {
 			g.SKUID = int(skuID.Int64)
 		}
@@ -740,18 +743,19 @@ func JoinGroup(c *gin.Context) {
 	}
 
 	var group models.Group
-	var skuID, spuID sql.NullInt64
+	var productID, skuID, spuID sql.NullInt64
 	err := db.QueryRow(
 		`SELECT id, product_id, sku_id, spu_id, target_count, current_count, status, deadline 
 		 FROM groups WHERE id = $1`,
 		groupID,
-	).Scan(&group.ID, &group.ProductID, &skuID, &spuID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline)
+	).Scan(&group.ID, &productID, &skuID, &spuID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
 		return
 	}
 
+	applyNullProductID(&group, productID)
 	if skuID.Valid {
 		group.SKUID = int(skuID.Int64)
 	}
@@ -835,12 +839,12 @@ func JoinGroup(c *gin.Context) {
 		newStatus = "completed"
 	}
 
-	var skuIDUpdate, spuIDUpdate sql.NullInt64
+	var productIDUpdate, skuIDUpdate, spuIDUpdate sql.NullInt64
 	err = db.QueryRow(
 		`UPDATE groups SET current_count = $1, status = $2 WHERE id = $3 
 		 RETURNING id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at`,
 		newCount, newStatus, group.ID,
-	).Scan(&group.ID, &group.ProductID, &skuIDUpdate, &spuIDUpdate, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
+	).Scan(&group.ID, &productIDUpdate, &skuIDUpdate, &spuIDUpdate, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -852,6 +856,7 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 
+	applyNullProductID(&group, productIDUpdate)
 	if skuIDUpdate.Valid {
 		group.SKUID = int(skuIDUpdate.Int64)
 	}
@@ -929,18 +934,19 @@ func GetGroupProgress(c *gin.Context) {
 	}
 
 	var group models.Group
-	var skuID, spuID sql.NullInt64
+	var productID, skuID, spuID sql.NullInt64
 	err := db.QueryRow(
 		`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at 
 		 FROM groups WHERE id = $1`,
 		id,
-	).Scan(&group.ID, &group.ProductID, &skuID, &spuID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
+	).Scan(&group.ID, &productID, &skuID, &spuID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
 		return
 	}
 
+	applyNullProductID(&group, productID)
 	if skuID.Valid {
 		group.SKUID = int(skuID.Int64)
 	}
