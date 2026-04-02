@@ -52,10 +52,10 @@ type Order struct {
 
 // Group represents a group purchase
 type Group struct {
-	ID           int    `json:"id"`
-	ProductID    *int   `json:"product_id,omitempty"` // legacy products FK; NULL for SKU-only groups (migration 020)
-	SKUID        int `json:"sku_id,omitempty"`
-	SPUID        int `json:"spu_id,omitempty"`
+	ID           int       `json:"id"`
+	ProductID    *int      `json:"product_id,omitempty"` // legacy products FK; NULL for SKU-only groups (migration 020)
+	SKUID        int       `json:"sku_id,omitempty"`
+	SPUID        int       `json:"spu_id,omitempty"`
 	CreatorID    int       `json:"creator_id"`
 	TargetCount  int       `json:"target_count"`
 	CurrentCount int       `json:"current_count"`
