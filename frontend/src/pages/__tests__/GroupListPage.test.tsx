@@ -152,9 +152,9 @@ describe('GroupListPage Component', () => {
       );
     });
 
-    // 检查空状态
-    expect(screen.getByText('暂无分组')).toBeInTheDocument();
-    expect(screen.getByText('创建分组')).toBeInTheDocument();
+    // 检查空状态（与 GroupListPage 文案一致）
+    expect(screen.getByText('暂无进行中的拼团')).toBeInTheDocument();
+    expect(screen.getByText('浏览商品')).toBeInTheDocument();
   });
 
   test('renders groups list when groups exist', async () => {
@@ -198,7 +198,7 @@ describe('GroupListPage Component', () => {
 
     // 检查分组列表
     expect(screen.getByText('拼团中心')).toBeInTheDocument();
-    expect(screen.getByText('分组 #1')).toBeInTheDocument();
+    expect(screen.getByText('拼团 #1')).toBeInTheDocument();
   });
 
   test('handles join group', async () => {
@@ -248,7 +248,7 @@ describe('GroupListPage Component', () => {
     });
   });
 
-  test('navigates to create group page', async () => {
+  test('navigates to catalog from empty state', async () => {
     // 模拟无分组状态
     mockUseGroupStore.mockReturnValue({
       isLoading: false,
@@ -270,13 +270,11 @@ describe('GroupListPage Component', () => {
       );
     });
 
-    // 点击创建分组按钮
-    const createButton = screen.getByText('创建分组');
+    const browseButton = screen.getByText('浏览商品');
     await act(async () => {
-      fireEvent.click(createButton);
+      fireEvent.click(browseButton);
     });
 
-    // 验证导航函数被调用
-    expect(mockNavigate).toHaveBeenCalledWith('/create-group');
+    expect(mockNavigate).toHaveBeenCalledWith('/catalog');
   });
 });

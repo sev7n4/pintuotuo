@@ -169,7 +169,7 @@ describe('ProductService', () => {
 
       const result = await productService.updateProduct(1, { price: 79.99 });
 
-      expect(mockedApi.put).toHaveBeenCalledWith('/products/merchants/1', { price: 79.99 });
+      expect(mockedApi.put).toHaveBeenCalledWith('/catalog/merchants/1', { price: 79.99 });
       expect(result.data.data?.price).toBe(79.99);
     });
   });

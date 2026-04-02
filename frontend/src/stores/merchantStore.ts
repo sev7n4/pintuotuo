@@ -4,7 +4,6 @@ import {
   MerchantStats,
   MerchantSettlement,
   MerchantOrder,
-  Product,
   MerchantAPIKey,
   APIKeyUsage,
   PaginatedResponse,
@@ -14,7 +13,6 @@ import { merchantService } from '@/services/merchant';
 interface MerchantState {
   profile: Merchant | null;
   stats: MerchantStats | null;
-  products: Product[];
   orders: MerchantOrder[];
   settlements: MerchantSettlement[];
   apiKeys: MerchantAPIKey[];
@@ -25,7 +23,6 @@ interface MerchantState {
   fetchProfile: () => Promise<void>;
   updateProfile: (data: Partial<Merchant>) => Promise<boolean>;
   fetchStats: () => Promise<void>;
-  fetchProducts: (page?: number, perPage?: number, status?: string) => Promise<void>;
   fetchOrders: (page?: number, perPage?: number, status?: string) => Promise<void>;
   fetchSettlements: () => Promise<void>;
   requestSettlement: () => Promise<boolean>;
@@ -46,7 +43,6 @@ interface MerchantState {
 export const useMerchantStore = create<MerchantState>((set) => ({
   profile: null,
   stats: null,
-  products: [],
   orders: [],
   settlements: [],
   apiKeys: [],
@@ -85,18 +81,6 @@ export const useMerchantStore = create<MerchantState>((set) => ({
       set({ stats: response.data, isLoading: false });
     } catch (error) {
       const message = error instanceof Error ? error.message : '获取统计数据失败';
-      set({ error: message, isLoading: false });
-    }
-  },
-
-  fetchProducts: async (page = 1, perPage = 20, status?: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await merchantService.getProducts(page, perPage, status);
-      const data = response.data as unknown as PaginatedResponse<Product>;
-      set({ products: data?.data || [], isLoading: false });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '获取商品列表失败';
       set({ error: message, isLoading: false });
     }
   },

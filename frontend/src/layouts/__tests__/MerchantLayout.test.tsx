@@ -386,7 +386,7 @@ describe('MerchantLayout Component', () => {
       expect(screen.getByText('商家后台')).toBeInTheDocument();
     });
 
-    const productMenuItem = screen.getByText('商品管理');
+    const productMenuItem = screen.getByText('选品与SKU管理');
     await act(async () => {
       fireEvent.click(productMenuItem);
     });

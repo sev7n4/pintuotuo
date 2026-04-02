@@ -161,12 +161,10 @@ describe('Page Navigation Integration Tests', () => {
       mockUseMerchantStore.mockReturnValue({
         stats: { total_products: 0, active_products: 0, month_sales: 0, month_orders: 0 },
         orders: [],
-        products: [],
         isLoading: false,
         error: null,
         fetchStats: jest.fn(),
         fetchOrders: jest.fn(),
-        fetchProducts: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -420,11 +418,11 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       render(
-        <MemoryRouter initialEntries={['/products/1']}>
+        <MemoryRouter initialEntries={['/catalog/1']}>
           <Routes>
             <Route path="/catalog/:id" element={<ProductDetailPage />} />
             <Route path="/cart" element={<CartPage />} />
-            <Route path="/*" element={<Navigate to="/products/1" />} />
+            <Route path="/*" element={<Navigate to="/catalog/1" replace />} />
           </Routes>
         </MemoryRouter>
       );
@@ -433,12 +431,42 @@ describe('Page Navigation Integration Tests', () => {
         expect(screen.getByText('加入购物车测试产品')).toBeInTheDocument();
       });
 
-      const addToCartButton = screen.getByText('加入购物车');
-      expect(addToCartButton).toBeInTheDocument();
+      await act(async () => {
+        fireEvent.click(screen.getByText('单独购买'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByText('加入购物车').length).toBeGreaterThan(0);
+      });
     });
   });
 
   describe('Order Navigation', () => {
+    beforeEach(() => {
+      mockUseCartStore.mockReturnValue({
+        items: [],
+        total: 0,
+        isLoading: false,
+        error: null,
+        addItem: jest.fn(),
+        removeItem: jest.fn(),
+        updateQuantity: jest.fn(),
+        clear: jest.fn(),
+        getTotal: jest.fn().mockReturnValue(0),
+      });
+      mockUseProductStore.mockReturnValue({
+        products: [],
+        total: 0,
+        filters: { page: 1, per_page: 20 },
+        isLoading: false,
+        error: null,
+        fetchProducts: jest.fn(),
+        setFilters: jest.fn(),
+        searchProducts: jest.fn(),
+        fetchProductByID: jest.fn(),
+      });
+    });
+
     test('should display order list with pending payment status', async () => {
       mockUseAuthStore.mockReturnValue({
         user: { id: 1, email: 'user@example.com', role: 'user' },
@@ -480,6 +508,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn(),
         createOrder: jest.fn(),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -493,9 +522,9 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('订单列表')).toBeInTheDocument();
-        expect(screen.getByText('待支付')).toBeInTheDocument();
-        expect(screen.getByText('已支付')).toBeInTheDocument();
+        expect(screen.getByText('我的订单')).toBeInTheDocument();
+        expect(screen.getAllByText('待支付').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('进行中').length).toBeGreaterThan(0);
       });
     });
 
@@ -532,6 +561,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn(),
         createOrder: jest.fn(),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -584,6 +614,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn(),
         createOrder: jest.fn(),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -643,6 +674,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn(),
         createOrder: jest.fn(),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -656,7 +688,7 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('已完成')).toBeInTheDocument();
+        expect(screen.getAllByText('已完成').length).toBeGreaterThan(0);
       });
     });
   });
@@ -685,12 +717,10 @@ describe('Page Navigation Integration Tests', () => {
           month_orders: 25,
         },
         orders: [],
-        products: [],
         isLoading: false,
         error: null,
         fetchStats: jest.fn(),
         fetchOrders: jest.fn(),
-        fetchProducts: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -735,12 +765,10 @@ describe('Page Navigation Integration Tests', () => {
           month_orders: 100,
         },
         orders: [],
-        products: [],
         isLoading: false,
         error: null,
         fetchStats: jest.fn(),
         fetchOrders: jest.fn(),
-        fetchProducts: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -790,12 +818,10 @@ describe('Page Navigation Integration Tests', () => {
             created_at: '2024-01-15T10:30:00Z',
           },
         ],
-        products: [],
         isLoading: false,
         error: null,
         fetchStats: jest.fn(),
         fetchOrders: jest.fn(),
-        fetchProducts: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -1001,6 +1027,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn(),
         createOrder: jest.fn(),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -1015,7 +1042,7 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('订单列表')).toBeInTheDocument();
+        expect(screen.getByText('我的订单')).toBeInTheDocument();
         expect(screen.getByText('支付')).toBeInTheDocument();
       });
     });
@@ -1099,6 +1126,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn(),
         createOrder: jest.fn(),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -1120,6 +1148,20 @@ describe('Page Navigation Integration Tests', () => {
   });
 
   describe('Layout Authentication State', () => {
+    beforeEach(() => {
+      mockUseCartStore.mockReturnValue({
+        items: [],
+        total: 0,
+        isLoading: false,
+        error: null,
+        addItem: jest.fn(),
+        removeItem: jest.fn(),
+        updateQuantity: jest.fn(),
+        clear: jest.fn(),
+        getTotal: jest.fn().mockReturnValue(0),
+      });
+    });
+
     test('should show login and register links when user is not authenticated', async () => {
       mockUseAuthStore.mockReturnValue({
         user: null,
@@ -1150,8 +1192,8 @@ describe('Page Navigation Integration Tests', () => {
       render(
         <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route path="products" element={<ProductListPage />} />
+            <Route element={<Layout />}>
+              <Route path="/catalog" element={<ProductListPage />} />
             </Route>
           </Routes>
         </MemoryRouter>
@@ -1192,8 +1234,8 @@ describe('Page Navigation Integration Tests', () => {
       render(
         <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route path="products" element={<ProductListPage />} />
+            <Route element={<Layout />}>
+              <Route path="/catalog" element={<ProductListPage />} />
             </Route>
           </Routes>
         </MemoryRouter>
@@ -1234,8 +1276,8 @@ describe('Page Navigation Integration Tests', () => {
       render(
         <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route path="products" element={<ProductListPage />} />
+            <Route element={<Layout />}>
+              <Route path="/catalog" element={<ProductListPage />} />
             </Route>
           </Routes>
         </MemoryRouter>
@@ -1278,10 +1320,10 @@ describe('Page Navigation Integration Tests', () => {
       render(
         <MemoryRouter initialEntries={['/catalog']}>
           <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route path="products" element={<ProductListPage />} />
-              <Route path="login" element={<div>登录页面</div>} />
+            <Route element={<Layout />}>
+              <Route path="/catalog" element={<ProductListPage />} />
             </Route>
+            <Route path="/login" element={<div>登录页面</div>} />
           </Routes>
         </MemoryRouter>
       );
@@ -1341,6 +1383,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn(),
         createOrder: jest.fn().mockResolvedValue(undefined),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -1395,6 +1438,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn(),
         createOrder: jest.fn(),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -1444,6 +1488,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn().mockResolvedValue(undefined),
         createOrder: jest.fn(),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -1498,6 +1543,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn().mockResolvedValue(undefined),
         createOrder: jest.fn(),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 
@@ -1566,6 +1612,7 @@ describe('Page Navigation Integration Tests', () => {
         fetchOrderByID: jest.fn(),
         createOrder: jest.fn(),
         cancelOrder: jest.fn(),
+        requestRefund: jest.fn(),
         clearError: jest.fn(),
       });
 

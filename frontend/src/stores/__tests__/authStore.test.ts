@@ -394,7 +394,9 @@ describe('AuthStore', () => {
       await store.fetchUser();
 
       const newState = useAuthStore.getState();
-      expect(newState.error).toBe(errorMessage);
+      expect(newState.user).toBeNull();
+      expect(newState.isAuthenticated).toBe(false);
+      expect(newState.error).toBeNull();
       expect(newState.isLoading).toBe(false);
     });
   });

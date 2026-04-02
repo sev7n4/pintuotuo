@@ -165,17 +165,10 @@ describe('tokenStore', () => {
 
     mockTokenService.createAPIKey.mockResolvedValue({
       data: {
-        code: 0,
-        message: 'success',
-        data: {
-          id: 3,
-          user_id: 1,
-          name: mockName,
-          api_key: 'new_api_key',
-          status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
+        id: 3,
+        key: 'new_api_key',
+        name: mockName,
+        status: 'active' as const,
       },
     } as any);
 
@@ -183,7 +176,7 @@ describe('tokenStore', () => {
     const success = await store.createAPIKey(mockName);
 
     const newState = useTokenStore.getState();
-    expect(success).toBe(true);
+    expect(success).toBe('new_api_key');
     expect(newState.isLoading).toBe(false);
     expect(newState.error).toBe(null);
   });
@@ -196,7 +189,7 @@ describe('tokenStore', () => {
     const success = await store.createAPIKey('新API密钥');
 
     const newState = useTokenStore.getState();
-    expect(success).toBe(false);
+    expect(success).toBeNull();
     expect(newState.isLoading).toBe(false);
     expect(newState.error).toBe(errorMessage);
   });
