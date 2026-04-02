@@ -360,7 +360,12 @@ const AdminMerchants = () => {
       fixed: 'right',
       render: (_: unknown, record: PendingMerchant) => (
         <Space>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => showDetail(record)}>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => showDetail(record)}
+          >
             详情
           </Button>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
@@ -398,7 +403,8 @@ const AdminMerchants = () => {
       title: '操作人',
       key: 'admin',
       width: 180,
-      render: (_: unknown, r: MerchantAuditLog) => r.admin_email || (r.admin_user_id ? `#${r.admin_user_id}` : '-'),
+      render: (_: unknown, r: MerchantAuditLog) =>
+        r.admin_email || (r.admin_user_id ? `#${r.admin_user_id}` : '-'),
     },
     {
       title: '时间',
@@ -662,7 +668,11 @@ const AdminMerchants = () => {
       >
         <Form form={editForm} layout="vertical">
           <Form.Item name="business_category" label="经营类目">
-            <Select allowClear placeholder="选择类目" options={[...MERCHANT_BUSINESS_CATEGORY_OPTIONS]} />
+            <Select
+              allowClear
+              placeholder="选择类目"
+              options={[...MERCHANT_BUSINESS_CATEGORY_OPTIONS]}
+            />
           </Form.Item>
           <Form.Item name="admin_notes" label="管理员内部备注">
             <TextArea rows={4} placeholder="仅后台可见" />

@@ -28,7 +28,7 @@ export const CartPage: React.FC = () => {
     return (
       <div style={{ marginTop: 50, textAlign: 'center' }}>
         <Empty description="购物车是空的" />
-        <Button type="primary" style={{ marginTop: 16 }} onClick={() => navigate('/products')}>
+        <Button type="primary" style={{ marginTop: 16 }} onClick={() => navigate('/catalog')}>
           继续购物
         </Button>
       </div>
@@ -42,7 +42,7 @@ export const CartPage: React.FC = () => {
       key: 'name',
       render: (text: string, record: CartItem) => (
         <Space direction="vertical" size={0}>
-          <a onClick={() => navigate(`/products/${record.product_id}`)}>{text}</a>
+          <a onClick={() => navigate(`/catalog/${record.sku_id}`)}>{text}</a>
           {record.sku_name && (
             <Space size={4}>
               <TagsOutlined style={{ fontSize: 12, color: '#999' }} />
@@ -142,7 +142,7 @@ export const CartPage: React.FC = () => {
               </Col>
               <Col>
                 <Space>
-                  <Button onClick={() => navigate('/products')}>继续购物</Button>
+                  <Button onClick={() => navigate('/catalog')}>继续购物</Button>
                   <Button type="primary" size="large" onClick={() => navigate('/checkout')}>
                     去结算
                   </Button>

@@ -1,29 +1,30 @@
 {
-  "current_step": 10,
+  "current_step": 8,
   "current_fix_cases": [
-    "UT-BE-ADMIN-MP-001",
-    "UT-BE-ADMIN-MP-002",
-    "UT-BE-ADMIN-MP-003"
+    "UT-BE-CATALOG-020",
+    "FE-CATALOG-ROUTE",
+    "FE-ADMIN-FLASH-SKU"
   ],
   "retry_count": 0,
-  "pr_number": 146,
+  "pr_number": null,
   "merged": false,
-  "branch": "feature/admin-model-providers-maintenance",
-  "local_validation": "passed",
+  "branch": "feature/catalog-products-sku-migration",
+  "local_validation": "pending",
   "ci_status": {
-    "cicd": "running",
+    "cicd": "pending",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
   },
   "error_history": [],
-  "created_at": "2026-04-01T20:00:00Z",
-  "updated_at": "2026-04-01T20:15:00Z",
+  "created_at": "2026-04-02T14:00:00Z",
+  "updated_at": "2026-04-02T14:00:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "管理端模型厂商维护：GET /admin/model-providers/all + 页面 /admin/model-providers",
+    "task": "DROP products 表 + /catalog 路由 + 秒杀 SKU id + Admin 秒杀页",
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/146"
+    "validation_note": "从 main 新建分支 feature/catalog-products-sku-migration，cherry-pick 本次修复",
+    "next_action": "local_validation_then_push_pr"
   }
 }

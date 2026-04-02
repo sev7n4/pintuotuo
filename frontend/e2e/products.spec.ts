@@ -6,13 +6,13 @@ test.describe('Products', () => {
   });
 
   test('should display product list', async ({ page }) => {
-    await page.goto('/products');
+    await page.goto('/catalog');
     const productCount = await page.locator('.ant-card').count();
     expect(productCount).toBeGreaterThanOrEqual(0);
   });
 
   test('should search products', async ({ page }) => {
-    await page.goto('/products');
+    await page.goto('/catalog');
     const searchInput = page.locator('input[placeholder*="搜索"]');
     if (await searchInput.isVisible()) {
       await searchInput.fill('测试商品');
@@ -22,7 +22,7 @@ test.describe('Products', () => {
   });
 
   test('should filter by category', async ({ page }) => {
-    await page.goto('/products');
+    await page.goto('/catalog');
     
     const categoryButton = page.locator('.ant-tag').first();
     if (await categoryButton.isVisible()) {
@@ -32,7 +32,7 @@ test.describe('Products', () => {
   });
 
   test('should view product details', async ({ page }) => {
-    await page.goto('/products');
+    await page.goto('/catalog');
     
     const productCard = page.locator('.ant-card').first();
     if (await productCard.isVisible()) {
@@ -42,7 +42,7 @@ test.describe('Products', () => {
   });
 
   test('should sort products', async ({ page }) => {
-    await page.goto('/products');
+    await page.goto('/catalog');
     
     const sortSelect = page.locator('.ant-select').first();
     if (await sortSelect.isVisible()) {
@@ -52,7 +52,7 @@ test.describe('Products', () => {
   });
 
   test('should paginate products', async ({ page }) => {
-    await page.goto('/products');
+    await page.goto('/catalog');
     
     const nextButton = page.locator('.ant-pagination-next');
     if (await nextButton.isVisible() && await nextButton.isEnabled()) {

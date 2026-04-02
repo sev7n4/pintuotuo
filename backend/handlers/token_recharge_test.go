@@ -214,4 +214,3 @@ func TestMockCompleteRechargeOrder_DisabledWithoutEnv(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, w.Code)
 }
-

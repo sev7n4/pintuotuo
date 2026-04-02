@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import Layout from '@components/Layout';
@@ -54,6 +54,12 @@ import AdminSettings from '@pages/admin/AdminSettings';
 import AdminSPUs from '@pages/admin/AdminSPUs';
 import AdminSKUs from '@pages/admin/AdminSKUs';
 import AdminModelProviders from '@pages/admin/AdminModelProviders';
+import AdminFlashSales from '@pages/admin/AdminFlashSales';
+
+function LegacyProductDetailRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/catalog/${id ?? ''}`} replace />;
+}
 
 function App() {
   return (
@@ -68,9 +74,11 @@ function App() {
           <Route element={<Layout />}>
             <Route index element={<HomePage />} />
 
-            {/* Products */}
-            <Route path="/products" element={<ProductListPage />} />
-            <Route path="/products/:id" element={<ProductDetailPage />} />
+            {/* Catalog (卖场 SKU 列表/详情)；旧路径 /products 重定向 */}
+            <Route path="/products" element={<Navigate to="/catalog" replace />} />
+            <Route path="/products/:id" element={<LegacyProductDetailRedirect />} />
+            <Route path="/catalog" element={<ProductListPage />} />
+            <Route path="/catalog/:id" element={<ProductDetailPage />} />
 
             {/* Categories */}
             <Route path="/categories" element={<CategoryPage />} />
@@ -145,6 +153,7 @@ function App() {
             <Route path="spus" element={<AdminSPUs />} />
             <Route path="skus" element={<AdminSKUs />} />
             <Route path="model-providers" element={<AdminModelProviders />} />
+            <Route path="flash-sales" element={<AdminFlashSales />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -439,9 +439,9 @@ func RequestSettlement(c *gin.Context) {
 
 	var totalSales float64
 	db.QueryRow(
-		`SELECT COALESCE(SUM(total_price), 0) FROM orders o 
-		 JOIN products p ON o.product_id = p.id 
-		 WHERE p.merchant_id = $1 AND o.status = 'completed' AND o.updated_at > 
+		`SELECT COALESCE(SUM(o.total_price), 0) FROM orders o 
+		 JOIN merchant_skus ms ON ms.sku_id = o.sku_id AND ms.merchant_id = $1
+		 WHERE o.status = 'completed' AND o.updated_at > 
 		 COALESCE((SELECT MAX(period_end) FROM merchant_settlements WHERE merchant_id = $1), '1970-01-01')`,
 		merchantID,
 	).Scan(&totalSales)

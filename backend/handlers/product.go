@@ -54,19 +54,16 @@ func ListProducts(c *gin.Context) {
 
 	db := config.GetDB()
 
-	// Build query with proper parameter handling for PostgreSQL
+	// Marketplace: one row per SKU (legacy `products` table is deprecated).
+	base := listSKUProductsBaseQuery
 	var rows *sql.Rows
 	var err error
 	if status == "" || status == allProductStatus {
-		rows, err = db.Query(
-			"SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products ORDER BY created_at DESC LIMIT $1 OFFSET $2",
-			perPageNum, offset,
-		)
+		q := base + ` ORDER BY s.created_at DESC LIMIT $1 OFFSET $2`
+		rows, err = db.Query(q, perPageNum, offset)
 	} else {
-		rows, err = db.Query(
-			"SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-			status, perPageNum, offset,
-		)
+		q := base + ` AND s.status = $1 ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`
+		rows, err = db.Query(q, status, perPageNum, offset)
 	}
 
 	if err != nil {
@@ -77,22 +74,20 @@ func ListProducts(c *gin.Context) {
 
 	var products []models.Product
 	for rows.Next() {
-		var p models.Product
-		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.Stock, &p.Status, &p.CreatedAt, &p.UpdatedAt)
-		if err != nil {
+		p, scanErr := productFromSKU(rows)
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 		products = append(products, p)
 	}
 
-	// Get total count
 	var total int
 	var countErr error
 	if status == "" || status == allProductStatus {
-		countErr = db.QueryRow("SELECT COUNT(*) FROM products").Scan(&total)
+		countErr = db.QueryRow(`SELECT COUNT(*) FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.status = 'active' AND sp.status = 'active' AND (s.stock > 0 OR s.stock = -1)`).Scan(&total)
 	} else {
-		countErr = db.QueryRow("SELECT COUNT(*) FROM products WHERE status = $1", status).Scan(&total)
+		countErr = db.QueryRow(`SELECT COUNT(*) FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.status = $1 AND sp.status = 'active' AND (s.stock > 0 OR s.stock = -1)`, status).Scan(&total)
 	}
 
 	if countErr != nil {
@@ -146,12 +141,7 @@ func GetProductByID(c *gin.Context) {
 		return
 	}
 
-	var product models.Product
-	err := db.QueryRow(
-		"SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products WHERE id = $1",
-		productID,
-	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
-
+	product, err := getProductBySKUID(db, productID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
@@ -211,12 +201,10 @@ func SearchProducts(c *gin.Context) {
 
 	db := config.GetDB()
 
-	// Search in product name and description
 	searchQuery := "%" + query + "%"
-	rows, err := db.Query(
-		"SELECT id, merchant_id, name, description, price, stock, status, created_at, updated_at FROM products WHERE status = 'active' AND (name ILIKE $1 OR description ILIKE $1) ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-		searchQuery, perPageNum, offset,
-	)
+	q := listSKUProductsBaseQuery + ` AND (sp.name ILIKE $1 OR sp.description ILIKE $1 OR s.sku_code ILIKE $1 OR sp.model_name ILIKE $1)
+		ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`
+	rows, err := db.Query(q, searchQuery, perPageNum, offset)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
@@ -225,19 +213,19 @@ func SearchProducts(c *gin.Context) {
 
 	var products []models.Product
 	for rows.Next() {
-		var p models.Product
-		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.Stock, &p.Status, &p.CreatedAt, &p.UpdatedAt)
-		if err != nil {
+		p, scanErr := productFromSKU(rows)
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 		products = append(products, p)
 	}
 
-	// Get total count
 	var total int
 	db.QueryRow(
-		"SELECT COUNT(*) FROM products WHERE status = 'active' AND (name ILIKE $1 OR description ILIKE $1)",
+		`SELECT COUNT(*) FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.status = 'active' AND sp.status = 'active'
+		 AND (s.stock > 0 OR s.stock = -1)
+		 AND (sp.name ILIKE $1 OR sp.description ILIKE $1 OR s.sku_code ILIKE $1 OR sp.model_name ILIKE $1)`,
 		searchQuery,
 	).Scan(&total)
 
@@ -256,244 +244,28 @@ func SearchProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// CreateProduct creates a new product (merchant only)
+// CreateProduct is removed: use merchant SKU shelf APIs (POST /merchants/skus).
 func CreateProduct(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-
-	userIDInt, ok := userID.(int)
-	if !ok {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-
-	var req struct {
-		Name          string  `json:"name" binding:"required"`
-		Description   string  `json:"description"`
-		Price         float64 `json:"price"`
-		OriginalPrice float64 `json:"original_price"`
-		Stock         int     `json:"stock"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		middleware.RespondWithError(c, apperrors.ErrInvalidProductData)
-		return
-	}
-
-	if req.Price <= 0 {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"INVALID_PRICE",
-			"价格必须大于0",
-			http.StatusBadRequest,
-			nil,
-		))
-		return
-	}
-
-	if req.Stock < 0 {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"INVALID_STOCK",
-			"库存不能为负数",
-			http.StatusBadRequest,
-			nil,
-		))
-		return
-	}
-
-	db := config.GetDB()
-
-	var merchantID int
-	var merchantStatus string
-	err := db.QueryRow("SELECT id, status FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID, &merchantStatus)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"商户信息不存在，请先完成商户认证",
-			http.StatusNotFound,
-			err,
-		))
-		return
-	}
-
-	if merchantStatus != merchantStatusActive {
-		c.JSON(http.StatusForbidden, gin.H{
-			"code":    "MERCHANT_NOT_APPROVED",
-			"message": "您的商户申请正在审核中，审核通过后即可创建商品",
-			"data": gin.H{
-				"merchant_status": merchantStatus,
-				"redirect":        "/merchant/apply",
-			},
-		})
-		return
-	}
-
-	var product models.Product
-	err = db.QueryRow(
-		"INSERT INTO products (merchant_id, name, description, price, original_price, stock, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, merchant_id, name, description, price, stock, status, created_at, updated_at",
-		merchantID, req.Name, req.Description, req.Price, req.OriginalPrice, req.Stock, productStatusActive,
-	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
-
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"PRODUCT_CREATION_FAILED",
-			"Failed to create product",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	c.JSON(http.StatusCreated, product)
+	c.JSON(http.StatusGone, gin.H{
+		"code":    "DEPRECATED",
+		"message": "Legacy products API removed. Use POST /api/v1/merchants/skus to put platform SKUs on shelf.",
+	})
 }
 
-// UpdateProduct updates a product (merchant only)
+// UpdateProduct is removed: use PUT /merchants/skus/:id.
 func UpdateProduct(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-
-	id := c.Param("id")
-
-	var req struct {
-		Name          string  `json:"name"`
-		Description   string  `json:"description"`
-		Price         float64 `json:"price"`
-		OriginalPrice float64 `json:"original_price"`
-		Stock         int     `json:"stock"`
-		Status        string  `json:"status"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
-		return
-	}
-
-	db := config.GetDB()
-
-	// Verify ownership
-	var productMerchantID int
-	err := db.QueryRow("SELECT merchant_id FROM products WHERE id = $1", id).Scan(&productMerchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-		return
-	}
-
-	// Get user's merchant ID
-	userIDInt, ok := userID.(int)
-	if !ok {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-
-	var userMerchantID int
-	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&userMerchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"商户信息不存在，请先完成商户认证",
-			http.StatusNotFound,
-			err,
-		))
-		return
-	}
-
-	if productMerchantID != userMerchantID {
-		middleware.RespondWithError(c, apperrors.ErrForbidden)
-		return
-	}
-
-	var product models.Product
-	err = db.QueryRow(
-		"UPDATE products SET name = COALESCE(NULLIF($1, ''), name), description = COALESCE(NULLIF($2, ''), description), price = CASE WHEN $3 > 0 THEN $3 ELSE price END, original_price = CASE WHEN $4 > 0 THEN $4 ELSE original_price END, stock = CASE WHEN $5 >= 0 THEN $5 ELSE stock END, status = COALESCE(NULLIF($6, ''), status) WHERE id = $7 RETURNING id, merchant_id, name, description, price, stock, status, created_at, updated_at",
-		req.Name, req.Description, req.Price, req.OriginalPrice, req.Stock, req.Status, id,
-	).Scan(&product.ID, &product.MerchantID, &product.Name, &product.Description, &product.Price, &product.Stock, &product.Status, &product.CreatedAt, &product.UpdatedAt)
-
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"PRODUCT_UPDATE_FAILED",
-			"Failed to update product",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	// Invalidate cache
-	ctx := context.Background()
-	cache.Delete(ctx, cache.ProductKey(idToInt(id)))
-	cache.InvalidatePatterns(ctx, "products:list:*")
-	cache.InvalidatePatterns(ctx, "products:search:*")
-
-	c.JSON(http.StatusOK, product)
+	c.JSON(http.StatusGone, gin.H{
+		"code":    "DEPRECATED",
+		"message": "Legacy products API removed. Use PUT /api/v1/merchants/skus/:id.",
+	})
 }
 
-// DeleteProduct deletes a product (merchant only)
+// DeleteProduct is removed: use DELETE /merchants/skus/:id.
 func DeleteProduct(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-
-	id := c.Param("id")
-
-	db := config.GetDB()
-
-	// Verify ownership
-	var productMerchantID int
-	err := db.QueryRow("SELECT merchant_id FROM products WHERE id = $1", id).Scan(&productMerchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-		return
-	}
-
-	// Get user's merchant ID
-	userIDInt, ok := userID.(int)
-	if !ok {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-
-	var userMerchantID int
-	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&userMerchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"商户信息不存在，请先完成商户认证",
-			http.StatusNotFound,
-			err,
-		))
-		return
-	}
-
-	if productMerchantID != userMerchantID {
-		middleware.RespondWithError(c, apperrors.ErrForbidden)
-		return
-	}
-
-	_, err = db.Exec("DELETE FROM products WHERE id = $1", id)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"PRODUCT_DELETE_FAILED",
-			"Failed to delete product",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	// Invalidate cache
-	ctx := context.Background()
-	cache.Delete(ctx, cache.ProductKey(idToInt(id)))
-	cache.InvalidatePatterns(ctx, "products:list:*")
-	cache.InvalidatePatterns(ctx, "products:search:*")
-
-	c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully"})
+	c.JSON(http.StatusGone, gin.H{
+		"code":    "DEPRECATED",
+		"message": "Legacy products API removed. Use DELETE /api/v1/merchants/skus/:id.",
+	})
 }
 
 // Helper function to convert string ID to int
@@ -511,7 +283,7 @@ func GetHotProducts(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	cacheKey := "products:hot:" + strconv.Itoa(limitNum)
+	cacheKey := "products:hot:sku:" + strconv.Itoa(limitNum)
 
 	// Try cache first
 	if cachedProducts, err := cache.Get(ctx, cacheKey); err == nil {
@@ -530,13 +302,8 @@ func GetHotProducts(c *gin.Context) {
 		return
 	}
 
-	rows, err := db.Query(
-		`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price) as original_price, 
-		 stock, COALESCE(sold_count, 0) as sold_count, COALESCE(category, '') as category, status, created_at, updated_at 
-		 FROM products WHERE status = 'active' AND stock > 0 
-		 ORDER BY sold_count DESC, created_at DESC LIMIT $1`,
-		limitNum,
-	)
+	q := listSKUProductsBaseQuery + ` ORDER BY s.sales_count DESC NULLS LAST, s.created_at DESC LIMIT $1`
+	rows, err := db.Query(q, limitNum)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
@@ -545,10 +312,8 @@ func GetHotProducts(c *gin.Context) {
 
 	var products []models.Product
 	for rows.Next() {
-		var p models.Product
-		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
-			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
-		if err != nil {
+		p, scanErr := productFromSKU(rows)
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
@@ -574,7 +339,7 @@ func GetNewProducts(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	cacheKey := "products:new:" + strconv.Itoa(limitNum)
+	cacheKey := "products:new:sku:" + strconv.Itoa(limitNum)
 
 	// Try cache first
 	if cachedProducts, err := cache.Get(ctx, cacheKey); err == nil {
@@ -593,13 +358,8 @@ func GetNewProducts(c *gin.Context) {
 		return
 	}
 
-	rows, err := db.Query(
-		`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price) as original_price, 
-		 stock, COALESCE(sold_count, 0) as sold_count, COALESCE(category, '') as category, status, created_at, updated_at 
-		 FROM products WHERE status = 'active' AND stock > 0 
-		 ORDER BY created_at DESC LIMIT $1`,
-		limitNum,
-	)
+	q := listSKUProductsBaseQuery + ` ORDER BY s.created_at DESC LIMIT $1`
+	rows, err := db.Query(q, limitNum)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
@@ -608,10 +368,8 @@ func GetNewProducts(c *gin.Context) {
 
 	var products []models.Product
 	for rows.Next() {
-		var p models.Product
-		err := rows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
-			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
-		if err != nil {
+		p, scanErr := productFromSKU(rows)
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
@@ -631,7 +389,7 @@ func GetNewProducts(c *gin.Context) {
 // GetCategories retrieves product categories
 func GetCategories(c *gin.Context) {
 	ctx := context.Background()
-	cacheKey := "categories:all"
+	cacheKey := "categories:sku:all"
 
 	// Try cache first
 	if cachedCategories, err := cache.Get(ctx, cacheKey); err == nil {
@@ -651,9 +409,10 @@ func GetCategories(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		`SELECT COALESCE(category, '未分类') as category, COUNT(*) as count 
-		 FROM products WHERE status = 'active' 
-		 GROUP BY category 
+		`SELECT COALESCE(sp.model_tier, '未分类') AS category, COUNT(*) AS count
+		 FROM skus s JOIN spus sp ON s.spu_id = sp.id
+		 WHERE s.status = 'active' AND sp.status = 'active'
+		 GROUP BY sp.model_tier
 		 ORDER BY count DESC`,
 	)
 	if err != nil {
@@ -690,7 +449,7 @@ func GetCategories(c *gin.Context) {
 // GetHomeData retrieves all data needed for homepage
 func GetHomeData(c *gin.Context) {
 	ctx := context.Background()
-	cacheKey := "home:data"
+	cacheKey := "home:data:sku:v1"
 
 	// Try cache first
 	if cachedData, err := cache.Get(ctx, cacheKey); err == nil {
@@ -707,12 +466,8 @@ func GetHomeData(c *gin.Context) {
 		return
 	}
 
-	// Get hot products
 	hotRows, err := db.Query(
-		`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price) as original_price, 
-		 stock, COALESCE(sold_count, 0) as sold_count, COALESCE(category, '') as category, status, created_at, updated_at 
-		 FROM products WHERE status = 'active' AND stock > 0 
-		 ORDER BY sold_count DESC, created_at DESC LIMIT 10`,
+		listSKUProductsBaseQuery + ` ORDER BY s.sales_count DESC NULLS LAST, s.created_at DESC LIMIT 10`,
 	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -722,9 +477,7 @@ func GetHomeData(c *gin.Context) {
 
 	var hotProducts []models.Product
 	for hotRows.Next() {
-		var p models.Product
-		scanErr := hotRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
-			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
+		p, scanErr := productFromSKU(hotRows)
 		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -732,12 +485,8 @@ func GetHomeData(c *gin.Context) {
 		hotProducts = append(hotProducts, p)
 	}
 
-	// Get new products
 	newRows, err := db.Query(
-		`SELECT id, merchant_id, name, description, price, COALESCE(original_price, price) as original_price, 
-		 stock, COALESCE(sold_count, 0) as sold_count, COALESCE(category, '') as category, status, created_at, updated_at 
-		 FROM products WHERE status = 'active' AND stock > 0 
-		 ORDER BY created_at DESC LIMIT 10`,
+		listSKUProductsBaseQuery + ` ORDER BY s.created_at DESC LIMIT 10`,
 	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -747,9 +496,7 @@ func GetHomeData(c *gin.Context) {
 
 	var newProducts []models.Product
 	for newRows.Next() {
-		var p models.Product
-		scanErr2 := newRows.Scan(&p.ID, &p.MerchantID, &p.Name, &p.Description, &p.Price, &p.OriginalPrice,
-			&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt)
+		p, scanErr2 := productFromSKU(newRows)
 		if scanErr2 != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -757,11 +504,11 @@ func GetHomeData(c *gin.Context) {
 		newProducts = append(newProducts, p)
 	}
 
-	// Get categories
 	catRows, err := db.Query(
-		`SELECT COALESCE(category, '未分类') as category, COUNT(*) as count 
-		 FROM products WHERE status = 'active' 
-		 GROUP BY category 
+		`SELECT COALESCE(sp.model_tier, '未分类') AS category, COUNT(*) AS count
+		 FROM skus s JOIN spus sp ON s.spu_id = sp.id
+		 WHERE s.status = 'active' AND sp.status = 'active'
+		 GROUP BY sp.model_tier
 		 ORDER BY count DESC`,
 	)
 	if err != nil {
@@ -787,9 +534,9 @@ func GetHomeData(c *gin.Context) {
 
 	// Get banners (placeholder for now)
 	banners := []map[string]interface{}{
-		{"id": 1, "title": "新人专享", "image": "/banners/newuser.png", "link": "/products?category=newuser"},
-		{"id": 2, "title": "限时特惠", "image": "/banners/sale.png", "link": "/products?category=sale"},
-		{"id": 3, "title": "热门推荐", "image": "/banners/hot.png", "link": "/products?sort=hot"},
+		{"id": 1, "title": "新人专享", "image": "/banners/newuser.png", "link": "/catalog?category=newuser"},
+		{"id": 2, "title": "限时特惠", "image": "/banners/sale.png", "link": "/catalog?category=sale"},
+		{"id": 3, "title": "热门推荐", "image": "/banners/hot.png", "link": "/catalog?sort=hot"},
 	}
 
 	homeData := map[string]interface{}{

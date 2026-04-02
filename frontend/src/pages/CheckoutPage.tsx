@@ -55,9 +55,10 @@ const CheckoutPage: React.FC = () => {
     }
 
     try {
-      const orderPromises = selectedCartItems.map((item) =>
-        createOrder(item.product_id, item.quantity, item.group_id)
-      );
+      const orderPromises = selectedCartItems.map((item) => {
+        const skuId = item.sku_id;
+        return createOrder(skuId, item.quantity, item.group_id);
+      });
       const orderIds = await Promise.all(orderPromises);
 
       clear();
@@ -79,7 +80,7 @@ const CheckoutPage: React.FC = () => {
     return (
       <div style={{ marginTop: 50, textAlign: 'center' }}>
         <Empty description="购物车是空的">
-          <Button type="primary" onClick={() => navigate('/products')}>
+          <Button type="primary" onClick={() => navigate('/catalog')}>
             去购物
           </Button>
         </Empty>
@@ -108,7 +109,7 @@ const CheckoutPage: React.FC = () => {
       dataIndex: ['product', 'name'],
       key: 'name',
       render: (text: string, record: CartItem) => (
-        <a onClick={() => navigate(`/products/${record.product_id}`)}>{text}</a>
+        <a onClick={() => navigate(`/catalog/${record.sku_id}`)}>{text}</a>
       ),
     },
     {

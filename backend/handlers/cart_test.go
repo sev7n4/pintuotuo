@@ -31,8 +31,8 @@ func TestAddToCart_MissingUserID(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	reqBody := map[string]interface{}{
-		"product_id": 1,
-		"quantity":   2,
+		"sku_id":   1,
+		"quantity": 2,
 	}
 	body, _ := json.Marshal(reqBody)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/cart/items", bytes.NewBuffer(body))
@@ -65,7 +65,7 @@ func TestAddToCart_MissingQuantity(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	reqBody := map[string]interface{}{
-		"product_id": 1,
+		"sku_id": 1,
 	}
 	body, _ := json.Marshal(reqBody)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/cart/items", bytes.NewBuffer(body))
@@ -82,8 +82,8 @@ func TestAddToCart_ZeroQuantity(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	reqBody := map[string]interface{}{
-		"product_id": 1,
-		"quantity":   0,
+		"sku_id":   1,
+		"quantity": 0,
 	}
 	body, _ := json.Marshal(reqBody)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/cart/items", bytes.NewBuffer(body))
@@ -100,8 +100,8 @@ func TestAddToCart_NegativeQuantity(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	reqBody := map[string]interface{}{
-		"product_id": 1,
-		"quantity":   -1,
+		"sku_id":   1,
+		"quantity": -1,
 	}
 	body, _ := json.Marshal(reqBody)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/cart/items", bytes.NewBuffer(body))
@@ -218,9 +218,9 @@ func TestAddToCart_WithGroupID(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	reqBody := map[string]interface{}{
-		"product_id": 1,
-		"quantity":   2,
-		"group_id":   5,
+		"sku_id":   1,
+		"quantity": 2,
+		"group_id": 5,
 	}
 	body, _ := json.Marshal(reqBody)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/cart/items", bytes.NewBuffer(body))

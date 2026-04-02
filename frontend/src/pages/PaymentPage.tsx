@@ -72,7 +72,7 @@ const PaymentPage: React.FC = () => {
           <Button type="primary" key="orders" onClick={() => navigate('/orders')}>
             查看订单
           </Button>,
-          <Button key="products" onClick={() => navigate('/products')}>
+          <Button key="products" onClick={() => navigate('/catalog')}>
             继续购物
           </Button>,
         ]}
@@ -91,7 +91,7 @@ const PaymentPage: React.FC = () => {
           <Button type="primary" key="orders" onClick={() => navigate('/orders')}>
             查看订单
           </Button>,
-          <Button key="products" onClick={() => navigate('/products')}>
+          <Button key="products" onClick={() => navigate('/catalog')}>
             继续购物
           </Button>,
         ]}

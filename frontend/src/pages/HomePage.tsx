@@ -31,7 +31,7 @@ const quickNavItems: QuickNav[] = [
     name: '热销爆款',
     icon: <FireOutlined />,
     color: '#ff4d4f',
-    link: '/products?sort=hot',
+    link: '/catalog?sort=hot',
   },
   { key: 'group', name: '超值拼团', icon: <GiftOutlined />, color: '#52c41a', link: '/groups' },
   {
@@ -39,14 +39,14 @@ const quickNavItems: QuickNav[] = [
     name: '限时秒杀',
     icon: <ThunderboltOutlined />,
     color: '#faad14',
-    link: '/products?flash=true',
+    link: '/catalog?flash=true',
   },
   {
     key: 'new',
     name: '新品上架',
     icon: <ClockCircleOutlined />,
     color: '#1890ff',
-    link: '/products?sort=new',
+    link: '/catalog?sort=new',
   },
 ];
 
@@ -75,7 +75,7 @@ const HomePage = () => {
   };
 
   const handleProductClick = (productId: number) => {
-    navigate(`/products/${productId}`);
+    navigate(`/catalog/${productId}`);
   };
 
   const handleCategoryClick = (category: string) => {

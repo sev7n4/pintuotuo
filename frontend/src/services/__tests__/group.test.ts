@@ -21,7 +21,7 @@ describe('groupService', () => {
 
   test('createGroup calls api.post with correct parameters', async () => {
     const mockData = {
-      product_id: 1,
+      sku_id: 1,
       target_count: 5,
       deadline: '2024-12-31T23:59:59Z',
     };

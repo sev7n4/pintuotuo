@@ -29,7 +29,7 @@ type FlashSale struct {
 type FlashSaleProduct struct {
 	ID            int     `json:"id"`
 	FlashSaleID   int     `json:"flash_sale_id"`
-	ProductID     int     `json:"product_id"`
+	SKUID         int     `json:"sku_id"`
 	ProductName   string  `json:"product_name"`
 	FlashPrice    float64 `json:"flash_price"`
 	OriginalPrice float64 `json:"original_price"`
@@ -41,7 +41,7 @@ type FlashSaleProduct struct {
 
 type FlashSaleWithProducts struct {
 	FlashSale
-	Products []FlashSaleProduct `json:"products"`
+	Skus []FlashSaleProduct `json:"skus"`
 }
 
 func GetActiveFlashSales(c *gin.Context) {
@@ -98,7 +98,7 @@ func GetActiveFlashSales(c *gin.Context) {
 		}
 		result = append(result, FlashSaleWithProducts{
 			FlashSale: sale,
-			Products:  products,
+			Skus:      products,
 		})
 	}
 
@@ -111,7 +111,7 @@ func GetActiveFlashSales(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"code":    1,
+		"code":    0,
 		"message": "success",
 		"data":    result,
 	})
@@ -146,10 +146,11 @@ func GetFlashSaleProducts(c *gin.Context) {
 
 func getFlashSaleProducts(db *sql.DB, saleID int) ([]FlashSaleProduct, error) {
 	rows, err := db.Query(`
-		SELECT fsp.id, fsp.flash_sale_id, fsp.product_id, p.name, fsp.flash_price, fsp.original_price, 
+		SELECT fsp.id, fsp.flash_sale_id, fsp.sku_id, sp.name || ' · ' || s.sku_code, fsp.flash_price, fsp.original_price, 
 		       fsp.stock_limit, fsp.stock_sold, fsp.per_user_limit
 		FROM flash_sale_products fsp
-		JOIN products p ON fsp.product_id = p.id
+		JOIN skus s ON fsp.sku_id = s.id
+		JOIN spus sp ON s.spu_id = sp.id
 		WHERE fsp.flash_sale_id = $1 AND fsp.stock_limit > fsp.stock_sold`,
 		saleID,
 	)
@@ -161,7 +162,7 @@ func getFlashSaleProducts(db *sql.DB, saleID int) ([]FlashSaleProduct, error) {
 	var products []FlashSaleProduct
 	for rows.Next() {
 		var p FlashSaleProduct
-		if err := rows.Scan(&p.ID, &p.FlashSaleID, &p.ProductID, &p.ProductName, &p.FlashPrice, &p.OriginalPrice, &p.StockLimit, &p.StockSold, &p.PerUserLimit); err != nil {
+		if err := rows.Scan(&p.ID, &p.FlashSaleID, &p.SKUID, &p.ProductName, &p.FlashPrice, &p.OriginalPrice, &p.StockLimit, &p.StockSold, &p.PerUserLimit); err != nil {
 			return nil, err
 		}
 		if p.OriginalPrice > 0 {
@@ -185,12 +186,12 @@ func CreateFlashSale(c *gin.Context) {
 		Description string    `json:"description"`
 		StartTime   time.Time `json:"start_time" binding:"required"`
 		EndTime     time.Time `json:"end_time" binding:"required"`
-		Products    []struct {
-			ProductID    int     `json:"product_id" binding:"required"`
+		Skus        []struct {
+			SKUID        int     `json:"sku_id" binding:"required"`
 			FlashPrice   float64 `json:"flash_price" binding:"required"`
 			StockLimit   int     `json:"stock_limit" binding:"required"`
 			PerUserLimit int     `json:"per_user_limit"`
-		} `json:"products" binding:"required"`
+		} `json:"skus" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -214,9 +215,8 @@ func CreateFlashSale(c *gin.Context) {
 		return
 	}
 
-	var isAdmin bool
-	db.QueryRow("SELECT role FROM users WHERE id = $1", userID).Scan(&isAdmin)
-	if !isAdmin {
+	var role string
+	if err := db.QueryRow("SELECT COALESCE(role, '') FROM users WHERE id = $1", userID).Scan(&role); err != nil || role != "admin" {
 		middleware.RespondWithError(c, apperrors.ErrForbidden)
 		return
 	}
@@ -250,18 +250,18 @@ func CreateFlashSale(c *gin.Context) {
 		return
 	}
 
-	for _, p := range req.Products {
+	for _, p := range req.Skus {
 		var originalPrice float64
-		err := tx.QueryRow("SELECT price FROM products WHERE id = $1", p.ProductID).Scan(&originalPrice)
+		err := tx.QueryRow("SELECT retail_price FROM skus WHERE id = $1 AND status = 'active'", p.SKUID).Scan(&originalPrice)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 			return
 		}
 
 		_, err = tx.Exec(`
-			INSERT INTO flash_sale_products (flash_sale_id, product_id, flash_price, original_price, stock_limit, per_user_limit)
+			INSERT INTO flash_sale_products (flash_sale_id, sku_id, flash_price, original_price, stock_limit, per_user_limit)
 			VALUES ($1, $2, $3, $4, $5, $6)`,
-			sale.ID, p.ProductID, p.FlashPrice, originalPrice, p.StockLimit, p.PerUserLimit,
+			sale.ID, p.SKUID, p.FlashPrice, originalPrice, p.StockLimit, p.PerUserLimit,
 		)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.NewAppError(

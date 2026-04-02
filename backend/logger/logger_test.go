@@ -12,7 +12,7 @@ func TestRequestLogStructure(t *testing.T) {
 	log := RequestLog{
 		Timestamp:   time.Now(),
 		Method:      "GET",
-		Path:        "/api/v1/products",
+		Path:        "/api/v1/catalog",
 		Status:      200,
 		Duration:    150,
 		UserID:      123,
@@ -22,7 +22,7 @@ func TestRequestLogStructure(t *testing.T) {
 	}
 
 	assert.Equal(t, "GET", log.Method)
-	assert.Equal(t, "/api/v1/products", log.Path)
+	assert.Equal(t, "/api/v1/catalog", log.Path)
 	assert.Equal(t, 200, log.Status)
 	assert.Equal(t, int64(150), log.Duration)
 	assert.Equal(t, 123, log.UserID)
@@ -145,7 +145,7 @@ func TestRequestLogContext(t *testing.T) {
 	log := RequestLog{
 		Timestamp: time.Now(),
 		Method:    "GET",
-		Path:      "/api/v1/products",
+		Path:      "/api/v1/catalog",
 		Status:    200,
 		Duration:  100,
 		ClientIP:  "127.0.0.1",

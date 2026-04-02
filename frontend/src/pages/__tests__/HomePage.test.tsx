@@ -17,8 +17,8 @@ describe('HomePage', () => {
   });
 
   const mockBanners = [
-    { id: 1, title: '测试banner1', link: '/products/1' },
-    { id: 2, title: '测试banner2', link: '/products/2' },
+    { id: 1, title: '测试banner1', link: '/catalog/1' },
+    { id: 2, title: '测试banner2', link: '/catalog/2' },
   ];
 
   const mockCategories = [

@@ -51,11 +51,14 @@ func GetFavorites(c *gin.Context) {
 	}
 
 	query := `
-		SELECT f.id, f.product_id, f.created_at,
-			   p.id, p.merchant_id, p.name, p.description, p.price, p.original_price, 
-			   p.stock, p.sold_count, p.category, p.status, p.created_at, p.updated_at
+		SELECT f.id, f.sku_id, f.created_at,
+			   s.id, COALESCE(s.merchant_id, 0), s.spu_id, sp.name || ' · ' || s.sku_code, COALESCE(sp.description, ''),
+			   s.retail_price, COALESCE(s.original_price, s.retail_price),
+			   CASE WHEN s.stock = -1 THEN 999999 ELSE s.stock END, COALESCE(s.sales_count, 0), COALESCE(sp.model_tier, ''),
+			   s.status, s.created_at, s.updated_at
 		FROM favorites f
-		JOIN products p ON f.product_id = p.id
+		JOIN skus s ON f.sku_id = s.id
+		JOIN spus sp ON s.spu_id = sp.id
 		WHERE f.user_id = $1
 		ORDER BY f.created_at DESC
 		LIMIT $2 OFFSET $3
@@ -78,8 +81,8 @@ func GetFavorites(c *gin.Context) {
 		var createdAt sql.NullTime
 
 		err := rows.Scan(
-			&item.ID, &item.ProductID, &createdAt,
-			&product.ID, &product.MerchantID, &product.Name, &product.Description,
+			&item.ID, &item.SKUID, &createdAt,
+			&product.ID, &product.MerchantID, &product.SpuID, &product.Name, &product.Description,
 			&product.Price, &product.OriginalPrice, &product.Stock, &product.SoldCount,
 			&product.Category, &product.Status, &product.CreatedAt, &product.UpdatedAt,
 		)
@@ -122,7 +125,7 @@ func AddFavorite(c *gin.Context) {
 	}
 
 	var req struct {
-		ProductID int `json:"product_id"`
+		SKUID int `json:"sku_id"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -133,10 +136,10 @@ func AddFavorite(c *gin.Context) {
 		return
 	}
 
-	if req.ProductID == 0 {
+	if req.SKUID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "INVALID_REQUEST",
-			"message": "product_id is required",
+			"message": "sku_id is required",
 		})
 		return
 	}
@@ -151,7 +154,7 @@ func AddFavorite(c *gin.Context) {
 	}
 
 	var productExists bool
-	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM products WHERE id = $1)`, req.ProductID).Scan(&productExists)
+	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active')`, req.SKUID).Scan(&productExists)
 	if err != nil || !productExists {
 		c.JSON(http.StatusNotFound, gin.H{
 			"code":    "NOT_FOUND",
@@ -161,26 +164,26 @@ func AddFavorite(c *gin.Context) {
 	}
 
 	var existingID int
-	err = db.QueryRow(`SELECT id FROM favorites WHERE user_id = $1 AND product_id = $2`, userID, req.ProductID).Scan(&existingID)
+	err = db.QueryRow(`SELECT id FROM favorites WHERE user_id = $1 AND sku_id = $2`, userID, req.SKUID).Scan(&existingID)
 	if err == nil {
 		c.JSON(http.StatusOK, gin.H{
 			"code":    0,
 			"message": "Already in favorites",
 			"data": gin.H{
-				"id":         existingID,
-				"product_id": req.ProductID,
+				"id":     existingID,
+				"sku_id": req.SKUID,
 			},
 		})
 		return
 	}
 
 	insertQuery := `
-		INSERT INTO favorites (user_id, product_id, created_at)
+		INSERT INTO favorites (user_id, sku_id, created_at)
 		VALUES ($1, $2, NOW())
 		RETURNING id
 	`
 	var newID int
-	err = db.QueryRow(insertQuery, userID, req.ProductID).Scan(&newID)
+	err = db.QueryRow(insertQuery, userID, req.SKUID).Scan(&newID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "DATABASE_ERROR",
@@ -193,8 +196,8 @@ func AddFavorite(c *gin.Context) {
 		"code":    0,
 		"message": "Added to favorites",
 		"data": gin.H{
-			"id":         newID,
-			"product_id": req.ProductID,
+			"id":     newID,
+			"sku_id": req.SKUID,
 		},
 	})
 }
@@ -209,12 +212,12 @@ func RemoveFavorite(c *gin.Context) {
 		return
 	}
 
-	productIDStr := c.Param("product_id")
-	productID, err := strconv.Atoi(productIDStr)
+	skuIDStr := c.Param("sku_id")
+	skuID, err := strconv.Atoi(skuIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "INVALID_REQUEST",
-			"message": "Invalid product_id",
+			"message": "Invalid sku_id",
 		})
 		return
 	}
@@ -228,8 +231,8 @@ func RemoveFavorite(c *gin.Context) {
 		return
 	}
 
-	query := `DELETE FROM favorites WHERE user_id = $1 AND product_id = $2`
-	result, err := db.Exec(query, userID, productID)
+	query := `DELETE FROM favorites WHERE user_id = $1 AND sku_id = $2`
+	result, err := db.Exec(query, userID, skuID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "DATABASE_ERROR",
@@ -263,12 +266,12 @@ func CheckFavorite(c *gin.Context) {
 		return
 	}
 
-	productIDStr := c.Param("product_id")
-	productID, err := strconv.Atoi(productIDStr)
+	skuIDStr := c.Param("sku_id")
+	skuID, err := strconv.Atoi(skuIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "INVALID_REQUEST",
-			"message": "Invalid product_id",
+			"message": "Invalid sku_id",
 		})
 		return
 	}
@@ -283,7 +286,7 @@ func CheckFavorite(c *gin.Context) {
 	}
 
 	var isFavorite bool
-	err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM favorites WHERE user_id = $1 AND product_id = $2)`, userID, productID).Scan(&isFavorite)
+	err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM favorites WHERE user_id = $1 AND sku_id = $2)`, userID, skuID).Scan(&isFavorite)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "DATABASE_ERROR",
@@ -342,11 +345,14 @@ func GetBrowseHistory(c *gin.Context) {
 	}
 
 	query := `
-		SELECT bh.id, bh.product_id, bh.view_count, bh.updated_at,
-			   p.id, p.merchant_id, p.name, p.description, p.price, p.original_price, 
-			   p.stock, p.sold_count, p.category, p.status, p.created_at, p.updated_at
+		SELECT bh.id, bh.sku_id, bh.view_count, bh.updated_at,
+			   s.id, COALESCE(s.merchant_id, 0), s.spu_id, sp.name || ' · ' || s.sku_code, COALESCE(sp.description, ''),
+			   s.retail_price, COALESCE(s.original_price, s.retail_price),
+			   CASE WHEN s.stock = -1 THEN 999999 ELSE s.stock END, COALESCE(s.sales_count, 0), COALESCE(sp.model_tier, ''),
+			   s.status, s.created_at, s.updated_at
 		FROM browse_history bh
-		JOIN products p ON bh.product_id = p.id
+		JOIN skus s ON bh.sku_id = s.id
+		JOIN spus sp ON s.spu_id = sp.id
 		WHERE bh.user_id = $1
 		ORDER BY bh.updated_at DESC
 		LIMIT $2 OFFSET $3
@@ -369,8 +375,8 @@ func GetBrowseHistory(c *gin.Context) {
 		var updatedAt sql.NullTime
 
 		err := rows.Scan(
-			&item.ID, &item.ProductID, &item.ViewCount, &updatedAt,
-			&product.ID, &product.MerchantID, &product.Name, &product.Description,
+			&item.ID, &item.SKUID, &item.ViewCount, &updatedAt,
+			&product.ID, &product.MerchantID, &product.SpuID, &product.Name, &product.Description,
 			&product.Price, &product.OriginalPrice, &product.Stock, &product.SoldCount,
 			&product.Category, &product.Status, &product.CreatedAt, &product.UpdatedAt,
 		)
@@ -413,7 +419,7 @@ func AddBrowseHistory(c *gin.Context) {
 	}
 
 	var req struct {
-		ProductID int `json:"product_id"`
+		SKUID int `json:"sku_id"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -424,10 +430,10 @@ func AddBrowseHistory(c *gin.Context) {
 		return
 	}
 
-	if req.ProductID == 0 {
+	if req.SKUID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "INVALID_REQUEST",
-			"message": "product_id is required",
+			"message": "sku_id is required",
 		})
 		return
 	}
@@ -442,7 +448,7 @@ func AddBrowseHistory(c *gin.Context) {
 	}
 
 	var productExists bool
-	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM products WHERE id = $1)`, req.ProductID).Scan(&productExists)
+	err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active')`, req.SKUID).Scan(&productExists)
 	if err != nil || !productExists {
 		c.JSON(http.StatusNotFound, gin.H{
 			"code":    "NOT_FOUND",
@@ -452,12 +458,12 @@ func AddBrowseHistory(c *gin.Context) {
 	}
 
 	upsertQuery := `
-		INSERT INTO browse_history (user_id, product_id, view_count, created_at, updated_at)
+		INSERT INTO browse_history (user_id, sku_id, view_count, created_at, updated_at)
 		VALUES ($1, $2, 1, NOW(), NOW())
-		ON CONFLICT (user_id, product_id) 
+		ON CONFLICT (user_id, sku_id) 
 		DO UPDATE SET view_count = browse_history.view_count + 1, updated_at = NOW()
 	`
-	_, err = db.Exec(upsertQuery, userID, req.ProductID)
+	_, err = db.Exec(upsertQuery, userID, req.SKUID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "DATABASE_ERROR",
@@ -517,12 +523,12 @@ func RemoveBrowseHistoryItem(c *gin.Context) {
 		return
 	}
 
-	productIDStr := c.Param("product_id")
-	productID, err := strconv.Atoi(productIDStr)
+	skuIDStr := c.Param("sku_id")
+	skuID, err := strconv.Atoi(skuIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "INVALID_REQUEST",
-			"message": "Invalid product_id",
+			"message": "Invalid sku_id",
 		})
 		return
 	}
@@ -536,8 +542,8 @@ func RemoveBrowseHistoryItem(c *gin.Context) {
 		return
 	}
 
-	query := `DELETE FROM browse_history WHERE user_id = $1 AND product_id = $2`
-	result, err := db.Exec(query, userID, productID)
+	query := `DELETE FROM browse_history WHERE user_id = $1 AND sku_id = $2`
+	result, err := db.Exec(query, userID, skuID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "DATABASE_ERROR",

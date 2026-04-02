@@ -89,7 +89,7 @@ export const GroupListPage: React.FC = () => {
           type="primary"
           icon={<ShoppingOutlined />}
           style={{ marginTop: 16 }}
-          onClick={() => navigate('/products')}
+          onClick={() => navigate('/catalog')}
         >
           浏览商品
         </Button>
@@ -110,7 +110,7 @@ export const GroupListPage: React.FC = () => {
         <Title level={screens.xs ? 4 : 3} style={{ margin: 0 }}>
           拼团中心
         </Title>
-        <Button type="primary" icon={<ShoppingOutlined />} onClick={() => navigate('/products')}>
+        <Button type="primary" icon={<ShoppingOutlined />} onClick={() => navigate('/catalog')}>
           {screens.xs ? '' : '去拼团'}
         </Button>
       </div>

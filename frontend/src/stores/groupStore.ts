@@ -11,7 +11,7 @@ interface GroupState {
 
   fetchGroups: (page?: number, perPage?: number) => Promise<Group[] | null>;
   fetchGroupByID: (id: number) => Promise<void>;
-  createGroup: (productId: number, targetCount: number, deadline: string) => Promise<number | null>;
+  createGroup: (skuId: number, targetCount: number, deadline: string) => Promise<number | null>;
   joinGroup: (id: number) => Promise<number | null>;
   cancelGroup: (id: number) => Promise<void>;
   getGroupProgress: (id: number) => Promise<void>;
@@ -56,11 +56,11 @@ export const useGroupStore = create<GroupState>((set) => ({
     }
   },
 
-  createGroup: async (productId, targetCount, deadline): Promise<number | null> => {
+  createGroup: async (skuId, targetCount, deadline): Promise<number | null> => {
     set({ isLoading: true, error: null });
     try {
       const response = await groupService.createGroup({
-        product_id: productId,
+        sku_id: skuId,
         target_count: targetCount,
         deadline: new Date(deadline).toISOString(),
       });
