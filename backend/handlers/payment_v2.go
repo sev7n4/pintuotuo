@@ -13,13 +13,17 @@ import (
 	"strings"
 	"time"
 
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/billing"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/payment"
+	"github.com/pintuotuo/backend/services"
 )
 
 const envTrue = "true"
@@ -313,8 +317,13 @@ func processBalancePayment(db *sql.DB, paymentID, orderID, userID int, amount fl
 	}
 	defer tx.Rollback()
 
+	engine := billing.GetBillingEngine()
+	if err = engine.DeductBalanceTx(tx, userID, amount, fmt.Sprintf("订单支付 #%d", orderID), ""); err != nil {
+		return err
+	}
+
 	_, err = tx.Exec(
-		"UPDATE payments SET status = 'success', paid_at = $1 WHERE id = $2",
+		"UPDATE payments SET status = 'success', paid_at = $1 WHERE id = $2 AND status = 'pending'",
 		time.Now(), paymentID,
 	)
 	if err != nil {
@@ -322,19 +331,24 @@ func processBalancePayment(db *sql.DB, paymentID, orderID, userID int, amount fl
 	}
 
 	_, err = tx.Exec(
-		"UPDATE orders SET status = 'paid' WHERE id = $1",
+		"UPDATE orders SET status = 'paid' WHERE id = $1 AND status = 'pending'",
 		orderID,
 	)
 	if err != nil {
 		return err
 	}
 
-	engine := billing.GetBillingEngine()
-	if err := engine.DeductBalance(userID, amount, fmt.Sprintf("订单支付 #%d", orderID), ""); err != nil {
+	fs := services.NewFulfillmentService()
+	if err = fs.FulfillOrder(tx, orderID); err != nil {
 		return err
 	}
 
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	ctx := context.Background()
+	cache.Delete(ctx, cache.TokenBalanceKey(userID))
+	return nil
 }
 
 func AlipayNotify(c *gin.Context) {
@@ -400,7 +414,7 @@ func AlipayNotify(c *gin.Context) {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(
-		"UPDATE payments SET status = 'success', transaction_id = $1, paid_at = $2 WHERE id = $3",
+		"UPDATE payments SET status = 'success', transaction_id = $1, paid_at = $2 WHERE id = $3 AND status = 'pending'",
 		tradeNo, time.Now(), paymentID,
 	)
 	if err != nil {
@@ -410,11 +424,18 @@ func AlipayNotify(c *gin.Context) {
 	}
 
 	_, err = tx.Exec(
-		"UPDATE orders SET status = 'paid' WHERE id = $1",
+		"UPDATE orders SET status = 'paid' WHERE id = $1 AND status = 'pending'",
 		orderID,
 	)
 	if err != nil {
 		log.Printf("[AlipayNotify] Update order error: %v", err)
+		c.String(http.StatusInternalServerError, "fail")
+		return
+	}
+
+	fs := services.NewFulfillmentService()
+	if err := fs.FulfillOrder(tx, orderID); err != nil {
+		log.Printf("[AlipayNotify] Fulfillment error: %v", err)
 		c.String(http.StatusInternalServerError, "fail")
 		return
 	}
@@ -424,6 +445,9 @@ func AlipayNotify(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "fail")
 		return
 	}
+
+	ctx := context.Background()
+	cache.Delete(ctx, cache.TokenBalanceKey(userID))
 
 	log.Printf("[AlipayNotify] Payment completed successfully: order_id=%d", orderID)
 	c.String(http.StatusOK, "success")
@@ -456,11 +480,11 @@ func WechatNotify(c *gin.Context) {
 		return
 	}
 
-	var paymentID, orderID int
+	var paymentID, orderID, payUserID int
 	err = db.QueryRow(
-		"SELECT id, order_id FROM payments WHERE out_trade_no = $1",
+		"SELECT id, order_id, user_id FROM payments WHERE out_trade_no = $1",
 		outTradeNo,
-	).Scan(&paymentID, &orderID)
+	).Scan(&paymentID, &orderID, &payUserID)
 	if err != nil {
 		c.String(http.StatusOK, "<xml><return_code><![CDATA[SUCCESS]]></return_code></xml>")
 		return
@@ -474,7 +498,7 @@ func WechatNotify(c *gin.Context) {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(
-		"UPDATE payments SET status = 'success', transaction_id = $1, paid_at = $2 WHERE id = $3",
+		"UPDATE payments SET status = 'success', transaction_id = $1, paid_at = $2 WHERE id = $3 AND status = 'pending'",
 		transactionID, time.Now(), paymentID,
 	)
 	if err != nil {
@@ -483,10 +507,16 @@ func WechatNotify(c *gin.Context) {
 	}
 
 	_, err = tx.Exec(
-		"UPDATE orders SET status = 'paid' WHERE id = $1",
+		"UPDATE orders SET status = 'paid' WHERE id = $1 AND status = 'pending'",
 		orderID,
 	)
 	if err != nil {
+		c.String(http.StatusInternalServerError, "<xml><return_code><![CDATA[FAIL]]></return_code></xml>")
+		return
+	}
+
+	fs := services.NewFulfillmentService()
+	if err := fs.FulfillOrder(tx, orderID); err != nil {
 		c.String(http.StatusInternalServerError, "<xml><return_code><![CDATA[FAIL]]></return_code></xml>")
 		return
 	}
@@ -495,6 +525,9 @@ func WechatNotify(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "<xml><return_code><![CDATA[FAIL]]></return_code></xml>")
 		return
 	}
+
+	ctx := context.Background()
+	cache.Delete(ctx, cache.TokenBalanceKey(payUserID))
 
 	c.String(http.StatusOK, "<xml><return_code><![CDATA[SUCCESS]]></return_code></xml>")
 }

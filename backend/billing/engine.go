@@ -143,6 +143,45 @@ func (e *BillingEngine) DeductBalance(userID int, amount float64, reason string,
 	return nil
 }
 
+// DeductBalanceTx deducts token balance inside an existing transaction (e.g. order payment + fulfillment).
+// Caller must Commit and invalidate cache.TokenBalanceKey(userID) after success.
+func (e *BillingEngine) DeductBalanceTx(tx *sql.Tx, userID int, amount float64, reason string, requestID string) error {
+	var currentBalance float64
+	err := tx.QueryRow("SELECT balance FROM tokens WHERE user_id = $1 FOR UPDATE", userID).Scan(&currentBalance)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("insufficient balance: no token account for user %d", userID)
+		}
+		return fmt.Errorf("failed to get current balance: %w", err)
+	}
+
+	if currentBalance < amount {
+		return fmt.Errorf("insufficient balance: current=%.2f, required=%.2f", currentBalance, amount)
+	}
+
+	_, err = tx.Exec(
+		"UPDATE tokens SET balance = balance - $1, total_used = total_used + $1, updated_at = $2 WHERE user_id = $3",
+		amount, time.Now(), userID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to deduct balance: %w", err)
+	}
+
+	reqID := interface{}(nil)
+	if requestID != "" {
+		reqID = requestID
+	}
+	_, err = tx.Exec(
+		"INSERT INTO token_transactions (user_id, type, amount, reason, request_id) VALUES ($1, $2, $3, $4, $5)",
+		userID, "usage", -amount, reason, reqID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to record transaction: %w", err)
+	}
+
+	return nil
+}
+
 func (e *BillingEngine) AddBalance(userID int, amount float64, reason string, orderID int) error {
 	if e.db == nil {
 		e.db = config.GetDB()
