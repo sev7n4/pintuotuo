@@ -109,7 +109,7 @@ func renewSubscriptionWithToken(ctx context.Context, db *sql.DB, engine *billing
 	newEndStr := newEnd.Format("2006-01-02")
 
 	reason := fmt.Sprintf("订阅自动续费 #%d", subscriptionID)
-	if err := engine.DeductBalanceTx(tx, userID, retailPrice, reason, ""); err != nil {
+	if err = engine.DeductBalanceTx(tx, userID, retailPrice, reason, ""); err != nil {
 		_, uerr := tx.ExecContext(ctx, `
 			UPDATE user_subscriptions SET auto_renew = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
 			subscriptionID,
@@ -131,8 +131,8 @@ func renewSubscriptionWithToken(ctx context.Context, db *sql.DB, engine *billing
 	if err != nil {
 		return false, false, err
 	}
-	if err := tx.Commit(); err != nil {
-		return false, false, err
+	if cerr := tx.Commit(); cerr != nil {
+		return false, false, cerr
 	}
 	cache.Delete(ctx, cache.TokenBalanceKey(userID))
 	return true, false, nil
