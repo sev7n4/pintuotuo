@@ -318,7 +318,7 @@ func processBalancePayment(db *sql.DB, paymentID, orderID, userID int, amount fl
 	defer tx.Rollback()
 
 	engine := billing.GetBillingEngine()
-	if err := engine.DeductBalanceTx(tx, userID, amount, fmt.Sprintf("订单支付 #%d", orderID), ""); err != nil {
+	if err = engine.DeductBalanceTx(tx, userID, amount, fmt.Sprintf("订单支付 #%d", orderID), ""); err != nil {
 		return err
 	}
 
@@ -339,11 +339,11 @@ func processBalancePayment(db *sql.DB, paymentID, orderID, userID int, amount fl
 	}
 
 	fs := services.NewFulfillmentService()
-	if err := fs.FulfillOrder(tx, orderID); err != nil {
+	if err = fs.FulfillOrder(tx, orderID); err != nil {
 		return err
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
 		return err
 	}
 	ctx := context.Background()

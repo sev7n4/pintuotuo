@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+const (
+	skuTypeTokenPack     = "token_pack"
+	skuTypeComputePoints = "compute_points"
+	skuTypeSubscription  = "subscription"
+	skuTypeTrial         = "trial"
+	skuTypeConcurrent    = "concurrent"
+)
+
 type FulfillmentService struct{}
 
 func NewFulfillmentService() *FulfillmentService {
@@ -71,29 +79,29 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 
 	st := strings.ToLower(strings.TrimSpace(skuRow.SKUType))
 	switch st {
-	case "token_pack":
-		if err := s.fulfillTokenPack(tx, userID, int(skuID.Int64), orderID, qty, skuRow.TokenAmount); err != nil {
+	case skuTypeTokenPack:
+		if err = s.fulfillTokenPack(tx, userID, int(skuID.Int64), orderID, qty, skuRow.TokenAmount); err != nil {
 			return err
 		}
-	case "compute_points":
-		if err := s.fulfillComputePoints(tx, userID, int(skuID.Int64), orderID, qty, skuRow.ComputePoints); err != nil {
+	case skuTypeComputePoints:
+		if err = s.fulfillComputePoints(tx, userID, int(skuID.Int64), orderID, qty, skuRow.ComputePoints); err != nil {
 			return err
 		}
-	case "subscription":
-		if err := s.fulfillSubscription(tx, userID, int(skuID.Int64), orderID, qty, skuRow); err != nil {
+	case skuTypeSubscription:
+		if err = s.fulfillSubscription(tx, userID, int(skuID.Int64), orderID, qty, skuRow); err != nil {
 			return err
 		}
-	case "trial":
-		if err := s.fulfillTrial(tx, userID, int(skuID.Int64), orderID, qty, skuRow); err != nil {
+	case skuTypeTrial:
+		if err = s.fulfillTrial(tx, userID, int(skuID.Int64), orderID, qty, skuRow); err != nil {
 			return err
 		}
-	case "concurrent":
+	case skuTypeConcurrent:
 		if skuRow.TokenAmount.Valid && skuRow.TokenAmount.Int64 > 0 {
-			if err := s.fulfillTokenPack(tx, userID, int(skuID.Int64), orderID, qty, skuRow.TokenAmount); err != nil {
+			if err = s.fulfillTokenPack(tx, userID, int(skuID.Int64), orderID, qty, skuRow.TokenAmount); err != nil {
 				return err
 			}
 		} else if skuRow.ComputePoints.Valid && skuRow.ComputePoints.Float64 > 0 {
-			if err := s.fulfillComputePoints(tx, userID, int(skuID.Int64), orderID, qty, skuRow.ComputePoints); err != nil {
+			if err = s.fulfillComputePoints(tx, userID, int(skuID.Int64), orderID, qty, skuRow.ComputePoints); err != nil {
 				return err
 			}
 		}
@@ -245,7 +253,7 @@ func (s *FulfillmentService) upsertSubscription(tx *sql.Tx, userID, skuID, order
 func stackSubscriptionPeriods(base time.Time, period string, validDays int, qty int) time.Time {
 	t := base
 	for i := 0; i < qty; i++ {
-		t = CalculateSubscriptionEndFrom(t, period, validDays, 0, "subscription")
+		t = CalculateSubscriptionEndFrom(t, period, validDays, 0, skuTypeSubscription)
 	}
 	return t
 }
@@ -263,7 +271,7 @@ func (s *FulfillmentService) insertSubscription(tx *sql.Tx, userID, skuID int, s
 func CalculateSubscriptionEndFrom(base time.Time, period string, validDays int, trialDays int, skuType string) time.Time {
 	base = base.UTC().Truncate(24 * time.Hour)
 	st := strings.ToLower(strings.TrimSpace(skuType))
-	if st == "trial" {
+	if st == skuTypeTrial {
 		d := trialDays
 		if d <= 0 {
 			d = validDays
@@ -298,15 +306,15 @@ func CalculateSubscriptionEndFrom(base time.Time, period string, validDays int, 
 func ValidateSKUForOrder(skuType string, tokenAmount int64, computePoints float64, subscriptionPeriod string, validDays int, trialDurationDays int) error {
 	st := strings.ToLower(strings.TrimSpace(skuType))
 	switch st {
-	case "token_pack":
+	case skuTypeTokenPack:
 		if tokenAmount <= 0 {
 			return fmt.Errorf("token_pack requires token_amount > 0")
 		}
-	case "compute_points":
+	case skuTypeComputePoints:
 		if computePoints <= 0 {
 			return fmt.Errorf("compute_points requires compute_points > 0")
 		}
-	case "subscription":
+	case skuTypeSubscription:
 		if strings.TrimSpace(subscriptionPeriod) != "" {
 			p := strings.ToLower(subscriptionPeriod)
 			if p != "monthly" && p != "quarterly" && p != "yearly" {
@@ -317,11 +325,11 @@ func ValidateSKUForOrder(skuType string, tokenAmount int64, computePoints float6
 		if validDays <= 0 {
 			return fmt.Errorf("subscription requires subscription_period or valid_days > 0")
 		}
-	case "trial":
+	case skuTypeTrial:
 		if trialDurationDays <= 0 && validDays <= 0 {
 			return fmt.Errorf("trial requires trial_duration_days or valid_days > 0")
 		}
-	case "concurrent":
+	case skuTypeConcurrent:
 		if tokenAmount <= 0 && computePoints <= 0 {
 			return fmt.Errorf("concurrent requires token_amount or compute_points > 0")
 		}

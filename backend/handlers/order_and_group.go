@@ -107,7 +107,7 @@ func CreateOrder(c *gin.Context) {
 	if validDays.Valid {
 		vd = int(validDays.Int64)
 	}
-	if err := services.ValidateSKUForOrder(skuType, tokAmt, cp, periodStr, vd, trialDays); err != nil {
+	if err = services.ValidateSKUForOrder(skuType, tokAmt, cp, periodStr, vd, trialDays); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"INVALID_SKU_CONFIG",
 			err.Error(),
