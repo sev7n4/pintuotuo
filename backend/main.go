@@ -22,6 +22,7 @@ import (
 
 var orderScheduler *scheduler.OrderScheduler
 var settlementScheduler *scheduler.SettlementScheduler
+var subscriptionScheduler *scheduler.SubscriptionScheduler
 
 func init() {
 	if err := config.LoadConfig(); err != nil {
@@ -64,6 +65,10 @@ func main() {
 	settlementScheduler = scheduler.NewSettlementScheduler(1 * time.Hour)
 	settlementScheduler.Start()
 	defer settlementScheduler.Stop()
+
+	subscriptionScheduler = scheduler.NewSubscriptionScheduler(1 * time.Hour)
+	subscriptionScheduler.Start()
+	defer subscriptionScheduler.Stop()
 
 	router := gin.Default()
 

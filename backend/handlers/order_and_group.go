@@ -15,6 +15,7 @@ import (
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/services"
 	"github.com/pintuotuo/backend/utils"
 )
 
@@ -65,16 +66,54 @@ func CreateOrder(c *gin.Context) {
 	var groupEnabled bool
 	var minGroupSize, maxGroupSize int
 	var groupDiscountRate sql.NullFloat64
+	var tokenAmount sql.NullInt64
+	var computePoints sql.NullFloat64
+	var subscriptionPeriod sql.NullString
+	var validDays sql.NullInt64
+	var trialDurationDays sql.NullInt64
+
 	err := db.QueryRow(
 		`SELECT s.id, s.spu_id, s.retail_price, s.wholesale_price, s.stock, s.sku_type,
-			s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate
+			s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
+			s.token_amount, s.compute_points, s.subscription_period, s.valid_days, s.trial_duration_days
 		 FROM skus s JOIN spus sp ON s.spu_id = sp.id 
 		 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
 		req.SKUID,
 	).Scan(&skuID, &spuID, &retailPrice, &wholesalePrice, &stock, &skuType,
-		&groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate)
+		&groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate,
+		&tokenAmount, &computePoints, &subscriptionPeriod, &validDays, &trialDurationDays)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
+	}
+
+	periodStr := ""
+	if subscriptionPeriod.Valid {
+		periodStr = subscriptionPeriod.String
+	}
+	trialDays := 0
+	if trialDurationDays.Valid {
+		trialDays = int(trialDurationDays.Int64)
+	}
+	tokAmt := int64(0)
+	if tokenAmount.Valid {
+		tokAmt = tokenAmount.Int64
+	}
+	cp := 0.0
+	if computePoints.Valid {
+		cp = computePoints.Float64
+	}
+	vd := 0
+	if validDays.Valid {
+		vd = int(validDays.Int64)
+	}
+	if err := services.ValidateSKUForOrder(skuType, tokAmt, cp, periodStr, vd, trialDays); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_SKU_CONFIG",
+			err.Error(),
+			http.StatusBadRequest,
+			nil,
+		))
 		return
 	}
 
