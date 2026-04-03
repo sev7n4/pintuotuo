@@ -26,6 +26,7 @@ description: >-
 [4] 禁止跳过CI监控！必须完成 CI/CD → Integration → E2E 完整链路！
 [5] 禁止在CI验证通过前合并PR！必须满足合并条件！
 [6] 如果涉及代码逻辑修改，禁止跳过 TDD 流程（Step 5-7）！
+[7] 禁止直接 push / 直接合并代码到 main！变更只能从功能分支经 PR 审核后合入（与仓库 `.cursorrules` 一致）！
 ```
 
 **重试限制**: 最多 5 次迭代，超过后请求人工介入
@@ -211,8 +212,8 @@ git commit -m "{type}: {description}"
 # 推送到远程
 git push -u origin {branch-name}
 
-# 创建 PR
-gh pr create --title "{title}" --body "{description}"
+# 创建 PR（目标分支须为 main，勿在本地直推 main）
+gh pr create --base main --title "{title}" --body "{description}"
 ```
 
 **触发**: PR 创建触发完整 CI 链路 (CI/CD → Integration → E2E)
@@ -296,8 +297,11 @@ Step 11.5: 修复后重新 commit + push
 - E2E Tests: current_fix_cases 通过 ✅
 
 ```bash
-gh pr merge {pr-number} --merge --delete-branch
+# 与仓库规范一致：GitHub 上使用 Squash & Merge（单条主线历史）
+gh pr merge {pr-number} --squash --delete-branch
 ```
+
+**说明**: 勿使用 `--merge`（会产生 merge commit）；本仓库要求 **Squash & Merge** 合入 `main`（见根目录 `.cursorrules` / `CLAUDE.md`）。
 
 **状态写入**: `scripts/00_01_workflow_state.json.merged = true`
 
