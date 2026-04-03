@@ -13,6 +13,7 @@ import (
 	_ "github.com/pintuotuo/backend/docs"
 	"github.com/pintuotuo/backend/handlers"
 	"github.com/pintuotuo/backend/middleware"
+	"github.com/pintuotuo/backend/notification"
 	"github.com/pintuotuo/backend/routes"
 	"github.com/pintuotuo/backend/scheduler"
 	"github.com/pintuotuo/backend/utils"
@@ -66,7 +67,8 @@ func main() {
 	settlementScheduler.Start()
 	defer settlementScheduler.Stop()
 
-	subscriptionScheduler = scheduler.NewSubscriptionScheduler(1 * time.Hour)
+	notifySvc := notification.NotificationServiceFromEnv()
+	subscriptionScheduler = scheduler.NewSubscriptionScheduler(1*time.Hour, notifySvc)
 	subscriptionScheduler.Start()
 	defer subscriptionScheduler.Stop()
 

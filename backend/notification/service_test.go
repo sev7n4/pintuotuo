@@ -31,6 +31,10 @@ func TestInitEmailTemplates(t *testing.T) {
 	if emailTemplates.LowBalance == nil {
 		t.Error("LowBalance template should not be nil")
 	}
+
+	if emailTemplates.SubscriptionExpiring == nil {
+		t.Error("SubscriptionExpiring template should not be nil")
+	}
 }
 
 func TestEmailTemplates_Render(t *testing.T) {
@@ -127,6 +131,25 @@ func TestEmailTemplates_Render(t *testing.T) {
 			t.Error("LowBalance template should contain low balance message")
 		}
 	})
+
+	t.Run("SubscriptionExpiring template", func(t *testing.T) {
+		data := map[string]interface{}{
+			"Name":         "测试用户",
+			"SPUName":      "Pro 会员",
+			"EndDate":      "2026-04-10",
+			"KindLabel":    "提前 7 天提醒",
+			"AutoRenewTxt": "是",
+		}
+		var buf strings.Builder
+		err := emailTemplates.SubscriptionExpiring.Execute(&buf, data)
+		if err != nil {
+			t.Errorf("Failed to execute SubscriptionExpiring template: %v", err)
+		}
+		result := buf.String()
+		if !strings.Contains(result, "Pro 会员") || !strings.Contains(result, "2026-04-10") {
+			t.Error("SubscriptionExpiring template should contain product and date")
+		}
+	})
 }
 
 func TestNotificationService_GetPushTitle(t *testing.T) {
@@ -141,6 +164,7 @@ func TestNotificationService_GetPushTitle(t *testing.T) {
 		{NotificationOrderConfirm, "订单创建成功"},
 		{NotificationPaymentSuccess, "支付成功"},
 		{NotificationLowBalance, "余额不足提醒"},
+		{NotificationSubscriptionExpiring, "订阅即将到期"},
 	}
 
 	for _, tt := range tests {
@@ -182,6 +206,17 @@ func TestNotificationService_GetPushBody(t *testing.T) {
 		body := service.getPushBody(NotificationLowBalance, data)
 		if !strings.Contains(body, "5.5") {
 			t.Error("LowBalance body should contain balance")
+		}
+	})
+
+	t.Run("SubscriptionExpiring body", func(t *testing.T) {
+		data := map[string]interface{}{
+			"SPUName": "Pro",
+			"EndDate": "2026-04-10",
+		}
+		body := service.getPushBody(NotificationSubscriptionExpiring, data)
+		if !strings.Contains(body, "Pro") || !strings.Contains(body, "2026-04-10") {
+			t.Error("SubscriptionExpiring body should contain name and date")
 		}
 	})
 }
@@ -255,8 +290,9 @@ func TestPushService_New(t *testing.T) {
 
 func TestNotificationService_New(t *testing.T) {
 	emailConfig := &EmailConfig{
-		SMTPHost: "smtp.example.com",
-		SMTPPort: 587,
+		SMTPHost:  "smtp.example.com",
+		SMTPPort:  587,
+		FromEmail: "from@example.com",
 	}
 	pushConfig := &PushConfig{
 		FCMServerKey: "test_key",

@@ -231,7 +231,7 @@ func (s *FulfillmentService) upsertSubscription(tx *sql.Tx, userID, skuID, order
 	).Scan(&subID, &endDate)
 	if err == sql.ErrNoRows {
 		start := time.Now().UTC().Truncate(24 * time.Hour)
-		end := stackSubscriptionPeriods(start, period, validDays, qty)
+		end := StackSubscriptionPeriods(start, period, validDays, qty)
 		return s.insertSubscription(tx, userID, skuID, start, end, autoRenew)
 	}
 	if err != nil {
@@ -242,7 +242,7 @@ func (s *FulfillmentService) upsertSubscription(tx *sql.Tx, userID, skuID, order
 	if base.Before(today) {
 		base = today
 	}
-	newEnd := stackSubscriptionPeriods(base, period, validDays, qty)
+	newEnd := StackSubscriptionPeriods(base, period, validDays, qty)
 	_, err = tx.Exec(
 		`UPDATE user_subscriptions SET end_date = $1::date, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
 		newEnd.Format("2006-01-02"), subID,
@@ -250,7 +250,8 @@ func (s *FulfillmentService) upsertSubscription(tx *sql.Tx, userID, skuID, order
 	return err
 }
 
-func stackSubscriptionPeriods(base time.Time, period string, validDays int, qty int) time.Time {
+// StackSubscriptionPeriods extends end date by qty billing periods from base (subscription SKUs).
+func StackSubscriptionPeriods(base time.Time, period string, validDays int, qty int) time.Time {
 	t := base
 	for i := 0; i < qty; i++ {
 		t = CalculateSubscriptionEndFrom(t, period, validDays, 0, skuTypeSubscription)
