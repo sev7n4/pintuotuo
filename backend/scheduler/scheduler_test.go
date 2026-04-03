@@ -5,6 +5,32 @@ import (
 	"time"
 )
 
+func TestNewSubscriptionScheduler(t *testing.T) {
+	s := NewSubscriptionScheduler(time.Hour, nil)
+	if s == nil {
+		t.Fatal("expected non-nil scheduler")
+	}
+	if s.interval != time.Hour {
+		t.Fatalf("interval %v", s.interval)
+	}
+}
+
+func TestReminderWindowKind(t *testing.T) {
+	day := func(y, m, d int) time.Time {
+		return time.Date(y, time.Month(m), d, 12, 0, 0, 0, time.UTC)
+	}
+	today := day(2026, 4, 3)
+	if got := reminderWindowKind(today, day(2026, 4, 10)); got != "7d" {
+		t.Errorf("7d: got %q", got)
+	}
+	if got := reminderWindowKind(today, day(2026, 4, 4)); got != "1d" {
+		t.Errorf("1d: got %q", got)
+	}
+	if got := reminderWindowKind(today, day(2026, 4, 5)); got != "" {
+		t.Errorf("none: got %q", got)
+	}
+}
+
 func TestNewOrderScheduler(t *testing.T) {
 	interval := 5 * time.Minute
 	timeout := 30 * time.Minute

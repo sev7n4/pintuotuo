@@ -118,11 +118,12 @@ func (s *EmailService) sendWithTLS(addr string, auth smtp.Auth, from string, to 
 }
 
 type EmailTemplate struct {
-	Welcome        *template.Template
-	ResetPassword  *template.Template
-	OrderConfirm   *template.Template
-	PaymentSuccess *template.Template
-	LowBalance     *template.Template
+	Welcome              *template.Template
+	ResetPassword        *template.Template
+	OrderConfirm         *template.Template
+	PaymentSuccess       *template.Template
+	LowBalance           *template.Template
+	SubscriptionExpiring *template.Template
 }
 
 var emailTemplates *EmailTemplate
@@ -240,6 +241,24 @@ func InitEmailTemplates() {
 </body>
 </html>
 `)),
+		SubscriptionExpiring: template.Must(template.New("subscription_expiring").Parse(`
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: #1890ff; color: white; padding: 30px; border-radius: 10px 10px 0 0;">
+    <h1 style="margin: 0;">订阅即将到期</h1>
+  </div>
+  <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+    <p>亲爱的 {{.Name}}，</p>
+    <p>您的订阅「<strong>{{.SPUName}}</strong>」将于 <strong>{{.EndDate}}</strong> 到期。</p>
+    <p>提醒类型：{{.KindLabel}}。自动续费：{{.AutoRenewTxt}}。</p>
+    <p>如需继续使用，请确保 Token 余额充足或及时手动续费。</p>
+    <p style="color: #888;">拼脱脱团队</p>
+  </div>
+</body>
+</html>
+`)),
 	}
 }
 
@@ -309,6 +328,30 @@ func (s *EmailService) SendLowBalanceEmail(to, name string, balance, threshold f
 	return s.Send(&EmailMessage{
 		To:      to,
 		Subject: "拼脱脱 - 余额不足提醒",
+		Body:    body.String(),
+		IsHTML:  true,
+	})
+}
+
+func (s *EmailService) SendSubscriptionExpiringEmail(to, name string, data map[string]interface{}) error {
+	kind, _ := data["Kind"].(string)
+	kindLabel := "提前 7 天提醒"
+	if kind == "1d" {
+		kindLabel = "提前 1 天提醒"
+	}
+	data["Name"] = name
+	data["KindLabel"] = kindLabel
+	var body bytes.Buffer
+	if err := emailTemplates.SubscriptionExpiring.Execute(&body, data); err != nil {
+		return err
+	}
+	subj := "拼脱脱 - 订阅即将到期提醒"
+	if kind == "1d" {
+		subj = "拼脱脱 - 订阅明日到期提醒"
+	}
+	return s.Send(&EmailMessage{
+		To:      to,
+		Subject: subj,
 		Body:    body.String(),
 		IsHTML:  true,
 	})
@@ -384,20 +427,29 @@ type NotificationService struct {
 
 func NewNotificationService(emailConfig *EmailConfig, pushConfig *PushConfig) *NotificationService {
 	InitEmailTemplates()
+	var email *EmailService
+	if emailConfig != nil && emailConfig.SMTPHost != "" && emailConfig.FromEmail != "" {
+		email = NewEmailService(emailConfig)
+	}
+	var push *PushService
+	if pushConfig != nil && pushConfig.FCMServerKey != "" {
+		push = NewPushService(pushConfig)
+	}
 	return &NotificationService{
-		email: NewEmailService(emailConfig),
-		push:  NewPushService(pushConfig),
+		email: email,
+		push:  push,
 	}
 }
 
 type NotificationType string
 
 const (
-	NotificationWelcome        NotificationType = "welcome"
-	NotificationResetPassword  NotificationType = "reset_password"
-	NotificationOrderConfirm   NotificationType = "order_confirm"
-	NotificationPaymentSuccess NotificationType = "payment_success"
-	NotificationLowBalance     NotificationType = "low_balance"
+	NotificationWelcome              NotificationType = "welcome"
+	NotificationResetPassword        NotificationType = "reset_password"
+	NotificationOrderConfirm         NotificationType = "order_confirm"
+	NotificationPaymentSuccess       NotificationType = "payment_success"
+	NotificationLowBalance           NotificationType = "low_balance"
+	NotificationSubscriptionExpiring NotificationType = "subscription_expiring"
 )
 
 type NotificationRequest struct {
@@ -412,21 +464,25 @@ type NotificationRequest struct {
 func (s *NotificationService) Send(req *NotificationRequest) error {
 	var err error
 
-	switch req.Type {
-	case NotificationWelcome:
-		err = s.email.SendWelcomeEmail(req.Email, req.Name)
-	case NotificationResetPassword:
-		if code, ok := req.Data["code"].(string); ok {
-			err = s.email.SendResetPasswordEmail(req.Email, code)
+	if s.email != nil {
+		switch req.Type {
+		case NotificationWelcome:
+			err = s.email.SendWelcomeEmail(req.Email, req.Name)
+		case NotificationResetPassword:
+			if code, ok := req.Data["code"].(string); ok {
+				err = s.email.SendResetPasswordEmail(req.Email, code)
+			}
+		case NotificationOrderConfirm:
+			err = s.email.SendOrderConfirmEmail(req.Email, req.Name, req.Data)
+		case NotificationPaymentSuccess:
+			err = s.email.SendPaymentSuccessEmail(req.Email, req.Name, req.Data)
+		case NotificationLowBalance:
+			balance, _ := req.Data["balance"].(float64)
+			threshold, _ := req.Data["threshold"].(float64)
+			err = s.email.SendLowBalanceEmail(req.Email, req.Name, balance, threshold)
+		case NotificationSubscriptionExpiring:
+			err = s.email.SendSubscriptionExpiringEmail(req.Email, req.Name, req.Data)
 		}
-	case NotificationOrderConfirm:
-		err = s.email.SendOrderConfirmEmail(req.Email, req.Name, req.Data)
-	case NotificationPaymentSuccess:
-		err = s.email.SendPaymentSuccessEmail(req.Email, req.Name, req.Data)
-	case NotificationLowBalance:
-		balance, _ := req.Data["balance"].(float64)
-		threshold, _ := req.Data["threshold"].(float64)
-		err = s.email.SendLowBalanceEmail(req.Email, req.Name, balance, threshold)
 	}
 
 	if req.PushToken != "" && s.push != nil {
@@ -447,11 +503,12 @@ func (s *NotificationService) Send(req *NotificationRequest) error {
 func (s *NotificationService) getPushTitle(t NotificationType) string {
 	//nolint:gosec,G101
 	titles := map[NotificationType]string{
-		NotificationWelcome:        "欢迎加入拼脱脱！",
-		NotificationResetPassword:  "密码重置验证码",
-		NotificationOrderConfirm:   "订单创建成功",
-		NotificationPaymentSuccess: "支付成功",
-		NotificationLowBalance:     "余额不足提醒",
+		NotificationWelcome:              "欢迎加入拼脱脱！",
+		NotificationResetPassword:        "密码重置验证码",
+		NotificationOrderConfirm:         "订单创建成功",
+		NotificationPaymentSuccess:       "支付成功",
+		NotificationLowBalance:           "余额不足提醒",
+		NotificationSubscriptionExpiring: "订阅即将到期",
 	}
 	return titles[t]
 }
@@ -464,6 +521,8 @@ func (s *NotificationService) getPushBody(t NotificationType, data map[string]in
 		return fmt.Sprintf("订单 #%v 支付成功，金额 ¥%v", data["OrderID"], data["Amount"])
 	case NotificationLowBalance:
 		return fmt.Sprintf("您的余额已不足 $%v，请及时充值", data["Balance"])
+	case NotificationSubscriptionExpiring:
+		return fmt.Sprintf("「%v」将于 %v 到期", data["SPUName"], data["EndDate"])
 	default:
 		return ""
 	}
@@ -477,7 +536,22 @@ func (s *NotificationService) convertData(data map[string]interface{}) map[strin
 	return result
 }
 
+// TrySendSubscriptionExpiringEmail sends expiry reminder email when SMTP is configured; no-op if disabled or address empty.
+func (s *NotificationService) TrySendSubscriptionExpiringEmail(to, name string, data map[string]interface{}) error {
+	if s == nil || s.email == nil {
+		return nil
+	}
+	to = strings.TrimSpace(to)
+	if to == "" {
+		return nil
+	}
+	return s.email.SendSubscriptionExpiringEmail(to, name, data)
+}
+
 func (s *NotificationService) SendBatchEmails(recipients []string, subject, body string) error {
+	if s.email == nil {
+		return fmt.Errorf("email service not configured")
+	}
 	for _, to := range recipients {
 		if err := s.email.Send(&EmailMessage{
 			To:      to,
