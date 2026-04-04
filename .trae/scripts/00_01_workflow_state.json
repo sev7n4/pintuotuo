@@ -48,12 +48,12 @@
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "pending",
-    "integration": "pending",
-    "e2e": "pending",
-    "deploy": "pending"
+    "cicd": "success",
+    "integration": "success",
+    "e2e": "success",
+    "deploy": "success"
   },
   "local_validation": "pending",
   "pr_number": null,
-  "merged": false
+  "merged": true
 }
