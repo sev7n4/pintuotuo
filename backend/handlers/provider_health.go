@@ -160,7 +160,7 @@ func GetHealthCheckHistory(c *gin.Context) {
 
 	limit := 20
 	if limitStr := c.Query("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+		if l, parseErr := strconv.Atoi(limitStr); parseErr == nil && l > 0 && l <= 100 {
 			limit = l
 		}
 	}
