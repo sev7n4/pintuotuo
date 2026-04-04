@@ -456,7 +456,7 @@ func (s *HealthChecker) getDecryptedAPIKey(apiKey *models.MerchantAPIKey) string
 
 func (s *HealthChecker) extractPricingInfo(provider string) map[string]interface{} {
 	engine := billing.GetBillingEngine()
-	
+
 	pricingData := map[string]interface{}{
 		"provider": provider,
 		"updated":  time.Now().Format(time.RFC3339),
@@ -487,7 +487,7 @@ func (s *HealthChecker) getProviderModels(provider string) []string {
 			"gpt-4-turbo-preview", "gpt-4", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo",
 		},
 		"anthropic": {
-			"claude-3-opus-20240229", "claude-3-sonnet-20240229", 
+			"claude-3-opus-20240229", "claude-3-sonnet-20240229",
 			"claude-3-haiku-20240307", "claude-3-5-sonnet-20241022",
 		},
 		"google": {
