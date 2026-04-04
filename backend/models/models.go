@@ -184,6 +184,22 @@ type MerchantAPIKey struct {
 	LastUsedAt         time.Time `json:"last_used_at,omitempty"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
+
+	HealthCheckInterval int        `json:"health_check_interval,omitempty"`
+	HealthCheckLevel    string     `json:"health_check_level,omitempty"`
+	EndpointURL         string     `json:"endpoint_url,omitempty"`
+	HealthStatus        string     `json:"health_status,omitempty"`
+	LastHealthCheckAt   *time.Time `json:"last_health_check_at,omitempty"`
+	ConsecutiveFailures int        `json:"consecutive_failures,omitempty"`
+
+	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
+	VerificationResult string     `json:"verification_result,omitempty"`
+	VerificationMsg    string     `json:"verification_message,omitempty"`
+	ModelsSupported    []string   `json:"models_supported,omitempty"`
+
+	CostInputRate  float64 `json:"cost_input_rate,omitempty"`
+	CostOutputRate float64 `json:"cost_output_rate,omitempty"`
+	ProfitMargin   float64 `json:"profit_margin,omitempty"`
 }
 
 // MerchantSettlement represents a merchant's settlement record

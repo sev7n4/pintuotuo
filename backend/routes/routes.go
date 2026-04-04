@@ -21,6 +21,15 @@ func RegisterHealthRoutes(router *gin.RouterGroup) {
 		health.GET("/ready", handlers.ReadyCheck)
 		health.GET("/live", handlers.LiveCheck)
 		health.GET("/db", handlers.DBStats)
+		health.GET("/stats", handlers.GetHealthCheckStats)
+	}
+
+	providers := router.Group("/health/providers")
+	{
+		providers.GET("", handlers.GetAllProvidersHealth)
+		providers.GET("/:id", handlers.GetProviderHealth)
+		providers.POST("/:id/check", handlers.TriggerHealthCheck)
+		providers.GET("/:id/history", handlers.GetHealthCheckHistory)
 	}
 }
 
