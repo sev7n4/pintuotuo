@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/utils"
 )
 
 type HealthCheckLevel string
@@ -440,14 +442,63 @@ func (s *HealthChecker) getDefaultEndpoint(provider string) string {
 }
 
 func (s *HealthChecker) getDecryptedAPIKey(apiKey *models.MerchantAPIKey) string {
-	return "dummy-key-for-health-check"
+	if apiKey.APIKeyEncrypted == "" {
+		return ""
+	}
+
+	decrypted, err := utils.Decrypt(apiKey.APIKeyEncrypted)
+	if err != nil {
+		return ""
+	}
+
+	return decrypted
 }
 
 func (s *HealthChecker) extractPricingInfo(provider string) map[string]interface{} {
-	return map[string]interface{}{
+	engine := billing.GetBillingEngine()
+
+	pricingData := map[string]interface{}{
 		"provider": provider,
 		"updated":  time.Now().Format(time.RFC3339),
+		"models":   []map[string]interface{}{},
 	}
+
+	models := s.getProviderModels(provider)
+	modelPricings := make([]map[string]interface{}, 0)
+
+	for _, model := range models {
+		if pricing, ok := engine.GetPricing(provider, model); ok {
+			modelPricings = append(modelPricings, map[string]interface{}{
+				"model":        model,
+				"input_price":  pricing.InputPrice,
+				"output_price": pricing.OutputPrice,
+				"currency":     pricing.Currency,
+			})
+		}
+	}
+
+	pricingData["models"] = modelPricings
+	return pricingData
+}
+
+func (s *HealthChecker) getProviderModels(provider string) []string {
+	modelsMap := map[string][]string{
+		"openai": {
+			"gpt-4-turbo-preview", "gpt-4", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo",
+		},
+		"anthropic": {
+			"claude-3-opus-20240229", "claude-3-sonnet-20240229",
+			"claude-3-haiku-20240307", "claude-3-5-sonnet-20241022",
+		},
+		"google": {
+			"gemini-pro", "gemini-1.5-pro", "gemini-1.5-flash",
+		},
+	}
+
+	if models, ok := modelsMap[provider]; ok {
+		return models
+	}
+	return []string{}
 }
 
 func (s *HealthChecker) ShouldPerformCheck(apiKey *models.MerchantAPIKey) bool {
