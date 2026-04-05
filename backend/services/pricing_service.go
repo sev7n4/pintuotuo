@@ -178,12 +178,12 @@ func (s *PricingService) CalculateCost(provider, model string, inputTokens, outp
 	metrics.RecordPricingCalculation(provider, model, duration)
 
 	logger.LogDebug(context.Background(), "pricing_service", "Pricing calculation completed", map[string]interface{}{
-		"provider":     provider,
-		"model":        model,
-		"input_tokens": inputTokens,
+		"provider":      provider,
+		"model":         model,
+		"input_tokens":  inputTokens,
 		"output_tokens": outputTokens,
-		"total_cost":   totalCost,
-		"duration_us":  duration * 1_000_000,
+		"total_cost":    totalCost,
+		"duration_us":   duration * 1_000_000,
 	})
 
 	return totalCost
