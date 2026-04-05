@@ -1,59 +1,107 @@
 {
-  "workflow_id": "phase2-improvements-001",
-  "created_at": "2026-04-04T10:30:00Z",
+  "workflow_id": "phase3-smart-router-001",
+  "created_at": "2026-04-04T16:40:00Z",
   "current_step": 1,
-  "issue_type": "enhancement",
-  "description": "Phase 2 健康检查服务待改进项修复",
+  "issue_type": "feature",
+  "description": "Phase 3 智能路由服务开发",
   "current_fix_cases": [],
-  "improvements": [
+  "phase3_tasks": [
     {
-      "id": "IMP-001",
-      "priority": "high",
-      "title": "集成测试补充",
-      "description": "补充数据库相关函数的集成测试，提高测试覆盖率至80%以上",
-      "affected_functions": [
-        "RecordRequestResult",
-        "CalculateFailureRate",
-        "MarkAsDegraded",
-        "GetProviderHealth",
-        "GetAllProviderHealth",
-        "SaveHealthCheckResult",
-        "TriggerActiveCheck",
-        "PerformHealthCheckAsync"
+      "id": "TASK-3.1",
+      "title": "创建智能路由服务核心结构",
+      "subtasks": [
+        "创建 services/smart_router.go",
+        "定义 SmartRouter 结构体",
+        "定义 RoutingStrategy 常量",
+        "定义 RoutingCandidate 结构体"
       ]
     },
     {
-      "id": "IMP-002",
-      "priority": "high",
-      "title": "API Key解密集成",
-      "description": "集成加密服务，替换getDecryptedAPIKey()的占位实现",
-      "affected_functions": ["getDecryptedAPIKey"]
+      "id": "TASK-3.2",
+      "title": "实现候选Provider获取",
+      "subtasks": [
+        "实现 getCandidates()",
+        "实现 filterUnhealthy()",
+        "实现 filterUnverified()"
+      ]
     },
     {
-      "id": "IMP-003",
-      "priority": "medium",
-      "title": "定价信息完善",
-      "description": "实现真实的定价信息获取逻辑，替换extractPricingInfo()的占位实现",
-      "affected_functions": ["extractPricingInfo"]
+      "id": "TASK-3.3",
+      "title": "实现多维度评分计算",
+      "subtasks": [
+        "实现 calculateScores()",
+        "实现价格评分因子",
+        "实现延迟评分因子",
+        "实现成功率评分因子",
+        "实现权重配置读取"
+      ]
     },
     {
-      "id": "IMP-004",
-      "priority": "high",
-      "title": "健康检查调度器",
-      "description": "实现定时健康检查调度器，自动执行健康检查任务",
-      "affected_files": ["services/health_scheduler.go"]
+      "id": "TASK-3.4",
+      "title": "实现路由决策逻辑",
+      "subtasks": [
+        "实现 SelectProvider()",
+        "实现 SelectBackupProvider()",
+        "实现故障切换逻辑"
+      ]
+    },
+    {
+      "id": "TASK-3.5",
+      "title": "实现熔断器保护",
+      "subtasks": [
+        "创建 services/circuit_breaker.go",
+        "实现 CircuitBreaker 结构体",
+        "实现 AllowRequest()",
+        "实现 RecordSuccess()",
+        "实现 RecordFailure()",
+        "实现半开状态探测"
+      ]
+    },
+    {
+      "id": "TASK-3.6",
+      "title": "实现请求重试机制",
+      "subtasks": [
+        "创建 services/retry_policy.go",
+        "实现 RetryPolicy 结构体",
+        "实现指数退避算法",
+        "实现可配置重试策略",
+        "实现重试日志记录"
+      ]
+    },
+    {
+      "id": "TASK-3.7",
+      "title": "实现连接池管理",
+      "subtasks": [
+        "创建 services/connection_pool.go",
+        "实现 Provider连接池",
+        "实现连接预热机制",
+        "实现连接复用"
+      ]
+    },
+    {
+      "id": "TASK-3.8",
+      "title": "编写智能路由单元测试",
+      "subtasks": [
+        "创建 services/smart_router_test.go",
+        "测试价格优先策略",
+        "测试延迟优先策略",
+        "测试均衡策略",
+        "测试故障切换",
+        "测试熔断器",
+        "测试重试机制"
+      ]
     }
   ],
-  "branch_name": "enhancement/phase2-health-check-improvements",
+  "branch_name": "feature/phase3-smart-router",
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "success",
-    "integration": "success",
-    "e2e": "success",
-    "deploy": "success"
+    "cicd": "pending",
+    "integration": "pending",
+    "e2e": "pending",
+    "deploy": "pending"
   },
   "local_validation": "pending",
   "pr_number": null,
-  "merged": true
+  "merged": false
 }
