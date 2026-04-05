@@ -309,6 +309,47 @@ export interface MerchantAPIKey {
   last_used_at?: string;
   created_at: string;
   updated_at: string;
+  
+  health_check_interval?: number;
+  health_check_level?: 'high' | 'medium' | 'low' | 'daily';
+  endpoint_url?: string;
+  health_status?: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+  last_health_check_at?: string;
+  consecutive_failures?: number;
+  
+  verified_at?: string;
+  verification_result?: 'success' | 'failed' | 'pending';
+  verification_message?: string;
+  models_supported?: string[];
+  
+  cost_input_rate?: number;
+  cost_output_rate?: number;
+  profit_margin?: number;
+}
+
+export interface HealthStatus {
+  status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+  last_check_at?: string;
+  consecutive_failures: number;
+  latency_ms?: number;
+}
+
+export interface VerificationResult {
+  id: number;
+  api_key_id: number;
+  verification_type: string;
+  status: 'pending' | 'in_progress' | 'success' | 'failed';
+  connection_test: boolean;
+  connection_latency_ms?: number;
+  models_found?: string[];
+  models_count: number;
+  pricing_verified: boolean;
+  pricing_info?: Record<string, unknown>;
+  error_code?: string;
+  error_message?: string;
+  started_at: string;
+  completed_at?: string;
+  retry_count: number;
 }
 
 export interface APIKeyUsage {
