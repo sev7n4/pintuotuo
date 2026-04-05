@@ -1,0 +1,35 @@
+.settlements {
+  padding: 24px;
+}
+
+.pageTitle {
+  margin-bottom: 24px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.statsRow {
+  margin-bottom: 24px;
+}
+
+.tableCard {
+  margin-bottom: 24px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+}
+
+.amount {
+  font-size: 16px;
+  font-weight: 600;
+  color: #52c41a;
+}

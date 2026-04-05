@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col } from 'antd';
+import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col, Input, Form } from 'antd';
 import {
   DollarOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   SyncOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
 import { MerchantSettlement } from '@/types';
@@ -13,7 +14,11 @@ import styles from './MerchantSettlements.module.css';
 const MerchantSettlements = () => {
   const { settlements, fetchSettlements, requestSettlement, isLoading } = useMerchantStore();
   const [detailVisible, setDetailVisible] = useState(false);
+  const [disputeVisible, setDisputeVisible] = useState(false);
   const [selectedSettlement, setSelectedSettlement] = useState<MerchantSettlement | null>(null);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [disputeLoading, setDisputeLoading] = useState(false);
 
   useEffect(() => {
     fetchSettlements();
@@ -30,6 +35,67 @@ const MerchantSettlements = () => {
   const handleViewDetail = (record: MerchantSettlement) => {
     setSelectedSettlement(record);
     setDetailVisible(true);
+  };
+
+  const handleConfirmSettlement = async () => {
+    if (!selectedSettlement) return;
+    
+    setConfirmLoading(true);
+    try {
+      const response = await fetch(`/api/v1/merchant/settlements/${selectedSettlement.id}/confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (response.ok) {
+        message.success('结算已确认');
+        setDetailVisible(false);
+        fetchSettlements();
+      } else {
+        const error = await response.json();
+        message.error(error.error || '确认失败');
+      }
+    } catch (error) {
+      message.error('确认失败，请重试');
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  const handleDisputeSettlement = async () => {
+    if (!selectedSettlement || !disputeReason.trim()) {
+      message.warning('请填写争议原因');
+      return;
+    }
+
+    setDisputeLoading(true);
+    try {
+      const response = await fetch(`/api/v1/merchant/settlements/${selectedSettlement.id}/dispute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ reason: disputeReason }),
+      });
+
+      if (response.ok) {
+        message.success('争议已提交');
+        setDisputeVisible(false);
+        setDisputeReason('');
+        fetchSettlements();
+      } else {
+        const error = await response.json();
+        message.error(error.error || '提交失败');
+      }
+    } catch (error) {
+      message.error('提交失败，请重试');
+    } finally {
+      setDisputeLoading(false);
+    }
   };
 
   const statusMap: Record<string, { color: string; text: string; icon: React.ReactNode }> = {
@@ -91,10 +157,13 @@ const MerchantSettlements = () => {
       },
     },
     {
-      title: '结算时间',
-      dataIndex: 'settled_at',
-      key: 'settled_at',
-      render: (date: string) => (date ? new Date(date).toLocaleString('zh-CN') : '-'),
+      title: '确认状态',
+      key: 'confirm_status',
+      render: (_: unknown, record: MerchantSettlement) => (
+        <Tag color={record.merchant_confirmed ? 'success' : 'default'}>
+          {record.merchant_confirmed ? '已确认' : '待确认'}
+        </Tag>
+      ),
     },
     {
       title: '操作',
@@ -158,7 +227,7 @@ const MerchantSettlements = () => {
           dataSource={settlements}
           rowKey="id"
           loading={isLoading}
-          scroll={{ x: 800 }}
+          scroll={{ x: 1000 }}
           pagination={false}
         />
       </Card>
@@ -168,41 +237,114 @@ const MerchantSettlements = () => {
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
         footer={null}
-        width={600}
+        width={700}
       >
         {selectedSettlement && (
-          <Descriptions column={2} bordered>
-            <Descriptions.Item label="结算ID">{selectedSettlement.id}</Descriptions.Item>
-            <Descriptions.Item label="状态">
-              <Tag color={statusMap[selectedSettlement.status]?.color}>
-                {statusMap[selectedSettlement.status]?.text}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="结算周期" span={2}>
-              {new Date(selectedSettlement.period_start).toLocaleDateString('zh-CN')} -{' '}
-              {new Date(selectedSettlement.period_end).toLocaleDateString('zh-CN')}
-            </Descriptions.Item>
-            <Descriptions.Item label="销售总额">
-              ¥{selectedSettlement.total_sales.toFixed(2)}
-            </Descriptions.Item>
-            <Descriptions.Item label="平台费用（5%）">
-              ¥{selectedSettlement.platform_fee.toFixed(2)}
-            </Descriptions.Item>
-            <Descriptions.Item label="结算金额" span={2}>
-              <span className={styles.amount}>
-                ¥{selectedSettlement.settlement_amount.toFixed(2)}
-              </span>
-            </Descriptions.Item>
-            <Descriptions.Item label="创建时间">
-              {new Date(selectedSettlement.created_at).toLocaleString('zh-CN')}
-            </Descriptions.Item>
-            <Descriptions.Item label="结算时间">
-              {selectedSettlement.settled_at
-                ? new Date(selectedSettlement.settled_at).toLocaleString('zh-CN')
-                : '-'}
-            </Descriptions.Item>
-          </Descriptions>
+          <>
+            <Descriptions column={2} bordered>
+              <Descriptions.Item label="结算ID">{selectedSettlement.id}</Descriptions.Item>
+              <Descriptions.Item label="状态">
+                <Tag color={statusMap[selectedSettlement.status]?.color}>
+                  {statusMap[selectedSettlement.status]?.text}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="结算周期" span={2}>
+                {new Date(selectedSettlement.period_start).toLocaleDateString('zh-CN')} -{' '}
+                {new Date(selectedSettlement.period_end).toLocaleDateString('zh-CN')}
+              </Descriptions.Item>
+              <Descriptions.Item label="销售总额">
+                ¥{selectedSettlement.total_sales.toFixed(2)}
+              </Descriptions.Item>
+              <Descriptions.Item label="平台费用（5%）">
+                ¥{selectedSettlement.platform_fee.toFixed(2)}
+              </Descriptions.Item>
+              <Descriptions.Item label="结算金额" span={2}>
+                <span className={styles.amount}>
+                  ¥{selectedSettlement.settlement_amount.toFixed(2)}
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="商户确认">
+                <Tag color={selectedSettlement.merchant_confirmed ? 'success' : 'default'}>
+                  {selectedSettlement.merchant_confirmed ? '已确认' : '待确认'}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="确认时间">
+                {selectedSettlement.merchant_confirmed_at
+                  ? new Date(selectedSettlement.merchant_confirmed_at).toLocaleString('zh-CN')
+                  : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="财务审批">
+                <Tag color={selectedSettlement.finance_approved ? 'success' : 'default'}>
+                  {selectedSettlement.finance_approved ? '已审批' : '待审批'}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="审批时间">
+                {selectedSettlement.finance_approved_at
+                  ? new Date(selectedSettlement.finance_approved_at).toLocaleString('zh-CN')
+                  : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="创建时间">
+                {new Date(selectedSettlement.created_at).toLocaleString('zh-CN')}
+              </Descriptions.Item>
+              <Descriptions.Item label="结算时间">
+                {selectedSettlement.settled_at
+                  ? new Date(selectedSettlement.settled_at).toLocaleString('zh-CN')
+                  : '-'}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div style={{ marginTop: 24, textAlign: 'right' }}>
+              {!selectedSettlement.merchant_confirmed && selectedSettlement.status === 'pending' && (
+                <>
+                  <Button
+                    type="primary"
+                    onClick={handleConfirmSettlement}
+                    loading={confirmLoading}
+                    style={{ marginRight: 8 }}
+                  >
+                    确认结算
+                  </Button>
+                  <Button
+                    danger
+                    icon={<WarningOutlined />}
+                    onClick={() => {
+                      setDetailVisible(false);
+                      setDisputeVisible(true);
+                    }}
+                  >
+                    提交争议
+                  </Button>
+                </>
+              )}
+            </div>
+          </>
         )}
+      </Modal>
+
+      <Modal
+        title="提交结算争议"
+        open={disputeVisible}
+        onCancel={() => {
+          setDisputeVisible(false);
+          setDisputeReason('');
+        }}
+        onOk={handleDisputeSettlement}
+        confirmLoading={disputeLoading}
+        okText="提交"
+        cancelText="取消"
+      >
+        <Form layout="vertical">
+          <Form.Item label="争议原因" required>
+            <Input.TextArea
+              rows={4}
+              value={disputeReason}
+              onChange={(e) => setDisputeReason(e.target.value)}
+              placeholder="请详细说明争议原因..."
+              maxLength={500}
+              showCount
+            />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );
