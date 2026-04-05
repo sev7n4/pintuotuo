@@ -17,6 +17,7 @@ import (
 	"github.com/pintuotuo/backend/routes"
 	"github.com/pintuotuo/backend/scheduler"
 	"github.com/pintuotuo/backend/utils"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -105,6 +106,8 @@ func main() {
 	}
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	port := os.Getenv("PORT")
 	if port == "" {
