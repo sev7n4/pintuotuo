@@ -16,8 +16,11 @@ import (
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/logger"
+	"github.com/pintuotuo/backend/metrics"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/services"
 	"github.com/pintuotuo/backend/utils"
 )
 
@@ -306,8 +309,28 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 			if err != nil {
 				tx.Rollback()
+				logger.LogError(context.Background(), "api_proxy", "Transaction rollback", err, map[string]interface{}{
+					"user_id":    userIDInt,
+					"provider":   req.Provider,
+					"model":      req.Model,
+					"cost":       cost,
+					"request_id": requestID,
+				})
 			} else {
 				tx.Commit()
+				logger.LogInfo(context.Background(), "api_proxy", "API request completed", map[string]interface{}{
+					"user_id":       userIDInt,
+					"provider":      req.Provider,
+					"model":         req.Model,
+					"input_tokens":  inputTokens,
+					"output_tokens": outputTokens,
+					"cost":          cost,
+					"latency_ms":    latency,
+					"status_code":   resp.StatusCode,
+					"request_id":    requestID,
+				})
+
+				metrics.RecordOrderCreation("completed", int64(cost*100), "USD")
 			}
 		}
 
@@ -319,48 +342,18 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 }
 
 func calculateTokenCost(provider, model string, inputTokens, outputTokens int) float64 {
-	var inputRate, outputRate float64
+	pricingService := services.GetPricingService()
+	cost := pricingService.CalculateCost(provider, model, inputTokens, outputTokens)
 
-	switch provider {
-	case "openai":
-		switch {
-		case strings.Contains(model, "gpt-4-turbo"):
-			inputRate = 0.01 / 1000
-			outputRate = 0.03 / 1000
-		case strings.Contains(model, "gpt-4"):
-			inputRate = 0.03 / 1000
-			outputRate = 0.06 / 1000
-		case strings.Contains(model, "gpt-3.5-turbo"):
-			inputRate = 0.0005 / 1000
-			outputRate = 0.0015 / 1000
-		default:
-			inputRate = 0.001 / 1000
-			outputRate = 0.002 / 1000
-		}
-	case providerAnthropic:
-		switch {
-		case strings.Contains(model, "claude-3-opus"):
-			inputRate = 0.015 / 1000
-			outputRate = 0.075 / 1000
-		case strings.Contains(model, "claude-3-sonnet"):
-			inputRate = 0.003 / 1000
-			outputRate = 0.015 / 1000
-		case strings.Contains(model, "claude-3-haiku"):
-			inputRate = 0.00025 / 1000
-			outputRate = 0.00125 / 1000
-		default:
-			inputRate = 0.003 / 1000
-			outputRate = 0.015 / 1000
-		}
-	case "google":
-		inputRate = 0.00025 / 1000
-		outputRate = 0.0005 / 1000
-	default:
-		inputRate = 0.001 / 1000
-		outputRate = 0.002 / 1000
-	}
+	logger.LogDebug(context.Background(), "api_proxy", "Token cost calculated", map[string]interface{}{
+		"provider":      provider,
+		"model":         model,
+		"input_tokens":  inputTokens,
+		"output_tokens": outputTokens,
+		"cost":          cost,
+	})
 
-	return float64(inputTokens)*inputRate + float64(outputTokens)*outputRate
+	return cost
 }
 
 func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeConfig, error) {
