@@ -9,9 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/logger"
+	"github.com/pintuotuo/backend/metrics"
 	"github.com/pintuotuo/backend/utils"
+	"github.com/redis/go-redis/v9"
 )
 
 type VerificationResult struct {
@@ -29,11 +32,25 @@ type VerificationResult struct {
 	ErrorMessage      string                 `json:"error_message,omitempty"`
 	StartedAt         time.Time              `json:"started_at"`
 	CompletedAt       time.Time              `json:"completed_at,omitempty"`
+	RetryCount        int                    `json:"retry_count,omitempty"`
 }
 
 type APIKeyValidator struct {
-	db *sql.DB
+	db              *sql.DB
+	redis           *redis.Client
+	maxRetries      int
+	retryDelay      time.Duration
+	cacheTTL        time.Duration
+	verificationTTL time.Duration
 }
+
+const (
+	VerificationCacheKeyPrefix = "api_key_verification:"
+	VerificationCacheTTL       = 5 * time.Minute
+	MaxVerificationRetries     = 3
+	RetryDelayBase             = 2 * time.Second
+	VerificationInterval       = 24 * time.Hour
+)
 
 var (
 	apiKeyValidator     *APIKeyValidator
@@ -43,37 +60,44 @@ var (
 func GetAPIKeyValidator() *APIKeyValidator {
 	apiKeyValidatorOnce.Do(func() {
 		apiKeyValidator = &APIKeyValidator{
-			db: config.GetDB(),
+			db:              config.GetDB(),
+			redis:           cache.GetClient(),
+			maxRetries:      MaxVerificationRetries,
+			retryDelay:      RetryDelayBase,
+			cacheTTL:        VerificationCacheTTL,
+			verificationTTL: VerificationInterval,
 		}
 	})
 	return apiKeyValidator
 }
 
-func (v *APIKeyValidator) ValidateAsync(apiKeyID int, provider, encryptedKey, verificationType string) error {
-	if apiKeyID <= 0 {
-		return fmt.Errorf("invalid API key ID")
-	}
-	if provider == "" {
-		return fmt.Errorf("provider cannot be empty")
-	}
-	if encryptedKey == "" {
-		return fmt.Errorf("encrypted key cannot be empty")
+func (v *APIKeyValidator) cacheVerificationResult(ctx context.Context, result VerificationResult) error {
+	if v.redis == nil {
+		return nil
 	}
 
-	go v.performVerification(apiKeyID, provider, encryptedKey, verificationType)
+	key := fmt.Sprintf("%s%d", VerificationCacheKeyPrefix, result.APIKeyID)
+	data, err := json.Marshal(result)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return v.redis.Set(ctx, key, data, v.cacheTTL).Err()
 }
 
-func (v *APIKeyValidator) performVerification(apiKeyID int, provider, encryptedKey, verificationType string) {
+func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, encryptedKey, verificationType string, retryCount int) {
 	ctx := context.Background()
 	startTime := time.Now()
+
+	metrics.ActiveVerifications.WithLabelValues(provider).Inc()
+	defer metrics.ActiveVerifications.WithLabelValues(provider).Dec()
 
 	result := VerificationResult{
 		APIKeyID:         apiKeyID,
 		VerificationType: verificationType,
 		Status:           "in_progress",
 		StartedAt:        startTime,
+		RetryCount:       retryCount,
 	}
 
 	verificationID, err := v.createVerificationRecord(apiKeyID, verificationType)
@@ -99,11 +123,18 @@ func (v *APIKeyValidator) performVerification(apiKeyID int, provider, encryptedK
 
 	connectionOK, latency, err := v.testConnection(providerConfig, decryptedKey)
 	if err != nil {
+		if retryCount < v.maxRetries {
+			metrics.VerificationRetries.WithLabelValues(provider, fmt.Sprintf("%d", retryCount+1)).Inc()
+			time.Sleep(v.retryDelay * time.Duration(1<<retryCount))
+			go v.performVerificationWithRetry(apiKeyID, provider, encryptedKey, verificationType, retryCount+1)
+			return
+		}
 		v.handleVerificationError(ctx, verificationID, "CONNECTION_FAILED", err.Error(), startTime)
 		return
 	}
 	result.ConnectionTest = connectionOK
 	result.ConnectionLatency = latency
+	metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(latency))
 
 	models, err := v.fetchModels(providerConfig, decryptedKey)
 	if err != nil {
@@ -114,10 +145,15 @@ func (v *APIKeyValidator) performVerification(apiKeyID int, provider, encryptedK
 	} else {
 		result.ModelsFound = models
 		result.ModelsCount = len(models)
+		metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(models)))
 	}
 
 	result.Status = "success"
 	result.CompletedAt = time.Now()
+
+	duration := result.CompletedAt.Sub(startTime).Seconds()
+	metrics.VerificationDuration.WithLabelValues(provider, verificationType).Observe(duration)
+	metrics.VerificationTotal.WithLabelValues(provider, verificationType, "success").Inc()
 
 	err = v.updateVerificationRecord(verificationID, result)
 	if err != nil {
@@ -135,6 +171,13 @@ func (v *APIKeyValidator) performVerification(apiKeyID int, provider, encryptedK
 		return
 	}
 
+	err = v.cacheVerificationResult(ctx, result)
+	if err != nil {
+		logger.LogError(ctx, "api_key_validator", "Failed to cache verification result", err, map[string]interface{}{
+			"api_key_id": apiKeyID,
+		})
+	}
+
 	logger.LogInfo(ctx, "api_key_validator", "API key verification completed", map[string]interface{}{
 		"api_key_id":         apiKeyID,
 		"verification_id":    verificationID,
@@ -142,7 +185,24 @@ func (v *APIKeyValidator) performVerification(apiKeyID int, provider, encryptedK
 		"connection_test":    result.ConnectionTest,
 		"models_count":       result.ModelsCount,
 		"connection_latency": result.ConnectionLatency,
+		"retry_count":        retryCount,
 	})
+}
+
+func (v *APIKeyValidator) ValidateAsync(apiKeyID int, provider, encryptedKey, verificationType string) error {
+	if apiKeyID <= 0 {
+		return fmt.Errorf("invalid API key ID")
+	}
+	if provider == "" {
+		return fmt.Errorf("provider cannot be empty")
+	}
+	if encryptedKey == "" {
+		return fmt.Errorf("encrypted key cannot be empty")
+	}
+
+	go v.performVerificationWithRetry(apiKeyID, provider, encryptedKey, verificationType, 0)
+
+	return nil
 }
 
 func (v *APIKeyValidator) testConnection(providerConfig map[string]string, apiKey string) (bool, int, error) {
@@ -397,6 +457,20 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 		ErrorCode:    errorCode,
 		ErrorMessage: errorMessage,
 		CompletedAt:  time.Now(),
+	}
+
+	var provider string
+	if v.db != nil {
+		v.db.QueryRow(
+			"SELECT provider FROM api_key_verifications v JOIN merchant_api_keys k ON v.api_key_id = k.id WHERE v.id = $1",
+			verificationID,
+		).Scan(&provider)
+	}
+
+	if provider != "" {
+		duration := result.CompletedAt.Sub(startTime).Seconds()
+		metrics.VerificationDuration.WithLabelValues(provider, "error").Observe(duration)
+		metrics.VerificationTotal.WithLabelValues(provider, "error", "failed").Inc()
 	}
 
 	err := v.updateVerificationRecord(verificationID, result)
