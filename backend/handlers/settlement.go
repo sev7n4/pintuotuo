@@ -15,7 +15,7 @@ import (
 
 func requireAdminRole(c *gin.Context) bool {
 	userRole, exists := c.Get("user_role")
-	if !exists || userRole != "admin" {
+	if !exists || userRole != roleAdmin {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FORBIDDEN",
 			"Admin access required",

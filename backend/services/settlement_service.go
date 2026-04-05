@@ -511,17 +511,6 @@ func (s *SettlementService) ProcessDispute(disputeID, handlerID int, resolution 
 	return nil
 }
 
-func (s *SettlementService) adjustSettlementAmount(settlementID int, adjustedAmount float64) error {
-	_, err := s.db.Exec(
-		`UPDATE merchant_settlements 
-		 SET settlement_amount = $1,
-		     updated_at = CURRENT_TIMESTAMP
-		 WHERE id = $2`,
-		adjustedAmount, settlementID,
-	)
-	return err
-}
-
 func (s *SettlementService) ReconcileOrders(settlementID int) (*ReconciliationData, error) {
 	ctx := context.Background()
 
