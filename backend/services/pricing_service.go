@@ -22,29 +22,29 @@ type PricingData struct {
 }
 
 type PricingHistory struct {
-	ID            int       `json:"id"`
-	EntityType    string    `json:"entity_type"`
-	EntityID      int       `json:"entity_id"`
-	OldInputPrice float64   `json:"old_input_price"`
-	OldOutputPrice float64  `json:"old_output_price"`
-	NewInputPrice float64   `json:"new_input_price"`
-	NewOutputPrice float64  `json:"new_output_price"`
-	ChangeReason  string    `json:"change_reason"`
-	ChangedBy     int       `json:"changed_by"`
-	ChangedAt     time.Time `json:"changed_at"`
-	EffectiveAt   time.Time `json:"effective_at"`
+	ID             int       `json:"id"`
+	EntityType     string    `json:"entity_type"`
+	EntityID       int       `json:"entity_id"`
+	OldInputPrice  float64   `json:"old_input_price"`
+	OldOutputPrice float64   `json:"old_output_price"`
+	NewInputPrice  float64   `json:"new_input_price"`
+	NewOutputPrice float64   `json:"new_output_price"`
+	ChangeReason   string    `json:"change_reason"`
+	ChangedBy      int       `json:"changed_by"`
+	ChangedAt      time.Time `json:"changed_at"`
+	EffectiveAt    time.Time `json:"effective_at"`
 }
 
 type PricingSchedule struct {
-	ID            int       `json:"id"`
-	EntityType    string    `json:"entity_type"`
-	EntityID      int       `json:"entity_id"`
-	NewInputPrice float64   `json:"new_input_price"`
-	NewOutputPrice float64  `json:"new_output_price"`
-	ScheduledAt   time.Time `json:"scheduled_at"`
-	Status        string    `json:"status"`
-	ChangeReason  string    `json:"change_reason"`
-	CreatedBy     int       `json:"created_by"`
+	ID             int       `json:"id"`
+	EntityType     string    `json:"entity_type"`
+	EntityID       int       `json:"entity_id"`
+	NewInputPrice  float64   `json:"new_input_price"`
+	NewOutputPrice float64   `json:"new_output_price"`
+	ScheduledAt    time.Time `json:"scheduled_at"`
+	Status         string    `json:"status"`
+	ChangeReason   string    `json:"change_reason"`
+	CreatedBy      int       `json:"created_by"`
 }
 
 type PricingService struct {
@@ -248,11 +248,11 @@ func (s *PricingService) RecordPricingHistory(entityType string, entityID int, o
 	}
 
 	logger.LogInfo(context.Background(), "pricing_service", "Pricing history recorded", map[string]interface{}{
-		"entity_type":      entityType,
-		"entity_id":        entityID,
-		"old_input_price":  oldInputPrice,
-		"new_input_price":  newInputPrice,
-		"changed_by":       changedBy,
+		"entity_type":     entityType,
+		"entity_id":       entityID,
+		"old_input_price": oldInputPrice,
+		"new_input_price": newInputPrice,
+		"changed_by":      changedBy,
 	})
 
 	return nil
@@ -343,11 +343,11 @@ func (s *PricingService) SchedulePricingChange(entityType string, entityID int, 
 	}
 
 	logger.LogInfo(context.Background(), "pricing_service", "Pricing change scheduled", map[string]interface{}{
-		"schedule_id":   scheduleID,
-		"entity_type":   entityType,
-		"entity_id":     entityID,
-		"scheduled_at":  scheduledAt,
-		"created_by":    createdBy,
+		"schedule_id":  scheduleID,
+		"entity_type":  entityType,
+		"entity_id":    entityID,
+		"scheduled_at": scheduledAt,
+		"created_by":   createdBy,
 	})
 
 	return scheduleID, nil
@@ -383,12 +383,11 @@ func (s *PricingService) ProcessScheduledPricing() (int, error) {
 	processedCount := 0
 	for rows.Next() {
 		var schedule PricingSchedule
-		err := rows.Scan(
+		if scanErr := rows.Scan(
 			&schedule.ID, &schedule.EntityType, &schedule.EntityID,
 			&schedule.NewInputPrice, &schedule.NewOutputPrice,
 			&schedule.ChangeReason, &schedule.CreatedBy,
-		)
-		if err != nil {
+		); scanErr != nil {
 			continue
 		}
 
