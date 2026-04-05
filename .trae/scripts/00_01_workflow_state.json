@@ -1,47 +1,32 @@
 {
-  "workflow_id": "phase5-api-key-validator-001",
-  "created_at": "2026-04-05T12:30:00Z",
-  "current_step": 10,
-  "issue_type": "feature",
-  "description": "Phase 5 API Key验证服务开发",
+  "workflow_id": "fix-deploy-health-check-001",
+  "created_at": "2026-04-05T06:45:00Z",
+  "current_step": 9,
+  "issue_type": "bugfix",
+  "description": "修复部署工作流健康检查超时问题",
   "current_fix_cases": [],
   "feature_tasks": [
     {
-      "id": "TASK-5.1",
-      "title": "创建API Key验证服务核心结构",
+      "id": "TASK-1",
+      "title": "为 curl 命令添加超时设置",
       "status": "completed"
     },
     {
-      "id": "TASK-5.2",
-      "title": "实现验证核心逻辑",
-      "status": "completed"
-    },
-    {
-      "id": "TASK-5.3",
-      "title": "实现验证状态管理",
-      "status": "completed"
-    },
-    {
-      "id": "TASK-5.4",
-      "title": "创建验证API端点",
-      "status": "completed"
-    },
-    {
-      "id": "TASK-5.5",
-      "title": "编写验证服务单元测试",
+      "id": "TASK-2",
+      "title": "优化健康检查重试策略",
       "status": "completed"
     }
   ],
-  "branch_name": "feature/phase5-api-key-validator",
+  "branch_name": "fix/deploy-health-check-timeout",
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "running",
+    "cicd": "pending",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
   },
   "local_validation": "passed",
-  "pr_number": 174,
+  "pr_number": null,
   "merged": false
 }

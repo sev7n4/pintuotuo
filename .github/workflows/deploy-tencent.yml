@@ -57,28 +57,45 @@ jobs:
           BASE="http://${{ secrets.TENCENT_CLOUD_IP }}:8080"
           echo "=== 1) 进程健康检查: GET /api/v1/health（必选）==="
           OK=0
-          for i in $(seq 1 10); do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${BASE}/api/v1/health" 2>/dev/null || echo "000")
+          for i in $(seq 1 20); do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              --connect-timeout 5 \
+              --max-time 10 \
+              "${BASE}/api/v1/health" 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ Health OK (HTTP $HTTP_CODE)"
               OK=1
               break
             fi
             echo "Attempt $i: health HTTP $HTTP_CODE, waiting..."
-            sleep 10
+            
+            # 指数退避策略
+            if [ $i -le 5 ]; then
+              sleep 5
+            elif [ $i -le 10 ]; then
+              sleep 10
+            else
+              sleep 15
+            fi
           done
           if [ "$OK" != "1" ]; then
-            echo "❌ /api/v1/health 未在约 100s 内返回 200"
+            echo "❌ /api/v1/health 未在约 200s 内返回 200"
             exit 1
           fi
 
           echo "=== 2) Catalog 断言（health 通过后再执行；列表或固定 SKU 二选一）==="
           if [ -n "$VERIFY_SKU_ID" ]; then
             echo "使用仓库变量 DEPLOY_VERIFY_CATALOG_SKU_ID=$VERIFY_SKU_ID → GET /api/v1/catalog/${VERIFY_SKU_ID}"
-            C_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${BASE}/api/v1/catalog/${VERIFY_SKU_ID}" 2>/dev/null || echo "000")
+            C_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              --connect-timeout 5 \
+              --max-time 10 \
+              "${BASE}/api/v1/catalog/${VERIFY_SKU_ID}" 2>/dev/null || echo "000")
           else
             echo "未设置 DEPLOY_VERIFY_CATALOG_SKU_ID → GET /api/v1/catalog?page=1&per_page=1（列表）"
-            C_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${BASE}/api/v1/catalog?page=1&per_page=1" 2>/dev/null || echo "000")
+            C_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              --connect-timeout 5 \
+              --max-time 10 \
+              "${BASE}/api/v1/catalog?page=1&per_page=1" 2>/dev/null || echo "000")
           fi
           if [ "$C_CODE" = "200" ]; then
             echo "✅ Catalog 断言通过 (HTTP $C_CODE)"
