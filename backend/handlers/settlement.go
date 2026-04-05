@@ -475,6 +475,10 @@ func AdminProcessDispute(c *gin.Context) {
 }
 
 func AdminReconcileSettlement(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+
 	settlementIDStr := c.Param("id")
 	settlementID, err := strconv.Atoi(settlementIDStr)
 	if err != nil {
