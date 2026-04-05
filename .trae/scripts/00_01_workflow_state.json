@@ -1,77 +1,42 @@
 {
-  "workflow_id": "phase4-dynamic-pricing-001",
-  "created_at": "2026-04-05T08:30:00Z",
-  "current_step": 0,
-  "issue_type": "feature",
-  "description": "Phase 4 动态定价服务开发",
+  "workflow_id": "pricing-monitoring-001",
+  "created_at": "2026-04-05T09:30:00Z",
+  "current_step": 1,
+  "issue_type": "enhancement",
+  "description": "为定价服务添加Prometheus监控和日志功能",
   "current_fix_cases": [],
-  "phase4_tasks": [
+  "enhancement_tasks": [
     {
-      "id": "TASK-4.1",
-      "title": "创建动态定价服务核心结构",
+      "id": "MONITOR-1",
+      "title": "添加Prometheus监控指标",
       "subtasks": [
-        "创建 services/pricing_service.go",
-        "定义 PricingService 结构体",
-        "定义 PricingData 结构体"
+        "添加 pricing_cache_hits_total 计数器",
+        "添加 pricing_cache_misses_total 计数器",
+        "添加 pricing_calculation_duration_seconds 直方图",
+        "在关键方法中埋点监控"
       ]
     },
     {
-      "id": "TASK-4.2",
-      "title": "实现定价数据读取",
+      "id": "LOG-1",
+      "title": "添加关键操作日志",
       "subtasks": [
-        "实现 GetPricing() 获取定价数据",
-        "实现 loadFromDB() 从数据库加载",
-        "实现缓存机制（5分钟TTL）"
-      ]
-    },
-    {
-      "id": "TASK-4.3",
-      "title": "实现成本计算逻辑",
-      "subtasks": [
-        "实现 CalculateCost() 计算Token成本",
-        "实现商户成本计算",
-        "实现平台利润计算"
-      ]
-    },
-    {
-      "id": "TASK-4.4",
-      "title": "预留策略配置读取接口",
-      "subtasks": [
-        "在 SmartRouter 中添加 GetStrategyConfig() 方法",
-        "从数据库读取路由策略配置",
-        "支持策略配置缓存"
-      ]
-    },
-    {
-      "id": "TASK-4.5",
-      "title": "重构API代理计费逻辑",
-      "subtasks": [
-        "修改 handlers/api_proxy.go",
-        "替换硬编码定价为动态定价服务调用",
-        "集成智能路由服务"
-      ]
-    },
-    {
-      "id": "TASK-4.6",
-      "title": "编写定价服务单元测试",
-      "subtasks": [
-        "创建 services/pricing_service_test.go",
-        "测试定价数据读取",
-        "测试缓存机制",
-        "测试成本计算准确性"
+        "添加缓存刷新日志（记录加载数据条数）",
+        "添加定价查询日志（记录provider+model）",
+        "添加错误日志（数据库连接失败、查询错误）",
+        "使用结构化日志格式"
       ]
     }
   ],
-  "branch_name": "feature/phase4-dynamic-pricing",
+  "branch_name": "enhancement/pricing-monitoring",
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "running",
+    "cicd": "pending",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
   },
-  "local_validation": "passed",
-  "pr_number": 169,
+  "local_validation": "pending",
+  "pr_number": null,
   "merged": false
 }

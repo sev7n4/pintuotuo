@@ -1,12 +1,15 @@
 package services
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/logger"
+	"github.com/pintuotuo/backend/metrics"
 )
 
 type PricingData struct {
@@ -47,6 +50,9 @@ func (s *PricingService) loadPricing() {
 	s.cacheMutex.Lock()
 	defer s.cacheMutex.Unlock()
 
+	startTime := time.Now()
+	source := "database"
+
 	if s.db == nil {
 		s.db = config.GetDB()
 	}
@@ -67,7 +73,11 @@ func (s *PricingService) loadPricing() {
 		`
 
 		rows, err := s.db.Query(query)
-		if err == nil {
+		if err != nil {
+			logger.LogError(context.Background(), "pricing_service", "Failed to query pricing from database", err, map[string]interface{}{
+				"query": query,
+			})
+		} else {
 			defer rows.Close()
 			for rows.Next() {
 				var p PricingData
@@ -82,9 +92,20 @@ func (s *PricingService) loadPricing() {
 
 	if len(s.pricingCache) == 0 {
 		s.loadDefaultPricing()
+		source = "default"
 	}
 
 	s.lastLoadTime = time.Now()
+	cacheSize := len(s.pricingCache)
+
+	metrics.RecordPricingCacheReload(source)
+	metrics.SetPricingCacheSize(cacheSize)
+
+	logger.LogInfo(context.Background(), "pricing_service", "Pricing cache reloaded", map[string]interface{}{
+		"source":       source,
+		"items_loaded": cacheSize,
+		"duration_ms":  time.Since(startTime).Milliseconds(),
+	})
 }
 
 func (s *PricingService) loadDefaultPricing() {
@@ -120,10 +141,27 @@ func (s *PricingService) GetPricing(provider, model string) (PricingData, bool) 
 
 	key := fmt.Sprintf("%s:%s", provider, model)
 	pricing, ok := s.pricingCache[key]
+
+	if ok {
+		metrics.RecordPricingCacheHit(provider, model)
+		logger.LogDebug(context.Background(), "pricing_service", "Pricing cache hit", map[string]interface{}{
+			"provider": provider,
+			"model":    model,
+		})
+	} else {
+		metrics.RecordPricingCacheMiss(provider, model)
+		logger.LogWarn(context.Background(), "pricing_service", "Pricing cache miss", map[string]interface{}{
+			"provider": provider,
+			"model":    model,
+		})
+	}
+
 	return pricing, ok
 }
 
 func (s *PricingService) CalculateCost(provider, model string, inputTokens, outputTokens int) float64 {
+	startTime := time.Now()
+
 	pricing, ok := s.GetPricing(provider, model)
 	if !ok {
 		pricing = PricingData{
@@ -134,6 +172,19 @@ func (s *PricingService) CalculateCost(provider, model string, inputTokens, outp
 
 	inputCost := float64(inputTokens) * pricing.InputPrice / 1_000_000
 	outputCost := float64(outputTokens) * pricing.OutputPrice / 1_000_000
+	totalCost := inputCost + outputCost
 
-	return inputCost + outputCost
+	duration := time.Since(startTime).Seconds()
+	metrics.RecordPricingCalculation(provider, model, duration)
+
+	logger.LogDebug(context.Background(), "pricing_service", "Pricing calculation completed", map[string]interface{}{
+		"provider":      provider,
+		"model":         model,
+		"input_tokens":  inputTokens,
+		"output_tokens": outputTokens,
+		"total_cost":    totalCost,
+		"duration_us":   duration * 1_000_000,
+	})
+
+	return totalCost
 }
