@@ -1,42 +1,67 @@
 {
-  "workflow_id": "pricing-monitoring-001",
-  "created_at": "2026-04-05T09:30:00Z",
-  "current_step": 1,
-  "issue_type": "enhancement",
-  "description": "为定价服务添加Prometheus监控和日志功能",
+  "workflow_id": "phase4-pricing-history-001",
+  "created_at": "2026-04-05T04:30:00Z",
+  "current_step": 14,
+  "issue_type": "feature",
+  "description": "Phase 4 定价历史记录和定时定价功能",
   "current_fix_cases": [],
-  "enhancement_tasks": [
+  "feature_tasks": [
     {
-      "id": "MONITOR-1",
-      "title": "添加Prometheus监控指标",
+      "id": "TASK-4.4",
+      "title": "定价历史记录",
+      "status": "completed",
       "subtasks": [
-        "添加 pricing_cache_hits_total 计数器",
-        "添加 pricing_cache_misses_total 计数器",
-        "添加 pricing_calculation_duration_seconds 直方图",
-        "在关键方法中埋点监控"
+        "添加 PricingHistory 结构体",
+        "实现 RecordPricingHistory() 记录审计日志",
+        "实现 GetPricingHistory() 查询历史"
       ]
     },
     {
-      "id": "LOG-1",
-      "title": "添加关键操作日志",
+      "id": "TASK-4.5",
+      "title": "定时定价功能",
+      "status": "completed",
       "subtasks": [
-        "添加缓存刷新日志（记录加载数据条数）",
-        "添加定价查询日志（记录provider+model）",
-        "添加错误日志（数据库连接失败、查询错误）",
-        "使用结构化日志格式"
+        "添加 PricingSchedule 结构体",
+        "实现 SchedulePricingChange() 创建定时计划",
+        "实现 ProcessScheduledPricing() 处理到期计划",
+        "实现 GetPendingSchedules() 获取待处理计划"
+      ]
+    },
+    {
+      "id": "TASK-4.7.5",
+      "title": "单元测试",
+      "status": "completed",
+      "subtasks": [
+        "添加 TestPricingHistoryStruct",
+        "添加 TestPricingScheduleStruct"
       ]
     }
   ],
-  "branch_name": "enhancement/pricing-monitoring",
-  "retry_count": 0,
-  "error_history": [],
+  "branch_name": "feature/phase4-pricing-history",
+  "retry_count": 1,
+  "error_history": [
+    {
+      "step": 10,
+      "error_type": "gofmt",
+      "message": "File is not properly formatted (gofmt)",
+      "timestamp": "2026-04-05T04:31:41Z"
+    },
+    {
+      "step": 10,
+      "error_type": "govet",
+      "message": "declaration of err shadows declaration at line 364",
+      "timestamp": "2026-04-05T04:31:41Z"
+    }
+  ],
   "ci_status": {
-    "cicd": "pending",
-    "integration": "pending",
-    "e2e": "pending",
-    "deploy": "pending"
+    "cicd": "passed",
+    "integration": "passed",
+    "e2e": "passed",
+    "deploy": "passed"
   },
-  "local_validation": "pending",
-  "pr_number": null,
-  "merged": false
+  "local_validation": "passed",
+  "pr_number": 173,
+  "merged": true,
+  "deployed_at": "2026-04-05T04:38:00Z",
+  "production_verified": true
 }
