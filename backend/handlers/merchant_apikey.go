@@ -12,8 +12,10 @@ import (
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/logger"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/services"
 	"github.com/pintuotuo/backend/utils"
 )
 
@@ -541,4 +543,154 @@ func GetSettlementDetail(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, settlement)
+}
+
+func VerifyMerchantAPIKey(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	keyIDStr := c.Param("id")
+	keyID, err := strconv.Atoi(keyIDStr)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var merchantID int
+	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"Merchant not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+
+	var apiKey models.MerchantAPIKey
+	err = db.QueryRow(
+		`SELECT id, merchant_id, provider, api_key_encrypted
+		 FROM merchant_api_keys
+		 WHERE id = $1 AND merchant_id = $2 AND status = 'active'`,
+		keyID, merchantID,
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted)
+
+	if err == sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"API key not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	} else if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	validator := services.GetAPIKeyValidator()
+	err = validator.ValidateAsync(apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "manual")
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"VERIFICATION_FAILED",
+			"Failed to start verification",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Verification started",
+		"api_key_id": apiKey.ID,
+	})
+}
+
+func GetMerchantAPIKeyVerification(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	keyIDStr := c.Param("id")
+	keyID, err := strconv.Atoi(keyIDStr)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var merchantID int
+	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"Merchant not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+
+	var apiKey models.MerchantAPIKey
+	err = db.QueryRow(
+		`SELECT id, merchant_id, provider, verification_result, verified_at, models_supported, verification_message
+		 FROM merchant_api_keys
+		 WHERE id = $1 AND merchant_id = $2`,
+		keyID, merchantID,
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.VerificationResult, &apiKey.VerifiedAt, &apiKey.ModelsSupported, &apiKey.VerificationMsg)
+
+	if err == sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"API key not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	} else if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	validator := services.GetAPIKeyValidator()
+	history, err := validator.GetVerificationHistory(keyID, 10)
+	if err != nil {
+		logger.LogError(context.Background(), "merchant_apikey", "Failed to get verification history", err, map[string]interface{}{
+			"api_key_id": keyID,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"api_key":  apiKey,
+		"history":  history,
+	})
 }

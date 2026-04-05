@@ -1,67 +1,74 @@
 {
-  "workflow_id": "phase4-pricing-history-001",
-  "created_at": "2026-04-05T04:30:00Z",
-  "current_step": 14,
+  "workflow_id": "phase5-api-key-validator-001",
+  "created_at": "2026-04-05T12:30:00Z",
+  "current_step": 1,
   "issue_type": "feature",
-  "description": "Phase 4 定价历史记录和定时定价功能",
+  "description": "Phase 5 API Key验证服务开发",
   "current_fix_cases": [],
   "feature_tasks": [
     {
-      "id": "TASK-4.4",
-      "title": "定价历史记录",
-      "status": "completed",
+      "id": "TASK-5.1",
+      "title": "创建API Key验证服务核心结构",
+      "status": "pending",
       "subtasks": [
-        "添加 PricingHistory 结构体",
-        "实现 RecordPricingHistory() 记录审计日志",
-        "实现 GetPricingHistory() 查询历史"
+        "创建 services/api_key_validator.go",
+        "定义 APIKeyValidator 结构体",
+        "定义 VerificationResult 结构体"
       ]
     },
     {
-      "id": "TASK-4.5",
-      "title": "定时定价功能",
-      "status": "completed",
+      "id": "TASK-5.2",
+      "title": "实现验证核心逻辑",
+      "status": "pending",
       "subtasks": [
-        "添加 PricingSchedule 结构体",
-        "实现 SchedulePricingChange() 创建定时计划",
-        "实现 ProcessScheduledPricing() 处理到期计划",
-        "实现 GetPendingSchedules() 获取待处理计划"
+        "实现 ValidateAsync() 异步验证入口",
+        "实现 validateAPIKey() 验证逻辑",
+        "实现 testConnection() 测试连接",
+        "实现 fetchModels() 获取模型列表"
       ]
     },
     {
-      "id": "TASK-4.7.5",
-      "title": "单元测试",
-      "status": "completed",
+      "id": "TASK-5.3",
+      "title": "实现验证状态管理",
+      "status": "pending",
       "subtasks": [
-        "添加 TestPricingHistoryStruct",
-        "添加 TestPricingScheduleStruct"
+        "实现 updateVerificationStatus() 更新验证状态",
+        "实现 IsVerified() 判断是否已验证",
+        "实现验证结果持久化"
+      ]
+    },
+    {
+      "id": "TASK-5.4",
+      "title": "创建验证API端点",
+      "status": "pending",
+      "subtasks": [
+        "修改 handlers/merchant_apikey.go",
+        "实现 POST /api/merchant/api-keys/:id/verify 触发验证",
+        "实现 GET /api/merchant/api-keys/:id/verification 获取验证结果"
+      ]
+    },
+    {
+      "id": "TASK-5.5",
+      "title": "编写验证服务单元测试",
+      "status": "pending",
+      "subtasks": [
+        "创建 services/api_key_validator_test.go",
+        "测试连接验证",
+        "测试模型列表获取",
+        "测试异步验证流程"
       ]
     }
   ],
-  "branch_name": "feature/phase4-pricing-history",
-  "retry_count": 1,
-  "error_history": [
-    {
-      "step": 10,
-      "error_type": "gofmt",
-      "message": "File is not properly formatted (gofmt)",
-      "timestamp": "2026-04-05T04:31:41Z"
-    },
-    {
-      "step": 10,
-      "error_type": "govet",
-      "message": "declaration of err shadows declaration at line 364",
-      "timestamp": "2026-04-05T04:31:41Z"
-    }
-  ],
+  "branch_name": "feature/phase5-api-key-validator",
+  "retry_count": 0,
+  "error_history": [],
   "ci_status": {
-    "cicd": "passed",
-    "integration": "passed",
-    "e2e": "passed",
-    "deploy": "passed"
+    "cicd": "pending",
+    "integration": "pending",
+    "e2e": "pending",
+    "deploy": "pending"
   },
-  "local_validation": "passed",
-  "pr_number": 173,
-  "merged": true,
-  "deployed_at": "2026-04-05T04:38:00Z",
-  "production_verified": true
+  "local_validation": "pending",
+  "pr_number": null,
+  "merged": false
 }

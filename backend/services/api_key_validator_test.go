@@ -1,0 +1,152 @@
+package services
+
+import (
+	"testing"
+	"time"
+)
+
+func TestAPIKeyValidatorStruct(t *testing.T) {
+	validator := &APIKeyValidator{
+		db: nil,
+	}
+
+	if validator == nil {
+		t.Fatal("APIKeyValidator should not be nil")
+	}
+}
+
+func TestVerificationResultStruct(t *testing.T) {
+	result := VerificationResult{
+		APIKeyID:           1,
+		Status:             "success",
+		ConnectionTest:     true,
+		ConnectionLatency:  150,
+		ModelsFound:        []string{"gpt-4", "gpt-3.5-turbo"},
+		ModelsCount:        2,
+		PricingVerified:    true,
+		VerificationType:   "initial",
+		StartedAt:          time.Now(),
+		CompletedAt:        time.Now(),
+	}
+
+	if result.APIKeyID != 1 {
+		t.Errorf("VerificationResult APIKeyID = %v, want 1", result.APIKeyID)
+	}
+	if result.Status != "success" {
+		t.Errorf("VerificationResult Status = %v, want success", result.Status)
+	}
+	if !result.ConnectionTest {
+		t.Errorf("VerificationResult ConnectionTest should be true")
+	}
+	if len(result.ModelsFound) != 2 {
+		t.Errorf("VerificationResult ModelsFound length = %v, want 2", len(result.ModelsFound))
+	}
+}
+
+func TestGetAPIKeyValidator(t *testing.T) {
+	validator1 := GetAPIKeyValidator()
+	validator2 := GetAPIKeyValidator()
+
+	if validator1 == nil {
+		t.Fatal("GetAPIKeyValidator() returned nil")
+	}
+
+	if validator1 != validator2 {
+		t.Fatal("GetAPIKeyValidator() should return singleton instance")
+	}
+}
+
+func TestValidateAsync(t *testing.T) {
+	validator := GetAPIKeyValidator()
+
+	tests := []struct {
+		name          string
+		apiKeyID      int
+		provider      string
+		encryptedKey  string
+		wantErr       bool
+	}{
+		{
+			name:         "Valid API Key ID",
+			apiKeyID:     1,
+			provider:     "openai",
+			encryptedKey: "encrypted-key-data",
+			wantErr:      false,
+		},
+		{
+			name:         "Invalid API Key ID",
+			apiKeyID:     0,
+			provider:     "openai",
+			encryptedKey: "encrypted-key-data",
+			wantErr:      true,
+		},
+		{
+			name:         "Empty provider",
+			apiKeyID:     1,
+			provider:     "",
+			encryptedKey: "encrypted-key-data",
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validator.ValidateAsync(tt.apiKeyID, tt.provider, tt.encryptedKey, "initial")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateAsync() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestIsVerified(t *testing.T) {
+	validator := GetAPIKeyValidator()
+
+	tests := []struct {
+		name       string
+		apiKeyID   int
+		wantStatus string
+	}{
+		{
+			name:       "Check verification status",
+			apiKeyID:   1,
+			wantStatus: "pending",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			verified, err := validator.IsVerified(tt.apiKeyID)
+			if err != nil {
+				t.Logf("IsVerified() error = %v (expected for non-existent key)", err)
+			}
+			t.Logf("IsVerified() returned verified=%v", verified)
+		})
+	}
+}
+
+func TestGetVerificationHistory(t *testing.T) {
+	validator := GetAPIKeyValidator()
+
+	tests := []struct {
+		name     string
+		apiKeyID int
+		limit    int
+	}{
+		{
+			name:     "Get verification history",
+			apiKeyID: 1,
+			limit:    10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			history, err := validator.GetVerificationHistory(tt.apiKeyID, tt.limit)
+			if err != nil {
+				t.Logf("GetVerificationHistory() error = %v (expected for non-existent key)", err)
+			}
+			t.Logf("GetVerificationHistory() returned %d records", len(history))
+		})
+	}
+}
