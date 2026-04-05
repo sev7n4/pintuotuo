@@ -128,6 +128,8 @@ func TestSettlementService_FinanceApprove(t *testing.T) {
 		settlementID := 1
 		financeUserID := 10
 
+		mock.ExpectBegin()
+
 		mock.ExpectQuery(`SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_confirmed", "finance_approved"}).
@@ -136,6 +138,8 @@ func TestSettlementService_FinanceApprove(t *testing.T) {
 		mock.ExpectExec(`UPDATE merchant_settlements SET finance_approved`).
 			WithArgs(true, financeUserID, settlementID).
 			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		mock.ExpectCommit()
 
 		err := service.FinanceApprove(settlementID, financeUserID)
 		assert.NoError(t, err)
@@ -147,10 +151,14 @@ func TestSettlementService_FinanceApprove(t *testing.T) {
 		settlementID := 1
 		financeUserID := 10
 
+		mock.ExpectBegin()
+
 		mock.ExpectQuery(`SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_confirmed", "finance_approved"}).
 				AddRow(false, false))
+
+		mock.ExpectRollback()
 
 		err := service.FinanceApprove(settlementID, financeUserID)
 		assert.Error(t, err)
