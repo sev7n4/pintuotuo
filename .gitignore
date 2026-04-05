@@ -97,6 +97,7 @@ Thumbs.db
 .trae/documents/
 .trae/skills/
 .trae/specs/
+.trae/scripts/
 
 # Go Coverage
 backend/coverage.out

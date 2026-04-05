@@ -624,7 +624,7 @@ func GetMerchantSettlements(c *gin.Context) {
 			return
 		}
 		if settledAt.Valid {
-			s.SettledAt = settledAt.Time
+			s.SettledAt = &settledAt.Time
 		}
 		settlements = append(settlements, s)
 	}

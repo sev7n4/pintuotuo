@@ -1,44 +1,82 @@
 {
-  "workflow_id": "phase7-settlement-api-001",
-  "created_at": "2026-04-05T11:20:00Z",
-  "current_step": 14,
-  "issue_type": "feature",
-  "description": "Phase 7 结算服务 API 端点开发",
-  "current_fix_cases": [],
-  "feature_tasks": [
+  "workflow_id": "settlement-critical-fix-001",
+  "created_at": "2026-04-05T13:30:00Z",
+  "current_step": 1,
+  "issue_type": "bugfix",
+  "description": "结算服务严重问题修复 - 安全漏洞、数据一致性、测试覆盖",
+  "current_fix_cases": [
+    "TEST-SETTLEMENT-ADMIN-AUTH",
+    "TEST-SETTLEMENT-MODEL-CONSISTENCY",
+    "TEST-SETTLEMENT-TRANSACTION",
+    "TEST-SETTLEMENT-HANDLER",
+    "TEST-SETTLEMENT-INTEGRATION"
+  ],
+  "fix_tasks": [
     {
-      "id": "TASK-7.6.1",
-      "title": "创建 settlement.go handler",
-      "status": "completed"
+      "id": "FIX-001",
+      "title": "添加管理员权限验证（7个端点）",
+      "priority": "P0",
+      "status": "pending"
     },
     {
-      "id": "TASK-7.6.2",
-      "title": "添加商户端 API 端点",
-      "status": "completed"
+      "id": "FIX-002",
+      "title": "修复MerchantSettlement数据模型",
+      "priority": "P0",
+      "status": "pending"
     },
     {
-      "id": "TASK-7.6.3",
-      "title": "添加管理端 API 端点",
-      "status": "completed"
+      "id": "FIX-003",
+      "title": "添加事务保护（4个关键操作）",
+      "priority": "P1",
+      "status": "pending"
     },
     {
-      "id": "TASK-7.6.4",
-      "title": "添加路由注册",
-      "status": "completed"
+      "id": "FIX-004",
+      "title": "添加并发控制（行级锁）",
+      "priority": "P1",
+      "status": "pending"
+    },
+    {
+      "id": "FIX-005",
+      "title": "统一错误处理",
+      "priority": "P2",
+      "status": "pending"
+    },
+    {
+      "id": "FIX-006",
+      "title": "完善日志记录",
+      "priority": "P2",
+      "status": "pending"
+    },
+    {
+      "id": "TEST-001",
+      "title": "编写Handler层测试",
+      "priority": "P0",
+      "status": "pending"
+    },
+    {
+      "id": "TEST-002",
+      "title": "编写集成测试",
+      "priority": "P1",
+      "status": "pending"
+    },
+    {
+      "id": "TEST-003",
+      "title": "编写E2E测试",
+      "priority": "P1",
+      "status": "pending"
     }
   ],
-  "branch_name": "feature/phase7-settlement-api",
+  "branch_name": "fix/settlement-critical-issues",
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "passed",
-    "integration": "passed",
-    "e2e": "passed",
-    "deploy": "passed"
+    "cicd": "pending",
+    "integration": "pending",
+    "e2e": "pending",
+    "deploy": "pending"
   },
-  "local_validation": "passed",
-  "pr_number": 180,
-  "merged": true,
-  "merged_at": "2026-04-05T12:38:09Z",
-  "completed_at": "2026-04-05T12:40:00Z"
+  "local_validation": "pending",
+  "pr_number": 0,
+  "merged": false
 }

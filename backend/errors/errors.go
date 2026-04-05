@@ -223,6 +223,55 @@ var (
 		Status:  http.StatusUnauthorized,
 	}
 
+	// Settlement errors
+	ErrSettlementNotFound = &AppError{
+		Code:    "SETTLEMENT_NOT_FOUND",
+		Message: "Settlement not found",
+		Status:  http.StatusNotFound,
+	}
+
+	ErrSettlementAlreadyExists = &AppError{
+		Code:    "SETTLEMENT_ALREADY_EXISTS",
+		Message: "Settlement already exists for this period",
+		Status:  http.StatusConflict,
+	}
+
+	ErrMerchantConfirmationRequired = &AppError{
+		Code:    "MERCHANT_CONFIRMATION_REQUIRED",
+		Message: "Merchant confirmation required before finance approval",
+		Status:  http.StatusBadRequest,
+	}
+
+	ErrFinanceApprovalRequired = &AppError{
+		Code:    "FINANCE_APPROVAL_REQUIRED",
+		Message: "Finance approval required before marking as paid",
+		Status:  http.StatusBadRequest,
+	}
+
+	ErrSettlementAlreadyApproved = &AppError{
+		Code:    "SETTLEMENT_ALREADY_APPROVED",
+		Message: "Settlement already approved by finance",
+		Status:  http.StatusConflict,
+	}
+
+	ErrDisputeNotFound = &AppError{
+		Code:    "DISPUTE_NOT_FOUND",
+		Message: "Dispute not found",
+		Status:  http.StatusNotFound,
+	}
+
+	ErrDisputeAlreadyResolved = &AppError{
+		Code:    "DISPUTE_ALREADY_RESOLVED",
+		Message: "Dispute has already been resolved",
+		Status:  http.StatusConflict,
+	}
+
+	ErrUnauthorizedSettlementAccess = &AppError{
+		Code:    "UNAUTHORIZED_SETTLEMENT_ACCESS",
+		Message: "You do not have permission to access this settlement",
+		Status:  http.StatusForbidden,
+	}
+
 	// Permission errors
 	ErrForbidden = &AppError{
 		Code:    "FORBIDDEN",

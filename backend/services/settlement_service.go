@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
 	"github.com/pintuotuo/backend/config"
+	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/logger"
 	"github.com/pintuotuo/backend/models"
 )
@@ -101,7 +103,12 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 	rows, err := s.db.Query(query, periodStart, periodEnd)
 	if err != nil {
 		logger.LogError(ctx, "settlement_service", "Failed to query merchant sales data", err, nil)
-		return nil, fmt.Errorf("failed to query merchant sales: %w", err)
+		return nil, apperrors.NewAppError(
+			"SETTLEMENT_QUERY_FAILED",
+			"Failed to query merchant sales data",
+			http.StatusInternalServerError,
+			err,
+		)
 	}
 	defer rows.Close()
 
@@ -116,17 +123,33 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 			continue
 		}
 
-		// 检查是否已存在该周期的结算
+		tx, err := s.db.Begin()
+		if err != nil {
+			logger.LogError(ctx, "settlement_service", "Failed to begin transaction for merchant", err, map[string]interface{}{
+				"merchant_id": data.MerchantID,
+			})
+			continue
+		}
+
 		var existingID int
-		err = s.db.QueryRow(
-			"SELECT id FROM merchant_settlements WHERE merchant_id = $1 AND period_start = $2 AND period_end = $3",
+		err = tx.QueryRow(
+			"SELECT id FROM merchant_settlements WHERE merchant_id = $1 AND period_start = $2 AND period_end = $3 FOR UPDATE",
 			data.MerchantID, periodStart, periodEnd,
 		).Scan(&existingID)
 
 		if err == nil {
+			tx.Rollback()
 			logger.LogInfo(ctx, "settlement_service", "Settlement already exists", map[string]interface{}{
 				"merchant_id":   data.MerchantID,
 				"settlement_id": existingID,
+			})
+			continue
+		}
+
+		if err != sql.ErrNoRows {
+			tx.Rollback()
+			logger.LogError(ctx, "settlement_service", "Failed to check existing settlement", err, map[string]interface{}{
+				"merchant_id": data.MerchantID,
 			})
 			continue
 		}
@@ -135,7 +158,7 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 		data.SettlementAmount = data.TotalSales - data.PlatformFee
 
 		var settlementID int
-		err = s.db.QueryRow(
+		err = tx.QueryRow(
 			`INSERT INTO merchant_settlements 
 			 (merchant_id, period_start, period_end, total_sales, platform_fee, settlement_amount, status)
 			 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -144,7 +167,15 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 		).Scan(&settlementID)
 
 		if err != nil {
+			tx.Rollback()
 			logger.LogError(ctx, "settlement_service", "Failed to create settlement", err, map[string]interface{}{
+				"merchant_id": data.MerchantID,
+			})
+			continue
+		}
+
+		if err := tx.Commit(); err != nil {
+			logger.LogError(ctx, "settlement_service", "Failed to commit transaction", err, map[string]interface{}{
 				"merchant_id": data.MerchantID,
 			})
 			continue
@@ -226,9 +257,16 @@ func (s *SettlementService) MerchantConfirm(settlementID, merchantID int) error 
 func (s *SettlementService) FinanceApprove(settlementID, financeUserID int) error {
 	ctx := context.Background()
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		logger.LogError(ctx, "settlement_service", "Failed to begin transaction", err, nil)
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	var merchantConfirmed, financeApproved bool
-	err := s.db.QueryRow(
-		"SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id = $1",
+	err = tx.QueryRow(
+		"SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id = $1 FOR UPDATE",
 		settlementID,
 	).Scan(&merchantConfirmed, &financeApproved)
 
@@ -247,7 +285,7 @@ func (s *SettlementService) FinanceApprove(settlementID, financeUserID int) erro
 		return fmt.Errorf("settlement already approved by finance")
 	}
 
-	_, err = s.db.Exec(
+	_, err = tx.Exec(
 		`UPDATE merchant_settlements 
 		 SET finance_approved = $1, 
 		     finance_approved_at = CURRENT_TIMESTAMP,
@@ -266,6 +304,11 @@ func (s *SettlementService) FinanceApprove(settlementID, financeUserID int) erro
 		return fmt.Errorf("failed to approve settlement: %w", err)
 	}
 
+	if err := tx.Commit(); err != nil {
+		logger.LogError(ctx, "settlement_service", "Failed to commit transaction", err, nil)
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	logger.LogInfo(ctx, "settlement_service", "Settlement approved by finance", map[string]interface{}{
 		"settlement_id":   settlementID,
 		"finance_user_id": financeUserID,
@@ -277,9 +320,16 @@ func (s *SettlementService) FinanceApprove(settlementID, financeUserID int) erro
 func (s *SettlementService) MarkAsPaid(settlementID, userID int) error {
 	ctx := context.Background()
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		logger.LogError(ctx, "settlement_service", "Failed to begin transaction", err, nil)
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	var financeApproved bool
-	err := s.db.QueryRow(
-		"SELECT finance_approved FROM merchant_settlements WHERE id = $1",
+	err = tx.QueryRow(
+		"SELECT finance_approved FROM merchant_settlements WHERE id = $1 FOR UPDATE",
 		settlementID,
 	).Scan(&financeApproved)
 
@@ -294,7 +344,7 @@ func (s *SettlementService) MarkAsPaid(settlementID, userID int) error {
 		return fmt.Errorf("finance approval required before marking as paid")
 	}
 
-	_, err = s.db.Exec(
+	_, err = tx.Exec(
 		`UPDATE merchant_settlements 
 		 SET marked_paid_at = CURRENT_TIMESTAMP,
 		     marked_paid_by = $1,
@@ -311,6 +361,11 @@ func (s *SettlementService) MarkAsPaid(settlementID, userID int) error {
 			"user_id":       userID,
 		})
 		return fmt.Errorf("failed to mark settlement as paid: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.LogError(ctx, "settlement_service", "Failed to commit transaction", err, nil)
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	logger.LogInfo(ctx, "settlement_service", "Settlement marked as paid", map[string]interface{}{
@@ -384,10 +439,17 @@ func (s *SettlementService) SubmitDispute(settlementID, merchantID int, disputeT
 func (s *SettlementService) ProcessDispute(disputeID, handlerID int, resolution string, adjustedAmount float64) error {
 	ctx := context.Background()
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		logger.LogError(ctx, "settlement_service", "Failed to begin transaction", err, nil)
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	var dispute DisputeData
 	var evidenceURLs []byte
-	err := s.db.QueryRow(
-		"SELECT id, settlement_id, merchant_id, dispute_type, dispute_reason, evidence_urls, original_amount, disputed_amount, status FROM settlement_disputes WHERE id = $1",
+	err = tx.QueryRow(
+		"SELECT id, settlement_id, merchant_id, dispute_type, dispute_reason, evidence_urls, original_amount, disputed_amount, status FROM settlement_disputes WHERE id = $1 FOR UPDATE",
 		disputeID,
 	).Scan(&dispute.ID, &dispute.SettlementID, &dispute.MerchantID, &dispute.DisputeType, &dispute.DisputeReason, &evidenceURLs, &dispute.OriginalAmount, &dispute.DisputedAmount, &dispute.Status)
 
@@ -398,7 +460,7 @@ func (s *SettlementService) ProcessDispute(disputeID, handlerID int, resolution 
 		return fmt.Errorf("failed to query dispute: %w", err)
 	}
 
-	_, err = s.db.Exec(
+	_, err = tx.Exec(
 		`UPDATE settlement_disputes 
 		 SET status = 'resolved',
 		     handled_by = $1,
@@ -419,13 +481,25 @@ func (s *SettlementService) ProcessDispute(disputeID, handlerID int, resolution 
 	}
 
 	if adjustedAmount > 0 {
-		err = s.adjustSettlementAmount(dispute.SettlementID, adjustedAmount)
+		_, err = tx.Exec(
+			`UPDATE merchant_settlements 
+			 SET settlement_amount = $1,
+			     updated_at = CURRENT_TIMESTAMP
+			 WHERE id = $2`,
+			adjustedAmount, dispute.SettlementID,
+		)
 		if err != nil {
 			logger.LogError(ctx, "settlement_service", "Failed to adjust settlement amount", err, map[string]interface{}{
 				"settlement_id":   dispute.SettlementID,
 				"adjusted_amount": adjustedAmount,
 			})
+			return fmt.Errorf("failed to adjust settlement amount: %w", err)
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		logger.LogError(ctx, "settlement_service", "Failed to commit transaction", err, nil)
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	logger.LogInfo(ctx, "settlement_service", "Dispute processed", map[string]interface{}{

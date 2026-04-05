@@ -204,17 +204,24 @@ type MerchantAPIKey struct {
 
 // MerchantSettlement represents a merchant's settlement record
 type MerchantSettlement struct {
-	ID               int       `json:"id"`
-	MerchantID       int       `json:"merchant_id"`
-	PeriodStart      time.Time `json:"period_start"`
-	PeriodEnd        time.Time `json:"period_end"`
-	TotalSales       float64   `json:"total_sales"`
-	PlatformFee      float64   `json:"platform_fee"`
-	SettlementAmount float64   `json:"settlement_amount"`
-	Status           string    `json:"status"` // pending, processing, completed
-	SettledAt        time.Time `json:"settled_at,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                  int        `json:"id"`
+	MerchantID          int        `json:"merchant_id"`
+	PeriodStart         time.Time  `json:"period_start"`
+	PeriodEnd           time.Time  `json:"period_end"`
+	TotalSales          float64    `json:"total_sales"`
+	PlatformFee         float64    `json:"platform_fee"`
+	SettlementAmount    float64    `json:"settlement_amount"`
+	Status              string     `json:"status"` // pending, processing, completed
+	SettledAt           *time.Time `json:"settled_at,omitempty"`
+	MerchantConfirmed   bool       `json:"merchant_confirmed"`
+	MerchantConfirmedAt *time.Time `json:"merchant_confirmed_at,omitempty"`
+	FinanceApproved     bool       `json:"finance_approved"`
+	FinanceApprovedAt   *time.Time `json:"finance_approved_at,omitempty"`
+	FinanceApprovedBy   *int       `json:"finance_approved_by,omitempty"`
+	MarkedPaidAt        *time.Time `json:"marked_paid_at,omitempty"`
+	MarkedPaidBy        *int       `json:"marked_paid_by,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 // MerchantStats represents daily merchant statistics

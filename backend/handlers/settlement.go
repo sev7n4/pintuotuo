@@ -14,6 +14,20 @@ import (
 	"github.com/pintuotuo/backend/services"
 )
 
+func requireAdminRole(c *gin.Context) bool {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != roleAdmin {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Admin access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return false
+	}
+	return true
+}
+
 func GetMerchantSettlementByID(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -192,9 +206,7 @@ func SubmitSettlementDispute(c *gin.Context) {
 }
 
 func AdminGetSettlements(c *gin.Context) {
-	_, exists := c.Get("user_id")
-	if !exists {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+	if !requireAdminRole(c) {
 		return
 	}
 
@@ -289,9 +301,7 @@ func AdminGetSettlements(c *gin.Context) {
 }
 
 func AdminGetSettlementByID(c *gin.Context) {
-	_, exists := c.Get("user_id")
-	if !exists {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+	if !requireAdminRole(c) {
 		return
 	}
 
@@ -353,6 +363,10 @@ func AdminGetSettlementByID(c *gin.Context) {
 }
 
 func AdminApproveSettlement(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+
 	adminUserID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
@@ -383,6 +397,10 @@ func AdminApproveSettlement(c *gin.Context) {
 }
 
 func AdminMarkSettlementPaid(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+
 	adminUserID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
@@ -413,6 +431,10 @@ func AdminMarkSettlementPaid(c *gin.Context) {
 }
 
 func AdminProcessDispute(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+
 	adminUserID, exists := c.Get("user_id")
 	if !exists {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
@@ -474,6 +496,10 @@ func AdminReconcileSettlement(c *gin.Context) {
 }
 
 func AdminGenerateMonthlySettlements(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+
 	var req struct {
 		Year  int `json:"year" binding:"required"`
 		Month int `json:"month" binding:"required"`
