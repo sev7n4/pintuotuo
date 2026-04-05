@@ -1,98 +1,68 @@
 {
-  "workflow_id": "phase3-smart-router-001",
-  "created_at": "2026-04-04T16:40:00Z",
-  "current_step": 1,
+  "workflow_id": "phase4-dynamic-pricing-001",
+  "created_at": "2026-04-05T08:30:00Z",
+  "current_step": 0,
   "issue_type": "feature",
-  "description": "Phase 3 智能路由服务开发",
+  "description": "Phase 4 动态定价服务开发",
   "current_fix_cases": [],
-  "phase3_tasks": [
+  "phase4_tasks": [
     {
-      "id": "TASK-3.1",
-      "title": "创建智能路由服务核心结构",
+      "id": "TASK-4.1",
+      "title": "创建动态定价服务核心结构",
       "subtasks": [
-        "创建 services/smart_router.go",
-        "定义 SmartRouter 结构体",
-        "定义 RoutingStrategy 常量",
-        "定义 RoutingCandidate 结构体"
+        "创建 services/pricing_service.go",
+        "定义 PricingService 结构体",
+        "定义 PricingData 结构体"
       ]
     },
     {
-      "id": "TASK-3.2",
-      "title": "实现候选Provider获取",
+      "id": "TASK-4.2",
+      "title": "实现定价数据读取",
       "subtasks": [
-        "实现 getCandidates()",
-        "实现 filterUnhealthy()",
-        "实现 filterUnverified()"
+        "实现 GetPricing() 获取定价数据",
+        "实现 loadFromDB() 从数据库加载",
+        "实现缓存机制（5分钟TTL）"
       ]
     },
     {
-      "id": "TASK-3.3",
-      "title": "实现多维度评分计算",
+      "id": "TASK-4.3",
+      "title": "实现成本计算逻辑",
       "subtasks": [
-        "实现 calculateScores()",
-        "实现价格评分因子",
-        "实现延迟评分因子",
-        "实现成功率评分因子",
-        "实现权重配置读取"
+        "实现 CalculateCost() 计算Token成本",
+        "实现商户成本计算",
+        "实现平台利润计算"
       ]
     },
     {
-      "id": "TASK-3.4",
-      "title": "实现路由决策逻辑",
+      "id": "TASK-4.4",
+      "title": "预留策略配置读取接口",
       "subtasks": [
-        "实现 SelectProvider()",
-        "实现 SelectBackupProvider()",
-        "实现故障切换逻辑"
+        "在 SmartRouter 中添加 GetStrategyConfig() 方法",
+        "从数据库读取路由策略配置",
+        "支持策略配置缓存"
       ]
     },
     {
-      "id": "TASK-3.5",
-      "title": "实现熔断器保护",
+      "id": "TASK-4.5",
+      "title": "重构API代理计费逻辑",
       "subtasks": [
-        "创建 services/circuit_breaker.go",
-        "实现 CircuitBreaker 结构体",
-        "实现 AllowRequest()",
-        "实现 RecordSuccess()",
-        "实现 RecordFailure()",
-        "实现半开状态探测"
+        "修改 handlers/api_proxy.go",
+        "替换硬编码定价为动态定价服务调用",
+        "集成智能路由服务"
       ]
     },
     {
-      "id": "TASK-3.6",
-      "title": "实现请求重试机制",
+      "id": "TASK-4.6",
+      "title": "编写定价服务单元测试",
       "subtasks": [
-        "创建 services/retry_policy.go",
-        "实现 RetryPolicy 结构体",
-        "实现指数退避算法",
-        "实现可配置重试策略",
-        "实现重试日志记录"
-      ]
-    },
-    {
-      "id": "TASK-3.7",
-      "title": "实现连接池管理",
-      "subtasks": [
-        "创建 services/connection_pool.go",
-        "实现 Provider连接池",
-        "实现连接预热机制",
-        "实现连接复用"
-      ]
-    },
-    {
-      "id": "TASK-3.8",
-      "title": "编写智能路由单元测试",
-      "subtasks": [
-        "创建 services/smart_router_test.go",
-        "测试价格优先策略",
-        "测试延迟优先策略",
-        "测试均衡策略",
-        "测试故障切换",
-        "测试熔断器",
-        "测试重试机制"
+        "创建 services/pricing_service_test.go",
+        "测试定价数据读取",
+        "测试缓存机制",
+        "测试成本计算准确性"
       ]
     }
   ],
-  "branch_name": "feature/phase3-smart-router",
+  "branch_name": "feature/phase4-dynamic-pricing",
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
