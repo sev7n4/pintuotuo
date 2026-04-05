@@ -18,47 +18,47 @@ type SettlementService struct {
 }
 
 type SettlementData struct {
-	MerchantID   int
-	TotalSales   float64
-	TotalOrders  int
-	PlatformFee  float64
+	MerchantID       int
+	TotalSales       float64
+	TotalOrders      int
+	PlatformFee      float64
 	SettlementAmount float64
 }
 
 type DisputeData struct {
-	ID              int                    `json:"id"`
-	SettlementID    int                    `json:"settlement_id"`
-	MerchantID      int                    `json:"merchant_id"`
-	DisputeType     string                 `json:"dispute_type"`
-	DisputeReason   string                 `json:"dispute_reason"`
-	EvidenceURLs    []string               `json:"evidence_urls,omitempty"`
-	OriginalAmount  float64                `json:"original_amount"`
-	DisputedAmount  float64                `json:"disputed_amount"`
-	AdjustedAmount  float64                `json:"adjusted_amount,omitempty"`
-	Status          string                 `json:"status"`
-	HandledBy       *int                   `json:"handled_by,omitempty"`
-	HandledAt       *time.Time             `json:"handled_at,omitempty"`
-	ResolutionNotes string                 `json:"resolution_notes,omitempty"`
-	CreatedAt       time.Time              `json:"created_at"`
-	UpdatedAt       time.Time              `json:"updated_at"`
+	ID              int        `json:"id"`
+	SettlementID    int        `json:"settlement_id"`
+	MerchantID      int        `json:"merchant_id"`
+	DisputeType     string     `json:"dispute_type"`
+	DisputeReason   string     `json:"dispute_reason"`
+	EvidenceURLs    []string   `json:"evidence_urls,omitempty"`
+	OriginalAmount  float64    `json:"original_amount"`
+	DisputedAmount  float64    `json:"disputed_amount"`
+	AdjustedAmount  float64    `json:"adjusted_amount,omitempty"`
+	Status          string     `json:"status"`
+	HandledBy       *int       `json:"handled_by,omitempty"`
+	HandledAt       *time.Time `json:"handled_at,omitempty"`
+	ResolutionNotes string     `json:"resolution_notes,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 type ReconciliationData struct {
-	ID                int                    `json:"id"`
-	SettlementID      int                    `json:"settlement_id"`
-	OrderCountExpected int                   `json:"order_count_expected"`
-	OrderCountActual   int                   `json:"order_count_actual"`
-	OrderCountDiff     int                   `json:"order_count_diff"`
-	UsageExpected      float64               `json:"usage_expected"`
-	UsageActual        float64               `json:"usage_actual"`
-	UsageDiff          float64               `json:"usage_diff"`
-	AmountExpected     float64               `json:"amount_expected"`
-	AmountActual       float64               `json:"amount_actual"`
-	AmountDiff         float64               `json:"amount_diff"`
-	HasAnomalies      bool                  `json:"has_anomalies"`
+	ID                 int                    `json:"id"`
+	SettlementID       int                    `json:"settlement_id"`
+	OrderCountExpected int                    `json:"order_count_expected"`
+	OrderCountActual   int                    `json:"order_count_actual"`
+	OrderCountDiff     int                    `json:"order_count_diff"`
+	UsageExpected      float64                `json:"usage_expected"`
+	UsageActual        float64                `json:"usage_actual"`
+	UsageDiff          float64                `json:"usage_diff"`
+	AmountExpected     float64                `json:"amount_expected"`
+	AmountActual       float64                `json:"amount_actual"`
+	AmountDiff         float64                `json:"amount_diff"`
+	HasAnomalies       bool                   `json:"has_anomalies"`
 	AnomalyDetails     map[string]interface{} `json:"anomaly_details,omitempty"`
-	ReconciledAt       time.Time             `json:"reconciled_at"`
-	ReconciledBy       *int                  `json:"reconciled_by,omitempty"`
+	ReconciledAt       time.Time              `json:"reconciled_at"`
+	ReconciledBy       *int                   `json:"reconciled_by,omitempty"`
 }
 
 var (
@@ -77,7 +77,7 @@ func GetSettlementService() *SettlementService {
 
 func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd time.Time) ([]models.MerchantSettlement, error) {
 	ctx := context.Background()
-	
+
 	logger.LogInfo(ctx, "settlement_service", "Starting monthly settlement generation", map[string]interface{}{
 		"period_start": periodStart.Format("2006-01-02"),
 		"period_end":   periodEnd.Format("2006-01-02"),
@@ -122,10 +122,10 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 			"SELECT id FROM merchant_settlements WHERE merchant_id = $1 AND period_start = $2 AND period_end = $3",
 			data.MerchantID, periodStart, periodEnd,
 		).Scan(&existingID)
-		
+
 		if err == nil {
 			logger.LogInfo(ctx, "settlement_service", "Settlement already exists", map[string]interface{}{
-				"merchant_id": data.MerchantID,
+				"merchant_id":   data.MerchantID,
 				"settlement_id": existingID,
 			})
 			continue
@@ -142,7 +142,7 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 			 RETURNING id`,
 			data.MerchantID, periodStart, periodEnd, data.TotalSales, data.PlatformFee, data.SettlementAmount, "pending",
 		).Scan(&settlementID)
-		
+
 		if err != nil {
 			logger.LogError(ctx, "settlement_service", "Failed to create settlement", err, map[string]interface{}{
 				"merchant_id": data.MerchantID,
@@ -163,10 +163,10 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 		settlements = append(settlements, settlement)
 
 		logger.LogInfo(ctx, "settlement_service", "Settlement created", map[string]interface{}{
-			"settlement_id":      settlementID,
-			"merchant_id":        data.MerchantID,
-			"total_sales":        data.TotalSales,
-			"settlement_amount":  data.SettlementAmount,
+			"settlement_id":     settlementID,
+			"merchant_id":       data.MerchantID,
+			"total_sales":       data.TotalSales,
+			"settlement_amount": data.SettlementAmount,
 		})
 	}
 
@@ -186,7 +186,7 @@ func (s *SettlementService) MerchantConfirm(settlementID, merchantID int) error 
 		"SELECT merchant_id, status FROM merchant_settlements WHERE id = $1",
 		settlementID,
 	).Scan(&dbMerchantID, &status)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("settlement not found")
@@ -206,7 +206,7 @@ func (s *SettlementService) MerchantConfirm(settlementID, merchantID int) error 
 		 WHERE id = $2 AND merchant_id = $3`,
 		true, settlementID, merchantID,
 	)
-	
+
 	if err != nil {
 		logger.LogError(ctx, "settlement_service", "Failed to confirm settlement", err, map[string]interface{}{
 			"settlement_id": settlementID,
@@ -231,7 +231,7 @@ func (s *SettlementService) FinanceApprove(settlementID, financeUserID int) erro
 		"SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id = $1",
 		settlementID,
 	).Scan(&merchantConfirmed, &financeApproved)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("settlement not found")
@@ -257,18 +257,18 @@ func (s *SettlementService) FinanceApprove(settlementID, financeUserID int) erro
 		 WHERE id = $3`,
 		true, financeUserID, settlementID,
 	)
-	
+
 	if err != nil {
 		logger.LogError(ctx, "settlement_service", "Failed to approve settlement", err, map[string]interface{}{
-			"settlement_id":    settlementID,
-			"finance_user_id":  financeUserID,
+			"settlement_id":   settlementID,
+			"finance_user_id": financeUserID,
 		})
 		return fmt.Errorf("failed to approve settlement: %w", err)
 	}
 
 	logger.LogInfo(ctx, "settlement_service", "Settlement approved by finance", map[string]interface{}{
-		"settlement_id":    settlementID,
-		"finance_user_id":  financeUserID,
+		"settlement_id":   settlementID,
+		"finance_user_id": financeUserID,
 	})
 
 	return nil
@@ -282,7 +282,7 @@ func (s *SettlementService) MarkAsPaid(settlementID, userID int) error {
 		"SELECT finance_approved FROM merchant_settlements WHERE id = $1",
 		settlementID,
 	).Scan(&financeApproved)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("settlement not found")
@@ -304,7 +304,7 @@ func (s *SettlementService) MarkAsPaid(settlementID, userID int) error {
 		 WHERE id = $2`,
 		userID, settlementID,
 	)
-	
+
 	if err != nil {
 		logger.LogError(ctx, "settlement_service", "Failed to mark settlement as paid", err, map[string]interface{}{
 			"settlement_id": settlementID,
@@ -329,7 +329,7 @@ func (s *SettlementService) SubmitDispute(settlementID, merchantID int, disputeT
 		"SELECT merchant_id FROM merchant_settlements WHERE id = $1",
 		settlementID,
 	).Scan(&dbMerchantID)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("settlement not found")
@@ -349,7 +349,7 @@ func (s *SettlementService) SubmitDispute(settlementID, merchantID int, disputeT
 		 RETURNING id`,
 		settlementID, merchantID, disputeType, reason, originalAmount, disputedAmount, "pending",
 	).Scan(&disputeID)
-	
+
 	if err != nil {
 		logger.LogError(ctx, "settlement_service", "Failed to submit dispute", err, map[string]interface{}{
 			"settlement_id": settlementID,
@@ -372,10 +372,10 @@ func (s *SettlementService) SubmitDispute(settlementID, merchantID int, disputeT
 	}
 
 	logger.LogInfo(ctx, "settlement_service", "Dispute submitted", map[string]interface{}{
-		"dispute_id":     disputeID,
-		"settlement_id":  settlementID,
-		"merchant_id":    merchantID,
-		"dispute_type":   disputeType,
+		"dispute_id":    disputeID,
+		"settlement_id": settlementID,
+		"merchant_id":   merchantID,
+		"dispute_type":  disputeType,
 	})
 
 	return dispute, nil
@@ -390,7 +390,7 @@ func (s *SettlementService) ProcessDispute(disputeID, handlerID int, resolution 
 		"SELECT id, settlement_id, merchant_id, dispute_type, dispute_reason, evidence_urls, original_amount, disputed_amount, status FROM settlement_disputes WHERE id = $1",
 		disputeID,
 	).Scan(&dispute.ID, &dispute.SettlementID, &dispute.MerchantID, &dispute.DisputeType, &dispute.DisputeReason, &evidenceURLs, &dispute.OriginalAmount, &dispute.DisputedAmount, &dispute.Status)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("dispute not found")
@@ -409,7 +409,7 @@ func (s *SettlementService) ProcessDispute(disputeID, handlerID int, resolution 
 		 WHERE id = $4`,
 		handlerID, resolution, adjustedAmount, disputeID,
 	)
-	
+
 	if err != nil {
 		logger.LogError(ctx, "settlement_service", "Failed to process dispute", err, map[string]interface{}{
 			"dispute_id": disputeID,
@@ -422,7 +422,7 @@ func (s *SettlementService) ProcessDispute(disputeID, handlerID int, resolution 
 		err = s.adjustSettlementAmount(dispute.SettlementID, adjustedAmount)
 		if err != nil {
 			logger.LogError(ctx, "settlement_service", "Failed to adjust settlement amount", err, map[string]interface{}{
-				"settlement_id":    dispute.SettlementID,
+				"settlement_id":   dispute.SettlementID,
 				"adjusted_amount": adjustedAmount,
 			})
 		}
@@ -457,7 +457,7 @@ func (s *SettlementService) ReconcileOrders(settlementID int) (*ReconciliationDa
 		"SELECT merchant_id, period_start, period_end FROM merchant_settlements WHERE id = $1",
 		settlementID,
 	).Scan(&merchantID, &periodStart, &periodEnd)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("settlement not found")
@@ -476,7 +476,7 @@ func (s *SettlementService) ReconcileOrders(settlementID int) (*ReconciliationDa
 		   AND created_at <= $3`,
 		merchantID, periodStart, periodEnd,
 	).Scan(&expectedCount, &expectedAmount)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to query expected orders: %w", err)
 	}
@@ -493,7 +493,7 @@ func (s *SettlementService) ReconcileOrders(settlementID int) (*ReconciliationDa
 		   AND o.created_at <= $3`,
 		merchantID, periodStart, periodEnd,
 	).Scan(&actualCount, &actualAmount)
-	
+
 	if err != nil && err != sql.ErrNoRows {
 		return nil, fmt.Errorf("failed to query actual orders: %w", err)
 	}
@@ -532,7 +532,7 @@ func (s *SettlementService) ReconcileOrders(settlementID int) (*ReconciliationDa
 		settlementID, expectedCount, actualCount, orderCountDiff,
 		expectedAmount, actualAmount, amountDiff, hasAnomalies, anomalyJSON,
 	).Scan(&reconciliationID)
-	
+
 	if err != nil {
 		logger.LogError(ctx, "settlement_service", "Failed to create reconciliation", err, map[string]interface{}{
 			"settlement_id": settlementID,
