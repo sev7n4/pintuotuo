@@ -340,30 +340,3 @@ func RegisterSKURoutes(router *gin.RouterGroup) {
 		subscriptions.GET("", handlers.GetUserSubscriptions)
 	}
 }
-
-func RegisterSettlementRoutes(router *gin.RouterGroup) {
-	merchantSettlements := router.Group("/merchant/settlements")
-	merchantSettlements.Use(middleware.AuthMiddleware())
-	{
-		merchantSettlements.GET("/:id", handlers.GetMerchantSettlementByID)
-		merchantSettlements.POST("/:id/confirm", handlers.ConfirmSettlement)
-		merchantSettlements.POST("/:id/dispute", handlers.SubmitSettlementDispute)
-	}
-
-	adminSettlements := router.Group("/admin/settlements")
-	adminSettlements.Use(middleware.AuthMiddleware())
-	{
-		adminSettlements.GET("", handlers.AdminGetSettlements)
-		adminSettlements.POST("/generate", handlers.AdminGenerateMonthlySettlements)
-		adminSettlements.GET("/:id", handlers.AdminGetSettlementByID)
-		adminSettlements.POST("/:id/approve", handlers.AdminApproveSettlement)
-		adminSettlements.POST("/:id/mark-paid", handlers.AdminMarkSettlementPaid)
-		adminSettlements.POST("/:id/reconcile", handlers.AdminReconcileSettlement)
-	}
-
-	adminDisputes := router.Group("/admin/disputes")
-	adminDisputes.Use(middleware.AuthMiddleware())
-	{
-		adminDisputes.POST("/:id/process", handlers.AdminProcessDispute)
-	}
-}

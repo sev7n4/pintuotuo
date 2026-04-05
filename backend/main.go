@@ -103,7 +103,6 @@ func main() {
 		routes.RegisterFavoriteRoutes(v1)
 		routes.RegisterBrowseHistoryRoutes(v1)
 		routes.RegisterSKURoutes(v1)
-		routes.RegisterSettlementRoutes(v1)
 	}
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
