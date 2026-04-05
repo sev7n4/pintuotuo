@@ -1,5 +1,7 @@
 .settlements {
   padding: 24px;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .pageTitle {
@@ -14,6 +16,7 @@
 
 .tableCard {
   margin-bottom: 24px;
+  overflow-x: auto;
 }
 
 .cardHeader {
@@ -21,15 +24,42 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .filters {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .amount {
   font-size: 16px;
   font-weight: 600;
   color: #52c41a;
+}
+
+@media (max-width: 768px) {
+  .settlements {
+    padding: 16px;
+  }
+
+  .pageTitle {
+    font-size: 20px;
+  }
+
+  .cardHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters {
+    width: 100%;
+  }
+
+  .filters > * {
+    flex: 1;
+    min-width: 120px;
+  }
 }
