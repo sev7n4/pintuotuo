@@ -10,13 +10,12 @@ import (
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
-	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
 )
 
 func requireAdminRole(c *gin.Context) bool {
 	userRole, exists := c.Get("user_role")
-	if !exists || userRole != roleAdmin {
+	if !exists || userRole != "admin" {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FORBIDDEN",
 			"Admin access required",
@@ -66,11 +65,21 @@ func GetMerchantSettlementByID(c *gin.Context) {
 	}
 
 	type SettlementResponse struct {
-		models.MerchantSettlement
+		ID                  int        `json:"id"`
+		MerchantID          int        `json:"merchant_id"`
+		PeriodStart         time.Time  `json:"period_start"`
+		PeriodEnd           time.Time  `json:"period_end"`
+		TotalSales          float64    `json:"total_sales"`
+		PlatformFee         float64    `json:"platform_fee"`
+		SettlementAmount    float64    `json:"settlement_amount"`
+		Status              string     `json:"status"`
+		SettledAt           *time.Time `json:"settled_at,omitempty"`
 		MerchantConfirmed   bool       `json:"merchant_confirmed"`
 		MerchantConfirmedAt *time.Time `json:"merchant_confirmed_at,omitempty"`
 		FinanceApproved     bool       `json:"finance_approved"`
 		FinanceApprovedAt   *time.Time `json:"finance_approved_at,omitempty"`
+		CreatedAt           time.Time  `json:"created_at"`
+		UpdatedAt           time.Time  `json:"updated_at"`
 	}
 
 	var s SettlementResponse
