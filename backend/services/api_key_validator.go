@@ -136,11 +136,11 @@ func (v *APIKeyValidator) performVerification(apiKeyID int, provider, encryptedK
 	}
 
 	logger.LogInfo(ctx, "api_key_validator", "API key verification completed", map[string]interface{}{
-		"api_key_id":        apiKeyID,
-		"verification_id":   verificationID,
-		"status":            result.Status,
-		"connection_test":   result.ConnectionTest,
-		"models_count":      result.ModelsCount,
+		"api_key_id":         apiKeyID,
+		"verification_id":    verificationID,
+		"status":             result.Status,
+		"connection_test":    result.ConnectionTest,
+		"models_count":       result.ModelsCount,
 		"connection_latency": result.ConnectionLatency,
 	})
 }
@@ -406,7 +406,7 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 		})
 	}
 
-	logger.LogError(ctx, "api_key_validator", "API key verification failed", fmt.Errorf(errorMessage), map[string]interface{}{
+	logger.LogError(ctx, "api_key_validator", "API key verification failed", fmt.Errorf("%s", errorMessage), map[string]interface{}{
 		"verification_id": verificationID,
 		"error_code":      errorCode,
 	})

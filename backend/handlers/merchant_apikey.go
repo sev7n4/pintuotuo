@@ -690,7 +690,7 @@ func GetMerchantAPIKeyVerification(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"api_key":  apiKey,
-		"history":  history,
+		"api_key": apiKey,
+		"history": history,
 	})
 }
