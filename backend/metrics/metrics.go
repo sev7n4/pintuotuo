@@ -283,6 +283,83 @@ var (
 	)
 )
 
+// API Key Verification Metrics
+var (
+	// Verification total counter
+	VerificationTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "api_key_verification_total",
+			Help: "Total number of API key verifications",
+		},
+		[]string{"provider", "verification_type", "status"},
+	)
+
+	// Verification duration histogram
+	VerificationDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "api_key_verification_duration_seconds",
+			Help:    "API key verification duration in seconds",
+			Buckets: []float64{.1, .5, 1, 2, 5, 10, 30, 60},
+		},
+		[]string{"provider", "verification_type"},
+	)
+
+	// Verification cache hits counter
+	VerificationCacheHits = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "api_key_verification_cache_hits_total",
+			Help: "Total number of verification cache hits",
+		},
+		[]string{"provider"},
+	)
+
+	// Verification cache misses counter
+	VerificationCacheMisses = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "api_key_verification_cache_misses_total",
+			Help: "Total number of verification cache misses",
+		},
+		[]string{"provider"},
+	)
+
+	// Verification retry counter
+	VerificationRetries = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "api_key_verification_retries_total",
+			Help: "Total number of verification retries",
+		},
+		[]string{"provider", "attempt"},
+	)
+
+	// Active verifications gauge
+	ActiveVerifications = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "api_key_active_verifications",
+			Help: "Number of active API key verifications",
+		},
+		[]string{"provider"},
+	)
+
+	// Verification connection latency histogram
+	VerificationConnectionLatency = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "api_key_verification_connection_latency_ms",
+			Help:    "API key verification connection latency in milliseconds",
+			Buckets: []float64{10, 50, 100, 200, 500, 1000, 2000, 5000},
+		},
+		[]string{"provider"},
+	)
+
+	// Models discovered counter
+	ModelsDiscovered = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "api_key_models_discovered_total",
+			Help: "Total number of models discovered during verification",
+		},
+		[]string{"provider"},
+	)
+)
+
 // Error Metrics
 var (
 	// Application errors counter
