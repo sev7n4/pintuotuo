@@ -222,6 +222,8 @@ func RegisterMerchantRoutes(router *gin.RouterGroup) {
 			apiKeys.PUT("/:id", handlers.UpdateMerchantAPIKey)
 			apiKeys.DELETE("/:id", handlers.DeleteMerchantAPIKey)
 			apiKeys.GET("/usage", handlers.GetMerchantAPIKeyUsage)
+			apiKeys.POST("/:id/verify", handlers.VerifyMerchantAPIKey)
+			apiKeys.GET("/:id/verification", handlers.GetMerchantAPIKeyVerification)
 		}
 
 		skus := authMerchants.Group("/skus")
