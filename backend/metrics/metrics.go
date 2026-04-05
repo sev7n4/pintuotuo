@@ -234,6 +234,55 @@ var (
 	)
 )
 
+// Pricing Service Metrics
+var (
+	// Pricing cache hits counter
+	PricingCacheHits = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "pricing_cache_hits_total",
+			Help: "Total number of pricing cache hits",
+		},
+		[]string{"provider", "model"},
+	)
+
+	// Pricing cache misses counter
+	PricingCacheMisses = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "pricing_cache_misses_total",
+			Help: "Total number of pricing cache misses",
+		},
+		[]string{"provider", "model"},
+	)
+
+	// Pricing calculation duration histogram
+	PricingCalculationDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "pricing_calculation_duration_seconds",
+			Help:    "Pricing calculation duration in seconds",
+			Buckets: []float64{.00001, .00005, .0001, .0005, .001, .005, .01},
+		},
+		[]string{"provider", "model"},
+	)
+
+	// Pricing cache reload counter
+	PricingCacheReloads = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "pricing_cache_reloads_total",
+			Help: "Total number of pricing cache reloads",
+		},
+		[]string{"source"},
+	)
+
+	// Pricing cache size gauge
+	PricingCacheSize = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "pricing_cache_size",
+			Help: "Number of items in pricing cache",
+		},
+		[]string{},
+	)
+)
+
 // Error Metrics
 var (
 	// Application errors counter
@@ -319,4 +368,29 @@ func RecordPaymentProcessed(method, status string, valueInCents int64) {
 // RecordApplicationError records an application error
 func RecordApplicationError(errorCode, severity string) {
 	ApplicationErrors.WithLabelValues(errorCode, severity).Inc()
+}
+
+// RecordPricingCacheHit records a pricing cache hit
+func RecordPricingCacheHit(provider, model string) {
+	PricingCacheHits.WithLabelValues(provider, model).Inc()
+}
+
+// RecordPricingCacheMiss records a pricing cache miss
+func RecordPricingCacheMiss(provider, model string) {
+	PricingCacheMisses.WithLabelValues(provider, model).Inc()
+}
+
+// RecordPricingCalculation records a pricing calculation
+func RecordPricingCalculation(provider, model string, durationSeconds float64) {
+	PricingCalculationDuration.WithLabelValues(provider, model).Observe(durationSeconds)
+}
+
+// RecordPricingCacheReload records a pricing cache reload
+func RecordPricingCacheReload(source string) {
+	PricingCacheReloads.WithLabelValues(source).Inc()
+}
+
+// SetPricingCacheSize sets the pricing cache size
+func SetPricingCacheSize(size int) {
+	PricingCacheSize.WithLabelValues().Set(float64(size))
 }
