@@ -55,6 +55,7 @@ import AdminSPUs from '@pages/admin/AdminSPUs';
 import AdminSKUs from '@pages/admin/AdminSKUs';
 import AdminModelProviders from '@pages/admin/AdminModelProviders';
 import AdminFlashSales from '@pages/admin/AdminFlashSales';
+import AdminSettlements from '@pages/admin/AdminSettlements';
 
 function LegacyProductDetailRedirect() {
   const { id } = useParams();
@@ -150,6 +151,7 @@ function App() {
             <Route path="merchants" element={<AdminMerchants />} />
             <Route path="products" element={<AdminProducts />} />
             <Route path="orders" element={<AdminOrders />} />
+            <Route path="settlements" element={<AdminSettlements />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="spus" element={<AdminSPUs />} />
             <Route path="skus" element={<AdminSKUs />} />
