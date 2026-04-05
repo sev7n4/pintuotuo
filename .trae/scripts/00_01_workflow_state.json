@@ -66,12 +66,14 @@
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "running",
-    "integration": "pending",
-    "e2e": "pending",
-    "deploy": "pending"
+    "cicd": "passed",
+    "integration": "passed",
+    "e2e": "passed",
+    "deploy": "passed"
   },
   "local_validation": "passed",
   "pr_number": 169,
-  "merged": false
+  "merged": true,
+  "deployed_at": "2026-04-05T01:11:05Z",
+  "production_verified": true
 }
