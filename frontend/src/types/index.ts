@@ -292,6 +292,33 @@ export interface MerchantSettlement {
   settled_at?: string;
   created_at: string;
   updated_at: string;
+  merchant_confirmed: boolean;
+  merchant_confirmed_at?: string;
+  finance_approved: boolean;
+  finance_approved_at?: string;
+}
+
+export interface SettlementDispute {
+  id: number;
+  settlement_id: number;
+  reason: string;
+  status: 'pending' | 'resolved' | 'rejected';
+  resolved_at?: string;
+  resolved_by?: number;
+  resolution_notes?: string;
+  created_at: string;
+}
+
+export interface SettlementReconciliation {
+  id: number;
+  settlement_id: number;
+  order_count: number;
+  total_usage: number;
+  total_amount: number;
+  anomalies: string;
+  reconciled_by: number;
+  reconciled_at: string;
+  created_at: string;
 }
 
 export interface MerchantOrder extends Order {
