@@ -341,3 +341,144 @@ func (r *SmartRouter) GetRoutingStats(ctx context.Context) (map[string]interface
 		"circuit_breaker_count": len(r.circuitBreaker),
 	}, nil
 }
+
+type StrategyConfig struct {
+	ID                      int
+	Name                    string
+	Code                    string
+	PriceWeight             float64
+	LatencyWeight           float64
+	ReliabilityWeight       float64
+	MaxRetryCount           int
+	RetryBackoffBase        int
+	CircuitBreakerThreshold int
+	CircuitBreakerTimeout   int
+	IsDefault               bool
+}
+
+var (
+	strategyCache     map[string]StrategyConfig
+	strategyCacheOnce sync.Once
+	strategyCacheMu   sync.RWMutex
+)
+
+func (r *SmartRouter) GetStrategyConfig(strategyCode string) (StrategyConfig, bool) {
+	strategyCacheOnce.Do(func() {
+		strategyCache = make(map[string]StrategyConfig)
+		r.loadStrategyCache()
+		if len(strategyCache) == 0 {
+			r.loadDefaultStrategies()
+		}
+	})
+
+	strategyCacheMu.RLock()
+	config, found := strategyCache[strategyCode]
+	strategyCacheMu.RUnlock()
+
+	return config, found
+}
+
+func (r *SmartRouter) loadDefaultStrategies() {
+	strategyCacheMu.Lock()
+	defer strategyCacheMu.Unlock()
+
+	defaultStrategies := []StrategyConfig{
+		{
+			ID:                      1,
+			Name:                    "价格优先",
+			Code:                    "price_first",
+			PriceWeight:             0.6,
+			LatencyWeight:           0.2,
+			ReliabilityWeight:       0.2,
+			MaxRetryCount:           3,
+			RetryBackoffBase:        1000,
+			CircuitBreakerThreshold: 5,
+			CircuitBreakerTimeout:   60,
+			IsDefault:               false,
+		},
+		{
+			ID:                      2,
+			Name:                    "延迟优先",
+			Code:                    "latency_first",
+			PriceWeight:             0.2,
+			LatencyWeight:           0.6,
+			ReliabilityWeight:       0.2,
+			MaxRetryCount:           3,
+			RetryBackoffBase:        1000,
+			CircuitBreakerThreshold: 5,
+			CircuitBreakerTimeout:   60,
+			IsDefault:               false,
+		},
+		{
+			ID:                      3,
+			Name:                    "均衡策略",
+			Code:                    "balanced",
+			PriceWeight:             0.33,
+			LatencyWeight:           0.34,
+			ReliabilityWeight:       0.33,
+			MaxRetryCount:           3,
+			RetryBackoffBase:        1000,
+			CircuitBreakerThreshold: 5,
+			CircuitBreakerTimeout:   60,
+			IsDefault:               true,
+		},
+		{
+			ID:                      4,
+			Name:                    "可靠性优先",
+			Code:                    "reliability_first",
+			PriceWeight:             0.2,
+			LatencyWeight:           0.2,
+			ReliabilityWeight:       0.6,
+			MaxRetryCount:           3,
+			RetryBackoffBase:        1000,
+			CircuitBreakerThreshold: 5,
+			CircuitBreakerTimeout:   60,
+			IsDefault:               false,
+		},
+	}
+
+	for _, s := range defaultStrategies {
+		strategyCache[s.Code] = s
+	}
+}
+
+func (r *SmartRouter) loadStrategyCache() {
+	if r.db == nil {
+		r.db = config.GetDB()
+	}
+	if r.db == nil {
+		return
+	}
+
+	rows, err := r.db.Query(`
+		SELECT 
+			id, name, code,
+			price_weight, latency_weight, reliability_weight,
+			max_retry_count, retry_backoff_base,
+			circuit_breaker_threshold, circuit_breaker_timeout,
+			is_default
+		FROM routing_strategies
+		WHERE status = 'active'
+	`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	strategyCacheMu.Lock()
+	defer strategyCacheMu.Unlock()
+
+	for rows.Next() {
+		var config StrategyConfig
+		err := rows.Scan(
+			&config.ID, &config.Name, &config.Code,
+			&config.PriceWeight, &config.LatencyWeight, &config.ReliabilityWeight,
+			&config.MaxRetryCount, &config.RetryBackoffBase,
+			&config.CircuitBreakerThreshold, &config.CircuitBreakerTimeout,
+			&config.IsDefault,
+		)
+		if err == nil {
+			strategyCache[config.Code] = config
+		}
+	}
+}
