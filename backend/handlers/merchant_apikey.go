@@ -539,7 +539,7 @@ func GetSettlementDetail(c *gin.Context) {
 	}
 
 	if settledAt.Valid {
-		settlement.SettledAt = settledAt.Time
+		settlement.SettledAt = &settledAt.Time
 	}
 
 	c.JSON(http.StatusOK, settlement)

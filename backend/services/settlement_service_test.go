@@ -20,21 +20,22 @@ func TestSettlementService_GenerateMonthlySettlements(t *testing.T) {
 		periodStart := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 		periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
 
-		// Mock the first query to get merchant sales data
 		mock.ExpectQuery(`SELECT m\.id, COALESCE`).
 			WithArgs(periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "total_sales", "total_orders"}).
 				AddRow(merchantID, 10000.00, 100))
 
-		// Mock the check for existing settlement (returns no rows, meaning settlement doesn't exist)
+		mock.ExpectBegin()
+
 		mock.ExpectQuery(`SELECT id FROM merchant_settlements WHERE merchant_id`).
 			WithArgs(merchantID, periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-		// Mock the insert with QueryRow (not Exec!)
 		mock.ExpectQuery(`INSERT INTO merchant_settlements`).
 			WithArgs(merchantID, periodStart, periodEnd, 10000.00, 500.00, 9500.00, "pending").
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+		mock.ExpectCommit()
 
 		settlements, err := service.GenerateMonthlySettlements(periodStart, periodEnd)
 		assert.NoError(t, err)
@@ -57,9 +58,13 @@ func TestSettlementService_GenerateMonthlySettlements(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"id", "total_sales", "total_orders"}).
 				AddRow(merchantID, 10000.00, 100))
 
+		mock.ExpectBegin()
+
 		mock.ExpectQuery(`SELECT id FROM merchant_settlements WHERE merchant_id`).
 			WithArgs(merchantID, periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+		mock.ExpectRollback()
 
 		settlements, err := service.GenerateMonthlySettlements(periodStart, periodEnd)
 		assert.NoError(t, err)
@@ -123,6 +128,8 @@ func TestSettlementService_FinanceApprove(t *testing.T) {
 		settlementID := 1
 		financeUserID := 10
 
+		mock.ExpectBegin()
+
 		mock.ExpectQuery(`SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_confirmed", "finance_approved"}).
@@ -131,6 +138,8 @@ func TestSettlementService_FinanceApprove(t *testing.T) {
 		mock.ExpectExec(`UPDATE merchant_settlements SET finance_approved`).
 			WithArgs(true, financeUserID, settlementID).
 			WillReturnResult(sqlmock.NewResult(0, 1))
+
+		mock.ExpectCommit()
 
 		err := service.FinanceApprove(settlementID, financeUserID)
 		assert.NoError(t, err)
@@ -142,10 +151,14 @@ func TestSettlementService_FinanceApprove(t *testing.T) {
 		settlementID := 1
 		financeUserID := 10
 
+		mock.ExpectBegin()
+
 		mock.ExpectQuery(`SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_confirmed", "finance_approved"}).
 				AddRow(false, false))
+
+		mock.ExpectRollback()
 
 		err := service.FinanceApprove(settlementID, financeUserID)
 		assert.Error(t, err)
