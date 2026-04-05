@@ -343,17 +343,17 @@ func (r *SmartRouter) GetRoutingStats(ctx context.Context) (map[string]interface
 }
 
 type StrategyConfig struct {
-	ID                     int
-	Name                   string
-	Code                   string
-	PriceWeight            float64
-	LatencyWeight          float64
-	ReliabilityWeight      float64
-	MaxRetryCount          int
-	RetryBackoffBase       int
+	ID                      int
+	Name                    string
+	Code                    string
+	PriceWeight             float64
+	LatencyWeight           float64
+	ReliabilityWeight       float64
+	MaxRetryCount           int
+	RetryBackoffBase        int
 	CircuitBreakerThreshold int
-	CircuitBreakerTimeout  int
-	IsDefault              bool
+	CircuitBreakerTimeout   int
+	IsDefault               bool
 }
 
 var (
@@ -384,56 +384,56 @@ func (r *SmartRouter) loadDefaultStrategies() {
 
 	defaultStrategies := []StrategyConfig{
 		{
-			ID:                     1,
-			Name:                   "价格优先",
-			Code:                   "price_first",
-			PriceWeight:            0.6,
-			LatencyWeight:          0.2,
-			ReliabilityWeight:      0.2,
-			MaxRetryCount:          3,
-			RetryBackoffBase:       1000,
+			ID:                      1,
+			Name:                    "价格优先",
+			Code:                    "price_first",
+			PriceWeight:             0.6,
+			LatencyWeight:           0.2,
+			ReliabilityWeight:       0.2,
+			MaxRetryCount:           3,
+			RetryBackoffBase:        1000,
 			CircuitBreakerThreshold: 5,
-			CircuitBreakerTimeout:  60,
-			IsDefault:              false,
+			CircuitBreakerTimeout:   60,
+			IsDefault:               false,
 		},
 		{
-			ID:                     2,
-			Name:                   "延迟优先",
-			Code:                   "latency_first",
-			PriceWeight:            0.2,
-			LatencyWeight:          0.6,
-			ReliabilityWeight:      0.2,
-			MaxRetryCount:          3,
-			RetryBackoffBase:       1000,
+			ID:                      2,
+			Name:                    "延迟优先",
+			Code:                    "latency_first",
+			PriceWeight:             0.2,
+			LatencyWeight:           0.6,
+			ReliabilityWeight:       0.2,
+			MaxRetryCount:           3,
+			RetryBackoffBase:        1000,
 			CircuitBreakerThreshold: 5,
-			CircuitBreakerTimeout:  60,
-			IsDefault:              false,
+			CircuitBreakerTimeout:   60,
+			IsDefault:               false,
 		},
 		{
-			ID:                     3,
-			Name:                   "均衡策略",
-			Code:                   "balanced",
-			PriceWeight:            0.33,
-			LatencyWeight:          0.34,
-			ReliabilityWeight:      0.33,
-			MaxRetryCount:          3,
-			RetryBackoffBase:       1000,
+			ID:                      3,
+			Name:                    "均衡策略",
+			Code:                    "balanced",
+			PriceWeight:             0.33,
+			LatencyWeight:           0.34,
+			ReliabilityWeight:       0.33,
+			MaxRetryCount:           3,
+			RetryBackoffBase:        1000,
 			CircuitBreakerThreshold: 5,
-			CircuitBreakerTimeout:  60,
-			IsDefault:              true,
+			CircuitBreakerTimeout:   60,
+			IsDefault:               true,
 		},
 		{
-			ID:                     4,
-			Name:                   "可靠性优先",
-			Code:                   "reliability_first",
-			PriceWeight:            0.2,
-			LatencyWeight:          0.2,
-			ReliabilityWeight:      0.6,
-			MaxRetryCount:          3,
-			RetryBackoffBase:       1000,
+			ID:                      4,
+			Name:                    "可靠性优先",
+			Code:                    "reliability_first",
+			PriceWeight:             0.2,
+			LatencyWeight:           0.2,
+			ReliabilityWeight:       0.6,
+			MaxRetryCount:           3,
+			RetryBackoffBase:        1000,
 			CircuitBreakerThreshold: 5,
-			CircuitBreakerTimeout:  60,
-			IsDefault:              false,
+			CircuitBreakerTimeout:   60,
+			IsDefault:               false,
 		},
 	}
 
