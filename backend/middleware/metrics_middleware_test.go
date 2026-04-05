@@ -35,7 +35,7 @@ func TestMetricsMiddlewareHandlesErrors(t *testing.T) {
 	router.Use(MetricsMiddleware())
 
 	router.GET("/error", func(c *gin.Context) {
-		c.AbortWithError(http.StatusInternalServerError, nil)
+		c.AbortWithStatus(http.StatusInternalServerError)
 	})
 
 	w := httptest.NewRecorder()
