@@ -175,9 +175,9 @@ func TestSettlementService_SubmitDispute(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_id"}).
 				AddRow(merchantID))
 
-		mock.ExpectExec(`INSERT INTO settlement_disputes`).
+		mock.ExpectQuery(`INSERT INTO settlement_disputes`).
 			WithArgs(settlementID, merchantID, disputeType, reason, originalAmount, disputedAmount, "pending").
-			WillReturnResult(sqlmock.NewResult(1, 1))
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		dispute, err := service.SubmitDispute(settlementID, merchantID, disputeType, reason, originalAmount, disputedAmount)
 		assert.NoError(t, err)
@@ -217,8 +217,8 @@ func TestSettlementService_ReconcileOrders(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"count", "total"}).
 				AddRow(100, 10000.00))
 
-		mock.ExpectExec(`INSERT INTO settlement_reconciliations`).
-			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectQuery(`INSERT INTO settlement_reconciliations`).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		reconciliation, err := service.ReconcileOrders(settlementID)
 		assert.NoError(t, err)
@@ -252,8 +252,8 @@ func TestSettlementService_ReconcileOrders(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"count", "total"}).
 				AddRow(95, 9500.00))
 
-		mock.ExpectExec(`INSERT INTO settlement_reconciliations`).
-			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectQuery(`INSERT INTO settlement_reconciliations`).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		reconciliation, err := service.ReconcileOrders(settlementID)
 		assert.NoError(t, err)
