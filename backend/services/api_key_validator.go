@@ -71,30 +71,6 @@ func GetAPIKeyValidator() *APIKeyValidator {
 	return apiKeyValidator
 }
 
-func (v *APIKeyValidator) getCachedVerification(ctx context.Context, apiKeyID int) (*VerificationResult, error) {
-	if v.redis == nil {
-		return nil, fmt.Errorf("redis client not available")
-	}
-
-	key := fmt.Sprintf("%s%d", VerificationCacheKeyPrefix, apiKeyID)
-	data, err := v.redis.Get(ctx, key).Result()
-	if err == redis.Nil {
-		metrics.VerificationCacheMisses.WithLabelValues("unknown").Inc()
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-
-	metrics.VerificationCacheHits.WithLabelValues("unknown").Inc()
-
-	var result VerificationResult
-	if err := json.Unmarshal([]byte(data), &result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
-}
-
 func (v *APIKeyValidator) cacheVerificationResult(ctx context.Context, result VerificationResult) error {
 	if v.redis == nil {
 		return nil
@@ -107,15 +83,6 @@ func (v *APIKeyValidator) cacheVerificationResult(ctx context.Context, result Ve
 	}
 
 	return v.redis.Set(ctx, key, data, v.cacheTTL).Err()
-}
-
-func (v *APIKeyValidator) invalidateVerificationCache(ctx context.Context, apiKeyID int) error {
-	if v.redis == nil {
-		return nil
-	}
-
-	key := fmt.Sprintf("%s%d", VerificationCacheKeyPrefix, apiKeyID)
-	return v.redis.Del(ctx, key).Err()
 }
 
 func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, encryptedKey, verificationType string, retryCount int) {
