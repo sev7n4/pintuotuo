@@ -1,14 +1,14 @@
 package services
 
 import (
-  "context"
-  "database/sql"
-  "fmt"
-  "sort"
-  "sync"
-  "time"
+	"context"
+	"database/sql"
+	"fmt"
+	"sort"
+	"sync"
+	"time"
 
-  "github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/config"
 )
 
 type RoutingStrategy string
@@ -21,19 +21,19 @@ const (
 )
 
 type RoutingCandidate struct {
-	APIKeyID      int
-	Provider      string
-	Model         string
-	Score         float64
-	PriceScore    float64
-	LatencyScore  float64
-	SuccessScore  float64
-	HealthStatus  string
-	Verified      bool
-	InputPrice    float64
-	OutputPrice   float64
-	AvgLatencyMs  int
-	SuccessRate   float64
+	APIKeyID     int
+	Provider     string
+	Model        string
+	Score        float64
+	PriceScore   float64
+	LatencyScore float64
+	SuccessScore float64
+	HealthStatus string
+	Verified     bool
+	InputPrice   float64
+	OutputPrice  float64
+	AvgLatencyMs int
+	SuccessRate  float64
 }
 
 type SmartRouter struct {
@@ -334,10 +334,10 @@ func (r *SmartRouter) GetRoutingStats(ctx context.Context) (map[string]interface
 	r.cbMutex.RUnlock()
 
 	return map[string]interface{}{
-		"total_providers":        totalProviders,
-		"healthy_providers":      healthyProviders,
-		"degraded_providers":     degradedProviders,
-		"open_circuit_breakers":  openCircuitBreakers,
-		"circuit_breaker_count":  len(r.circuitBreaker),
+		"total_providers":       totalProviders,
+		"healthy_providers":     healthyProviders,
+		"degraded_providers":    degradedProviders,
+		"open_circuit_breakers": openCircuitBreakers,
+		"circuit_breaker_count": len(r.circuitBreaker),
 	}, nil
 }
