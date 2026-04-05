@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col, Input, Form, Select } from 'antd';
+import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col, Form, Select, DatePicker } from 'antd';
+import type { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
 import {
   DollarOutlined,
   CheckCircleOutlined,
@@ -11,6 +13,10 @@ import {
 import { MerchantSettlement } from '@/types';
 import styles from './AdminSettlements.module.css';
 
+const getAuthToken = () => {
+  return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
+};
+
 const AdminSettlements = () => {
   const [settlements, setSettlements] = useState<MerchantSettlement[]>([]);
   const [loading, setLoading] = useState(false);
@@ -21,24 +27,26 @@ const AdminSettlements = () => {
   const [generateVisible, setGenerateVisible] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('');
-  const [filterYear, setFilterYear] = useState<string>('');
-  const [filterMonth, setFilterMonth] = useState<string>('');
+  const [filterYearMonth, setFilterYearMonth] = useState<Dayjs | null>(null);
+  const [generateYearMonth, setGenerateYearMonth] = useState<Dayjs | null>(null);
 
   useEffect(() => {
     fetchSettlements();
-  }, [filterStatus, filterYear, filterMonth]);
+  }, [filterStatus, filterYearMonth]);
 
   const fetchSettlements = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (filterStatus) params.append('status', filterStatus);
-      if (filterYear) params.append('year', filterYear);
-      if (filterMonth) params.append('month', filterMonth);
+      if (filterYearMonth) {
+        params.append('year', filterYearMonth.year().toString());
+        params.append('month', (filterYearMonth.month() + 1).toString());
+      }
 
       const response = await fetch(`/api/v1/admin/settlements?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -60,7 +68,7 @@ const AdminSettlements = () => {
     try {
       const response = await fetch(`/api/v1/admin/settlements/${record.id}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -86,7 +94,7 @@ const AdminSettlements = () => {
       const response = await fetch(`/api/v1/admin/settlements/${selectedSettlement.id}/approve`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -113,7 +121,7 @@ const AdminSettlements = () => {
       const response = await fetch(`/api/v1/admin/settlements/${selectedSettlement.id}/mark-paid`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -139,7 +147,7 @@ const AdminSettlements = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${getAuthToken()}`,
         },
         body: JSON.stringify(values),
       });
@@ -313,21 +321,12 @@ const AdminSettlements = () => {
               <Select.Option value="processing">处理中</Select.Option>
               <Select.Option value="completed">已完成</Select.Option>
             </Select>
-            <Input
-              placeholder="年份"
-              style={{ width: 100 }}
-              value={filterYear}
-              onChange={(e) => setFilterYear(e.target.value)}
-              type="number"
-            />
-            <Input
-              placeholder="月份"
-              style={{ width: 100 }}
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-              type="number"
-              min={1}
-              max={12}
+            <DatePicker
+              picker="month"
+              placeholder="选择年月"
+              value={filterYearMonth}
+              onChange={setFilterYearMonth}
+              style={{ width: 150 }}
             />
           </div>
           <Button type="primary" onClick={() => setGenerateVisible(true)}>
@@ -436,15 +435,31 @@ const AdminSettlements = () => {
       <Modal
         title="生成月度结算"
         open={generateVisible}
-        onCancel={() => setGenerateVisible(false)}
+        onCancel={() => {
+          setGenerateVisible(false);
+          setGenerateYearMonth(null);
+        }}
         footer={null}
       >
-        <Form layout="vertical" onFinish={handleGenerateSettlements}>
-          <Form.Item label="年份" name="year" rules={[{ required: true, message: '请输入年份' }]}>
-            <Input type="number" placeholder="例如：2026" />
-          </Form.Item>
-          <Form.Item label="月份" name="month" rules={[{ required: true, message: '请输入月份' }]}>
-            <Input type="number" placeholder="1-12" min={1} max={12} />
+        <Form layout="vertical" onFinish={() => {
+          if (!generateYearMonth) {
+            message.warning('请选择年月');
+            return;
+          }
+          handleGenerateSettlements({
+            year: generateYearMonth.year(),
+            month: generateYearMonth.month() + 1,
+          });
+        }}>
+          <Form.Item label="选择年月" required>
+            <DatePicker
+              picker="month"
+              placeholder="选择年月"
+              value={generateYearMonth}
+              onChange={setGenerateYearMonth}
+              style={{ width: '100%' }}
+              disabledDate={(current) => current && current > dayjs().endOf('month')}
+            />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={generateLoading} block>

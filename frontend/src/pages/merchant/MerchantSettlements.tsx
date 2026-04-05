@@ -11,6 +11,10 @@ import { useMerchantStore } from '@/stores/merchantStore';
 import { MerchantSettlement } from '@/types';
 import styles from './MerchantSettlements.module.css';
 
+const getAuthToken = () => {
+  return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
+};
+
 const MerchantSettlements = () => {
   const { settlements, fetchSettlements, requestSettlement, isLoading } = useMerchantStore();
   const [detailVisible, setDetailVisible] = useState(false);
@@ -46,7 +50,7 @@ const MerchantSettlements = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -77,7 +81,7 @@ const MerchantSettlements = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${getAuthToken()}`,
         },
         body: JSON.stringify({ reason: disputeReason }),
       });
