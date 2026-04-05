@@ -20,21 +20,22 @@ func TestSettlementService_GenerateMonthlySettlements(t *testing.T) {
 		periodStart := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 		periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
 
-		// Mock the first query to get merchant sales data
 		mock.ExpectQuery(`SELECT m\.id, COALESCE`).
 			WithArgs(periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "total_sales", "total_orders"}).
 				AddRow(merchantID, 10000.00, 100))
 
-		// Mock the check for existing settlement (returns no rows, meaning settlement doesn't exist)
+		mock.ExpectBegin()
+
 		mock.ExpectQuery(`SELECT id FROM merchant_settlements WHERE merchant_id`).
 			WithArgs(merchantID, periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-		// Mock the insert with QueryRow (not Exec!)
 		mock.ExpectQuery(`INSERT INTO merchant_settlements`).
 			WithArgs(merchantID, periodStart, periodEnd, 10000.00, 500.00, 9500.00, "pending").
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+		mock.ExpectCommit()
 
 		settlements, err := service.GenerateMonthlySettlements(periodStart, periodEnd)
 		assert.NoError(t, err)
@@ -57,9 +58,13 @@ func TestSettlementService_GenerateMonthlySettlements(t *testing.T) {
 			WillReturnRows(sqlmock.NewRows([]string{"id", "total_sales", "total_orders"}).
 				AddRow(merchantID, 10000.00, 100))
 
+		mock.ExpectBegin()
+
 		mock.ExpectQuery(`SELECT id FROM merchant_settlements WHERE merchant_id`).
 			WithArgs(merchantID, periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+		mock.ExpectRollback()
 
 		settlements, err := service.GenerateMonthlySettlements(periodStart, periodEnd)
 		assert.NoError(t, err)
