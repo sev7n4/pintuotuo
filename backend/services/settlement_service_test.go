@@ -20,15 +20,18 @@ func TestSettlementService_GenerateMonthlySettlements(t *testing.T) {
 		periodStart := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 		periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
 
-		mock.ExpectQuery(`SELECT m.id, COALESCE`).
+		// Mock the first query to get merchant sales data
+		mock.ExpectQuery(`SELECT m\.id, COALESCE`).
 			WithArgs(periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "total_sales", "total_orders"}).
 				AddRow(merchantID, 10000.00, 100))
 
-		mock.ExpectQuery(`SELECT id FROM merchant_settlements`).
+		// Mock the check for existing settlement (returns no rows, meaning settlement doesn't exist)
+		mock.ExpectQuery(`SELECT id FROM merchant_settlements WHERE merchant_id`).
 			WithArgs(merchantID, periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
+		// Mock the insert
 		mock.ExpectExec(`INSERT INTO merchant_settlements`).
 			WithArgs(merchantID, periodStart, periodEnd, 10000.00, 500.00, 9500.00, "pending").
 			WillReturnResult(sqlmock.NewResult(1, 1))
@@ -40,6 +43,27 @@ func TestSettlementService_GenerateMonthlySettlements(t *testing.T) {
 		assert.Equal(t, 10000.00, settlements[0].TotalSales)
 		assert.Equal(t, 500.00, settlements[0].PlatformFee)
 		assert.Equal(t, 9500.00, settlements[0].SettlementAmount)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("settlement already exists", func(t *testing.T) {
+		merchantID := 1
+		periodStart := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+		periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
+
+		mock.ExpectQuery(`SELECT m\.id, COALESCE`).
+			WithArgs(periodStart, periodEnd).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "total_sales", "total_orders"}).
+				AddRow(merchantID, 10000.00, 100))
+
+		mock.ExpectQuery(`SELECT id FROM merchant_settlements WHERE merchant_id`).
+			WithArgs(merchantID, periodStart, periodEnd).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+		settlements, err := service.GenerateMonthlySettlements(periodStart, periodEnd)
+		assert.NoError(t, err)
+		assert.Len(t, settlements, 0)
 
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
@@ -56,7 +80,7 @@ func TestSettlementService_MerchantConfirm(t *testing.T) {
 		settlementID := 1
 		merchantID := 1
 
-		mock.ExpectQuery(`SELECT merchant_id, status FROM merchant_settlements WHERE id = \$1`).
+		mock.ExpectQuery(`SELECT merchant_id, status FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "status"}).
 				AddRow(merchantID, "pending"))
@@ -75,7 +99,7 @@ func TestSettlementService_MerchantConfirm(t *testing.T) {
 		settlementID := 1
 		merchantID := 1
 
-		mock.ExpectQuery(`SELECT merchant_id, status FROM merchant_settlements WHERE id = \$1`).
+		mock.ExpectQuery(`SELECT merchant_id, status FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "status"}).
 				AddRow(2, "pending"))
@@ -99,7 +123,7 @@ func TestSettlementService_FinanceApprove(t *testing.T) {
 		settlementID := 1
 		financeUserID := 10
 
-		mock.ExpectQuery(`SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id = \$1`).
+		mock.ExpectQuery(`SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_confirmed", "finance_approved"}).
 				AddRow(true, false))
@@ -118,7 +142,7 @@ func TestSettlementService_FinanceApprove(t *testing.T) {
 		settlementID := 1
 		financeUserID := 10
 
-		mock.ExpectQuery(`SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id = \$1`).
+		mock.ExpectQuery(`SELECT merchant_confirmed, finance_approved FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_confirmed", "finance_approved"}).
 				AddRow(false, false))
@@ -146,7 +170,7 @@ func TestSettlementService_SubmitDispute(t *testing.T) {
 		originalAmount := 10000.00
 		disputedAmount := 9500.00
 
-		mock.ExpectQuery(`SELECT merchant_id FROM merchant_settlements WHERE id = \$1`).
+		mock.ExpectQuery(`SELECT merchant_id FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_id"}).
 				AddRow(merchantID))
@@ -178,7 +202,7 @@ func TestSettlementService_ReconcileOrders(t *testing.T) {
 		periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
 		merchantID := 1
 
-		mock.ExpectQuery(`SELECT merchant_id, period_start, period_end FROM merchant_settlements WHERE id = \$1`).
+		mock.ExpectQuery(`SELECT merchant_id, period_start, period_end FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "period_start", "period_end"}).
 				AddRow(merchantID, periodStart, periodEnd))
@@ -189,7 +213,7 @@ func TestSettlementService_ReconcileOrders(t *testing.T) {
 				AddRow(100, 10000.00))
 
 		mock.ExpectQuery(`SELECT COUNT\(\*\), COALESCE\(SUM`).
-			WithArgs(settlementID).
+			WithArgs(merchantID, periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"count", "total"}).
 				AddRow(100, 10000.00))
 
@@ -213,7 +237,7 @@ func TestSettlementService_ReconcileOrders(t *testing.T) {
 		periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
 		merchantID := 1
 
-		mock.ExpectQuery(`SELECT merchant_id, period_start, period_end FROM merchant_settlements WHERE id = \$1`).
+		mock.ExpectQuery(`SELECT merchant_id, period_start, period_end FROM merchant_settlements WHERE id`).
 			WithArgs(settlementID).
 			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "period_start", "period_end"}).
 				AddRow(merchantID, periodStart, periodEnd))
@@ -224,7 +248,7 @@ func TestSettlementService_ReconcileOrders(t *testing.T) {
 				AddRow(100, 10000.00))
 
 		mock.ExpectQuery(`SELECT COUNT\(\*\), COALESCE\(SUM`).
-			WithArgs(settlementID).
+			WithArgs(merchantID, periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"count", "total"}).
 				AddRow(95, 9500.00))
 
