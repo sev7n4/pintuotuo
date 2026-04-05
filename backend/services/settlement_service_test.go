@@ -31,10 +31,10 @@ func TestSettlementService_GenerateMonthlySettlements(t *testing.T) {
 			WithArgs(merchantID, periodStart, periodEnd).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-		// Mock the insert
-		mock.ExpectExec(`INSERT INTO merchant_settlements`).
+		// Mock the insert with QueryRow (not Exec!)
+		mock.ExpectQuery(`INSERT INTO merchant_settlements`).
 			WithArgs(merchantID, periodStart, periodEnd, 10000.00, 500.00, 9500.00, "pending").
-			WillReturnResult(sqlmock.NewResult(1, 1))
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		settlements, err := service.GenerateMonthlySettlements(periodStart, periodEnd)
 		assert.NoError(t, err)
