@@ -346,6 +346,7 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 	merchantSettlements.Use(middleware.AuthMiddleware())
 	{
 		merchantSettlements.GET("/:id", handlers.GetMerchantSettlementByID)
+		merchantSettlements.GET("/:id/items", handlers.GetSettlementItems)
 		merchantSettlements.POST("/:id/confirm", handlers.ConfirmSettlement)
 		merchantSettlements.POST("/:id/dispute", handlers.SubmitSettlementDispute)
 	}
@@ -355,10 +356,17 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 	{
 		adminSettlements.GET("", handlers.AdminGetSettlements)
 		adminSettlements.POST("/generate", handlers.AdminGenerateMonthlySettlements)
+		adminSettlements.POST("/generate/merchant", handlers.AdminGenerateSettlementForMerchant)
 		adminSettlements.GET("/:id", handlers.AdminGetSettlementByID)
 		adminSettlements.POST("/:id/approve", handlers.AdminApproveSettlement)
 		adminSettlements.POST("/:id/mark-paid", handlers.AdminMarkSettlementPaid)
 		adminSettlements.POST("/:id/reconcile", handlers.AdminReconcileSettlement)
+	}
+
+	adminBillings := router.Group("/admin/billings")
+	adminBillings.Use(middleware.AuthMiddleware())
+	{
+		adminBillings.GET("", handlers.AdminGetBillingRecords)
 	}
 
 	adminDisputes := router.Group("/admin/disputes")

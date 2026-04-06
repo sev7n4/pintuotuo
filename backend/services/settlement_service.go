@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -80,32 +81,34 @@ func GetSettlementService() *SettlementService {
 func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd time.Time) ([]models.MerchantSettlement, error) {
 	ctx := context.Background()
 
-	logger.LogInfo(ctx, "settlement_service", "Starting monthly settlement generation", map[string]interface{}{
+	logger.LogInfo(ctx, "settlement_service", "Starting monthly settlement generation (billing-based)", map[string]interface{}{
 		"period_start": periodStart.Format("2006-01-02"),
 		"period_end":   periodEnd.Format("2006-01-02"),
 	})
 
 	query := `
 		SELECT 
-			m.id,
-			COALESCE(SUM(o.total_price), 0) as total_sales,
-			COUNT(o.id) as total_orders
-		FROM merchants m
-		LEFT JOIN orders o ON m.user_id = o.user_id 
-			AND o.status = 'completed'
-			AND o.created_at >= $1 
-			AND o.created_at <= $2
-		WHERE m.status = 'approved'
-		GROUP BY m.id
-		HAVING COUNT(o.id) > 0
+			mak.merchant_id,
+			COUNT(aul.id) as total_requests,
+			SUM(aul.input_tokens + aul.output_tokens) as total_tokens,
+			SUM(aul.cost) as total_cost
+		FROM api_usage_logs aul
+		JOIN merchant_api_keys mak ON mak.id = aul.key_id
+		JOIN merchants m ON m.id = mak.merchant_id
+		WHERE aul.created_at >= $1 
+			AND aul.created_at <= $2
+			AND aul.status_code = 200
+			AND m.status = 'approved'
+		GROUP BY mak.merchant_id
+		HAVING COUNT(aul.id) > 0
 	`
 
 	rows, err := s.db.Query(query, periodStart, periodEnd)
 	if err != nil {
-		logger.LogError(ctx, "settlement_service", "Failed to query merchant sales data", err, nil)
+		logger.LogError(ctx, "settlement_service", "Failed to query merchant billing data", err, nil)
 		return nil, apperrors.NewAppError(
 			"SETTLEMENT_QUERY_FAILED",
-			"Failed to query merchant sales data",
+			"Failed to query merchant billing data",
 			http.StatusInternalServerError,
 			err,
 		)
@@ -113,91 +116,34 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 	defer rows.Close()
 
 	var settlements []models.MerchantSettlement
-	platformFeeRate := 0.05 // 5% 平台费率
+	platformFeeRate := 0.05
 
 	for rows.Next() {
 		var data SettlementData
-		err := rows.Scan(&data.MerchantID, &data.TotalSales, &data.TotalOrders)
+		var totalTokens int64
+		err := rows.Scan(&data.MerchantID, &data.TotalOrders, &totalTokens, &data.TotalSales)
 		if err != nil {
 			logger.LogError(ctx, "settlement_service", "Failed to scan merchant data", err, nil)
 			continue
 		}
 
-		tx, err := s.db.Begin()
+		settlement, err := s.createSettlementWithItems(data.MerchantID, periodStart, periodEnd, data.TotalSales, platformFeeRate)
 		if err != nil {
-			logger.LogError(ctx, "settlement_service", "Failed to begin transaction for merchant", err, map[string]interface{}{
-				"merchant_id": data.MerchantID,
-			})
-			continue
-		}
-
-		var existingID int
-		err = tx.QueryRow(
-			"SELECT id FROM merchant_settlements WHERE merchant_id = $1 AND period_start = $2 AND period_end = $3 FOR UPDATE",
-			data.MerchantID, periodStart, periodEnd,
-		).Scan(&existingID)
-
-		if err == nil {
-			tx.Rollback()
-			logger.LogInfo(ctx, "settlement_service", "Settlement already exists", map[string]interface{}{
-				"merchant_id":   data.MerchantID,
-				"settlement_id": existingID,
-			})
-			continue
-		}
-
-		if err != sql.ErrNoRows {
-			tx.Rollback()
-			logger.LogError(ctx, "settlement_service", "Failed to check existing settlement", err, map[string]interface{}{
-				"merchant_id": data.MerchantID,
-			})
-			continue
-		}
-
-		data.PlatformFee = data.TotalSales * platformFeeRate
-		data.SettlementAmount = data.TotalSales - data.PlatformFee
-
-		var settlementID int
-		err = tx.QueryRow(
-			`INSERT INTO merchant_settlements 
-			 (merchant_id, period_start, period_end, total_sales, platform_fee, settlement_amount, status)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7)
-			 RETURNING id`,
-			data.MerchantID, periodStart, periodEnd, data.TotalSales, data.PlatformFee, data.SettlementAmount, "pending",
-		).Scan(&settlementID)
-
-		if err != nil {
-			tx.Rollback()
 			logger.LogError(ctx, "settlement_service", "Failed to create settlement", err, map[string]interface{}{
 				"merchant_id": data.MerchantID,
 			})
 			continue
 		}
 
-		if err := tx.Commit(); err != nil {
-			logger.LogError(ctx, "settlement_service", "Failed to commit transaction", err, map[string]interface{}{
-				"merchant_id": data.MerchantID,
-			})
-			continue
-		}
-
-		settlement := models.MerchantSettlement{
-			ID:               settlementID,
-			MerchantID:       data.MerchantID,
-			PeriodStart:      periodStart,
-			PeriodEnd:        periodEnd,
-			TotalSales:       data.TotalSales,
-			PlatformFee:      data.PlatformFee,
-			SettlementAmount: data.SettlementAmount,
-			Status:           "pending",
-		}
-		settlements = append(settlements, settlement)
+		settlements = append(settlements, *settlement)
 
 		logger.LogInfo(ctx, "settlement_service", "Settlement created", map[string]interface{}{
-			"settlement_id":     settlementID,
+			"settlement_id":     settlement.ID,
 			"merchant_id":       data.MerchantID,
 			"total_sales":       data.TotalSales,
-			"settlement_amount": data.SettlementAmount,
+			"settlement_amount": settlement.SettlementAmount,
+			"total_requests":    data.TotalOrders,
+			"total_tokens":      totalTokens,
 		})
 	}
 
@@ -206,6 +152,277 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 	})
 
 	return settlements, nil
+}
+
+func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, periodStart, periodEnd time.Time) (*models.MerchantSettlement, error) {
+	ctx := context.Background()
+
+	logger.LogInfo(ctx, "settlement_service", "Generating settlement for merchant", map[string]interface{}{
+		"merchant_id":  merchantID,
+		"period_start": periodStart.Format("2006-01-02"),
+		"period_end":   periodEnd.Format("2006-01-02"),
+	})
+
+	query := `
+		SELECT 
+			COUNT(aul.id) as total_requests,
+			SUM(aul.input_tokens + aul.output_tokens) as total_tokens,
+			SUM(aul.cost) as total_cost
+		FROM api_usage_logs aul
+		JOIN merchant_api_keys mak ON mak.id = aul.key_id
+		WHERE mak.merchant_id = $1
+			AND aul.created_at >= $2 
+			AND aul.created_at <= $3
+			AND aul.status_code = 200
+	`
+
+	var totalRequests int
+	var totalTokens int64
+	var totalCost float64
+	err := s.db.QueryRow(query, merchantID, periodStart, periodEnd).Scan(&totalRequests, &totalTokens, &totalCost)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("no billing data found for merchant %d in the specified period", merchantID)
+		}
+		return nil, fmt.Errorf("failed to query billing data: %w", err)
+	}
+
+	if totalRequests == 0 {
+		return nil, fmt.Errorf("no billing data found for merchant %d in the specified period", merchantID)
+	}
+
+	platformFeeRate := 0.05
+	settlement, err := s.createSettlementWithItems(merchantID, periodStart, periodEnd, totalCost, platformFeeRate)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.LogInfo(ctx, "settlement_service", "Settlement created for merchant", map[string]interface{}{
+		"settlement_id":     settlement.ID,
+		"merchant_id":       merchantID,
+		"total_sales":       totalCost,
+		"settlement_amount": settlement.SettlementAmount,
+		"total_requests":    totalRequests,
+		"total_tokens":      totalTokens,
+	})
+
+	return settlement, nil
+}
+
+func (s *SettlementService) createSettlementWithItems(merchantID int, periodStart, periodEnd time.Time, totalSales float64, platformFeeRate float64) (*models.MerchantSettlement, error) {
+	ctx := context.Background()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	var existingID int
+	err = tx.QueryRow(
+		"SELECT id FROM merchant_settlements WHERE merchant_id = $1 AND period_start = $2 AND period_end = $3 FOR UPDATE",
+		merchantID, periodStart, periodEnd,
+	).Scan(&existingID)
+
+	if err == nil {
+		return nil, fmt.Errorf("settlement already exists: %d", existingID)
+	}
+
+	if err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to check existing settlement: %w", err)
+	}
+
+	platformFee := totalSales * platformFeeRate
+	settlementAmount := totalSales - platformFee
+
+	var settlementID int
+	err = tx.QueryRow(
+		`INSERT INTO merchant_settlements 
+		 (merchant_id, period_start, period_end, total_sales, platform_fee, settlement_amount, status)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 RETURNING id`,
+		merchantID, periodStart, periodEnd, totalSales, platformFee, settlementAmount, "pending",
+	).Scan(&settlementID)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create settlement: %w", err)
+	}
+
+	_, err = tx.Exec(
+		`INSERT INTO settlement_items (settlement_id, api_usage_log_id, user_id, merchant_id, provider, model, input_tokens, output_tokens, cost)
+		 SELECT $1, aul.id, aul.user_id, mak.merchant_id, aul.provider, aul.model, aul.input_tokens, aul.output_tokens, aul.cost
+		 FROM api_usage_logs aul
+		 JOIN merchant_api_keys mak ON mak.id = aul.key_id
+		 WHERE mak.merchant_id = $2
+		   AND aul.created_at >= $3 
+		   AND aul.created_at <= $4
+		   AND aul.status_code = 200`,
+		settlementID, merchantID, periodStart, periodEnd,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create settlement items: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	settlement := &models.MerchantSettlement{
+		ID:               settlementID,
+		MerchantID:       merchantID,
+		PeriodStart:      periodStart,
+		PeriodEnd:        periodEnd,
+		TotalSales:       totalSales,
+		PlatformFee:      platformFee,
+		SettlementAmount: settlementAmount,
+		Status:           "pending",
+	}
+
+	logger.LogInfo(ctx, "settlement_service", "Settlement with items created", map[string]interface{}{
+		"settlement_id": settlementID,
+		"merchant_id":   merchantID,
+	})
+
+	return settlement, nil
+}
+
+type BillingRecord struct {
+	ID           int       `json:"id"`
+	UserID       int       `json:"user_id"`
+	MerchantID   int       `json:"merchant_id"`
+	Provider     string    `json:"provider"`
+	Model        string    `json:"model"`
+	InputTokens  int       `json:"input_tokens"`
+	OutputTokens int       `json:"output_tokens"`
+	Cost         float64   `json:"cost"`
+	RequestID    string    `json:"request_id"`
+	StatusCode   int       `json:"status_code"`
+	LatencyMs    int       `json:"latency_ms"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+func (s *SettlementService) GetBillingRecords(merchantID int, startDate, endDate time.Time, page, pageSize int) ([]BillingRecord, error) {
+	ctx := context.Background()
+
+	offset := (page - 1) * pageSize
+
+	query := `
+		SELECT 
+			aul.id,
+			aul.user_id,
+			mak.merchant_id,
+			aul.provider,
+			aul.model,
+			aul.input_tokens,
+			aul.output_tokens,
+			aul.cost,
+			aul.request_id,
+			aul.status_code,
+			aul.latency_ms,
+			aul.created_at
+		FROM api_usage_logs aul
+		JOIN merchant_api_keys mak ON mak.id = aul.key_id
+		WHERE aul.created_at >= $1 
+			AND aul.created_at <= $2
+	`
+	args := []interface{}{startDate, endDate}
+	argIndex := 3
+
+	if merchantID > 0 {
+		query += " AND mak.merchant_id = $" + strconv.Itoa(argIndex)
+		args = append(args, merchantID)
+		argIndex++
+	}
+
+	query += " ORDER BY aul.created_at DESC LIMIT $" + strconv.Itoa(argIndex) + " OFFSET $" + strconv.Itoa(argIndex+1)
+	args = append(args, pageSize, offset)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		logger.LogError(ctx, "settlement_service", "Failed to query billing records", err, nil)
+		return nil, fmt.Errorf("failed to query billing records: %w", err)
+	}
+	defer rows.Close()
+
+	var records []BillingRecord
+	for rows.Next() {
+		var r BillingRecord
+		err := rows.Scan(
+			&r.ID, &r.UserID, &r.MerchantID, &r.Provider, &r.Model,
+			&r.InputTokens, &r.OutputTokens, &r.Cost, &r.RequestID,
+			&r.StatusCode, &r.LatencyMs, &r.CreatedAt,
+		)
+		if err != nil {
+			logger.LogError(ctx, "settlement_service", "Failed to scan billing record", err, nil)
+			continue
+		}
+		records = append(records, r)
+	}
+
+	return records, nil
+}
+
+type SettlementItem struct {
+	ID           int       `json:"id"`
+	SettlementID int       `json:"settlement_id"`
+	APILogID     int       `json:"api_usage_log_id"`
+	UserID       int       `json:"user_id"`
+	MerchantID   int       `json:"merchant_id"`
+	Provider     string    `json:"provider"`
+	Model        string    `json:"model"`
+	InputTokens  int       `json:"input_tokens"`
+	OutputTokens int       `json:"output_tokens"`
+	Cost         float64   `json:"cost"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+func (s *SettlementService) GetSettlementItems(settlementID int) ([]SettlementItem, error) {
+	ctx := context.Background()
+
+	query := `
+		SELECT 
+			id,
+			settlement_id,
+			api_usage_log_id,
+			user_id,
+			merchant_id,
+			provider,
+			model,
+			input_tokens,
+			output_tokens,
+			cost,
+			created_at
+		FROM settlement_items
+		WHERE settlement_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := s.db.Query(query, settlementID)
+	if err != nil {
+		logger.LogError(ctx, "settlement_service", "Failed to query settlement items", err, map[string]interface{}{
+			"settlement_id": settlementID,
+		})
+		return nil, fmt.Errorf("failed to query settlement items: %w", err)
+	}
+	defer rows.Close()
+
+	var items []SettlementItem
+	for rows.Next() {
+		var item SettlementItem
+		err := rows.Scan(
+			&item.ID, &item.SettlementID, &item.APILogID, &item.UserID,
+			&item.MerchantID, &item.Provider, &item.Model,
+			&item.InputTokens, &item.OutputTokens, &item.Cost, &item.CreatedAt,
+		)
+		if err != nil {
+			logger.LogError(ctx, "settlement_service", "Failed to scan settlement item", err, nil)
+			continue
+		}
+		items = append(items, item)
+	}
+
+	return items, nil
 }
 
 func (s *SettlementService) MerchantConfirm(settlementID, merchantID int) error {

@@ -539,3 +539,162 @@ func AdminGenerateMonthlySettlements(c *gin.Context) {
 		"settlements": settlements,
 	})
 }
+
+func GetSettlementItems(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	settlementIDStr := c.Param("id")
+	settlementID, err := strconv.Atoi(settlementIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid settlement ID"})
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var merchantID int
+	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Merchant not found"})
+			return
+		}
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var settlementMerchantID int
+	err = db.QueryRow("SELECT merchant_id FROM merchant_settlements WHERE id = $1", settlementID).Scan(&settlementMerchantID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Settlement not found"})
+			return
+		}
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	if settlementMerchantID != merchantID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized to view this settlement"})
+		return
+	}
+
+	service := services.GetSettlementService()
+	items, err := service.GetSettlementItems(settlementID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items": items,
+		"total": len(items),
+	})
+}
+
+func AdminGenerateSettlementForMerchant(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+
+	var req struct {
+		MerchantID int `json:"merchant_id" binding:"required"`
+		Year       int `json:"year" binding:"required"`
+		Month      int `json:"month" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	periodStart := time.Date(req.Year, time.Month(req.Month), 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := periodStart.AddDate(0, 1, -1).Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+
+	service := services.GetSettlementService()
+	settlement, err := service.GenerateSettlementForMerchant(req.MerchantID, periodStart, periodEnd)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "Settlement generated successfully",
+		"settlement": settlement,
+	})
+}
+
+func AdminGetBillingRecords(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+
+	merchantIDStr := c.Query("merchant_id")
+	startDateStr := c.Query("start_date")
+	endDateStr := c.Query("end_date")
+	pageStr := c.DefaultQuery("page", "1")
+	pageSizeStr := c.DefaultQuery("page_size", "20")
+
+	merchantID := 0
+	if merchantIDStr != "" {
+		var err error
+		merchantID, err = strconv.Atoi(merchantIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid merchant_id"})
+			return
+		}
+	}
+
+	if startDateStr == "" || endDateStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "start_date and end_date are required"})
+		return
+	}
+
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start_date format, use YYYY-MM-DD"})
+		return
+	}
+
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end_date format, use YYYY-MM-DD"})
+		return
+	}
+
+	page, _ := strconv.Atoi(pageStr)
+	pageSize, _ := strconv.Atoi(pageSizeStr)
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+
+	service := services.GetSettlementService()
+	records, err := service.GetBillingRecords(merchantID, startDate, endDate, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"records":   records,
+		"page":      page,
+		"page_size": pageSize,
+	})
+}
