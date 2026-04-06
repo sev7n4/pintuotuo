@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pintuotuo/backend/apperrors"
+	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/services"
