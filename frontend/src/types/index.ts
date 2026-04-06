@@ -283,6 +283,7 @@ export interface MerchantStats {
 export interface MerchantSettlement {
   id: number;
   merchant_id: number;
+  company_name?: string;
   period_start: string;
   period_end: string;
   total_sales: number;
@@ -319,6 +320,50 @@ export interface SettlementReconciliation {
   reconciled_by: number;
   reconciled_at: string;
   created_at: string;
+}
+
+export interface SettlementItem {
+  id: number;
+  settlement_id: number;
+  api_usage_log_id: number;
+  user_id: number;
+  merchant_id: number;
+  provider: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost: number;
+  created_at: string;
+}
+
+export interface BillingRecord {
+  id: number;
+  user_id: number;
+  merchant_id: number;
+  provider: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost: number;
+  request_id: string;
+  status_code: number;
+  latency_ms: number;
+  created_at: string;
+}
+
+export interface BillingStats {
+  total_cost: number;
+  total_requests: number;
+  total_tokens: number;
+  avg_latency: number;
+}
+
+export interface BillingFilter {
+  start_date?: string;
+  end_date?: string;
+  merchant_id?: number;
+  year?: number;
+  month?: number;
 }
 
 export interface MerchantOrder extends Order {

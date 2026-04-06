@@ -358,6 +358,7 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 		adminSettlements.POST("/generate", handlers.AdminGenerateMonthlySettlements)
 		adminSettlements.POST("/generate/merchant", handlers.AdminGenerateSettlementForMerchant)
 		adminSettlements.GET("/:id", handlers.AdminGetSettlementByID)
+		adminSettlements.GET("/:id/items", handlers.AdminGetSettlementItems)
 		adminSettlements.POST("/:id/approve", handlers.AdminApproveSettlement)
 		adminSettlements.POST("/:id/mark-paid", handlers.AdminMarkSettlementPaid)
 		adminSettlements.POST("/:id/reconcile", handlers.AdminReconcileSettlement)

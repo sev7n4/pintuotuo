@@ -9,8 +9,9 @@ import {
   SyncOutlined,
   AuditOutlined,
   BankOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
-import { MerchantSettlement } from '@/types';
+import { MerchantSettlement, SettlementItem } from '@/types';
 import styles from './AdminSettlements.module.css';
 
 const getAuthToken = () => {
@@ -29,9 +30,18 @@ const AdminSettlements = () => {
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterYearMonth, setFilterYearMonth] = useState<Dayjs | null>(null);
   const [generateYearMonth, setGenerateYearMonth] = useState<Dayjs | null>(null);
+  const [itemsVisible, setItemsVisible] = useState(false);
+  const [settlementItems, setSettlementItems] = useState<SettlementItem[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [merchants, setMerchants] = useState<Array<{id: number; company_name: string}>>([]);
+  const [generateMerchantVisible, setGenerateMerchantVisible] = useState(false);
+  const [generateMerchantLoading, setGenerateMerchantLoading] = useState(false);
+  const [selectedMerchantId, setSelectedMerchantId] = useState<number | null>(null);
+  const [generateMerchantYearMonth, setGenerateMerchantYearMonth] = useState<Dayjs | null>(null);
 
   useEffect(() => {
     fetchSettlements();
+    fetchMerchants();
   }, [filterStatus, filterYearMonth]);
 
   const fetchSettlements = async () => {
@@ -60,6 +70,23 @@ const AdminSettlements = () => {
       message.error('获取结算列表失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMerchants = async () => {
+    try {
+      const response = await fetch('/api/v1/admin/merchants', {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMerchants(data.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch merchants:', error);
     }
   };
 
@@ -168,6 +195,68 @@ const AdminSettlements = () => {
     }
   };
 
+  const handleGenerateForMerchant = async () => {
+    if (!selectedMerchantId || !generateMerchantYearMonth) {
+      message.warning('请选择商户和年月');
+      return;
+    }
+
+    setGenerateMerchantLoading(true);
+    try {
+      const response = await fetch('/api/v1/admin/settlements/generate/merchant', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+        body: JSON.stringify({
+          merchant_id: selectedMerchantId,
+          year: generateMerchantYearMonth.year(),
+          month: generateMerchantYearMonth.month() + 1,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        message.success(`成功生成结算单: ${data.settlement.id}`);
+        setGenerateMerchantVisible(false);
+        setSelectedMerchantId(null);
+        setGenerateMerchantYearMonth(null);
+        fetchSettlements();
+      } else {
+        const error = await response.json();
+        message.error(error.error || '生成失败');
+      }
+    } catch (error) {
+      message.error('生成失败，请重试');
+    } finally {
+      setGenerateMerchantLoading(false);
+    }
+  };
+
+  const handleViewItems = async (record: MerchantSettlement) => {
+    setItemsLoading(true);
+    setItemsVisible(true);
+    try {
+      const response = await fetch(`/api/v1/admin/settlements/${record.id}/items`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSettlementItems(data.items || []);
+      } else {
+        message.error('获取结算明细失败');
+      }
+    } catch (error) {
+      message.error('获取结算明细失败');
+    } finally {
+      setItemsLoading(false);
+    }
+  };
+
   const statusMap: Record<string, { color: string; text: string; icon: React.ReactNode }> = {
     pending: { color: 'default', text: '待处理', icon: <ClockCircleOutlined /> },
     processing: { color: 'processing', text: '处理中', icon: <SyncOutlined spin /> },
@@ -253,11 +342,16 @@ const AdminSettlements = () => {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 150,
       render: (_: unknown, record: MerchantSettlement) => (
-        <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
-          查看详情
-        </Button>
+        <>
+          <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
+            查看详情
+          </Button>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewItems(record)}>
+            明细
+          </Button>
+        </>
       ),
     },
   ];
@@ -329,9 +423,14 @@ const AdminSettlements = () => {
               style={{ width: 150 }}
             />
           </div>
-          <Button type="primary" onClick={() => setGenerateVisible(true)}>
-            生成月度结算
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button onClick={() => setGenerateMerchantVisible(true)}>
+              按商户生成
+            </Button>
+            <Button type="primary" onClick={() => setGenerateVisible(true)}>
+              生成月度结算
+            </Button>
+          </div>
         </div>
         <Table
           columns={columns}
@@ -465,6 +564,118 @@ const AdminSettlements = () => {
             <Button type="primary" htmlType="submit" loading={generateLoading} block>
               生成结算
             </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="结算明细"
+        open={itemsVisible}
+        onCancel={() => {
+          setItemsVisible(false);
+          setSettlementItems([]);
+        }}
+        footer={null}
+        width={1000}
+      >
+        <Table
+          dataSource={settlementItems}
+          rowKey="id"
+          loading={itemsLoading}
+          scroll={{ x: 900 }}
+          pagination={{ pageSize: 10 }}
+          columns={[
+            {
+              title: 'ID',
+              dataIndex: 'id',
+              key: 'id',
+              width: 60,
+            },
+            {
+              title: 'Provider',
+              dataIndex: 'provider',
+              key: 'provider',
+              width: 100,
+            },
+            {
+              title: 'Model',
+              dataIndex: 'model',
+              key: 'model',
+              width: 150,
+            },
+            {
+              title: '输入Tokens',
+              dataIndex: 'input_tokens',
+              key: 'input_tokens',
+              width: 100,
+              render: (v: number) => v.toLocaleString(),
+            },
+            {
+              title: '输出Tokens',
+              dataIndex: 'output_tokens',
+              key: 'output_tokens',
+              width: 100,
+              render: (v: number) => v.toLocaleString(),
+            },
+            {
+              title: '费用',
+              dataIndex: 'cost',
+              key: 'cost',
+              width: 100,
+              render: (v: number) => `$${v.toFixed(4)}`,
+            },
+            {
+              title: '时间',
+              dataIndex: 'created_at',
+              key: 'created_at',
+              width: 180,
+              render: (v: string) => new Date(v).toLocaleString('zh-CN'),
+            },
+          ]}
+        />
+      </Modal>
+
+      <Modal
+        title="按商户生成结算"
+        open={generateMerchantVisible}
+        onCancel={() => {
+          setGenerateMerchantVisible(false);
+          setSelectedMerchantId(null);
+          setGenerateMerchantYearMonth(null);
+        }}
+        onOk={handleGenerateForMerchant}
+        confirmLoading={generateMerchantLoading}
+        okText="生成结算"
+        cancelText="取消"
+      >
+        <Form layout="vertical">
+          <Form.Item label="选择商户" required>
+            <Select
+              placeholder="请选择商户"
+              value={selectedMerchantId}
+              onChange={setSelectedMerchantId}
+              style={{ width: '100%' }}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {merchants.map((merchant) => (
+                <Select.Option key={merchant.id} value={merchant.id}>
+                  {merchant.company_name} (ID: {merchant.id})
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item label="选择年月" required>
+            <DatePicker
+              picker="month"
+              placeholder="选择年月"
+              value={generateMerchantYearMonth}
+              onChange={setGenerateMerchantYearMonth}
+              style={{ width: '100%' }}
+              disabledDate={(current) => current && current > dayjs().endOf('month')}
+            />
           </Form.Item>
         </Form>
       </Modal>
