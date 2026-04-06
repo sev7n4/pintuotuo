@@ -231,7 +231,7 @@ func MerchantGetBillings(c *gin.Context) {
 	}
 
 	var merchantID int
-	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userID).Scan(&merchantID)
+	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userID).Scan(&merchantID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MERCHANT_NOT_FOUND",
