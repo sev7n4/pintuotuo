@@ -9,8 +9,9 @@ import {
   SyncOutlined,
   AuditOutlined,
   BankOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
-import { MerchantSettlement } from '@/types';
+import { MerchantSettlement, SettlementItem } from '@/types';
 import styles from './AdminSettlements.module.css';
 
 const getAuthToken = () => {
@@ -29,6 +30,9 @@ const AdminSettlements = () => {
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterYearMonth, setFilterYearMonth] = useState<Dayjs | null>(null);
   const [generateYearMonth, setGenerateYearMonth] = useState<Dayjs | null>(null);
+  const [itemsVisible, setItemsVisible] = useState(false);
+  const [settlementItems, setSettlementItems] = useState<SettlementItem[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
 
   useEffect(() => {
     fetchSettlements();
@@ -168,6 +172,29 @@ const AdminSettlements = () => {
     }
   };
 
+  const handleViewItems = async (record: MerchantSettlement) => {
+    setItemsLoading(true);
+    setItemsVisible(true);
+    try {
+      const response = await fetch(`/api/v1/admin/settlements/${record.id}/items`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSettlementItems(data.items || []);
+      } else {
+        message.error('获取结算明细失败');
+      }
+    } catch (error) {
+      message.error('获取结算明细失败');
+    } finally {
+      setItemsLoading(false);
+    }
+  };
+
   const statusMap: Record<string, { color: string; text: string; icon: React.ReactNode }> = {
     pending: { color: 'default', text: '待处理', icon: <ClockCircleOutlined /> },
     processing: { color: 'processing', text: '处理中', icon: <SyncOutlined spin /> },
@@ -253,11 +280,16 @@ const AdminSettlements = () => {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 150,
       render: (_: unknown, record: MerchantSettlement) => (
-        <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
-          查看详情
-        </Button>
+        <>
+          <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
+            查看详情
+          </Button>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewItems(record)}>
+            明细
+          </Button>
+        </>
       ),
     },
   ];
@@ -467,6 +499,73 @@ const AdminSettlements = () => {
             </Button>
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="结算明细"
+        open={itemsVisible}
+        onCancel={() => {
+          setItemsVisible(false);
+          setSettlementItems([]);
+        }}
+        footer={null}
+        width={1000}
+      >
+        <Table
+          dataSource={settlementItems}
+          rowKey="id"
+          loading={itemsLoading}
+          scroll={{ x: 900 }}
+          pagination={{ pageSize: 10 }}
+          columns={[
+            {
+              title: 'ID',
+              dataIndex: 'id',
+              key: 'id',
+              width: 60,
+            },
+            {
+              title: 'Provider',
+              dataIndex: 'provider',
+              key: 'provider',
+              width: 100,
+            },
+            {
+              title: 'Model',
+              dataIndex: 'model',
+              key: 'model',
+              width: 150,
+            },
+            {
+              title: '输入Tokens',
+              dataIndex: 'input_tokens',
+              key: 'input_tokens',
+              width: 100,
+              render: (v: number) => v.toLocaleString(),
+            },
+            {
+              title: '输出Tokens',
+              dataIndex: 'output_tokens',
+              key: 'output_tokens',
+              width: 100,
+              render: (v: number) => v.toLocaleString(),
+            },
+            {
+              title: '费用',
+              dataIndex: 'cost',
+              key: 'cost',
+              width: 100,
+              render: (v: number) => `$${v.toFixed(4)}`,
+            },
+            {
+              title: '时间',
+              dataIndex: 'created_at',
+              key: 'created_at',
+              width: 180,
+              render: (v: string) => new Date(v).toLocaleString('zh-CN'),
+            },
+          ]}
+        />
       </Modal>
     </div>
   );

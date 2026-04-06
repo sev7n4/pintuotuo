@@ -698,3 +698,46 @@ func AdminGetBillingRecords(c *gin.Context) {
 		"page_size": pageSize,
 	})
 }
+
+func AdminGetSettlementItems(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+
+	settlementIDStr := c.Param("id")
+	settlementID, err := strconv.Atoi(settlementIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid settlement ID"})
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var exists bool
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM merchant_settlements WHERE id = $1)", settlementID).Scan(&exists)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Settlement not found"})
+		return
+	}
+
+	service := services.GetSettlementService()
+	items, err := service.GetSettlementItems(settlementID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items": items,
+		"total": len(items),
+	})
+}
