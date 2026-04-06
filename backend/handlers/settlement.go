@@ -223,6 +223,10 @@ func AdminGetSettlements(c *gin.Context) {
 	year := c.Query("year")
 	month := c.Query("month")
 	merchantID := c.Query("merchant_id")
+	merchantConfirmed := c.Query("merchant_confirmed")
+	financeApproved := c.Query("finance_approved")
+	minAmount := c.Query("min_amount")
+	maxAmount := c.Query("max_amount")
 
 	db := config.GetDB()
 	if db == nil {
@@ -261,6 +265,36 @@ func AdminGetSettlements(c *gin.Context) {
 	if merchantID != "" {
 		query += " AND s.merchant_id = $" + strconv.Itoa(argIndex)
 		args = append(args, merchantID)
+		argIndex++
+	}
+
+	if merchantConfirmed != "" {
+		query += " AND s.merchant_confirmed = $" + strconv.Itoa(argIndex)
+		confirmed := merchantConfirmed == "true" || merchantConfirmed == "1"
+		args = append(args, confirmed)
+		argIndex++
+	}
+
+	if financeApproved != "" {
+		query += " AND s.finance_approved = $" + strconv.Itoa(argIndex)
+		approved := financeApproved == "true" || financeApproved == "1"
+		args = append(args, approved)
+		argIndex++
+	}
+
+	if minAmount != "" {
+		if minAmt, err := strconv.ParseFloat(minAmount, 64); err == nil {
+			query += " AND s.settlement_amount >= $" + strconv.Itoa(argIndex)
+			args = append(args, minAmt)
+			argIndex++
+		}
+	}
+
+	if maxAmount != "" {
+		if maxAmt, err := strconv.ParseFloat(maxAmount, 64); err == nil {
+			query += " AND s.settlement_amount <= $" + strconv.Itoa(argIndex)
+			args = append(args, maxAmt)
+		}
 	}
 
 	query += " ORDER BY s.period_start DESC"
