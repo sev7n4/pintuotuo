@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	"pintuotuo/backend/apperrors"
-	"pintuotuo/backend/config"
-	"pintuotuo/backend/middleware"
-	"pintuotuo/backend/services"
+	"github.com/pintuotuo/backend/apperrors"
+	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/middleware"
+	"github.com/pintuotuo/backend/services"
 
 	"github.com/gin-gonic/gin"
 )
