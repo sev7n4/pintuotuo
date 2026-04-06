@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col, Form, Select, DatePicker } from 'antd';
+import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col, Form, Select, DatePicker, InputNumber, Space } from 'antd';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import {
@@ -10,6 +10,7 @@ import {
   AuditOutlined,
   BankOutlined,
   EyeOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { MerchantSettlement, SettlementItem } from '@/types';
 import styles from './AdminSettlements.module.css';
@@ -38,11 +39,16 @@ const AdminSettlements = () => {
   const [generateMerchantLoading, setGenerateMerchantLoading] = useState(false);
   const [selectedMerchantId, setSelectedMerchantId] = useState<number | null>(null);
   const [generateMerchantYearMonth, setGenerateMerchantYearMonth] = useState<Dayjs | null>(null);
+  const [filterMerchantId, setFilterMerchantId] = useState<number | null>(null);
+  const [filterMerchantConfirmed, setFilterMerchantConfirmed] = useState<string>('');
+  const [filterFinanceApproved, setFilterFinanceApproved] = useState<string>('');
+  const [filterMinAmount, setFilterMinAmount] = useState<number | null>(null);
+  const [filterMaxAmount, setFilterMaxAmount] = useState<number | null>(null);
 
   useEffect(() => {
     fetchSettlements();
     fetchMerchants();
-  }, [filterStatus, filterYearMonth]);
+  }, [filterStatus, filterYearMonth, filterMerchantId, filterMerchantConfirmed, filterFinanceApproved, filterMinAmount, filterMaxAmount]);
 
   const fetchSettlements = async () => {
     setLoading(true);
@@ -53,6 +59,11 @@ const AdminSettlements = () => {
         params.append('year', filterYearMonth.year().toString());
         params.append('month', (filterYearMonth.month() + 1).toString());
       }
+      if (filterMerchantId) params.append('merchant_id', filterMerchantId.toString());
+      if (filterMerchantConfirmed) params.append('merchant_confirmed', filterMerchantConfirmed);
+      if (filterFinanceApproved) params.append('finance_approved', filterFinanceApproved);
+      if (filterMinAmount !== null) params.append('min_amount', filterMinAmount.toString());
+      if (filterMaxAmount !== null) params.append('max_amount', filterMaxAmount.toString());
 
       const response = await fetch(`/api/v1/admin/settlements?${params.toString()}`, {
         headers: {
@@ -71,6 +82,16 @@ const AdminSettlements = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResetFilters = () => {
+    setFilterStatus('');
+    setFilterYearMonth(null);
+    setFilterMerchantId(null);
+    setFilterMerchantConfirmed('');
+    setFilterFinanceApproved('');
+    setFilterMinAmount(null);
+    setFilterMaxAmount(null);
   };
 
   const fetchMerchants = async () => {
@@ -403,7 +424,24 @@ const AdminSettlements = () => {
 
       <Card className={styles.tableCard}>
         <div className={styles.cardHeader}>
-          <div className={styles.filters}>
+          <Space size="middle" wrap>
+            <Select
+              placeholder="商户筛选"
+              style={{ width: 200 }}
+              value={filterMerchantId}
+              onChange={setFilterMerchantId}
+              allowClear
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {merchants.map((merchant) => (
+                <Select.Option key={merchant.id} value={merchant.id}>
+                  {merchant.company_name} (ID: {merchant.id})
+                </Select.Option>
+              ))}
+            </Select>
             <Select
               placeholder="状态筛选"
               style={{ width: 120 }}
@@ -415,6 +453,26 @@ const AdminSettlements = () => {
               <Select.Option value="processing">处理中</Select.Option>
               <Select.Option value="completed">已完成</Select.Option>
             </Select>
+            <Select
+              placeholder="商户确认"
+              style={{ width: 120 }}
+              value={filterMerchantConfirmed}
+              onChange={setFilterMerchantConfirmed}
+              allowClear
+            >
+              <Select.Option value="true">已确认</Select.Option>
+              <Select.Option value="false">未确认</Select.Option>
+            </Select>
+            <Select
+              placeholder="财务审批"
+              style={{ width: 120 }}
+              value={filterFinanceApproved}
+              onChange={setFilterFinanceApproved}
+              allowClear
+            >
+              <Select.Option value="true">已审批</Select.Option>
+              <Select.Option value="false">未审批</Select.Option>
+            </Select>
             <DatePicker
               picker="month"
               placeholder="选择年月"
@@ -422,7 +480,28 @@ const AdminSettlements = () => {
               onChange={setFilterYearMonth}
               style={{ width: 150 }}
             />
-          </div>
+            <Space.Compact>
+              <InputNumber
+                placeholder="最小金额"
+                style={{ width: 120 }}
+                value={filterMinAmount}
+                onChange={(value) => setFilterMinAmount(value)}
+                min={0}
+                precision={2}
+              />
+              <InputNumber
+                placeholder="最大金额"
+                style={{ width: 120 }}
+                value={filterMaxAmount}
+                onChange={(value) => setFilterMaxAmount(value)}
+                min={0}
+                precision={2}
+              />
+            </Space.Compact>
+            <Button icon={<ReloadOutlined />} onClick={handleResetFilters}>
+              重置
+            </Button>
+          </Space>
           <div style={{ display: 'flex', gap: 8 }}>
             <Button onClick={() => setGenerateMerchantVisible(true)}>
               按商户生成

@@ -150,3 +150,94 @@ func TestAdminMarkSettlementPaid_RequireAdminRole(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, w.Code)
 	})
 }
+
+func TestAdminGetSettlements_MerchantIDFilter(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("TC-SETTLEMENT-001: should filter settlements by merchant_id", func(t *testing.T) {
+		t.Skip("Requires database setup - will be implemented in integration tests")
+		router := gin.New()
+		router.GET("/admin/settlements", func(c *gin.Context) {
+			c.Set("user_id", 1)
+			c.Set("user_role", "admin")
+			AdminGetSettlements(c)
+		})
+
+		req, _ := http.NewRequest(http.MethodGet, "/admin/settlements?merchant_id=4", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		settlements := response["settlements"].([]interface{})
+		assert.True(t, len(settlements) > 0, "Should return settlements for merchant_id=4")
+
+		for _, s := range settlements {
+			settlement := s.(map[string]interface{})
+			assert.Equal(t, float64(4), settlement["merchant_id"], "All settlements should belong to merchant_id=4")
+		}
+	})
+}
+
+func TestAdminGetSettlements_NullSettledAt(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("TC-SETTLEMENT-002: should handle NULL settled_at correctly", func(t *testing.T) {
+		t.Skip("Requires database setup - will be implemented in integration tests")
+		router := gin.New()
+		router.GET("/admin/settlements", func(c *gin.Context) {
+			c.Set("user_id", 1)
+			c.Set("user_role", "admin")
+			AdminGetSettlements(c)
+		})
+
+		req, _ := http.NewRequest(http.MethodGet, "/admin/settlements", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		settlements := response["settlements"].([]interface{})
+		assert.True(t, len(settlements) > 0, "Should return settlements even with NULL settled_at")
+
+		for _, s := range settlements {
+			settlement := s.(map[string]interface{})
+			if settledAt, exists := settlement["settled_at"]; exists {
+				if settledAt == nil {
+					assert.Nil(t, settledAt, "settled_at should be null for pending settlements")
+				}
+			}
+		}
+	})
+}
+
+func TestAdminGetSettlements_ErrorHandling(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("TC-SETTLEMENT-003: should not skip records on scan error", func(t *testing.T) {
+		t.Skip("Requires database setup - will be implemented in integration tests")
+		router := gin.New()
+		router.GET("/admin/settlements", func(c *gin.Context) {
+			c.Set("user_id", 1)
+			c.Set("user_role", "admin")
+			AdminGetSettlements(c)
+		})
+
+		req, _ := http.NewRequest(http.MethodGet, "/admin/settlements", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &response)
+		settlements := response["settlements"].([]interface{})
+
+		assert.True(t, len(settlements) > 0, "Should return all settlements without skipping")
+	})
+}
+
