@@ -1,31 +1,28 @@
 {
-  "workflow_id": "phase8-settlement-frontend",
-  "created_at": "2026-04-05T15:30:00Z",
-  "current_step": 1,
-  "issue_type": "feature",
-  "description": "Phase 8 结算前端开发 - 商户确认、争议提交、管理员审核",
-  "current_fix_cases": [],
-  "development_tasks": [
-    {
-      "id": "TASK-001",
-      "description": "更新 MerchantSettlements.tsx 添加确认、争议、打款记录功能",
-      "status": "pending"
-    },
-    {
-      "id": "TASK-002",
-      "description": "创建 AdminSettlements.tsx 管理员结算管理页面",
-      "status": "pending"
-    }
+  "current_step": "Step 4: 代码分析",
+  "branch_name": "feature/settlement-core-enhancements",
+  "issue_description": "补充Phase 7和Phase 8核心功能：1. 结算定时任务服务；2. 账单管理页面；3. 商户结算页面完善； 4. 边界条件测试； 5. 对账功能完善； 6. 性能优化和文档完善； 7. 商户账单明细查看功能",
+  "current_fix_cases": [
+    "TC-SETTLEMENT-SCHEDULER-001: 测试定时任务服务",
+    "TC-SETTLEMENT-SCHEDULER-002: 测试手动触发接口",
+    "TC-BILLING-PAGE-001: 测试账单管理页面",
+    "TC-MERCHANT-SETTLEMENT-001: 测试商户账单明细",
+    "TC-BOUNDARY-001: 测试边界条件",
+    "TC-RECONCILE-001: 测试对账功能"
   ],
-  "retry_count": 0,
-  "error_history": [],
+  "problem_type": "功能开发 - 需要实现新功能",
+  "requires_tdd": true,
   "ci_status": {
     "cicd": "pending",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
   },
+  "retry_count": 0,
+  "error_history": [],
   "local_validation": "pending",
   "pr_number": null,
-  "merged": false
+  "merged": false,
+  "created_at": "2026-04-06T00:00:00Z",
+  "updated_at": "2026-04-06T00:00:00Z"
 }
