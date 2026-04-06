@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
@@ -209,20 +210,22 @@ func TestSettlementService_GenerateMonthlySettlements_TransactionProtection(t *t
 		periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
 		merchantID := 1
 
-		mock.ExpectQuery(`SELECT m\.id, COALESCE`).
+		mock.ExpectQuery(`SELECT mak\.merchant_id, COUNT`).
 			WithArgs(periodStart, periodEnd).
-			WillReturnRows(sqlmock.NewRows([]string{"id", "total_sales", "total_orders"}).
-				AddRow(merchantID, 10000.00, 100))
+			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost"}).
+				AddRow(merchantID, 100, 50000, 10000.00))
 
 		mock.ExpectBegin()
 
 		mock.ExpectQuery(`SELECT id FROM merchant_settlements WHERE merchant_id = \$1 AND period_start = \$2 AND period_end = \$3 FOR UPDATE`).
 			WithArgs(merchantID, periodStart, periodEnd).
-			WillReturnRows(sqlmock.NewRows([]string{"id"}))
+			WillReturnError(sql.ErrNoRows)
 
 		mock.ExpectQuery(`INSERT INTO merchant_settlements`).
-			WithArgs(merchantID, periodStart, periodEnd, 10000.00, 500.00, 9500.00, "pending").
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+
+		mock.ExpectExec(`INSERT INTO settlement_items`).
+			WillReturnResult(sqlmock.NewResult(0, 100))
 
 		mock.ExpectCommit()
 
@@ -238,10 +241,10 @@ func TestSettlementService_GenerateMonthlySettlements_TransactionProtection(t *t
 		periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
 		merchantID := 1
 
-		mock.ExpectQuery(`SELECT m\.id, COALESCE`).
+		mock.ExpectQuery(`SELECT mak\.merchant_id, COUNT`).
 			WithArgs(periodStart, periodEnd).
-			WillReturnRows(sqlmock.NewRows([]string{"id", "total_sales", "total_orders"}).
-				AddRow(merchantID, 10000.00, 100))
+			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost"}).
+				AddRow(merchantID, 100, 50000, 10000.00))
 
 		mock.ExpectBegin()
 
