@@ -18,47 +18,47 @@ func NewBillingService(db *sql.DB) *BillingService {
 }
 
 type BillingRecordDetail struct {
-	ID            int       `json:"id"`
-	MerchantID    int       `json:"merchant_id"`
-	CompanyName   string    `json:"company_name"`
-	UserID        *int      `json:"user_id,omitempty"`
-	Username      *string   `json:"username,omitempty"`
-	Provider      string    `json:"provider"`
-	Model         string    `json:"model"`
-	InputTokens   int       `json:"input_tokens"`
-	OutputTokens  int       `json:"output_tokens"`
-	TotalTokens   int       `json:"total_tokens"`
-	Cost          float64   `json:"cost"`
-	RequestTime   float64   `json:"request_time"`
-	StatusCode    int       `json:"status_code"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID           int       `json:"id"`
+	MerchantID   int       `json:"merchant_id"`
+	CompanyName  string    `json:"company_name"`
+	UserID       *int      `json:"user_id,omitempty"`
+	Username     *string   `json:"username,omitempty"`
+	Provider     string    `json:"provider"`
+	Model        string    `json:"model"`
+	InputTokens  int       `json:"input_tokens"`
+	OutputTokens int       `json:"output_tokens"`
+	TotalTokens  int       `json:"total_tokens"`
+	Cost         float64   `json:"cost"`
+	RequestTime  float64   `json:"request_time"`
+	StatusCode   int       `json:"status_code"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type BillingStats struct {
-	TotalCost         float64 `json:"total_cost"`
-	TotalRequests     int     `json:"total_requests"`
-	TotalTokens       int64   `json:"total_tokens"`
-	AverageLatency    float64 `json:"average_latency"`
-	SuccessRate       float64 `json:"success_rate"`
+	TotalCost         float64                  `json:"total_cost"`
+	TotalRequests     int                      `json:"total_requests"`
+	TotalTokens       int64                    `json:"total_tokens"`
+	AverageLatency    float64                  `json:"average_latency"`
+	SuccessRate       float64                  `json:"success_rate"`
 	ProviderBreakdown map[string]ProviderStats `json:"provider_breakdown"`
 }
 
 type ProviderStats struct {
-	Provider     string  `json:"provider"`
-	TotalCost    float64 `json:"total_cost"`
-	TotalRequests int    `json:"total_requests"`
-	Percentage   float64 `json:"percentage"`
+	Provider      string  `json:"provider"`
+	TotalCost     float64 `json:"total_cost"`
+	TotalRequests int     `json:"total_requests"`
+	Percentage    float64 `json:"percentage"`
 }
 
 type BillingFilter struct {
-	MerchantID  *int
-	UserID      *int
-	Provider    *string
-	Model       *string
-	StartDate   *time.Time
-	EndDate     *time.Time
-	Page        int
-	PageSize    int
+	MerchantID *int
+	UserID     *int
+	Provider   *string
+	Model      *string
+	StartDate  *time.Time
+	EndDate    *time.Time
+	Page       int
+	PageSize   int
 }
 
 func (s *BillingService) GetMerchantBillings(filter *BillingFilter) ([]BillingRecordDetail, int, error) {

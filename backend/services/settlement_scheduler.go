@@ -12,11 +12,11 @@ import (
 )
 
 type SettlementScheduler struct {
-	service     *SettlementService
-	cron        *cron.Cron
-	running     bool
-	mu          sync.RWMutex
-	cronExpr    string
+	service  *SettlementService
+	cron     *cron.Cron
+	running  bool
+	mu       sync.RWMutex
+	cronExpr string
 }
 
 func NewSettlementScheduler(service *SettlementService) *SettlementScheduler {
