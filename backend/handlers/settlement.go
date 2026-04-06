@@ -222,6 +222,7 @@ func AdminGetSettlements(c *gin.Context) {
 	status := c.Query("status")
 	year := c.Query("year")
 	month := c.Query("month")
+	merchantID := c.Query("merchant_id")
 
 	db := config.GetDB()
 	if db == nil {
@@ -254,6 +255,12 @@ func AdminGetSettlements(c *gin.Context) {
 	if month != "" {
 		query += " AND EXTRACT(MONTH FROM s.period_start) = $" + strconv.Itoa(argIndex)
 		args = append(args, month)
+		argIndex++
+	}
+
+	if merchantID != "" {
+		query += " AND s.merchant_id = $" + strconv.Itoa(argIndex)
+		args = append(args, merchantID)
 	}
 
 	query += " ORDER BY s.period_start DESC"
@@ -280,7 +287,7 @@ func AdminGetSettlements(c *gin.Context) {
 		PlatformFee         float64    `json:"platform_fee"`
 		SettlementAmount    float64    `json:"settlement_amount"`
 		Status              string     `json:"status"`
-		SettledAt           time.Time  `json:"settled_at,omitempty"`
+		SettledAt           *time.Time `json:"settled_at,omitempty"`
 		MerchantConfirmed   bool       `json:"merchant_confirmed"`
 		MerchantConfirmedAt *time.Time `json:"merchant_confirmed_at,omitempty"`
 		FinanceApproved     bool       `json:"finance_approved"`
@@ -297,7 +304,13 @@ func AdminGetSettlements(c *gin.Context) {
 			&s.MerchantConfirmed, &s.MerchantConfirmedAt, &s.FinanceApproved, &s.FinanceApprovedAt,
 			&s.CompanyName)
 		if err != nil {
-			continue
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"SETTLEMENTS_SCAN_FAILED",
+				"Failed to scan settlement record",
+				http.StatusInternalServerError,
+				err,
+			))
+			return
 		}
 		settlements = append(settlements, s)
 	}
