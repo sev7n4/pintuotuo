@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col, Input, Form } from 'antd';
+import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col, Input, Form, Space, Pagination } from 'antd';
+import dayjs from 'dayjs';
 import {
   DollarOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   SyncOutlined,
   WarningOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
-import { MerchantSettlement } from '@/types';
+import { MerchantSettlement, BillingRecord } from '@/types';
 import styles from './MerchantSettlements.module.css';
 
 const getAuthToken = () => {
@@ -19,10 +21,16 @@ const MerchantSettlements = () => {
   const { settlements, fetchSettlements, requestSettlement, isLoading } = useMerchantStore();
   const [detailVisible, setDetailVisible] = useState(false);
   const [disputeVisible, setDisputeVisible] = useState(false);
+  const [billingVisible, setBillingVisible] = useState(false);
   const [selectedSettlement, setSelectedSettlement] = useState<MerchantSettlement | null>(null);
   const [disputeReason, setDisputeReason] = useState('');
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [disputeLoading, setDisputeLoading] = useState(false);
+  const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([]);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingPage, setBillingPage] = useState(1);
+  const [billingPageSize, setBillingPageSize] = useState(20);
+  const [billingTotal, setBillingTotal] = useState(0);
 
   useEffect(() => {
     fetchSettlements();
@@ -39,6 +47,41 @@ const MerchantSettlements = () => {
   const handleViewDetail = (record: MerchantSettlement) => {
     setSelectedSettlement(record);
     setDetailVisible(true);
+  };
+
+  const handleViewBilling = async (settlement: MerchantSettlement) => {
+    setSelectedSettlement(settlement);
+    setBillingVisible(true);
+    await fetchBillingRecords(settlement);
+  };
+
+  const fetchBillingRecords = async (settlement: MerchantSettlement) => {
+    setBillingLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('page', billingPage.toString());
+      params.append('page_size', billingPageSize.toString());
+      params.append('start_date', dayjs(settlement.period_start).format('YYYY-MM-DD'));
+      params.append('end_date', dayjs(settlement.period_end).format('YYYY-MM-DD'));
+
+      const response = await fetch(`/api/v1/merchant/billings?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setBillingRecords(data.billings || []);
+        setBillingTotal(data.total || 0);
+      } else {
+        message.error('获取账单明细失败');
+      }
+    } catch (error) {
+      message.error('获取账单明细失败');
+    } finally {
+      setBillingLoading(false);
+    }
   };
 
   const handleConfirmSettlement = async () => {
@@ -100,6 +143,10 @@ const MerchantSettlements = () => {
     } finally {
       setDisputeLoading(false);
     }
+  };
+
+  const handleExportBilling = () => {
+    message.info('导出功能开发中...');
   };
 
   const statusMap: Record<string, { color: string; text: string; icon: React.ReactNode }> = {
@@ -172,12 +219,84 @@ const MerchantSettlements = () => {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 150,
       render: (_: unknown, record: MerchantSettlement) => (
-        <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
-          查看详情
-        </Button>
+        <Space>
+          <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
+            详情
+          </Button>
+          <Button type="link" size="small" onClick={() => handleViewBilling(record)}>
+            账单明细
+          </Button>
+        </Space>
       ),
+    },
+  ];
+
+  const billingColumns = [
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 80,
+    },
+    {
+      title: 'Provider',
+      dataIndex: 'provider',
+      key: 'provider',
+      width: 100,
+    },
+    {
+      title: 'Model',
+      dataIndex: 'model',
+      key: 'model',
+      width: 150,
+    },
+    {
+      title: '输入Tokens',
+      dataIndex: 'input_tokens',
+      key: 'input_tokens',
+      width: 100,
+      render: (num: number) => num.toLocaleString(),
+    },
+    {
+      title: '输出Tokens',
+      dataIndex: 'output_tokens',
+      key: 'output_tokens',
+      width: 100,
+      render: (num: number) => num.toLocaleString(),
+    },
+    {
+      title: '成本',
+      dataIndex: 'cost',
+      key: 'cost',
+      width: 100,
+      render: (cost: number) => `$${cost.toFixed(4)}`,
+    },
+    {
+      title: '延迟(ms)',
+      dataIndex: 'latency_ms',
+      key: 'latency_ms',
+      width: 100,
+      render: (time: number) => time.toFixed(2),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status_code',
+      key: 'status_code',
+      width: 80,
+      render: (code: number) => (
+        <Tag color={code === 200 ? 'success' : 'error'}>
+          {code}
+        </Tag>
+      ),
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 180,
+      render: (date: string) => dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
     },
   ];
 
@@ -231,7 +350,7 @@ const MerchantSettlements = () => {
           dataSource={settlements}
           rowKey="id"
           loading={isLoading}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1200 }}
           pagination={false}
         />
       </Card>
@@ -301,6 +420,15 @@ const MerchantSettlements = () => {
               {!selectedSettlement.merchant_confirmed && selectedSettlement.status === 'pending' && (
                 <>
                   <Button
+                    style={{ marginRight: 8 }}
+                    onClick={() => {
+                      setDetailVisible(false);
+                      handleViewBilling(selectedSettlement);
+                    }}
+                  >
+                    查看账单明细
+                  </Button>
+                  <Button
                     type="primary"
                     onClick={handleConfirmSettlement}
                     loading={confirmLoading}
@@ -320,6 +448,58 @@ const MerchantSettlements = () => {
                   </Button>
                 </>
               )}
+            </div>
+          </>
+        )}
+      </Modal>
+
+      <Modal
+        title="账单明细"
+        open={billingVisible}
+        onCancel={() => {
+          setBillingVisible(false);
+          setBillingRecords([]);
+          setBillingTotal(0);
+        }}
+        footer={null}
+        width={1200}
+      >
+        {selectedSettlement && (
+          <>
+            <div style={{ marginBottom: 16 }}>
+              <Space>
+                <span>结算周期: {dayjs(selectedSettlement.period_start).format('YYYY-MM-DD')} - {dayjs(selectedSettlement.period_end).format('YYYY-MM-DD')}</span>
+                <Button icon={<DownloadOutlined />} onClick={handleExportBilling}>
+                  导出
+                </Button>
+              </Space>
+            </div>
+
+            <Table
+              columns={billingColumns}
+              dataSource={billingRecords}
+              rowKey="id"
+              loading={billingLoading}
+              scroll={{ x: 1000 }}
+              pagination={false}
+            />
+
+            <div style={{ marginTop: 16, textAlign: 'right' }}>
+              <Pagination
+                current={billingPage}
+                pageSize={billingPageSize}
+                total={billingTotal}
+                showSizeChanger
+                showQuickJumper
+                showTotal={(total) => `共 ${total} 条记录`}
+                onChange={(page, pageSize) => {
+                  setBillingPage(page);
+                  setBillingPageSize(pageSize);
+                  if (selectedSettlement) {
+                    fetchBillingRecords(selectedSettlement);
+                  }
+                }}
+              />
             </div>
           </>
         )}

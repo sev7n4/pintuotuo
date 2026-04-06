@@ -1,14 +1,11 @@
 {
-  "current_step": "Step 4: 代码分析",
-  "branch_name": "feature/settlement-core-enhancements",
-  "issue_description": "补充Phase 7和Phase 8核心功能：1. 结算定时任务服务；2. 账单管理页面；3. 商户结算页面完善； 4. 边界条件测试； 5. 对账功能完善； 6. 性能优化和文档完善； 7. 商户账单明细查看功能",
+  "current_step": "Step 0: 初始化检查",
+  "branch_name": "feature/settlement-enhancements-part2",
+  "issue_description": "完善Phase 7和Phase 8剩余功能：1. 商户结算页面账单明细查看；2. 边界条件测试；3. 对账功能完善；4. 性能优化和文档完善",
   "current_fix_cases": [
-    "TC-SETTLEMENT-SCHEDULER-001: 测试定时任务服务",
-    "TC-SETTLEMENT-SCHEDULER-002: 测试手动触发接口",
-    "TC-BILLING-PAGE-001: 测试账单管理页面",
-    "TC-MERCHANT-SETTLEMENT-001: 测试商户账单明细",
-    "TC-BOUNDARY-001: 测试边界条件",
-    "TC-RECONCILE-001: 测试对账功能"
+    "TC-MERCHANT-BILLING-DETAIL-001: 测试商户账单明细查看",
+    "TC-BOUNDARY-TEST-001: 测试边界条件",
+    "TC-RECONCILE-ENHANCE-001: 测试对账功能增强"
   ],
   "problem_type": "功能开发 - 需要实现新功能",
   "requires_tdd": true,
