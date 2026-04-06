@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/config"
+	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/services"
 
@@ -84,9 +84,9 @@ func AdminGetBillings(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"billings": billings,
-		"total":    total,
-		"page":     filter.Page,
+		"billings":  billings,
+		"total":     total,
+		"page":      filter.Page,
 		"page_size": filter.PageSize,
 	})
 }
@@ -231,7 +231,7 @@ func MerchantGetBillings(c *gin.Context) {
 	}
 
 	var merchantID int
-	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userID).Scan(&merchantID)
+	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userID).Scan(&merchantID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MERCHANT_NOT_FOUND",
@@ -248,10 +248,10 @@ func MerchantGetBillings(c *gin.Context) {
 		PageSize:   20,
 	}
 
-	if page, err := strconv.Atoi(pageStr); err == nil && page > 0 {
+	if page, parseErr := strconv.Atoi(pageStr); parseErr == nil && page > 0 {
 		filter.Page = page
 	}
-	if pageSize, err := strconv.Atoi(pageSizeStr); err == nil && pageSize > 0 {
+	if pageSize, parseErr := strconv.Atoi(pageSizeStr); parseErr == nil && pageSize > 0 {
 		filter.PageSize = pageSize
 	}
 
@@ -264,13 +264,13 @@ func MerchantGetBillings(c *gin.Context) {
 	}
 
 	if startDateStr != "" {
-		if startDate, err := time.Parse("2006-01-02", startDateStr); err == nil {
+		if startDate, parseErr := time.Parse("2006-01-02", startDateStr); parseErr == nil {
 			filter.StartDate = &startDate
 		}
 	}
 
 	if endDateStr != "" {
-		if endDate, err := time.Parse("2006-01-02", endDateStr); err == nil {
+		if endDate, parseErr := time.Parse("2006-01-02", endDateStr); parseErr == nil {
 			endOfDay := endDate.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
 			filter.EndDate = &endOfDay
 		}
