@@ -240,4 +240,3 @@ func TestAdminGetSettlements_ErrorHandling(t *testing.T) {
 		assert.True(t, len(settlements) > 0, "Should return all settlements without skipping")
 	})
 }
-

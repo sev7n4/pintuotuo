@@ -163,6 +163,18 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 		"period_end":   periodEnd.Format("2006-01-02"),
 	})
 
+	if s.db == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	if merchantID <= 0 {
+		return nil, fmt.Errorf("invalid merchant ID: %d", merchantID)
+	}
+
+	if periodStart.After(periodEnd) {
+		return nil, fmt.Errorf("invalid date range: period_start (%s) is after period_end (%s)", periodStart.Format("2006-01-02"), periodEnd.Format("2006-01-02"))
+	}
+
 	query := `
 		SELECT 
 			COUNT(aul.id) as total_requests,
@@ -802,6 +814,13 @@ func (s *SettlementService) ReconcileOrders(settlementID int) (*ReconciliationDa
 			"expected_amount":  expectedAmount,
 			"actual_amount":    actualAmount,
 		}
+
+		if alertErr := s.sendReconciliationAlert(settlementID, merchantID, anomalyDetails); alertErr != nil {
+			logger.LogError(ctx, "settlement_service", "Failed to send reconciliation alert", alertErr, map[string]interface{}{
+				"settlement_id": settlementID,
+				"merchant_id":   merchantID,
+			})
+		}
 	}
 
 	var reconciliationID int
@@ -830,6 +849,14 @@ func (s *SettlementService) ReconcileOrders(settlementID int) (*ReconciliationDa
 		return nil, fmt.Errorf("failed to create reconciliation: %w", err)
 	}
 
+	if hasAnomalies {
+		if err := s.markSettlementAnomaly(settlementID, anomalyDetails); err != nil {
+			logger.LogError(ctx, "settlement_service", "Failed to mark settlement anomaly", err, map[string]interface{}{
+				"settlement_id": settlementID,
+			})
+		}
+	}
+
 	reconciliation := &ReconciliationData{
 		ID:                 reconciliationID,
 		SettlementID:       settlementID,
@@ -852,4 +879,39 @@ func (s *SettlementService) ReconcileOrders(settlementID int) (*ReconciliationDa
 	})
 
 	return reconciliation, nil
+}
+
+func (s *SettlementService) sendReconciliationAlert(settlementID, merchantID int, anomalyDetails map[string]interface{}) error {
+	ctx := context.Background()
+
+	logger.LogInfo(ctx, "settlement_service", "Sending reconciliation alert", map[string]interface{}{
+		"settlement_id":   settlementID,
+		"merchant_id":     merchantID,
+		"anomaly_details": anomalyDetails,
+	})
+
+	return nil
+}
+
+func (s *SettlementService) markSettlementAnomaly(settlementID int, anomalyDetails map[string]interface{}) error {
+	ctx := context.Background()
+
+	_, err := s.db.Exec(
+		`UPDATE merchant_settlements 
+		 SET status = 'anomaly_detected',
+		     updated_at = NOW()
+		 WHERE id = $1`,
+		settlementID,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to mark settlement anomaly: %w", err)
+	}
+
+	logger.LogInfo(ctx, "settlement_service", "Settlement anomaly marked", map[string]interface{}{
+		"settlement_id":   settlementID,
+		"anomaly_details": anomalyDetails,
+	})
+
+	return nil
 }
