@@ -120,7 +120,7 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 
 	for rows.Next() {
 		var data SettlementData
-		var totalTokens int64
+		var totalTokens sql.NullInt64
 		err := rows.Scan(&data.MerchantID, &data.TotalOrders, &totalTokens, &data.TotalSales)
 		if err != nil {
 			logger.LogError(ctx, "settlement_service", "Failed to scan merchant data", err, nil)
@@ -177,8 +177,8 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 	`
 
 	var totalRequests int
-	var totalTokens int64
-	var totalCost float64
+	var totalTokens sql.NullInt64
+	var totalCost sql.NullFloat64
 	err := s.db.QueryRow(query, merchantID, periodStart, periodEnd).Scan(&totalRequests, &totalTokens, &totalCost)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -191,8 +191,18 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 		return nil, fmt.Errorf("no billing data found for merchant %d in the specified period", merchantID)
 	}
 
+	actualTotalTokens := int64(0)
+	if totalTokens.Valid {
+		actualTotalTokens = totalTokens.Int64
+	}
+
+	actualTotalCost := 0.0
+	if totalCost.Valid {
+		actualTotalCost = totalCost.Float64
+	}
+
 	platformFeeRate := 0.05
-	settlement, err := s.createSettlementWithItems(merchantID, periodStart, periodEnd, totalCost, platformFeeRate)
+	settlement, err := s.createSettlementWithItems(merchantID, periodStart, periodEnd, actualTotalCost, platformFeeRate)
 	if err != nil {
 		return nil, err
 	}
@@ -200,10 +210,10 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 	logger.LogInfo(ctx, "settlement_service", "Settlement created for merchant", map[string]interface{}{
 		"settlement_id":     settlement.ID,
 		"merchant_id":       merchantID,
-		"total_sales":       totalCost,
+		"total_sales":       actualTotalCost,
 		"settlement_amount": settlement.SettlementAmount,
 		"total_requests":    totalRequests,
-		"total_tokens":      totalTokens,
+		"total_tokens":      actualTotalTokens,
 	})
 
 	return settlement, nil

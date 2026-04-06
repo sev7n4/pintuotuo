@@ -77,6 +77,55 @@ func TestSettlementService_GenerateMonthlySettlements(t *testing.T) {
 	})
 }
 
+func TestSettlementService_GenerateMonthlySettlements_EmptyData(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	service := &SettlementService{db: db}
+
+	t.Run("no billing data - empty result", func(t *testing.T) {
+		periodStart := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+		periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
+
+		mock.ExpectQuery(`SELECT mak\.merchant_id, COUNT`).
+			WithArgs(periodStart, periodEnd).
+			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost"}))
+
+		settlements, err := service.GenerateMonthlySettlements(periodStart, periodEnd)
+		assert.NoError(t, err)
+		assert.Len(t, settlements, 0)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+func TestSettlementService_GenerateSettlementForMerchant_EmptyData(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	service := &SettlementService{db: db}
+
+	t.Run("no billing data for merchant", func(t *testing.T) {
+		merchantID := 1
+		periodStart := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+		periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
+
+		mock.ExpectQuery(`SELECT COUNT\(aul\.id\)`).
+			WithArgs(merchantID, periodStart, periodEnd).
+			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost"}).
+				AddRow(0, nil, nil))
+
+		settlement, err := service.GenerateSettlementForMerchant(merchantID, periodStart, periodEnd)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no billing data found")
+		assert.Nil(t, settlement)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
 func TestSettlementService_MerchantConfirm(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	assert.NoError(t, err)
