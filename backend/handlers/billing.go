@@ -213,7 +213,7 @@ func AdminGetUserBillings(c *gin.Context) {
 func MerchantGetBillings(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		middleware.RespondWithError(c, apperrors.ErrUnauthorized)
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
