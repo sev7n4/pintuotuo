@@ -815,8 +815,8 @@ func (s *SettlementService) ReconcileOrders(settlementID int) (*ReconciliationDa
 			"actual_amount":    actualAmount,
 		}
 
-		if err := s.sendReconciliationAlert(settlementID, merchantID, anomalyDetails); err != nil {
-			logger.LogError(ctx, "settlement_service", "Failed to send reconciliation alert", err, map[string]interface{}{
+		if alertErr := s.sendReconciliationAlert(settlementID, merchantID, anomalyDetails); alertErr != nil {
+			logger.LogError(ctx, "settlement_service", "Failed to send reconciliation alert", alertErr, map[string]interface{}{
 				"settlement_id": settlementID,
 				"merchant_id":   merchantID,
 			})
