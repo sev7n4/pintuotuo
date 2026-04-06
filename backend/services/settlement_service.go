@@ -364,17 +364,17 @@ func (s *SettlementService) GetBillingRecords(merchantID int, startDate, endDate
 }
 
 type SettlementItem struct {
-	ID            int       `json:"id"`
-	SettlementID  int       `json:"settlement_id"`
-	APILogID      int       `json:"api_usage_log_id"`
-	UserID        int       `json:"user_id"`
-	MerchantID    int       `json:"merchant_id"`
-	Provider      string    `json:"provider"`
-	Model         string    `json:"model"`
-	InputTokens   int       `json:"input_tokens"`
-	OutputTokens  int       `json:"output_tokens"`
-	Cost          float64   `json:"cost"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID           int       `json:"id"`
+	SettlementID int       `json:"settlement_id"`
+	APILogID     int       `json:"api_usage_log_id"`
+	UserID       int       `json:"user_id"`
+	MerchantID   int       `json:"merchant_id"`
+	Provider     string    `json:"provider"`
+	Model        string    `json:"model"`
+	InputTokens  int       `json:"input_tokens"`
+	OutputTokens int       `json:"output_tokens"`
+	Cost         float64   `json:"cost"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 func (s *SettlementService) GetSettlementItems(settlementID int) ([]SettlementItem, error) {
