@@ -97,6 +97,9 @@ func RegisterCatalogRoutes(router *gin.RouterGroup) {
 		catalog.GET("/search", handlers.SearchProducts)
 		catalog.GET("/:id", handlers.GetProductByID)
 		catalog.GET("/:id/groups", handlers.GetGroupsBySKU)
+		catalog.GET("/scenarios", handlers.GetScenarios)
+		catalog.GET("/scenarios/:scenario/spus", handlers.GetSPUsByScenario)
+		catalog.GET("/spus/:id/performance", handlers.GetSPUPerformance)
 
 		merchants := catalog.Group("/merchants")
 		merchants.Use(middleware.AuthMiddleware())
