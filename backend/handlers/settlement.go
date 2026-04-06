@@ -270,14 +270,14 @@ func AdminGetSettlements(c *gin.Context) {
 
 	if merchantConfirmed != "" {
 		query += " AND s.merchant_confirmed = $" + strconv.Itoa(argIndex)
-		confirmed := merchantConfirmed == "true" || merchantConfirmed == "1"
+		confirmed := merchantConfirmed == queryParamTrue || merchantConfirmed == "1"
 		args = append(args, confirmed)
 		argIndex++
 	}
 
 	if financeApproved != "" {
 		query += " AND s.finance_approved = $" + strconv.Itoa(argIndex)
-		approved := financeApproved == "true" || financeApproved == "1"
+		approved := financeApproved == queryParamTrue || financeApproved == "1"
 		args = append(args, approved)
 		argIndex++
 	}
