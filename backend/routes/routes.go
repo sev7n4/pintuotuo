@@ -273,6 +273,8 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.POST("/spus", handlers.CreateSPU)
 		admin.PUT("/spus/:id", handlers.UpdateSPU)
 		admin.DELETE("/spus/:id", handlers.DeleteSPU)
+		admin.GET("/spus/:id/scenarios", handlers.GetSPUScenarios)
+		admin.PUT("/spus/:id/scenarios", handlers.UpdateSPUScenarios)
 
 		admin.GET("/skus", handlers.ListSKUs)
 		admin.GET("/skus/:id", handlers.GetSKUByID)

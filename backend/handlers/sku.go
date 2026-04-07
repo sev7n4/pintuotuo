@@ -1441,3 +1441,121 @@ func GetPublicSKUByID(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"data": s})
 }
+
+type SPUScenarioResponse struct {
+	ID          int    `json:"id"`
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	IsLinked    bool   `json:"is_linked"`
+	IsPrimary   bool   `json:"is_primary"`
+}
+
+func GetSPUScenarios(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
+	id := c.Param("id")
+	spuID := idToInt(id)
+	if spuID <= 0 {
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
+	}
+
+	db := config.GetDB()
+	query := `
+		SELECT us.id, us.code, us.name, us.description, 
+		       CASE WHEN ss.spu_id IS NOT NULL THEN true ELSE false END as is_linked,
+		       COALESCE(ss.is_primary, false) as is_primary
+		FROM usage_scenarios us
+		LEFT JOIN spu_scenarios ss ON us.id = ss.scenario_id AND ss.spu_id = $1
+		WHERE us.status = 'active'
+		ORDER BY us.sort_order ASC
+	`
+
+	rows, err := db.Query(query, spuID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer rows.Close()
+
+	var scenarios []SPUScenarioResponse
+	for rows.Next() {
+		var s SPUScenarioResponse
+		var desc sql.NullString
+		if err := rows.Scan(&s.ID, &s.Code, &s.Name, &desc, &s.IsLinked, &s.IsPrimary); err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		if desc.Valid {
+			s.Description = desc.String
+		}
+		scenarios = append(scenarios, s)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"scenarios": scenarios})
+}
+
+type UpdateSPUScenariosRequest struct {
+	ScenarioIDs []int `json:"scenario_ids"`
+	PrimaryID   int   `json:"primary_id,omitempty"`
+}
+
+func UpdateSPUScenarios(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
+	id := c.Param("id")
+	spuID := idToInt(id)
+	if spuID <= 0 {
+		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
+	}
+
+	var req UpdateSPUScenariosRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	ctx := context.Background()
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("DELETE FROM spu_scenarios WHERE spu_id = $1", spuID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	for _, scenarioID := range req.ScenarioIDs {
+		isPrimary := scenarioID == req.PrimaryID
+		_, err = tx.Exec(
+			"INSERT INTO spu_scenarios (spu_id, scenario_id, is_primary) VALUES ($1, $2, $3)",
+			spuID, scenarioID, isPrimary,
+		)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	cache.InvalidatePatterns(ctx, "spus:list:*")
+	cache.InvalidatePatterns(ctx, "catalog:scenarios:*")
+
+	c.JSON(http.StatusOK, gin.H{"message": "SPU scenarios updated successfully"})
+}

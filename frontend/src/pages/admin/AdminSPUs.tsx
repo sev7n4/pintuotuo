@@ -14,11 +14,21 @@ import {
   Popconfirm,
   Row,
   Col,
+  Checkbox,
 } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, TagsOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
 import type { SPU, ModelProvider, SPUCreateRequest } from '@/types/sku';
 import { MODEL_TIER_LABELS } from '@/types/sku';
+
+interface SPUScenario {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  is_linked: boolean;
+  is_primary: boolean;
+}
 
 const AdminSPUs = () => {
   const [spus, setSPUs] = useState<SPU[]>([]);
@@ -37,6 +47,12 @@ const AdminSPUs = () => {
     pageSize: 20,
     total: 0,
   });
+  const [scenarioModalVisible, setScenarioModalVisible] = useState(false);
+  const [currentSPU, setCurrentSPU] = useState<SPU | null>(null);
+  const [scenarios, setScenarios] = useState<SPUScenario[]>([]);
+  const [selectedScenarios, setSelectedScenarios] = useState<number[]>([]);
+  const [primaryScenario, setPrimaryScenario] = useState<number | undefined>();
+  const [scenarioLoading, setScenarioLoading] = useState(false);
 
   useEffect(() => {
     fetchSPUs();
@@ -95,6 +111,43 @@ const AdminSPUs = () => {
       fetchSPUs();
     } catch {
       message.error('删除失败');
+    }
+  };
+
+  const handleManageScenarios = async (record: SPU) => {
+    setCurrentSPU(record);
+    setScenarioLoading(true);
+    setScenarioModalVisible(true);
+    try {
+      const response = await skuService.getSPUScenarios(record.id);
+      const scenarioList = response.data.scenarios || [];
+      setScenarios(scenarioList);
+      const linkedIds = scenarioList.filter((s) => s.is_linked).map((s) => s.id);
+      setSelectedScenarios(linkedIds);
+      const primary = scenarioList.find((s) => s.is_primary);
+      setPrimaryScenario(primary?.id);
+    } catch {
+      message.error('获取场景失败');
+    } finally {
+      setScenarioLoading(false);
+    }
+  };
+
+  const handleSaveScenarios = async () => {
+    if (!currentSPU) return;
+    setScenarioLoading(true);
+    try {
+      await skuService.updateSPUScenarios(currentSPU.id, {
+        scenario_ids: selectedScenarios,
+        primary_id: primaryScenario,
+      });
+      message.success('场景关联已更新');
+      setScenarioModalVisible(false);
+      fetchSPUs();
+    } catch {
+      message.error('更新失败');
+    } finally {
+      setScenarioLoading(false);
     }
   };
 
@@ -191,7 +244,7 @@ const AdminSPUs = () => {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 200,
       render: (_: unknown, record: SPU) => (
         <Space size="small">
           <Button
@@ -201,6 +254,14 @@ const AdminSPUs = () => {
             onClick={() => handleEdit(record)}
           >
             编辑
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<TagsOutlined />}
+            onClick={() => handleManageScenarios(record)}
+          >
+            场景
           </Button>
           <Popconfirm
             title="确定要删除这个SPU吗？关联的SKU也会被删除。"
@@ -393,6 +454,83 @@ const AdminSPUs = () => {
             </Col>
           </Row>
         </Form>
+      </Modal>
+
+      <Modal
+        title={`场景管理 - ${currentSPU?.name || ''}`}
+        open={scenarioModalVisible}
+        onOk={handleSaveScenarios}
+        onCancel={() => setScenarioModalVisible(false)}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={scenarioLoading}
+        width={600}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ color: '#666', marginBottom: 8 }}>
+            选择该SPU适用的使用场景，可多选。设置主要场景用于前端展示优先级。
+          </p>
+        </div>
+        {scenarioLoading ? (
+          <div style={{ textAlign: 'center', padding: 20 }}>加载中...</div>
+        ) : (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontWeight: 500, marginRight: 8 }}>选择场景：</span>
+            </div>
+            <Row gutter={[16, 16]}>
+              {scenarios.map((scenario) => (
+                <Col span={12} key={scenario.id}>
+                  <Card
+                    size="small"
+                    hoverable
+                    style={{
+                      borderColor: selectedScenarios.includes(scenario.id) ? '#1890ff' : undefined,
+                      backgroundColor: selectedScenarios.includes(scenario.id) ? '#e6f7ff' : undefined,
+                    }}
+                    onClick={() => {
+                      if (selectedScenarios.includes(scenario.id)) {
+                        setSelectedScenarios(selectedScenarios.filter((id) => id !== scenario.id));
+                        if (primaryScenario === scenario.id) {
+                          setPrimaryScenario(undefined);
+                        }
+                      } else {
+                        setSelectedScenarios([...selectedScenarios, scenario.id]);
+                      }
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <Checkbox
+                          checked={selectedScenarios.includes(scenario.id)}
+                          style={{ marginRight: 8 }}
+                        />
+                        <span style={{ fontWeight: 500 }}>{scenario.name}</span>
+                        {scenario.description && (
+                          <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
+                            {scenario.description}
+                          </div>
+                        )}
+                      </div>
+                      {selectedScenarios.includes(scenario.id) && (
+                        <Checkbox
+                          checked={primaryScenario === scenario.id}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setPrimaryScenario(e.target.checked ? scenario.id : undefined);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          主要
+                        </Checkbox>
+                      )}
+                    </div>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </div>
+        )}
       </Modal>
     </div>
   );
