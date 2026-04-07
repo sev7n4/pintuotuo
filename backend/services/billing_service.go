@@ -337,3 +337,150 @@ func (s *BillingService) GetBillingStats(filter *BillingFilter) (*BillingStats, 
 
 	return &stats, nil
 }
+
+type BillingTrend struct {
+	Date          string  `json:"date"`
+	TotalCost     float64 `json:"total_cost"`
+	TotalTokens   int64   `json:"total_tokens"`
+	TotalRequests int     `json:"total_requests"`
+	AvgLatency    float64 `json:"avg_latency"`
+}
+
+func (s *BillingService) GetBillingTrends(filter *BillingFilter, granularity string) ([]BillingTrend, error) {
+	ctx := context.Background()
+
+	logger.LogInfo(ctx, "billing_service", "Getting billing trends", map[string]interface{}{
+		"merchant_id": filter.MerchantID,
+		"granularity": granularity,
+	})
+
+	var groupBy string
+	switch granularity {
+	case "day":
+		groupBy = "DATE(aul.created_at)"
+	case "week":
+		groupBy = "TO_CHAR(aul.created_at, 'YYYY-\"W\"WW')"
+	case "month":
+		groupBy = "TO_CHAR(aul.created_at, 'YYYY-MM')"
+	default:
+		groupBy = "DATE(aul.created_at)"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			%s as date,
+			COALESCE(SUM(aul.cost), 0) as total_cost,
+			COALESCE(SUM(aul.input_tokens + aul.output_tokens), 0) as total_tokens,
+			COUNT(*) as total_requests,
+			COALESCE(AVG(aul.request_time), 0) as avg_latency
+		FROM api_usage_logs aul
+		JOIN merchant_api_keys mak ON mak.id = aul.key_id
+		WHERE 1=1
+	`, groupBy)
+
+	args := []interface{}{}
+	argIndex := 1
+
+	if filter.MerchantID != nil {
+		query += fmt.Sprintf(" AND mak.merchant_id = $%d", argIndex)
+		args = append(args, *filter.MerchantID)
+		argIndex++
+	}
+
+	if filter.UserID != nil {
+		query += fmt.Sprintf(" AND aul.user_id = $%d", argIndex)
+		args = append(args, *filter.UserID)
+		argIndex++
+	}
+
+	if filter.StartDate != nil {
+		query += fmt.Sprintf(" AND aul.created_at >= $%d", argIndex)
+		args = append(args, *filter.StartDate)
+		argIndex++
+	}
+
+	if filter.EndDate != nil {
+		query += fmt.Sprintf(" AND aul.created_at <= $%d", argIndex)
+		args = append(args, *filter.EndDate)
+		argIndex++
+	}
+
+	query += fmt.Sprintf(" GROUP BY %s ORDER BY date ASC", groupBy)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		logger.LogError(ctx, "billing_service", "Failed to get billing trends", err, nil)
+		return nil, fmt.Errorf("failed to get billing trends: %w", err)
+	}
+	defer rows.Close()
+
+	var trends []BillingTrend
+	for rows.Next() {
+		var t BillingTrend
+		err := rows.Scan(&t.Date, &t.TotalCost, &t.TotalTokens, &t.TotalRequests, &t.AvgLatency)
+		if err != nil {
+			continue
+		}
+		trends = append(trends, t)
+	}
+
+	if trends == nil {
+		trends = []BillingTrend{}
+	}
+
+	return trends, nil
+}
+
+func (s *BillingService) ExportBillingsToCSV(filter *BillingFilter) ([]byte, error) {
+	billings, _, err := s.GetMerchantBillings(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	var csv string
+	csv = "ID,商户ID,公司名称,用户ID,用户名,Provider,Model,输入Token,输出Token,总Token,费用,请求时间(ms),状态码,创建时间\n"
+
+	for _, b := range billings {
+		username := ""
+		if b.Username != nil {
+			username = *b.Username
+		}
+		userID := ""
+		if b.UserID != nil {
+			userID = fmt.Sprintf("%d", *b.UserID)
+		}
+		csv += fmt.Sprintf("%d,%d,%s,%s,%s,%s,%s,%d,%d,%d,%.6f,%.2f,%d,%s\n",
+			b.ID, b.MerchantID, b.CompanyName, userID, username,
+			b.Provider, b.Model, b.InputTokens, b.OutputTokens, b.TotalTokens,
+			b.Cost, b.RequestTime, b.StatusCode, b.CreatedAt.Format("2006-01-02 15:04:05"))
+	}
+
+	return []byte(csv), nil
+}
+
+func (s *BillingService) ExportUserBillingsToCSV(filter *BillingFilter) ([]byte, error) {
+	billings, _, err := s.GetUserBillings(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	var csv string
+	csv = "ID,商户ID,公司名称,用户ID,用户名,Provider,Model,输入Token,输出Token,总Token,费用,请求时间(ms),状态码,创建时间\n"
+
+	for _, b := range billings {
+		username := ""
+		if b.Username != nil {
+			username = *b.Username
+		}
+		userID := ""
+		if b.UserID != nil {
+			userID = fmt.Sprintf("%d", *b.UserID)
+		}
+		csv += fmt.Sprintf("%d,%d,%s,%s,%s,%s,%s,%d,%d,%d,%.6f,%.2f,%d,%s\n",
+			b.ID, b.MerchantID, b.CompanyName, userID, username,
+			b.Provider, b.Model, b.InputTokens, b.OutputTokens, b.TotalTokens,
+			b.Cost, b.RequestTime, b.StatusCode, b.CreatedAt.Format("2006-01-02 15:04:05"))
+	}
+
+	return []byte(csv), nil
+}
