@@ -33,7 +33,7 @@ import { skuService } from '@/services/sku';
 import api from '@/services/api';
 import type { SKUWithSPU } from '@/types/sku';
 import dayjs from 'dayjs';
-import ScenarioFilter from '@/components/ScenarioFilter';
+import { ScenarioFilter } from '@/components/ScenarioFilter';
 
 const { Option } = Select;
 const { Title, Text } = Typography;

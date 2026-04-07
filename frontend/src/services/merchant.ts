@@ -9,6 +9,7 @@ import {
   PaginatedResponse,
   APIResponse,
 } from '@/types';
+import type { ModelProvider } from '@/types/sku';
 
 export const merchantService = {
   registerMerchant: (data: {
@@ -72,4 +73,7 @@ export const merchantService = {
       can_submit: boolean;
       rejection_reason?: string;
     }>('/merchants/status'),
+
+  /** Active model_providers only; same data as admin dropdown, merchant role required */
+  getMerchantModelProviders: () => api.get<{ data: ModelProvider[] }>('/merchants/model-providers'),
 };
