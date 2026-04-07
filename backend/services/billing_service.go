@@ -71,10 +71,10 @@ func (s *BillingService) GetMerchantBillings(filter *BillingFilter) ([]BillingRe
 	})
 
 	query := `
-		SELECT aul.id, mak.merchant_id, m.company_name, aul.user_id, u.username,
+		SELECT aul.id, mak.merchant_id, m.company_name, aul.user_id, u.name,
 			   aul.provider, aul.model, aul.input_tokens, aul.output_tokens,
 			   (aul.input_tokens + aul.output_tokens) as total_tokens,
-			   aul.cost, aul.request_time, aul.status_code, aul.created_at
+			   aul.cost, aul.latency_ms, aul.status_code, aul.created_at
 		FROM api_usage_logs aul
 		JOIN merchant_api_keys mak ON mak.id = aul.key_id
 		JOIN merchants m ON m.id = mak.merchant_id
@@ -170,10 +170,10 @@ func (s *BillingService) GetUserBillings(filter *BillingFilter) ([]BillingRecord
 	filter.MerchantID = nil
 
 	query := `
-		SELECT aul.id, mak.merchant_id, m.company_name, aul.user_id, u.username,
+		SELECT aul.id, mak.merchant_id, m.company_name, aul.user_id, u.name,
 			   aul.provider, aul.model, aul.input_tokens, aul.output_tokens,
 			   (aul.input_tokens + aul.output_tokens) as total_tokens,
-			   aul.cost, aul.request_time, aul.status_code, aul.created_at
+			   aul.cost, aul.latency_ms, aul.status_code, aul.created_at
 		FROM api_usage_logs aul
 		JOIN merchant_api_keys mak ON mak.id = aul.key_id
 		JOIN merchants m ON m.id = mak.merchant_id
@@ -251,7 +251,7 @@ func (s *BillingService) GetBillingStats(filter *BillingFilter) (*BillingStats, 
 			COUNT(*) as total_requests,
 			COALESCE(SUM(aul.cost), 0) as total_cost,
 			COALESCE(SUM(aul.input_tokens + aul.output_tokens), 0) as total_tokens,
-			COALESCE(AVG(aul.request_time), 0) as average_latency,
+			COALESCE(AVG(aul.latency_ms), 0) as average_latency,
 			COALESCE(100.0 * COUNT(CASE WHEN aul.status_code = 200 THEN 1 END) / NULLIF(COUNT(*), 0), 0) as success_rate
 		FROM api_usage_logs aul
 		JOIN merchant_api_keys mak ON mak.id = aul.key_id
@@ -372,7 +372,7 @@ func (s *BillingService) GetBillingTrends(filter *BillingFilter, granularity str
 			COALESCE(SUM(aul.cost), 0) as total_cost,
 			COALESCE(SUM(aul.input_tokens + aul.output_tokens), 0) as total_tokens,
 			COUNT(*) as total_requests,
-			COALESCE(AVG(aul.request_time), 0) as avg_latency
+			COALESCE(AVG(aul.latency_ms), 0) as avg_latency
 		FROM api_usage_logs aul
 		JOIN merchant_api_keys mak ON mak.id = aul.key_id
 		WHERE 1=1
