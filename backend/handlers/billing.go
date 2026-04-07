@@ -472,6 +472,60 @@ func AdminGetUserBillings(c *gin.Context) {
 	})
 }
 
+func AdminGetBillingProviders(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	billingService := services.NewBillingService(db)
+	providers, err := billingService.GetProviders(nil)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"PROVIDERS_QUERY_FAILED",
+			"Failed to get providers",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"providers": providers})
+}
+
+func AdminGetBillingModels(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+
+	provider := c.Query("provider")
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	billingService := services.NewBillingService(db)
+	models, err := billingService.GetModels(provider)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MODELS_QUERY_FAILED",
+			"Failed to get models",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"models": models})
+}
+
 func MerchantGetBillings(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {

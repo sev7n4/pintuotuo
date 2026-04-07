@@ -378,6 +378,8 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 		adminBillings.GET("/stats", handlers.AdminGetBillingStats)
 		adminBillings.GET("/trends", handlers.AdminGetBillingTrends)
 		adminBillings.GET("/export", handlers.AdminExportBillings)
+		adminBillings.GET("/providers", handlers.AdminGetBillingProviders)
+		adminBillings.GET("/models", handlers.AdminGetBillingModels)
 	}
 
 	adminUserBillings := router.Group("/admin/user-billings")
