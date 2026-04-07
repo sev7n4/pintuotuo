@@ -355,7 +355,8 @@ export interface BillingStats {
   total_cost: number;
   total_requests: number;
   total_tokens: number;
-  avg_latency: number;
+  average_latency: number;
+  success_rate: number;
 }
 
 export interface BillingFilter {
