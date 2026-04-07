@@ -34,10 +34,10 @@ func TestBillingService_GetMerchantBillings(t *testing.T) {
 		0.05, 150.5, 200, time.Now(),
 	)
 
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM ( SELECT aul.id, mak.merchant_id, m.company_name, aul.user_id, u.username, aul.provider, aul.model, aul.input_tokens, aul.output_tokens, (aul.input_tokens + aul.output_tokens) as total_tokens, aul.cost, aul.request_time, aul.status_code, aul.created_at FROM api_usage_logs aul JOIN merchant_api_keys mak ON mak.id = aul.key_id JOIN merchants m ON m.id = mak.merchant_id LEFT JOIN users u ON u.id = aul.user_id WHERE 1=1 AND mak.merchant_id = $1) as subquery`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT COUNT(*) FROM ( SELECT aul.id, mak.merchant_id, m.company_name, aul.user_id, u.name, aul.provider, aul.model, aul.input_tokens, aul.output_tokens, (aul.input_tokens + aul.output_tokens) as total_tokens, aul.cost, aul.latency_ms, aul.status_code, aul.created_at FROM api_usage_logs aul JOIN merchant_api_keys mak ON mak.id = aul.key_id JOIN merchants m ON m.id = mak.merchant_id LEFT JOIN users u ON u.id = aul.user_id WHERE 1=1 AND mak.merchant_id = $1) as subquery`)).
 		WithArgs(merchantID).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT aul.id, mak.merchant_id, m.company_name, aul.user_id, u.username, aul.provider, aul.model, aul.input_tokens, aul.output_tokens, (aul.input_tokens + aul.output_tokens) as total_tokens, aul.cost, aul.request_time, aul.status_code, aul.created_at FROM api_usage_logs aul JOIN merchant_api_keys mak ON mak.id = aul.key_id JOIN merchants m ON m.id = mak.merchant_id LEFT JOIN users u ON u.id = aul.user_id WHERE 1=1 AND mak.merchant_id = $1 ORDER BY aul.created_at DESC LIMIT $2 OFFSET $3`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT aul.id, mak.merchant_id, m.company_name, aul.user_id, u.name, aul.provider, aul.model, aul.input_tokens, aul.output_tokens, (aul.input_tokens + aul.output_tokens) as total_tokens, aul.cost, aul.latency_ms, aul.status_code, aul.created_at FROM api_usage_logs aul JOIN merchant_api_keys mak ON mak.id = aul.key_id JOIN merchants m ON m.id = mak.merchant_id LEFT JOIN users u ON u.id = aul.user_id WHERE 1=1 AND mak.merchant_id = $1 ORDER BY aul.created_at DESC LIMIT $2 OFFSET $3`)).
 		WithArgs(merchantID, 20, 0).
 		WillReturnRows(rows)
 
