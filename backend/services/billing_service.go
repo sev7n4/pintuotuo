@@ -402,7 +402,6 @@ func (s *BillingService) GetBillingTrends(filter *BillingFilter, granularity str
 	if filter.EndDate != nil {
 		query += fmt.Sprintf(" AND aul.created_at <= $%d", argIndex)
 		args = append(args, *filter.EndDate)
-		argIndex++
 	}
 
 	query += fmt.Sprintf(" GROUP BY %s ORDER BY date ASC", groupBy)
