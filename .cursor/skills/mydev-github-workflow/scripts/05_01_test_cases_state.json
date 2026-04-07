@@ -32,5 +32,6 @@
     "failed": 0,
     "pending": 0
   },
-  "lastUpdated": "2026-04-07T14:00:00Z"
+  "lastUpdated": "2026-04-07T15:18:54Z",
+  "workflowNote": "PR #204 merged 2026-04-07；部署 run 24087868849 success"
 }

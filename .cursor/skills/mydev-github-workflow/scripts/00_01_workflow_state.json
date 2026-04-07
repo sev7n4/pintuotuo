@@ -1,5 +1,5 @@
 {
-  "current_step": 9,
+  "current_step": 14,
   "current_fix_cases": [
     "UT-BE-CREATE-MODEL-PROVIDER",
     "IT-BE-ADMIN-MODEL-PROVIDER-POST-AUTH",
@@ -7,26 +7,28 @@
   ],
   "retry_count": 0,
   "pr_number": 204,
-  "merged": false,
+  "merged": true,
   "branch": "feature/admin-model-provider-create",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "running",
-    "integration": "pending",
-    "e2e": "pending",
-    "deploy": "pending"
+    "cicd": "passed",
+    "integration": "passed",
+    "e2e": "passed",
+    "deploy": "passed"
   },
   "error_history": [],
   "created_at": "2026-04-07T14:00:00Z",
-  "updated_at": "2026-04-07T14:05:00Z",
+  "updated_at": "2026-04-07T15:18:54Z",
   "metadata": {
     "repo": "pintuotuo",
     "task": "POST /admin/model-providers 创建厂商；Admin 新增厂商表单；迁移 038 插入 minimax / moonshot / stepfun",
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "validation_note": "backend: GOMODCACHE/GOCACHE 于仓库 .cache 下 go test ./...；frontend: npm run type-check；npm test 存在 MyToken 超时偶发失败（与本改动无关）",
-    "next_action": "ci_monitoring",
+    "validation_note": "backend: GOMODCACHE/GOCACHE 于仓库 .cache 下 go test ./...；frontend: npm run type-check",
+    "next_action": "completed",
     "pr_url": "https://github.com/sev7n4/pintuotuo/pull/204",
-    "deploy_run_id": null
+    "deploy_run_id": 24087868849,
+    "deploy_run_url": "https://github.com/sev7n4/pintuotuo/actions/runs/24087868849",
+    "deploy_note": "Deploy to Tencent Cloud 随 main push 触发，#204 对应 run completed:success"
   }
 }
