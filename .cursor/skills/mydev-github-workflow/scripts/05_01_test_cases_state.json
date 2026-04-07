@@ -1,50 +1,36 @@
 {
   "currentIssue": {
-    "id": "MERCHANT-APIKEY-VERIFY-002",
+    "id": "MERCHANT-APIKEY-VERIFY-003",
     "type": "bugfix",
     "module": "merchant api-keys",
-    "branch": "fix/merchant-api-key-verification-poll",
-    "title": "商户 API Key 验证卡住修复与深度验证增强"
+    "branch": "bugfix/issue-APIKEY-VERIFY-HISTORY-NULL-SCAN",
+    "title": "验证历史 NULL 错误字段扫描修复与前端错误码展示"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-BE-APIKEY-VERIFY-001",
-        "name": "normalizeVerificationDBStatus maps success to verified",
+        "id": "UT-BE-APIKEY-VERIFY-004",
+        "name": "GetVerificationHistory scans NULL error_code/error_message without dropping success rows",
         "feature": "APIKeyValidator",
         "status": "passed",
-        "file": "backend/services/api_key_validator_test.go"
+        "file": "backend/services/api_key_validator.go"
       },
       {
-        "id": "UT-BE-APIKEY-VERIFY-002",
-        "name": "extractProviderError parses provider code and message",
-        "feature": "APIKeyValidator",
-        "status": "passed",
-        "file": "backend/services/api_key_validator_test.go"
-      },
-      {
-        "id": "UT-BE-APIKEY-VERIFY-003",
-        "name": "isQuotaProbeSupported keeps provider whitelist",
-        "feature": "APIKeyValidator",
-        "status": "passed",
-        "file": "backend/services/api_key_validator_test.go"
-      },
-      {
-        "id": "UT-FE-APIKEY-VERIFY-001",
-        "name": "MerchantAPIKeys normalizes verified status and supports deep verify trigger",
+        "id": "UT-FE-APIKEY-VERIFY-002",
+        "name": "MerchantAPIKeys verification modal shows error_code when present",
         "feature": "MerchantAPIKeys",
         "status": "passed",
-        "file": "frontend/src/pages/merchant/__tests__/MerchantAPIKeys.test.tsx"
+        "file": "frontend/src/pages/merchant/MerchantAPIKeys.tsx"
       }
     ],
     "integration": [],
     "e2e": []
   },
   "statistics": {
-    "total": 4,
-    "passed": 4,
+    "total": 2,
+    "passed": 2,
     "failed": 0,
     "pending": 0
   },
-  "lastUpdated": "2026-04-07T03:15:00Z"
+  "lastUpdated": "2026-04-07T11:00:00Z"
 }

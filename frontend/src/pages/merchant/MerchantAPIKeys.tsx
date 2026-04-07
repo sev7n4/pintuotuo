@@ -643,6 +643,12 @@ const MerchantAPIKeys = () => {
               )}
             </Descriptions.Item>
 
+            {verificationResult.error_code && (
+              <Descriptions.Item label="错误码">
+                <Tag color="volcano">{verificationResult.error_code}</Tag>
+              </Descriptions.Item>
+            )}
+
             {verificationResult.error_message && (
               <Descriptions.Item label="错误信息">
                 <span style={{ color: '#ff4d4f' }}>{verificationResult.error_message}</span>
