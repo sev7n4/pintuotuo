@@ -1,17 +1,17 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": [
     "UT-BE-MERCHANT-MP-001",
     "UT-BE-MERCHANT-MP-002",
     "UT-BE-MERCHANT-MP-003"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 193,
   "merged": false,
   "branch": "feature/merchant-model-providers-dropdown",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "pending",
+    "cicd": "running",
     "integration": "pending",
     "e2e": "pending",
     "deploy": "pending"
@@ -25,8 +25,8 @@
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
     "validation_note": "GOMODCACHE=/Users/4seven/go/pkg/mod make test 全绿；本地若 GOMODCACHE 指向 sandbox 需改用默认或 GOPATH/pkg/mod",
-    "next_action": "push_and_pr",
-    "pr_url": null,
+    "next_action": "monitor_ci",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/193",
     "deploy_run_id": null
   }
 }
