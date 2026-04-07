@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import axios from 'axios';
 import {
   Merchant,
   MerchantStats,
@@ -9,6 +10,18 @@ import {
   PaginatedResponse,
 } from '@/types';
 import { merchantService } from '@/services/merchant';
+
+function getApiErrorMessage(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { message?: string; error?: string } | undefined;
+    if (data && typeof data === 'object') {
+      if (typeof data.message === 'string' && data.message) return data.message;
+      if (typeof data.error === 'string' && data.error) return data.error;
+    }
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
 
 interface MerchantState {
   profile: Merchant | null;
@@ -139,7 +152,7 @@ export const useMerchantStore = create<MerchantState>((set) => ({
       set({ isLoading: false });
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '创建API密钥失败';
+      const message = getApiErrorMessage(error, '创建API密钥失败');
       set({ error: message, isLoading: false });
       return false;
     }
@@ -152,7 +165,7 @@ export const useMerchantStore = create<MerchantState>((set) => ({
       set({ isLoading: false });
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '更新API密钥失败';
+      const message = getApiErrorMessage(error, '更新API密钥失败');
       set({ error: message, isLoading: false });
       return false;
     }
