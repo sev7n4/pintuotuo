@@ -143,11 +143,15 @@ func getEnv(key, defaultValue string) string {
 }
 
 func RespondWithError(c *gin.Context, appErr *errors.AppError) {
-	c.JSON(appErr.Status, gin.H{
+	body := gin.H{
 		"error":   appErr.Message,
 		"code":    appErr.Code,
 		"message": appErr.Message,
-	})
+	}
+	if appErr.Details != nil {
+		body["details"] = appErr.Details
+	}
+	c.JSON(appErr.Status, body)
 }
 
 func RateLimitMiddleware() gin.HandlerFunc {
