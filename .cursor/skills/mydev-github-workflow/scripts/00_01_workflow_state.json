@@ -1,5 +1,5 @@
 {
-  "current_step": 10,
+  "current_step": 12,
   "current_fix_cases": [
     "UT-BE-MERCHANT-MP-001",
     "UT-BE-MERCHANT-MP-002",
@@ -11,9 +11,9 @@
   "branch": "feature/merchant-model-providers-dropdown",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "running",
-    "integration": "running",
-    "e2e": "running",
+    "cicd": "passed",
+    "integration": "passed",
+    "e2e": "passed",
     "deploy": "pending"
   },
   "error_history": [
@@ -32,7 +32,7 @@
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
     "validation_note": "本地 go test -race ./services -run TestValidateAsync|TestIsVerified 通过",
-    "next_action": "monitor_ci",
+    "next_action": "await_review_then_squash_merge",
     "pr_url": "https://github.com/sev7n4/pintuotuo/pull/193",
     "deploy_run_id": null
   }
