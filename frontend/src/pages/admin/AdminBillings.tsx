@@ -55,6 +55,8 @@ const AdminBillings = () => {
   const [selectedBilling, setSelectedBilling] = useState<BillingRecord | null>(null);
   const [merchants, setMerchants] = useState<Array<{id: number; company_name: string}>>([]);
   const [stats, setStats] = useState<BillingStats | null>(null);
+  const [providers, setProviders] = useState<string[]>([]);
+  const [models, setModels] = useState<string[]>([]);
 
   const [filterMerchantId, setFilterMerchantId] = useState<number | null>(null);
   const [filterProvider, setFilterProvider] = useState<string>('');
@@ -70,7 +72,12 @@ const AdminBillings = () => {
     fetchBillings();
     fetchMerchants();
     fetchStats();
+    fetchProviders();
   }, [page, pageSize, filterMerchantId, filterProvider, filterModel, filterStartDate, filterEndDate]);
+
+  useEffect(() => {
+    fetchModels();
+  }, [filterProvider]);
 
   const fetchBillings = async () => {
     setLoading(true);
@@ -141,6 +148,43 @@ const AdminBillings = () => {
       }
     } catch (error) {
       console.error('Failed to fetch stats:', error);
+    }
+  };
+
+  const fetchProviders = async () => {
+    try {
+      const response = await fetch('/api/v1/admin/billings/providers', {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProviders(data.providers || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch providers:', error);
+    }
+  };
+
+  const fetchModels = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filterProvider) params.append('provider', filterProvider);
+
+      const response = await fetch(`/api/v1/admin/billings/models?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setModels(data.models || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch models:', error);
     }
   };
 
@@ -374,12 +418,34 @@ const AdminBillings = () => {
               placeholder="Provider筛选"
               style={{ width: 150 }}
               value={filterProvider}
-              onChange={setFilterProvider}
+              onChange={(value) => {
+                setFilterProvider(value);
+                setFilterModel('');
+              }}
               allowClear
             >
-              <Select.Option value="openai">OpenAI</Select.Option>
-              <Select.Option value="anthropic">Anthropic</Select.Option>
-              <Select.Option value="google">Google</Select.Option>
+              {providers.map((provider) => (
+                <Select.Option key={provider} value={provider}>
+                  {provider}
+                </Select.Option>
+              ))}
+            </Select>
+            <Select
+              placeholder="Model筛选"
+              style={{ width: 200 }}
+              value={filterModel}
+              onChange={setFilterModel}
+              allowClear
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {models.map((model) => (
+                <Select.Option key={model} value={model}>
+                  {model}
+                </Select.Option>
+              ))}
             </Select>
             <DatePicker
               placeholder="开始日期"

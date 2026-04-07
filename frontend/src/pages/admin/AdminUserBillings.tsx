@@ -8,7 +8,6 @@ import {
   Modal,
   DatePicker,
   Select,
-  Input,
   InputNumber,
   Statistic,
   Row,
@@ -54,11 +53,18 @@ const AdminUserBillings: React.FC = () => {
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [selectedBilling, setSelectedBilling] = useState<UserBillingRecord | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [providers, setProviders] = useState<string[]>([]);
+  const [models, setModels] = useState<string[]>([]);
 
   useEffect(() => {
     fetchBillings();
     fetchStats();
+    fetchProviders();
   }, [pagination.current, pagination.pageSize, filterUserId, filterProvider, filterModel, dateRange]);
+
+  useEffect(() => {
+    fetchModels();
+  }, [filterProvider]);
 
   const fetchBillings = async () => {
     setLoading(true);
@@ -136,6 +142,26 @@ const AdminUserBillings: React.FC = () => {
     setFilterModel(undefined);
     setDateRange(null);
     setPagination({ ...pagination, current: 1 });
+  };
+
+  const fetchProviders = async () => {
+    try {
+      const response = await billingService.getUserBillingProviders();
+      setProviders(response.data.providers || []);
+    } catch (error) {
+      console.error('获取Provider列表失败', error);
+    }
+  };
+
+  const fetchModels = async () => {
+    try {
+      const params: any = {};
+      if (filterProvider) params.provider = filterProvider;
+      const response = await billingService.getUserBillingModels(params);
+      setModels(response.data.models || []);
+    } catch (error) {
+      console.error('获取Model列表失败', error);
+    }
   };
 
   const columns: ColumnsType<UserBillingRecord> = [
@@ -335,17 +361,29 @@ const AdminUserBillings: React.FC = () => {
               }}
               allowClear
             >
-              <Select.Option value="openai">OpenAI</Select.Option>
-              <Select.Option value="anthropic">Anthropic</Select.Option>
-              <Select.Option value="google">Google</Select.Option>
+              {providers.map((provider) => (
+                <Select.Option key={provider} value={provider}>
+                  {provider}
+                </Select.Option>
+              ))}
             </Select>
-            <Input
+            <Select
               placeholder="Model筛选"
               style={{ width: 200 }}
               value={filterModel}
-              onChange={(e) => setFilterModel(e.target.value || undefined)}
+              onChange={setFilterModel}
               allowClear
-            />
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {models.map((model) => (
+                <Select.Option key={model} value={model}>
+                  {model}
+                </Select.Option>
+              ))}
+            </Select>
             <RangePicker
               value={dateRange}
               onChange={(dates) => setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs] | null)}
