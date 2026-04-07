@@ -8,6 +8,8 @@ import {
   Modal,
   DatePicker,
   Select,
+  Input,
+  InputNumber,
   Statistic,
   Row,
   Col,
@@ -21,6 +23,7 @@ import {
   EyeOutlined,
   DownloadOutlined,
   CheckCircleOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -47,6 +50,7 @@ const AdminUserBillings: React.FC = () => {
   });
   const [filterUserId, setFilterUserId] = useState<number | undefined>();
   const [filterProvider, setFilterProvider] = useState<string | undefined>();
+  const [filterModel, setFilterModel] = useState<string | undefined>();
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [selectedBilling, setSelectedBilling] = useState<UserBillingRecord | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -54,7 +58,7 @@ const AdminUserBillings: React.FC = () => {
   useEffect(() => {
     fetchBillings();
     fetchStats();
-  }, [pagination.current, pagination.pageSize, filterUserId, filterProvider, dateRange]);
+  }, [pagination.current, pagination.pageSize, filterUserId, filterProvider, filterModel, dateRange]);
 
   const fetchBillings = async () => {
     setLoading(true);
@@ -65,6 +69,7 @@ const AdminUserBillings: React.FC = () => {
       };
       if (filterUserId) params.user_id = filterUserId;
       if (filterProvider) params.provider = filterProvider;
+      if (filterModel) params.model = filterModel;
       if (dateRange) {
         params.start_date = dateRange[0].format('YYYY-MM-DD');
         params.end_date = dateRange[1].format('YYYY-MM-DD');
@@ -123,6 +128,14 @@ const AdminUserBillings: React.FC = () => {
       current: pag.current,
       pageSize: pag.pageSize,
     });
+  };
+
+  const handleResetFilters = () => {
+    setFilterUserId(undefined);
+    setFilterProvider(undefined);
+    setFilterModel(undefined);
+    setDateRange(null);
+    setPagination({ ...pagination, current: 1 });
   };
 
   const columns: ColumnsType<UserBillingRecord> = [
@@ -244,8 +257,8 @@ const AdminUserBillings: React.FC = () => {
 
   return (
     <div>
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={4}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
               title="总消费"
@@ -253,27 +266,30 @@ const AdminUserBillings: React.FC = () => {
               precision={2}
               prefix={<DollarOutlined />}
               suffix="USD"
+              valueStyle={{ fontSize: '20px' }}
             />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
               title="总请求数"
               value={stats?.total_requests || 0}
               prefix={<ApiOutlined />}
+              valueStyle={{ fontSize: '20px' }}
             />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
               title="总Tokens"
               value={stats?.total_tokens || 0}
+              valueStyle={{ fontSize: '20px' }}
             />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
               title="平均延迟"
@@ -281,10 +297,11 @@ const AdminUserBillings: React.FC = () => {
               precision={2}
               suffix="ms"
               prefix={<ClockCircleOutlined />}
+              valueStyle={{ fontSize: '20px' }}
             />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
               title="成功率"
@@ -292,6 +309,7 @@ const AdminUserBillings: React.FC = () => {
               precision={2}
               suffix="%"
               prefix={<CheckCircleOutlined />}
+              valueStyle={{ fontSize: '20px' }}
             />
           </Card>
         </Col>
@@ -300,28 +318,41 @@ const AdminUserBillings: React.FC = () => {
       <Card>
         <div style={{ marginBottom: 16 }}>
           <Space size="middle" wrap>
-            <Select
+            <InputNumber
               placeholder="用户ID筛选"
               style={{ width: 150 }}
               value={filterUserId}
-              onChange={setFilterUserId}
-              allowClear
+              onChange={(value) => setFilterUserId(value as number | undefined)}
+              min={1}
             />
             <Select
               placeholder="Provider筛选"
-              style={{ width: 120 }}
+              style={{ width: 150 }}
               value={filterProvider}
-              onChange={setFilterProvider}
+              onChange={(value) => {
+                setFilterProvider(value);
+                setFilterModel(undefined);
+              }}
               allowClear
             >
               <Select.Option value="openai">OpenAI</Select.Option>
               <Select.Option value="anthropic">Anthropic</Select.Option>
               <Select.Option value="google">Google</Select.Option>
             </Select>
+            <Input
+              placeholder="Model筛选"
+              style={{ width: 200 }}
+              value={filterModel}
+              onChange={(e) => setFilterModel(e.target.value || undefined)}
+              allowClear
+            />
             <RangePicker
               value={dateRange}
               onChange={(dates) => setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs] | null)}
             />
+            <Button icon={<ReloadOutlined />} onClick={handleResetFilters}>
+              重置
+            </Button>
             <Button icon={<DownloadOutlined />} onClick={handleExport}>
               导出CSV
             </Button>
