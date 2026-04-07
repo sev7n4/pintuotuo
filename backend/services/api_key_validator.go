@@ -36,6 +36,7 @@ type VerificationResult struct {
 }
 
 type APIKeyValidator struct {
+	dbMu            sync.Mutex
 	db              *sql.DB
 	redis           *redis.Client
 	maxRetries      int
@@ -69,6 +70,16 @@ func GetAPIKeyValidator() *APIKeyValidator {
 		}
 	})
 	return apiKeyValidator
+}
+
+// ensureDB lazily binds config.GetDB(); safe under concurrent tests and async validation.
+func (v *APIKeyValidator) ensureDB() *sql.DB {
+	v.dbMu.Lock()
+	defer v.dbMu.Unlock()
+	if v.db == nil {
+		v.db = config.GetDB()
+	}
+	return v.db
 }
 
 func (v *APIKeyValidator) cacheVerificationResult(ctx context.Context, result VerificationResult) error {
@@ -281,15 +292,13 @@ func (v *APIKeyValidator) fetchModels(providerConfig map[string]string, apiKey s
 }
 
 func (v *APIKeyValidator) IsVerified(apiKeyID int) (bool, error) {
-	if v.db == nil {
-		v.db = config.GetDB()
-	}
-	if v.db == nil {
+	db := v.ensureDB()
+	if db == nil {
 		return false, fmt.Errorf("database not available")
 	}
 
 	var verificationResult string
-	err := v.db.QueryRow(
+	err := db.QueryRow(
 		"SELECT verification_result FROM merchant_api_keys WHERE id = $1",
 		apiKeyID,
 	).Scan(&verificationResult)
@@ -302,10 +311,8 @@ func (v *APIKeyValidator) IsVerified(apiKeyID int) (bool, error) {
 }
 
 func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]VerificationResult, error) {
-	if v.db == nil {
-		v.db = config.GetDB()
-	}
-	if v.db == nil {
+	db := v.ensureDB()
+	if db == nil {
 		return nil, fmt.Errorf("database not available")
 	}
 
@@ -326,7 +333,7 @@ func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]Ver
 		LIMIT $2
 	`
 
-	rows, err := v.db.Query(query, apiKeyID, limit)
+	rows, err := db.Query(query, apiKeyID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -364,15 +371,13 @@ func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]Ver
 }
 
 func (v *APIKeyValidator) createVerificationRecord(apiKeyID int, verificationType string) (int, error) {
-	if v.db == nil {
-		v.db = config.GetDB()
-	}
-	if v.db == nil {
+	db := v.ensureDB()
+	if db == nil {
 		return 0, fmt.Errorf("database not available")
 	}
 
 	var verificationID int
-	err := v.db.QueryRow(
+	err := db.QueryRow(
 		`INSERT INTO api_key_verifications (api_key_id, verification_type, status, started_at)
 		 VALUES ($1, $2, 'in_progress', NOW())
 		 RETURNING id`,
@@ -383,17 +388,15 @@ func (v *APIKeyValidator) createVerificationRecord(apiKeyID int, verificationTyp
 }
 
 func (v *APIKeyValidator) updateVerificationRecord(verificationID int, result VerificationResult) error {
-	if v.db == nil {
-		v.db = config.GetDB()
-	}
-	if v.db == nil {
+	db := v.ensureDB()
+	if db == nil {
 		return fmt.Errorf("database not available")
 	}
 
 	modelsJSON, _ := json.Marshal(result.ModelsFound)
 	pricingJSON, _ := json.Marshal(result.PricingInfo)
 
-	_, err := v.db.Exec(
+	_, err := db.Exec(
 		`UPDATE api_key_verifications 
 		 SET status = $1, connection_test = $2, connection_latency_ms = $3,
 		     models_found = $4, models_count = $5, pricing_verified = $6, pricing_info = $7,
@@ -408,16 +411,14 @@ func (v *APIKeyValidator) updateVerificationRecord(verificationID int, result Ve
 }
 
 func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result VerificationResult) error {
-	if v.db == nil {
-		v.db = config.GetDB()
-	}
-	if v.db == nil {
+	db := v.ensureDB()
+	if db == nil {
 		return fmt.Errorf("database not available")
 	}
 
 	modelsJSON, _ := json.Marshal(result.ModelsFound)
 
-	_, err := v.db.Exec(
+	_, err := db.Exec(
 		`UPDATE merchant_api_keys 
 		 SET verification_result = $1, verified_at = $2, models_supported = $3, verification_message = $4, updated_at = NOW()
 		 WHERE id = $5`,
@@ -428,15 +429,13 @@ func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result Ve
 }
 
 func (v *APIKeyValidator) getProviderConfig(provider string) (map[string]string, error) {
-	if v.db == nil {
-		v.db = config.GetDB()
-	}
-	if v.db == nil {
+	db := v.ensureDB()
+	if db == nil {
 		return nil, fmt.Errorf("database not available")
 	}
 
 	var apiBaseURL string
-	err := v.db.QueryRow(
+	err := db.QueryRow(
 		"SELECT COALESCE(api_base_url, '') FROM model_providers WHERE code = $1 AND status = 'active'",
 		provider,
 	).Scan(&apiBaseURL)
@@ -460,8 +459,8 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 	}
 
 	var provider string
-	if v.db != nil {
-		v.db.QueryRow(
+	if db := v.ensureDB(); db != nil {
+		db.QueryRow(
 			"SELECT provider FROM api_key_verifications v JOIN merchant_api_keys k ON v.api_key_id = k.id WHERE v.id = $1",
 			verificationID,
 		).Scan(&provider)
