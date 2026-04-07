@@ -16,6 +16,7 @@ import {
   ApiOutlined,
   ThunderboltOutlined,
   WalletOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -72,6 +73,16 @@ const menuItems = [
     key: '/admin/settlements',
     icon: <WalletOutlined />,
     label: '结算管理',
+  },
+  {
+    key: '/admin/billings',
+    icon: <DollarOutlined />,
+    label: '商户账单',
+  },
+  {
+    key: '/admin/user-billings',
+    icon: <DollarOutlined />,
+    label: '用户账单',
   },
   {
     key: '/admin/settings',

@@ -55,6 +55,8 @@ import AdminSPUs from '@pages/admin/AdminSPUs';
 import AdminSKUs from '@pages/admin/AdminSKUs';
 import AdminModelProviders from '@pages/admin/AdminModelProviders';
 import AdminFlashSales from '@pages/admin/AdminFlashSales';
+import AdminBillings from '@pages/admin/AdminBillings';
+import AdminUserBillings from '@pages/admin/AdminUserBillings';
 import AdminSettlements from '@pages/admin/AdminSettlements';
 
 function LegacyProductDetailRedirect() {
@@ -152,6 +154,8 @@ function App() {
             <Route path="products" element={<AdminProducts />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="settlements" element={<AdminSettlements />} />
+            <Route path="billings" element={<AdminBillings />} />
+            <Route path="user-billings" element={<AdminUserBillings />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="spus" element={<AdminSPUs />} />
             <Route path="skus" element={<AdminSKUs />} />
