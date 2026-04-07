@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Spin, Tag } from 'antd';
-import { CodeOutlined, EditOutlined, BarChartOutlined, MessageOutlined, EyeOutlined, ThunderboltOutlined, SoundOutlined, BulbOutlined } from '@ant-design/icons';
+import {
+  CodeOutlined,
+  EditOutlined,
+  BarChartOutlined,
+  MessageOutlined,
+  EyeOutlined,
+  ThunderboltOutlined,
+  SoundOutlined,
+  BulbOutlined,
+} from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '@/services/api';
 
@@ -93,11 +102,7 @@ export const ScenarioFilter: React.FC = () => {
   }
 
   return (
-    <Card 
-      title="使用场景" 
-      style={{ marginBottom: 16 }}
-      bodyStyle={{ padding: '12px 16px' }}
-    >
+    <Card title="使用场景" style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 16px' }}>
       <Row gutter={[12, 12]}>
         {scenarios.map((scenario) => {
           const isActive = activeScenario === scenario.code;
@@ -125,10 +130,7 @@ export const ScenarioFilter: React.FC = () => {
                   {scenario.name}
                 </div>
                 {scenario.spu_count !== undefined && scenario.spu_count > 0 && (
-                  <Tag 
-                    color={isActive ? color : 'default'}
-                    style={{ marginTop: 4, fontSize: 10 }}
-                  >
+                  <Tag color={isActive ? color : 'default'} style={{ marginTop: 4, fontSize: 10 }}>
                     {scenario.spu_count} 款
                   </Tag>
                 )}
@@ -140,5 +142,3 @@ export const ScenarioFilter: React.FC = () => {
     </Card>
   );
 };
-
-export default ScenarioFilter;

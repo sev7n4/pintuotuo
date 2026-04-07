@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -29,6 +30,68 @@ func ensureAdmin(c *gin.Context) bool {
 		return false
 	}
 	return true
+}
+
+func ensureMerchant(c *gin.Context) bool {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != roleMerchant {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Merchant access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return false
+	}
+	return true
+}
+
+// loadActiveModelProviders returns model_providers rows with status=active, using the same cache key as admin GetModelProviders.
+func loadActiveModelProviders() ([]models.ModelProvider, error) {
+	ctx := context.Background()
+	cacheKey := "model_providers:all"
+
+	if cachedProviders, err := cache.Get(ctx, cacheKey); err == nil {
+		var providers []models.ModelProvider
+		if err := json.Unmarshal([]byte(cachedProviders), &providers); err == nil {
+			return providers, nil
+		}
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		return nil, errors.New("database not available")
+	}
+	rows, err := db.Query(
+		"SELECT id, code, name, api_base_url, api_format, billing_type, cache_enabled, COALESCE(cache_discount_rate, 0), status, sort_order, created_at, updated_at FROM model_providers WHERE status = 'active' ORDER BY sort_order ASC",
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var providers []models.ModelProvider
+	for rows.Next() {
+		var p models.ModelProvider
+		var apiBaseURL, billingType sql.NullString
+		err := rows.Scan(&p.ID, &p.Code, &p.Name, &apiBaseURL, &p.APIFormat, &billingType, &p.CacheEnabled, &p.CacheDiscount, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		if apiBaseURL.Valid {
+			p.APIBaseURL = apiBaseURL.String
+		}
+		if billingType.Valid {
+			p.BillingType = billingType.String
+		}
+		providers = append(providers, p)
+	}
+
+	if providersJSON, err := json.Marshal(providers); err == nil {
+		cache.Set(ctx, cacheKey, string(providersJSON), 30*60)
+	}
+
+	return providers, nil
 }
 
 func ListSPUs(c *gin.Context) {
@@ -999,47 +1062,25 @@ func GetModelProviders(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
-	cacheKey := "model_providers:all"
-
-	if cachedProviders, err := cache.Get(ctx, cacheKey); err == nil {
-		var providers []models.ModelProvider
-		if err := json.Unmarshal([]byte(cachedProviders), &providers); err == nil {
-			c.JSON(http.StatusOK, gin.H{"data": providers})
-			return
-		}
-	}
-
-	db := config.GetDB()
-	rows, err := db.Query(
-		"SELECT id, code, name, api_base_url, api_format, billing_type, cache_enabled, COALESCE(cache_discount_rate, 0), status, sort_order, created_at, updated_at FROM model_providers WHERE status = 'active' ORDER BY sort_order ASC",
-	)
+	providers, err := loadActiveModelProviders()
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	defer rows.Close()
 
-	var providers []models.ModelProvider
-	for rows.Next() {
-		var p models.ModelProvider
-		var apiBaseURL, billingType sql.NullString
-		err := rows.Scan(&p.ID, &p.Code, &p.Name, &apiBaseURL, &p.APIFormat, &billingType, &p.CacheEnabled, &p.CacheDiscount, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
-		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-			return
-		}
-		if apiBaseURL.Valid {
-			p.APIBaseURL = apiBaseURL.String
-		}
-		if billingType.Valid {
-			p.BillingType = billingType.String
-		}
-		providers = append(providers, p)
+	c.JSON(http.StatusOK, gin.H{"data": providers})
+}
+
+// GetMerchantModelProviders exposes the same active-only model_providers list as GetModelProviders for merchant API key forms (provider dropdown). Requires merchant role; does not expose inactive providers.
+func GetMerchantModelProviders(c *gin.Context) {
+	if !ensureMerchant(c) {
+		return
 	}
 
-	if providersJSON, err := json.Marshal(providers); err == nil {
-		cache.Set(ctx, cacheKey, string(providersJSON), 30*60)
+	providers, err := loadActiveModelProviders()
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": providers})

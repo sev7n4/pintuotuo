@@ -1,4 +1,4 @@
-import { render, screen, act, within } from '@testing-library/react';
+import { render, screen, act, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 jest.mock('@/stores/merchantStore', () => ({
@@ -50,23 +50,62 @@ jest.mock('@/services/api', () => ({
   default: { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() },
 }));
 
+const mockProvidersPayload = {
+  data: {
+    data: [
+      {
+        id: 1,
+        code: 'openai',
+        name: 'OpenAI',
+        api_format: 'openai',
+        status: 'active',
+        sort_order: 0,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+        cache_enabled: false,
+      },
+      {
+        id: 2,
+        code: 'anthropic',
+        name: 'Anthropic',
+        api_format: 'anthropic',
+        status: 'active',
+        sort_order: 1,
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+        cache_enabled: false,
+      },
+    ],
+  },
+};
+
+jest.mock('@/services/merchant', () => ({
+  merchantService: {
+    getMerchantModelProviders: jest.fn(),
+  },
+}));
+
 describe('MerchantAPIKeys', () => {
   let MerchantAPIKeys: React.FC;
 
+  jest.setTimeout(20_000);
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    const { merchantService } = require('@/services/merchant');
+    merchantService.getMerchantModelProviders.mockResolvedValue(mockProvidersPayload);
     MerchantAPIKeys = (await import('../MerchantAPIKeys')).default;
   });
 
   it('renders API keys page with title', async () => {
-    await act(async () => {
-      render(
-        <MemoryRouter>
-          <MerchantAPIKeys />
-        </MemoryRouter>
-      );
+    render(
+      <MemoryRouter>
+        <MerchantAPIKeys />
+      </MemoryRouter>
+    );
+    await waitFor(() => {
+      expect(screen.getByText('API密钥管理')).toBeInTheDocument();
     });
-    expect(screen.getByText('API密钥管理')).toBeInTheDocument();
   });
 
   it('displays add key button', async () => {

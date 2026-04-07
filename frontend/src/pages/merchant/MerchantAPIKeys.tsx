@@ -30,7 +30,9 @@ import {
 } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
 import { MerchantAPIKey, VerificationResult } from '@/types';
+import type { ModelProvider } from '@/types/sku';
 import api from '@/services/api';
+import { merchantService } from '@/services/merchant';
 import styles from './MerchantAPIKeys.module.css';
 
 const MerchantAPIKeys = () => {
@@ -50,11 +52,37 @@ const MerchantAPIKeys = () => {
   const [verificationModalVisible, setVerificationModalVisible] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [verificationLoading, setVerificationLoading] = useState(false);
+  const [modelProviders, setModelProviders] = useState<ModelProvider[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
 
   useEffect(() => {
     fetchAPIKeys();
     fetchAPIKeyUsage();
   }, [fetchAPIKeys, fetchAPIKeyUsage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setProvidersLoading(true);
+      try {
+        const res = await merchantService.getMerchantModelProviders();
+        if (!cancelled && res.data?.data) {
+          setModelProviders(res.data.data);
+        }
+      } catch {
+        if (!cancelled) {
+          message.error('加载提供商列表失败');
+          setModelProviders([]);
+        }
+      } finally {
+        if (!cancelled) setProvidersLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleAdd = () => {
     setEditingKey(null);
@@ -116,7 +144,7 @@ const MerchantAPIKeys = () => {
     try {
       await api.post(`/merchants/api-keys/${id}/verify`);
       message.success('验证已启动，正在后台执行...');
-      
+
       await pollVerificationResult(id);
     } catch (error) {
       message.error('启动验证失败');
@@ -131,15 +159,17 @@ const MerchantAPIKeys = () => {
 
     const poll = async (): Promise<void> => {
       try {
-        const response = await api.get<VerificationResult>(`/merchants/api-keys/${id}/verification`);
+        const response = await api.get<VerificationResult>(
+          `/merchants/api-keys/${id}/verification`
+        );
         const result = response.data;
-        
+
         setVerificationResult(result);
-        
+
         if (result.status === 'pending' || result.status === 'in_progress') {
           attempts++;
           if (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, interval));
+            await new Promise((resolve) => setTimeout(resolve, interval));
             await poll();
           } else {
             message.warning('验证超时，请稍后查看结果');
@@ -152,7 +182,7 @@ const MerchantAPIKeys = () => {
       } catch (error) {
         attempts++;
         if (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, interval));
+          await new Promise((resolve) => setTimeout(resolve, interval));
           await poll();
         } else {
           message.error('获取验证结果失败');
@@ -166,7 +196,7 @@ const MerchantAPIKeys = () => {
 
   const getHealthStatusTag = (status?: string) => {
     if (!status) return <Tag>未知</Tag>;
-    
+
     const statusConfig: Record<string, { color: string; icon: React.ReactNode; text: string }> = {
       healthy: { color: 'success', icon: <CheckCircleOutlined />, text: '健康' },
       degraded: { color: 'warning', icon: <ExclamationCircleOutlined />, text: '降级' },
@@ -184,14 +214,19 @@ const MerchantAPIKeys = () => {
 
   const getVerificationStatusBadge = (result?: string) => {
     if (!result) return <Badge status="default" text="未验证" />;
-    
+
     const statusMap: Record<string, 'success' | 'error' | 'processing' | 'default'> = {
       success: 'success',
       failed: 'error',
       pending: 'processing',
     };
 
-    return <Badge status={statusMap[result] || 'default'} text={result === 'success' ? '已验证' : result === 'failed' ? '验证失败' : '待验证'} />;
+    return (
+      <Badge
+        status={statusMap[result] || 'default'}
+        text={result === 'success' ? '已验证' : result === 'failed' ? '验证失败' : '待验证'}
+      />
+    );
   };
 
   const columns = [
@@ -352,7 +387,7 @@ const MerchantAPIKeys = () => {
           >
             <Input placeholder="例如：生产环境密钥" disabled={!!editingKey} />
           </Form.Item>
-          
+
           {!editingKey && (
             <>
               <Form.Item
@@ -360,12 +395,21 @@ const MerchantAPIKeys = () => {
                 label="提供商"
                 rules={[{ required: true, message: '请选择提供商' }]}
               >
-                <Select placeholder="请选择提供商">
-                  <Select.Option value="openai">OpenAI</Select.Option>
-                  <Select.Option value="anthropic">Anthropic</Select.Option>
-                  <Select.Option value="google">Google AI</Select.Option>
-                  <Select.Option value="azure">Azure OpenAI</Select.Option>
-                </Select>
+                <Spin spinning={providersLoading}>
+                  <Select
+                    placeholder="请选择提供商"
+                    allowClear
+                    showSearch
+                    optionFilterProp="children"
+                    notFoundContent={providersLoading ? '加载中…' : '暂无可用提供商'}
+                  >
+                    {modelProviders.map((p) => (
+                      <Select.Option key={p.id} value={p.code}>
+                        {p.name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Spin>
               </Form.Item>
               <Form.Item
                 name="api_key"
@@ -379,11 +423,11 @@ const MerchantAPIKeys = () => {
               </Form.Item>
             </>
           )}
-          
+
           <Form.Item name="endpoint_url" label="端点URL">
             <Input placeholder="自定义端点URL（可选，留空使用默认）" />
           </Form.Item>
-          
+
           <Form.Item name="quota_limit" label="配额限制（美元）">
             <InputNumber
               min={0}
@@ -392,7 +436,7 @@ const MerchantAPIKeys = () => {
               placeholder="0表示无限制"
             />
           </Form.Item>
-          
+
           <Form.Item name="health_check_level" label="健康检查级别">
             <Select placeholder="选择健康检查频率">
               <Select.Option value="high">高频（每5分钟）</Select.Option>
@@ -401,9 +445,9 @@ const MerchantAPIKeys = () => {
               <Select.Option value="daily">每日一次</Select.Option>
             </Select>
           </Form.Item>
-          
+
           <Divider>成本定价配置</Divider>
-          
+
           <Form.Item name="cost_input_rate" label="输入成本率（$/1K tokens）">
             <InputNumber
               min={0}
@@ -412,7 +456,7 @@ const MerchantAPIKeys = () => {
               placeholder="输入token成本"
             />
           </Form.Item>
-          
+
           <Form.Item name="cost_output_rate" label="输出成本率（$/1K tokens）">
             <InputNumber
               min={0}
@@ -421,7 +465,7 @@ const MerchantAPIKeys = () => {
               placeholder="输出token成本"
             />
           </Form.Item>
-          
+
           <Form.Item name="profit_margin" label="利润率（%）">
             <InputNumber
               min={0}
@@ -431,7 +475,7 @@ const MerchantAPIKeys = () => {
               placeholder="利润率百分比"
             />
           </Form.Item>
-          
+
           {editingKey && (
             <Form.Item name="status" label="状态">
               <Select>
@@ -459,19 +503,25 @@ const MerchantAPIKeys = () => {
             <p style={{ marginTop: 16 }}>正在验证 API Key...</p>
           </div>
         )}
-        
+
         {verificationResult && (
           <Descriptions bordered column={1}>
             <Descriptions.Item label="验证状态">
               {verificationResult.status === 'success' ? (
-                <Tag color="success" icon={<CheckCircleOutlined />}>验证成功</Tag>
+                <Tag color="success" icon={<CheckCircleOutlined />}>
+                  验证成功
+                </Tag>
               ) : verificationResult.status === 'failed' ? (
-                <Tag color="error" icon={<ExclamationCircleOutlined />}>验证失败</Tag>
+                <Tag color="error" icon={<ExclamationCircleOutlined />}>
+                  验证失败
+                </Tag>
               ) : (
-                <Tag color="processing" icon={<SyncOutlined spin />}>验证中</Tag>
+                <Tag color="processing" icon={<SyncOutlined spin />}>
+                  验证中
+                </Tag>
               )}
             </Descriptions.Item>
-            
+
             <Descriptions.Item label="连接测试">
               {verificationResult.connection_test ? (
                 <Tag color="success">成功 ({verificationResult.connection_latency_ms}ms)</Tag>
@@ -479,17 +529,17 @@ const MerchantAPIKeys = () => {
                 <Tag color="error">失败</Tag>
               )}
             </Descriptions.Item>
-            
+
             {verificationResult.models_found && verificationResult.models_found.length > 0 && (
               <Descriptions.Item label="支持的模型">
                 <Space wrap>
-                  {verificationResult.models_found.map(model => (
+                  {verificationResult.models_found.map((model) => (
                     <Tag key={model}>{model}</Tag>
                   ))}
                 </Space>
               </Descriptions.Item>
             )}
-            
+
             <Descriptions.Item label="定价验证">
               {verificationResult.pricing_verified ? (
                 <Tag color="success">已验证</Tag>
@@ -497,16 +547,14 @@ const MerchantAPIKeys = () => {
                 <Tag color="warning">未验证</Tag>
               )}
             </Descriptions.Item>
-            
+
             {verificationResult.error_message && (
               <Descriptions.Item label="错误信息">
                 <span style={{ color: '#ff4d4f' }}>{verificationResult.error_message}</span>
               </Descriptions.Item>
             )}
-            
-            <Descriptions.Item label="重试次数">
-              {verificationResult.retry_count}
-            </Descriptions.Item>
+
+            <Descriptions.Item label="重试次数">{verificationResult.retry_count}</Descriptions.Item>
           </Descriptions>
         )}
       </Modal>
