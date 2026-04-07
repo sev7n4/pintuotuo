@@ -375,18 +375,22 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 	{
 		adminBillings.GET("", handlers.AdminGetBillings)
 		adminBillings.GET("/stats", handlers.AdminGetBillingStats)
+		adminBillings.GET("/trends", handlers.AdminGetBillingTrends)
+		adminBillings.GET("/export", handlers.AdminExportBillings)
 	}
 
 	adminUserBillings := router.Group("/admin/user-billings")
 	adminUserBillings.Use(middleware.AuthMiddleware())
 	{
 		adminUserBillings.GET("", handlers.AdminGetUserBillings)
+		adminUserBillings.GET("/export", handlers.AdminExportUserBillings)
 	}
 
 	merchantBillings := router.Group("/merchant/billings")
 	merchantBillings.Use(middleware.AuthMiddleware())
 	{
 		merchantBillings.GET("", handlers.MerchantGetBillings)
+		merchantBillings.GET("/export", handlers.MerchantExportBillings)
 	}
 
 	adminDisputes := router.Group("/admin/disputes")
