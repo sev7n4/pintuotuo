@@ -661,12 +661,15 @@ func GetMerchantAPIKeyVerification(c *gin.Context) {
 	}
 
 	var apiKey models.MerchantAPIKey
+	var verificationResult, verificationMsg sql.NullString
+	var verifiedAt sql.NullTime
+	var modelsJSON []byte
 	err = db.QueryRow(
 		`SELECT id, merchant_id, provider, verification_result, verified_at, models_supported, verification_message
 		 FROM merchant_api_keys
 		 WHERE id = $1 AND merchant_id = $2`,
 		keyID, merchantID,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.VerificationResult, &apiKey.VerifiedAt, &apiKey.ModelsSupported, &apiKey.VerificationMsg)
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &verificationResult, &verifiedAt, &modelsJSON, &verificationMsg)
 
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -679,6 +682,20 @@ func GetMerchantAPIKeyVerification(c *gin.Context) {
 	} else if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
+	}
+
+	if verificationResult.Valid {
+		apiKey.VerificationResult = verificationResult.String
+	}
+	if verificationMsg.Valid {
+		apiKey.VerificationMsg = verificationMsg.String
+	}
+	if verifiedAt.Valid {
+		t := verifiedAt.Time
+		apiKey.VerifiedAt = &t
+	}
+	if len(modelsJSON) > 0 {
+		_ = json.Unmarshal(modelsJSON, &apiKey.ModelsSupported)
 	}
 
 	validator := services.GetAPIKeyValidator()

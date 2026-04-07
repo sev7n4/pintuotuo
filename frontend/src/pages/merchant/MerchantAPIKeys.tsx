@@ -35,6 +35,45 @@ import api from '@/services/api';
 import { merchantService } from '@/services/merchant';
 import styles from './MerchantAPIKeys.module.css';
 
+/** GET /merchants/api-keys/:id/verification response shape */
+interface VerificationPollResponse {
+  api_key: MerchantAPIKey;
+  history: VerificationResult[];
+}
+
+function normalizeVerificationStatus(
+  raw: string | undefined
+): VerificationResult['status'] {
+  if (raw === 'success') return 'success';
+  if (raw === 'failed') return 'failed';
+  if (raw === 'in_progress') return 'in_progress';
+  return 'pending';
+}
+
+function buildVerificationView(
+  keyId: number,
+  payload: VerificationPollResponse
+): VerificationResult {
+  const latest = payload.history?.[0];
+  if (latest) {
+    return {
+      ...latest,
+      status: normalizeVerificationStatus(latest.status),
+    };
+  }
+  return {
+    id: 0,
+    api_key_id: keyId,
+    verification_type: 'manual',
+    status: 'in_progress',
+    connection_test: false,
+    models_count: 0,
+    pricing_verified: false,
+    started_at: new Date().toISOString(),
+    retry_count: 0,
+  };
+}
+
 const MerchantAPIKeys = () => {
   const {
     apiKeys,
@@ -178,10 +217,10 @@ const MerchantAPIKeys = () => {
 
     const poll = async (): Promise<void> => {
       try {
-        const response = await api.get<VerificationResult>(
+        const response = await api.get<VerificationPollResponse>(
           `/merchants/api-keys/${id}/verification`
         );
-        const result = response.data;
+        const result = buildVerificationView(id, response.data);
 
         setVerificationResult(result);
 

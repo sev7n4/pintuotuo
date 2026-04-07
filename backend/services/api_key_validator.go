@@ -122,13 +122,13 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 
 	decryptedKey, err := utils.Decrypt(encryptedKey)
 	if err != nil {
-		v.handleVerificationError(ctx, verificationID, "DECRYPTION_FAILED", "Failed to decrypt API key", startTime)
+		v.handleVerificationError(ctx, verificationID, apiKeyID, "DECRYPTION_FAILED", "Failed to decrypt API key", startTime)
 		return
 	}
 
 	providerConfig, err := v.getProviderConfig(provider)
 	if err != nil {
-		v.handleVerificationError(ctx, verificationID, "PROVIDER_NOT_FOUND", "Provider configuration not found", startTime)
+		v.handleVerificationError(ctx, verificationID, apiKeyID, "PROVIDER_NOT_FOUND", "Provider configuration not found", startTime)
 		return
 	}
 
@@ -140,7 +140,7 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 			go v.performVerificationWithRetry(apiKeyID, provider, encryptedKey, verificationType, retryCount+1)
 			return
 		}
-		v.handleVerificationError(ctx, verificationID, "CONNECTION_FAILED", err.Error(), startTime)
+		v.handleVerificationError(ctx, verificationID, apiKeyID, "CONNECTION_FAILED", err.Error(), startTime)
 		return
 	}
 	result.ConnectionTest = connectionOK
@@ -417,12 +417,16 @@ func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result Ve
 	}
 
 	modelsJSON, _ := json.Marshal(result.ModelsFound)
+	verifyMsg := result.ErrorMessage
+	if verifyMsg == "" && result.ErrorCode != "" {
+		verifyMsg = result.ErrorCode
+	}
 
 	_, err := db.Exec(
 		`UPDATE merchant_api_keys 
 		 SET verification_result = $1, verified_at = $2, models_supported = $3, verification_message = $4, updated_at = NOW()
 		 WHERE id = $5`,
-		result.Status, result.CompletedAt, modelsJSON, "", apiKeyID,
+		result.Status, result.CompletedAt, modelsJSON, verifyMsg, apiKeyID,
 	)
 
 	return err
@@ -449,7 +453,7 @@ func (v *APIKeyValidator) getProviderConfig(provider string) (map[string]string,
 	}, nil
 }
 
-func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificationID int, errorCode, errorMessage string, startTime time.Time) {
+func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificationID, apiKeyID int, errorCode, errorMessage string, startTime time.Time) {
 	result := VerificationResult{
 		ID:           verificationID,
 		Status:       "failed",
@@ -477,6 +481,14 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 		logger.LogError(ctx, "api_key_validator", "Failed to update verification record with error", err, map[string]interface{}{
 			"verification_id": verificationID,
 		})
+	}
+
+	if apiKeyID > 0 {
+		if uerr := v.updateAPIKeyVerificationStatus(apiKeyID, result); uerr != nil {
+			logger.LogError(ctx, "api_key_validator", "Failed to update merchant_api_keys after verification error", uerr, map[string]interface{}{
+				"api_key_id": apiKeyID,
+			})
+		}
 	}
 
 	logger.LogError(ctx, "api_key_validator", "API key verification failed", fmt.Errorf("%s", errorMessage), map[string]interface{}{
