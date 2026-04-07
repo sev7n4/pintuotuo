@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -86,6 +87,24 @@ func TestAdminModelProvidersHTTPAuth(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		r.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusForbidden, w.Code)
+	})
+
+	t.Run("POST /model-providers 无 Token 返回 401", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/model-providers", http.NoBody)
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusUnauthorized, w.Code, "body=%s", w.Body.String())
+	})
+
+	t.Run("POST /model-providers 普通用户返回 403", func(t *testing.T) {
+		token := testAccessToken(t, 1, "user@example.com", "user")
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/model-providers", strings.NewReader(`{"code":"x","name":"y"}`))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusForbidden, w.Code, "body=%s", w.Body.String())
 	})
 
 	t.Run("GET /all admin 角色通过鉴权（有库则 200，无库则 500）", func(t *testing.T) {

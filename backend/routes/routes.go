@@ -285,6 +285,7 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 
 		admin.GET("/model-providers/all", handlers.ListAllModelProviders)
 		admin.GET("/model-providers", handlers.GetModelProviders)
+		admin.POST("/model-providers", handlers.CreateModelProvider)
 		admin.PATCH("/model-providers/:id", handlers.PatchModelProvider)
 	}
 }

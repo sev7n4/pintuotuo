@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
@@ -1128,6 +1130,96 @@ func ListAllModelProviders(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": providers})
+}
+
+var modelProviderCodeRegexp = regexp.MustCompile(`^[a-z][a-z0-9_]{0,48}$`)
+
+// CreateModelProvider inserts a row into model_providers (admin only).
+func CreateModelProvider(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
+	var req struct {
+		Code        string `json:"code" binding:"required"`
+		Name        string `json:"name" binding:"required"`
+		APIBaseURL  string `json:"api_base_url"`
+		APIFormat   string `json:"api_format"`
+		BillingType string `json:"billing_type"`
+		Status      string `json:"status"`
+		SortOrder   int    `json:"sort_order"`
+	}
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	code := strings.ToLower(strings.TrimSpace(req.Code))
+	name := strings.TrimSpace(req.Name)
+	if code == "" || name == "" || !modelProviderCodeRegexp.MatchString(code) {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_MODEL_PROVIDER_CODE",
+			"code must be lowercase [a-z][a-z0-9_]{0,48}",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	apiFormat := strings.TrimSpace(req.APIFormat)
+	if apiFormat == "" {
+		apiFormat = "openai"
+	}
+	billingType := strings.TrimSpace(req.BillingType)
+	if billingType == "" {
+		billingType = "flat"
+	}
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		status = merchantStatusActive
+	}
+	if status != merchantStatusActive && status != merchantSKUStatusInactive {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	apiBase := strings.TrimSpace(req.APIBaseURL)
+	var apiBaseArg interface{}
+	if apiBase != "" {
+		apiBaseArg = apiBase
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var p models.ModelProvider
+	err := db.QueryRow(
+		`INSERT INTO model_providers (code, name, api_base_url, api_format, billing_type, status, sort_order)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), status, sort_order, created_at, updated_at`,
+		code, name, apiBaseArg, apiFormat, billingType, status, req.SortOrder,
+	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"MODEL_PROVIDER_CODE_EXISTS",
+				"Model provider code already exists",
+				http.StatusConflict,
+				err,
+			))
+			return
+		}
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	cache.Delete(context.Background(), "model_providers:all")
+
+	c.JSON(http.StatusCreated, gin.H{"data": p})
 }
 
 func PatchModelProvider(c *gin.Context) {

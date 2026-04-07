@@ -1,26 +1,26 @@
 {
   "currentIssue": {
-    "id": "MERCHANT-APIKEY-VERIFY-003",
-    "type": "bugfix",
-    "module": "merchant api-keys",
-    "branch": "bugfix/issue-APIKEY-VERIFY-HISTORY-NULL-SCAN",
-    "title": "验证历史 NULL 错误字段扫描修复与前端错误码展示"
+    "id": "ADMIN-MODEL-PROVIDER-CREATE-001",
+    "type": "feature",
+    "module": "admin model providers",
+    "branch": "feature/admin-model-provider-create",
+    "title": "模型厂商管理支持创建与三家厂商种子迁移"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-BE-APIKEY-VERIFY-004",
-        "name": "GetVerificationHistory scans NULL error_code/error_message without dropping success rows",
-        "feature": "APIKeyValidator",
+        "id": "UT-BE-CREATE-MODEL-PROVIDER",
+        "name": "CreateModelProvider validates code, auth, conflict 23505",
+        "feature": "sku handlers",
         "status": "passed",
-        "file": "backend/services/api_key_validator.go"
+        "file": "backend/handlers/admin_test.go"
       },
       {
-        "id": "UT-FE-APIKEY-VERIFY-002",
-        "name": "MerchantAPIKeys verification modal shows error_code when present",
-        "feature": "MerchantAPIKeys",
+        "id": "UT-BE-ADMIN-POST-MODEL-PROVIDER-AUTH",
+        "name": "POST /admin/model-providers JWT admin-only",
+        "feature": "routes",
         "status": "passed",
-        "file": "frontend/src/pages/merchant/MerchantAPIKeys.tsx"
+        "file": "backend/routes/admin_model_providers_auth_test.go"
       }
     ],
     "integration": [],
@@ -32,5 +32,5 @@
     "failed": 0,
     "pending": 0
   },
-  "lastUpdated": "2026-04-07T11:00:00Z"
+  "lastUpdated": "2026-04-07T14:00:00Z"
 }

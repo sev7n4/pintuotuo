@@ -72,6 +72,16 @@ export const skuService = {
   /** 全部厂商（含停用），供管理端维护页使用 */
   getAllModelProviders: () => api.get<{ data: ModelProvider[] }>('/admin/model-providers/all'),
 
+  createModelProvider: (data: {
+    code: string;
+    name: string;
+    api_base_url?: string;
+    api_format?: string;
+    billing_type?: string;
+    status?: string;
+    sort_order?: number;
+  }) => api.post<{ data: ModelProvider }>('/admin/model-providers', data),
+
   patchModelProvider: (
     id: number,
     data: Partial<{
