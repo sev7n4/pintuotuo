@@ -711,6 +711,48 @@ func GetSKUByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": s})
 }
 
+func sqlNullableString(s string) interface{} {
+	t := strings.TrimSpace(s)
+	if t == "" {
+		return nil
+	}
+	return t
+}
+
+// validateSKUCreateRequest checks type-specific required fields before INSERT.
+func validateSKUCreateRequest(req *models.SKUCreateRequest) *apperrors.AppError {
+	switch req.SKUType {
+	case "token_pack":
+		if req.TokenAmount <= 0 {
+			return apperrors.NewAppError("TOKEN_AMOUNT_REQUIRED", "Token包须填写大于 0 的 Token 数量", http.StatusBadRequest, nil)
+		}
+		if req.ComputePoints <= 0 {
+			return apperrors.NewAppError("COMPUTE_POINTS_REQUIRED", "Token包须填写大于 0 的算力点", http.StatusBadRequest, nil)
+		}
+	case "subscription":
+		p := strings.TrimSpace(req.SubscriptionPeriod)
+		if p == "" {
+			return apperrors.NewAppError("SUBSCRIPTION_PERIOD_REQUIRED", "订阅套餐必须选择订阅周期", http.StatusBadRequest, nil)
+		}
+		if p != "monthly" && p != "quarterly" && p != "yearly" {
+			return apperrors.NewAppError("INVALID_SUBSCRIPTION_PERIOD", "订阅周期必须是 monthly、quarterly 或 yearly", http.StatusBadRequest, nil)
+		}
+	case "concurrent":
+		if req.ConcurrentReqs <= 0 {
+			return apperrors.NewAppError("CONCURRENT_REQUESTS_REQUIRED", "并发套餐须填写大于 0 的并发请求数", http.StatusBadRequest, nil)
+		}
+	case "trial":
+		// 试用套餐：订阅周期等可为空，由数据库存 NULL
+	case "compute_points":
+		if req.ComputePoints <= 0 {
+			return apperrors.NewAppError("COMPUTE_POINTS_REQUIRED", "算力点套餐须填写大于 0 的算力点", http.StatusBadRequest, nil)
+		}
+	default:
+		return apperrors.NewAppError("INVALID_SKU_TYPE", "不支持的 SKU 类型", http.StatusBadRequest, nil)
+	}
+	return nil
+}
+
 func CreateSKU(c *gin.Context) {
 	if !ensureAdmin(c) {
 		return
@@ -742,6 +784,11 @@ func CreateSKU(c *gin.Context) {
 		req.ValidDays = 365
 	}
 
+	if vErr := validateSKUCreateRequest(&req); vErr != nil {
+		middleware.RespondWithError(c, vErr)
+		return
+	}
+
 	db := config.GetDB()
 
 	var spuExists bool
@@ -765,6 +812,8 @@ func CreateSKU(c *gin.Context) {
 		return
 	}
 
+	subscriptionPeriod := sqlNullableString(req.SubscriptionPeriod)
+
 	var sku models.SKU
 	err = db.QueryRow(
 		`INSERT INTO skus (spu_id, sku_code, sku_type, token_amount, compute_points, 
@@ -775,16 +824,41 @@ func CreateSKU(c *gin.Context) {
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) 
 		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, created_at, updated_at`,
 		req.SPUID, req.SKUCode, req.SKUType, req.TokenAmount, req.ComputePoints,
-		req.SubscriptionPeriod, req.IsUnlimited, req.FairUseLimit, req.TPMLimit, req.RPMLimit, req.ConcurrentReqs,
+		subscriptionPeriod, req.IsUnlimited, req.FairUseLimit, req.TPMLimit, req.RPMLimit, req.ConcurrentReqs,
 		req.ValidDays, req.RetailPrice, req.WholesalePrice, req.OriginalPrice, req.Stock, req.DailyLimit,
 		req.GroupEnabled, req.MinGroupSize, req.MaxGroupSize, req.GroupDiscountRate,
 		req.IsTrial, req.TrialDurationDays, req.Status, req.IsPromoted,
 	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.CreatedAt, &sku.UpdatedAt)
 
 	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) {
+			switch pqErr.Code {
+			case "23505":
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"SKU_CODE_EXISTS",
+					"SKU编码已存在，请更换其他编码",
+					http.StatusConflict,
+					err,
+				))
+				return
+			case "23514":
+				middleware.RespondWithError(c, apperrors.NewAppErrorWithDetails(
+					"SKU_CONSTRAINT_VIOLATION",
+					"创建失败：数据不符合数据库规则（例如 SKU 类型与订阅周期、并发数不匹配）",
+					http.StatusBadRequest,
+					err,
+					map[string]string{
+						"constraint": pqErr.Constraint,
+						"hint":       "非订阅类 SKU 请勿提交空的订阅周期；订阅类必须选择 monthly / quarterly / yearly",
+					},
+				))
+				return
+			}
+		}
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SKU_CREATION_FAILED",
-			"创建SKU失败",
+			"创建SKU失败，请稍后重试或查看服务日志",
 			http.StatusInternalServerError,
 			err,
 		))

@@ -22,6 +22,7 @@ import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
 import type { SKUWithSPU, SPU, SKUCreateRequest, SKUUpdateRequest } from '@/types/sku';
 import { SKU_TYPE_LABELS, MODEL_TIER_LABELS, SUBSCRIPTION_PERIOD_LABELS } from '@/types/sku';
+import { getApiErrorMessage } from '@/utils/apiError';
 
 const { useBreakpoint } = Grid;
 
@@ -62,8 +63,8 @@ const AdminSKUs = () => {
       });
       setSKUs(response.data.data || []);
       setPagination((prev) => ({ ...prev, total: response.data.total }));
-    } catch {
-      message.error('获取SKU列表失败');
+    } catch (e) {
+      message.error(getApiErrorMessage(e, '获取SKU列表失败'));
     } finally {
       setLoading(false);
     }
@@ -109,8 +110,8 @@ const AdminSKUs = () => {
       await skuService.deleteSKU(id);
       message.success('SKU已删除');
       fetchSKUs();
-    } catch {
-      message.error('删除失败');
+    } catch (e) {
+      message.error(getApiErrorMessage(e, '删除失败'));
     }
   };
 
@@ -148,7 +149,8 @@ const AdminSKUs = () => {
       if (error && typeof error === 'object' && 'errorFields' in error) {
         return;
       }
-      message.error(editingSKU ? '更新失败' : '创建失败');
+      const fallback = editingSKU ? '更新失败' : '创建失败';
+      message.error(getApiErrorMessage(error, fallback));
     }
   };
 
