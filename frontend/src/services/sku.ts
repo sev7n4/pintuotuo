@@ -32,6 +32,21 @@ export const skuService = {
 
   deleteSPU: (id: number) => api.delete(`/admin/spus/${id}`),
 
+  getSPUScenarios: (id: number) =>
+    api.get<{
+      scenarios: Array<{
+        id: number;
+        code: string;
+        name: string;
+        description?: string;
+        is_linked: boolean;
+        is_primary: boolean;
+      }>;
+    }>(`/admin/spus/${id}/scenarios`),
+
+  updateSPUScenarios: (id: number, data: { scenario_ids: number[]; primary_id?: number }) =>
+    api.put<{ message: string }>(`/admin/spus/${id}/scenarios`, data),
+
   getSKUs: (params?: {
     page?: number;
     per_page?: number;
