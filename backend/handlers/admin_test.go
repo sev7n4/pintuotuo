@@ -3,9 +3,11 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/config"
@@ -497,4 +499,81 @@ func TestListAllModelProviders_WithDatabase(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &body)
 	assert.NoError(t, err)
 	assert.Contains(t, body, "data")
+}
+
+func TestCreateModelProvider_MissingRole(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/model-providers", bytes.NewBufferString(`{}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	CreateModelProvider(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestCreateModelProvider_NonAdmin(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	body, _ := json.Marshal(map[string]string{"code": "x", "name": "Y"})
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/model-providers", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_role", "user")
+
+	CreateModelProvider(c)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestCreateModelProvider_InvalidCode(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	body, _ := json.Marshal(map[string]string{"code": "9invalid_start", "name": "Test"})
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/model-providers", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_role", "admin")
+
+	CreateModelProvider(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestCreateModelProvider_WithDatabase(t *testing.T) {
+	if config.GetDB() == nil {
+		t.Skip("跳过需要数据库连接的测试")
+	}
+
+	code := fmt.Sprintf("zz_test_mp_%d", time.Now().UnixNano())
+	payload := map[string]interface{}{
+		"code":         code,
+		"name":         "Test Provider",
+		"api_format":   "openai",
+		"billing_type": "flat",
+		"status":       "active",
+		"sort_order":   999,
+	}
+	body, _ := json.Marshal(payload)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/model-providers", bytes.NewBuffer(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user_role", "admin")
+
+	CreateModelProvider(c)
+
+	assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var resp map[string]interface{}
+	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	d, ok := resp["data"].(map[string]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, code, d["code"])
+
+	w2 := httptest.NewRecorder()
+	c2, _ := gin.CreateTestContext(w2)
+	c2.Request = httptest.NewRequest(http.MethodPost, "/api/admin/model-providers", bytes.NewBuffer(body))
+	c2.Request.Header.Set("Content-Type", "application/json")
+	c2.Set("user_role", "admin")
+	CreateModelProvider(c2)
+	assert.Equal(t, http.StatusConflict, w2.Code, w2.Body.String())
 }

@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Button, Tag, Modal, Form, Input, Select, InputNumber, message } from 'antd';
-import { EditOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Tag, Modal, Form, Input, Select, InputNumber, message, Space } from 'antd';
+import { EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
 import type { ModelProvider } from '@/types/sku';
+
+type ModalMode = 'create' | 'edit';
 
 const AdminModelProviders = () => {
   const [rows, setRows] = useState<ModelProvider[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [modalMode, setModalMode] = useState<ModalMode>('edit');
   const [editing, setEditing] = useState<ModelProvider | null>(null);
   const [form] = Form.useForm();
 
@@ -27,7 +30,21 @@ const AdminModelProviders = () => {
     fetchList();
   }, []);
 
+  const openCreate = () => {
+    setModalMode('create');
+    setEditing(null);
+    form.resetFields();
+    form.setFieldsValue({
+      api_format: 'openai',
+      billing_type: 'flat',
+      status: 'active',
+      sort_order: 0,
+    });
+    setModalVisible(true);
+  };
+
   const handleEdit = (record: ModelProvider) => {
+    setModalMode('edit');
     setEditing(record);
     form.setFieldsValue({
       name: record.name,
@@ -43,22 +60,35 @@ const AdminModelProviders = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      if (!editing) return;
-      await skuService.patchModelProvider(editing.id, {
-        name: values.name,
-        api_base_url: values.api_base_url || undefined,
-        api_format: values.api_format,
-        billing_type: values.billing_type || undefined,
-        status: values.status,
-        sort_order: values.sort_order,
-      });
-      message.success('已保存');
+      if (modalMode === 'create') {
+        await skuService.createModelProvider({
+          code: (values.code as string).trim().toLowerCase(),
+          name: (values.name as string).trim(),
+          api_base_url: values.api_base_url ? String(values.api_base_url).trim() : undefined,
+          api_format: values.api_format,
+          billing_type: values.billing_type ? String(values.billing_type).trim() : undefined,
+          status: values.status,
+          sort_order: values.sort_order as number,
+        });
+        message.success('已创建');
+      } else {
+        if (!editing) return;
+        await skuService.patchModelProvider(editing.id, {
+          name: values.name,
+          api_base_url: values.api_base_url || undefined,
+          api_format: values.api_format,
+          billing_type: values.billing_type || undefined,
+          status: values.status,
+          sort_order: values.sort_order,
+        });
+        message.success('已保存');
+      }
       setModalVisible(false);
       setEditing(null);
       fetchList();
-    } catch (e) {
-      if ((e as { errorFields?: unknown }).errorFields) return;
-      message.error('保存失败');
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'errorFields' in e) return;
+      message.error(modalMode === 'create' ? '创建失败' : '保存失败');
     }
   };
 
@@ -122,9 +152,25 @@ const AdminModelProviders = () => {
     },
   ];
 
+  const apiFormatOptions = [
+    { value: 'openai', label: 'openai（OpenAI 兼容 /chat/completions）' },
+    { value: 'anthropic', label: 'anthropic（/messages + x-api-key）' },
+    { value: 'baidu', label: 'baidu（千帆等，需与代理实现一致）' },
+  ];
+
   return (
     <div>
-      <Card title="模型厂商" extra={<Button onClick={() => fetchList()}>刷新</Button>}>
+      <Card
+        title="模型厂商"
+        extra={
+          <Space>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
+              新增厂商
+            </Button>
+            <Button onClick={() => fetchList()}>刷新</Button>
+          </Space>
+        }
+      >
         <Table
           rowKey="id"
           loading={loading}
@@ -136,7 +182,7 @@ const AdminModelProviders = () => {
       </Card>
 
       <Modal
-        title={editing ? `编辑：${editing.code}` : '编辑'}
+        title={modalMode === 'create' ? '新增模型厂商' : editing ? `编辑：${editing.code}` : '编辑'}
         open={modalVisible}
         onOk={handleSubmit}
         onCancel={() => {
@@ -146,36 +192,52 @@ const AdminModelProviders = () => {
         destroyOnClose
         width={560}
       >
-        {editing && (
-          <Form form={form} layout="vertical">
-            <Form.Item label="代码（只读）">
-              <Input value={editing.code} disabled />
+        <Form form={form} layout="vertical">
+          {modalMode === 'create' ? (
+            <Form.Item
+              name="code"
+              label="代码（唯一，小写字母/数字/下划线）"
+              rules={[
+                { required: true, message: '请输入代码' },
+                {
+                  pattern: /^[a-z][a-z0-9_]{0,48}$/,
+                  message: '须以小写字母开头，仅 a-z、0-9、下划线，最长 50 字符',
+                },
+              ]}
+            >
+              <Input placeholder="例如 minimax" autoComplete="off" />
             </Form.Item>
-            <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-              <Input />
-            </Form.Item>
-            <Form.Item name="api_base_url" label="API Base URL">
-              <Input placeholder="例如 https://api.openai.com/v1" />
-            </Form.Item>
-            <Form.Item name="api_format" label="API 格式" rules={[{ required: true }]}>
-              <Input placeholder="如 openai_compatible" />
-            </Form.Item>
-            <Form.Item name="billing_type" label="计费类型">
-              <Input placeholder="可选" />
-            </Form.Item>
-            <Form.Item name="status" label="状态" rules={[{ required: true }]}>
-              <Select
-                options={[
-                  { value: 'active', label: '启用' },
-                  { value: 'inactive', label: '停用' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item name="sort_order" label="排序" rules={[{ required: true }]}>
-              <InputNumber min={0} style={{ width: '100%' }} />
-            </Form.Item>
-          </Form>
-        )}
+          ) : (
+            editing && (
+              <Form.Item label="代码（只读）">
+                <Input value={editing.code} disabled />
+              </Form.Item>
+            )
+          )}
+          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="api_base_url" label="API Base URL">
+            <Input placeholder="例如 https://api.openai.com/v1" />
+          </Form.Item>
+          <Form.Item name="api_format" label="API 格式" rules={[{ required: true }]}>
+            <Select options={apiFormatOptions} placeholder="选择格式" />
+          </Form.Item>
+          <Form.Item name="billing_type" label="计费类型">
+            <Input placeholder="可选，默认 flat" />
+          </Form.Item>
+          <Form.Item name="status" label="状态" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { value: 'active', label: '启用' },
+                { value: 'inactive', label: '停用' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="sort_order" label="排序" rules={[{ required: true }]}>
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );
