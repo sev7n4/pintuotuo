@@ -1,37 +1,37 @@
 {
   "currentIssue": {
-    "id": "MERCHANT-MODEL-PROVIDERS-001",
-    "type": "feature",
+    "id": "MERCHANT-APIKEY-VERIFY-002",
+    "type": "bugfix",
     "module": "merchant api-keys",
-    "branch": "feature/merchant-model-providers-dropdown",
-    "title": "商户端 model_providers 下拉与 GET /merchants/model-providers"
+    "branch": "fix/merchant-api-key-verification-poll",
+    "title": "商户 API Key 验证卡住修复与深度验证增强"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-BE-MERCHANT-MP-001",
-        "name": "GetMerchantModelProviders rejects without merchant role",
-        "feature": "GetMerchantModelProviders",
+        "id": "UT-BE-APIKEY-VERIFY-001",
+        "name": "normalizeVerificationDBStatus maps success to verified",
+        "feature": "APIKeyValidator",
         "status": "passed",
-        "file": "backend/handlers/merchant_apikey_test.go"
+        "file": "backend/services/api_key_validator_test.go"
       },
       {
-        "id": "UT-BE-MERCHANT-MP-002",
-        "name": "GetMerchantModelProviders rejects non-merchant user_role",
-        "feature": "GetMerchantModelProviders",
+        "id": "UT-BE-APIKEY-VERIFY-002",
+        "name": "extractProviderError parses provider code and message",
+        "feature": "APIKeyValidator",
         "status": "passed",
-        "file": "backend/handlers/merchant_apikey_test.go"
+        "file": "backend/services/api_key_validator_test.go"
       },
       {
-        "id": "UT-BE-MERCHANT-MP-003",
-        "name": "GetMerchantModelProviders returns data when DB available",
-        "feature": "GetMerchantModelProviders",
+        "id": "UT-BE-APIKEY-VERIFY-003",
+        "name": "isQuotaProbeSupported keeps provider whitelist",
+        "feature": "APIKeyValidator",
         "status": "passed",
-        "file": "backend/handlers/merchant_apikey_test.go"
+        "file": "backend/services/api_key_validator_test.go"
       },
       {
-        "id": "UT-FE-MERCHANT-MP-001",
-        "name": "MerchantAPIKeys mocks getMerchantModelProviders and renders",
+        "id": "UT-FE-APIKEY-VERIFY-001",
+        "name": "MerchantAPIKeys normalizes verified status and supports deep verify trigger",
         "feature": "MerchantAPIKeys",
         "status": "passed",
         "file": "frontend/src/pages/merchant/__tests__/MerchantAPIKeys.test.tsx"
@@ -46,5 +46,5 @@
     "failed": 0,
     "pending": 0
   },
-  "lastUpdated": "2026-04-07T02:35:00Z"
+  "lastUpdated": "2026-04-07T03:15:00Z"
 }

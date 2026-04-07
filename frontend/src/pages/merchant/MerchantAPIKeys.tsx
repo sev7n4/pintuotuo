@@ -44,6 +44,7 @@ interface VerificationPollResponse {
 function normalizeVerificationStatus(
   raw: string | undefined
 ): VerificationResult['status'] {
+  if (raw === 'verified') return 'success';
   if (raw === 'success') return 'success';
   if (raw === 'failed') return 'failed';
   if (raw === 'in_progress') return 'in_progress';
@@ -59,6 +60,22 @@ function buildVerificationView(
     return {
       ...latest,
       status: normalizeVerificationStatus(latest.status),
+    };
+  }
+  const keyStatus = normalizeVerificationStatus(payload.api_key?.verification_result);
+  if (keyStatus === 'success' || keyStatus === 'failed') {
+    return {
+      id: 0,
+      api_key_id: keyId,
+      verification_type: 'manual',
+      status: keyStatus,
+      connection_test: keyStatus === 'success',
+      models_found: payload.api_key?.models_supported,
+      models_count: payload.api_key?.models_supported?.length || 0,
+      pricing_verified: false,
+      error_message: payload.api_key?.verification_message,
+      started_at: new Date().toISOString(),
+      retry_count: 0,
     };
   }
   return {
@@ -194,14 +211,20 @@ const MerchantAPIKeys = () => {
     }
   };
 
-  const handleVerify = async (id: number) => {
+  const handleVerify = async (id: number, mode: 'light' | 'deep' = 'light') => {
     setVerificationModalVisible(true);
     setVerificationLoading(true);
     setVerificationResult(null);
 
     try {
-      await api.post(`/merchants/api-keys/${id}/verify`);
-      message.success('验证已启动，正在后台执行...');
+      await api.post(`/merchants/api-keys/${id}/verify`, {
+        verification_mode: mode,
+      });
+      message.success(
+        mode === 'deep'
+          ? '深度验证已启动（包含配额探测，支持的提供商会执行）'
+          : '轻量验证已启动，正在后台执行...'
+      );
 
       await pollVerificationResult(id);
     } catch (error) {
@@ -274,6 +297,7 @@ const MerchantAPIKeys = () => {
     if (!result) return <Badge status="default" text="未验证" />;
 
     const statusMap: Record<string, 'success' | 'error' | 'processing' | 'default'> = {
+      verified: 'success',
       success: 'success',
       failed: 'error',
       pending: 'processing',
@@ -282,7 +306,13 @@ const MerchantAPIKeys = () => {
     return (
       <Badge
         status={statusMap[result] || 'default'}
-        text={result === 'success' ? '已验证' : result === 'failed' ? '验证失败' : '待验证'}
+        text={
+          result === 'success' || result === 'verified'
+            ? '已验证'
+            : result === 'failed'
+              ? '验证失败'
+              : '待验证'
+        }
       />
     );
   };
@@ -375,14 +405,23 @@ const MerchantAPIKeys = () => {
       width: 220,
       render: (_: unknown, record: MerchantAPIKey) => (
         <Space size="small">
-          <Tooltip title="验证API Key">
+          <Tooltip title="轻量验证（连通性/鉴权）">
             <Button
               type="link"
               size="small"
               icon={<ApiOutlined />}
-              onClick={() => handleVerify(record.id)}
+              onClick={() => handleVerify(record.id, 'light')}
             >
-              验证
+              轻量验证
+            </Button>
+          </Tooltip>
+          <Tooltip title="深度验证（含配额探测，仅支持部分提供商）">
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleVerify(record.id, 'deep')}
+            >
+              深度验证
             </Button>
           </Tooltip>
           <Button
