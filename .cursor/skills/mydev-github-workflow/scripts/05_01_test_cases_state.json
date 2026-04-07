@@ -1,37 +1,30 @@
 {
   "currentIssue": {
-    "id": "ADMIN-MODEL-PROVIDER-CREATE-001",
-    "type": "feature",
-    "module": "admin model providers",
-    "branch": "feature/admin-model-provider-create",
-    "title": "模型厂商管理支持创建与三家厂商种子迁移"
+    "id": "ADMIN-SKU-CREATE-500-001",
+    "type": "bugfix",
+    "module": "admin skus",
+    "branch": "fix/admin-sku-create-500",
+    "title": "SKU 创建 subscription_period 空串 500 与前端错误提示"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-BE-CREATE-MODEL-PROVIDER",
-        "name": "CreateModelProvider validates code, auth, conflict 23505",
-        "feature": "sku handlers",
+        "id": "UT-BE-VALIDATE-SKU-CREATE",
+        "name": "validateSKUCreateRequest and sqlNullableString for subscription_period",
+        "feature": "CreateSKU",
         "status": "passed",
-        "file": "backend/handlers/admin_test.go"
-      },
-      {
-        "id": "UT-BE-ADMIN-POST-MODEL-PROVIDER-AUTH",
-        "name": "POST /admin/model-providers JWT admin-only",
-        "feature": "routes",
-        "status": "passed",
-        "file": "backend/routes/admin_model_providers_auth_test.go"
+        "file": "backend/handlers/sku_create_validate_test.go"
       }
     ],
     "integration": [],
     "e2e": []
   },
   "statistics": {
-    "total": 2,
-    "passed": 2,
+    "total": 1,
+    "passed": 1,
     "failed": 0,
     "pending": 0
   },
-  "lastUpdated": "2026-04-07T15:18:54Z",
-  "workflowNote": "PR #204 merged 2026-04-07；部署 run 24087868849 success"
+  "lastUpdated": "2026-04-07T17:00:00Z",
+  "workflowNote": "PR #206 merged；部署 run 24091351933 success"
 }
