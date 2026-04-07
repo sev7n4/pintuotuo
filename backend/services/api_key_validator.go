@@ -377,13 +377,14 @@ func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]Ver
 		var pricingJSON []byte
 		var latency sql.NullInt64
 		var completedAt sql.NullTime
+		var errCode, errMsg sql.NullString
 
 		err := rows.Scan(
 			&result.ID, &result.APIKeyID, &result.VerificationType, &result.Status,
 			&result.ConnectionTest, &latency,
 			&modelsJSON, &result.ModelsCount,
 			&result.PricingVerified, &pricingJSON,
-			&result.ErrorCode, &result.ErrorMessage,
+			&errCode, &errMsg,
 			&result.StartedAt, &completedAt,
 		)
 		if err != nil {
@@ -398,6 +399,12 @@ func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]Ver
 		}
 		if completedAt.Valid {
 			result.CompletedAt = completedAt.Time
+		}
+		if errCode.Valid {
+			result.ErrorCode = errCode.String
+		}
+		if errMsg.Valid {
+			result.ErrorMessage = errMsg.String
 		}
 
 		if len(modelsJSON) > 0 {
@@ -471,6 +478,11 @@ func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result Ve
 	verifyMsg := result.ErrorMessage
 	if verifyMsg == "" && result.ErrorCode != "" {
 		verifyMsg = result.ErrorCode
+	}
+	if result.Status == "failed" && result.ErrorCode != "" && result.ErrorMessage != "" {
+		verifyMsg = fmt.Sprintf("[%s] %s", result.ErrorCode, result.ErrorMessage)
+	} else if result.Status == "failed" && result.ErrorCode != "" && verifyMsg != "" && verifyMsg != result.ErrorCode {
+		verifyMsg = fmt.Sprintf("[%s] %s", result.ErrorCode, verifyMsg)
 	}
 	dbResult := normalizeVerificationDBStatus(result.Status)
 

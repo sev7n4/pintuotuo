@@ -1,40 +1,31 @@
 {
-  "current_step": 8,
+  "current_step": 9,
   "current_fix_cases": [
-    "BUG-MERCHANT-APIKEY-VERIFY-POLL-STUCK",
-    "BUG-MERCHANT-APIKEY-VERIFY-NULL-SCAN",
-    "ENH-MERCHANT-APIKEY-PROVIDER-ERROR-BODY",
-    "ENH-MERCHANT-APIKEY-OPTIONAL-DEEP-VERIFY"
+    "BUG-APIKEY-VERIFY-HISTORY-NULL-ERROR-SCAN",
+    "ENH-FE-VERIFICATION-MODAL-ERROR-CODE"
   ],
   "retry_count": 0,
-  "pr_number": 193,
+  "pr_number": null,
   "merged": false,
-  "branch": "fix/merchant-api-key-verification-poll",
-  "local_validation": "partial",
+  "branch": "bugfix/issue-APIKEY-VERIFY-HISTORY-NULL-SCAN",
+  "local_validation": "passed",
   "ci_status": {
-    "cicd": "passed",
-    "integration": "passed",
-    "e2e": "passed",
+    "cicd": "pending",
+    "integration": "pending",
+    "e2e": "pending",
     "deploy": "pending"
   },
-  "error_history": [
-    {
-      "step": 11,
-      "error_type": "code",
-      "message": "切换至商户 API Key 验证卡住与验证增强修复流，按 skill 重置当前修复用例",
-      "timestamp": "2026-04-07T10:40:00+08:00"
-    }
-  ],
-  "created_at": "2026-04-07T02:25:00Z",
-  "updated_at": "2026-04-07T03:15:00Z",
+  "error_history": [],
+  "created_at": "2026-04-07T11:00:00Z",
+  "updated_at": "2026-04-07T11:00:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "商户 API Key 验证卡住修复 + 深度验证与错误体增强",
+    "task": "GetVerificationHistory 对 NULL error_code/error_message 使用 NullString 扫描；失败时 merchant 行写入 [code] message；前端展示错误码",
     "issue_type": "bugfix",
     "skill": "mydev-github-workflow",
-    "validation_note": "frontend type-check + MerchantAPIKeys.test.tsx 通过；backend go test 在当前 Cursor sandbox go-mod 缓存损坏导致无法完成（非代码错误）",
-    "next_action": "commit_and_push_for_ci_validation",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/196",
+    "validation_note": "go test ./services/... -short（GOMODCACHE/GOCACHE 于仓库 .cache）；npm run type-check；jest MerchantAPIKeys.test.tsx",
+    "next_action": "push_and_open_pr",
+    "pr_url": null,
     "deploy_run_id": null
   }
 }
