@@ -118,21 +118,40 @@ const MerchantAPIKeys = () => {
       const values = await form.validateFields();
       if (editingKey) {
         const success = await updateAPIKey(editingKey.id, values);
-        if (success) {
-          message.success('API密钥已更新');
-          setModalVisible(false);
-          fetchAPIKeys();
+        if (!success) {
+          const msg = useMerchantStore.getState().error || '更新失败';
+          message.error(msg);
+          throw new Error(msg);
         }
-      } else {
-        const success = await createAPIKey(values);
-        if (success) {
-          message.success('API密钥已创建');
-          setModalVisible(false);
-          fetchAPIKeys();
-        }
+        message.success('API密钥已更新');
+        setModalVisible(false);
+        fetchAPIKeys();
+        return;
       }
-    } catch (error) {
-      message.error('操作失败');
+      const payload = {
+        name: values.name as string,
+        provider: values.provider as string,
+        api_key: values.api_key as string,
+        api_secret: values.api_secret as string | undefined,
+        quota_limit: values.quota_limit as number | undefined,
+      };
+      const success = await createAPIKey(payload);
+      if (!success) {
+        const msg = useMerchantStore.getState().error || '创建失败';
+        message.error(msg);
+        throw new Error(msg);
+      }
+      message.success('API密钥已创建');
+      setModalVisible(false);
+      fetchAPIKeys();
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'errorFields' in e) {
+        throw e;
+      }
+      if (!(e instanceof Error)) {
+        message.error('操作失败');
+      }
+      throw e instanceof Error ? e : new Error('操作失败');
     }
   };
 
