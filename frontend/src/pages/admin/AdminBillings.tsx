@@ -153,8 +153,36 @@ const AdminBillings = () => {
     setPage(1);
   };
 
-  const handleExport = () => {
-    message.info('导出功能开发中...');
+  const handleExport = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filterMerchantId) params.append('merchant_id', filterMerchantId.toString());
+      if (filterProvider) params.append('provider', filterProvider);
+      if (filterModel) params.append('model', filterModel);
+      if (filterStartDate) params.append('start_date', filterStartDate.format('YYYY-MM-DD'));
+      if (filterEndDate) params.append('end_date', filterEndDate.format('YYYY-MM-DD'));
+
+      const response = await fetch(`/api/v1/admin/billings/export?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `merchant_billings_${dayjs().format('YYYYMMDDHHmmss')}.csv`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+        message.success('导出成功');
+      } else {
+        message.error('导出失败');
+      }
+    } catch (error) {
+      message.error('导出失败');
+    }
   };
 
   const columns = [
@@ -264,8 +292,8 @@ const AdminBillings = () => {
 
   return (
     <div className={styles.container}>
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={4}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
               title="总消费"
@@ -273,27 +301,30 @@ const AdminBillings = () => {
               precision={2}
               prefix={<DollarOutlined />}
               suffix="USD"
+              valueStyle={{ fontSize: '20px' }}
             />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
               title="总请求数"
               value={stats?.total_requests || 0}
               prefix={<ApiOutlined />}
+              valueStyle={{ fontSize: '20px' }}
             />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
               title="总Tokens"
               value={stats?.total_tokens || 0}
+              valueStyle={{ fontSize: '20px' }}
             />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
               title="平均延迟"
@@ -301,10 +332,11 @@ const AdminBillings = () => {
               precision={2}
               suffix="ms"
               prefix={<ClockCircleOutlined />}
+              valueStyle={{ fontSize: '20px' }}
             />
           </Card>
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
               title="成功率"
@@ -312,6 +344,7 @@ const AdminBillings = () => {
               precision={2}
               suffix="%"
               prefix={<CheckCircleOutlined />}
+              valueStyle={{ fontSize: '20px' }}
             />
           </Card>
         </Col>
@@ -339,7 +372,7 @@ const AdminBillings = () => {
             </Select>
             <Select
               placeholder="Provider筛选"
-              style={{ width: 120 }}
+              style={{ width: 150 }}
               value={filterProvider}
               onChange={setFilterProvider}
               allowClear
