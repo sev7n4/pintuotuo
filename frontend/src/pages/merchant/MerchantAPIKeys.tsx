@@ -409,27 +409,25 @@ const MerchantAPIKeys = () => {
 
           {!editingKey && (
             <>
-              <Form.Item
-                name="provider"
-                label="提供商"
-                rules={[{ required: true, message: '请选择提供商' }]}
-              >
-                <Spin spinning={providersLoading}>
+              <Spin spinning={providersLoading}>
+                <Form.Item
+                  name="provider"
+                  label="提供商"
+                  rules={[{ required: true, message: '请选择提供商' }]}
+                >
                   <Select
                     placeholder="请选择提供商"
                     allowClear
                     showSearch
-                    optionFilterProp="children"
+                    optionFilterProp="label"
+                    options={modelProviders.map((p) => ({
+                      value: p.code,
+                      label: p.name,
+                    }))}
                     notFoundContent={providersLoading ? '加载中…' : '暂无可用提供商'}
-                  >
-                    {modelProviders.map((p) => (
-                      <Select.Option key={p.id} value={p.code}>
-                        {p.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Spin>
-              </Form.Item>
+                  />
+                </Form.Item>
+              </Spin>
               <Form.Item
                 name="api_key"
                 label="API Key"
