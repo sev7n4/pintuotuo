@@ -1178,6 +1178,7 @@ func ListPublicSKUs(c *gin.Context) {
 	validMinStr := strings.TrimSpace(c.Query("valid_days_min"))
 	validMaxStr := strings.TrimSpace(c.Query("valid_days_max"))
 	sortParam := strings.TrimSpace(c.Query("sort"))
+	scenario := strings.TrimSpace(c.Query("scenario"))
 
 	pageNum, _ := strconv.Atoi(page)
 	perPageNum, _ := strconv.Atoi(perPage)
@@ -1264,6 +1265,11 @@ func ListPublicSKUs(c *gin.Context) {
 			args = append(args, v)
 			argPos++
 		}
+	}
+	if scenario != "" {
+		where += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM spu_scenarios ss JOIN usage_scenarios us ON ss.scenario_id = us.id WHERE ss.spu_id = s.spu_id AND us.code = $%d)", argPos)
+		args = append(args, scenario)
+		argPos++
 	}
 
 	orderClause := "s.is_promoted DESC, s.sales_count DESC, s.created_at DESC"

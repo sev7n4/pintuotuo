@@ -104,6 +104,7 @@ export const skuService = {
     valid_days_min?: number;
     valid_days_max?: number;
     sort?: 'hot' | 'new' | 'price_asc' | 'price_desc';
+    scenario?: string;
   }) =>
     api.get<{ total: number; page: number; per_page: number; data: SKUWithSPU[] }>('/skus', {
       params,

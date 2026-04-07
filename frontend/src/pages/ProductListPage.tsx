@@ -33,6 +33,7 @@ import { skuService } from '@/services/sku';
 import api from '@/services/api';
 import type { SKUWithSPU } from '@/types/sku';
 import dayjs from 'dayjs';
+import ScenarioFilter from '@/components/ScenarioFilter';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -163,6 +164,7 @@ export const ProductListPage: React.FC = () => {
         valid_days_min: parseIntParam(searchParams.get('valid_days_min')),
         valid_days_max: parseIntParam(searchParams.get('valid_days_max')),
         sort,
+        scenario: searchParams.get('scenario') || undefined,
       });
       const apiResponse = response.data;
       setSKUs(apiResponse.data || []);
@@ -559,6 +561,8 @@ export const ProductListPage: React.FC = () => {
           </Space>
         </Col>
       </Row>
+
+      <ScenarioFilter />
 
       <Row gutter={16} style={{ marginBottom: 20 }}>
         <Col flex="auto">
