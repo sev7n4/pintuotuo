@@ -5,26 +5,33 @@
     "UT-BE-MERCHANT-MP-002",
     "UT-BE-MERCHANT-MP-003"
   ],
-  "retry_count": 0,
+  "retry_count": 1,
   "pr_number": 193,
   "merged": false,
   "branch": "feature/merchant-model-providers-dropdown",
   "local_validation": "passed",
   "ci_status": {
     "cicd": "running",
-    "integration": "pending",
-    "e2e": "pending",
+    "integration": "running",
+    "e2e": "running",
     "deploy": "pending"
   },
-  "error_history": [],
+  "error_history": [
+    {
+      "step": 11,
+      "error_type": "code",
+      "message": "PR193 merge main 后 CI Backend Unit Tests (-race) 失败：api_key_validator 单例并发懒加载 v.db DATA RACE；已用 ensureDB+dbMu 修复并 push",
+      "timestamp": "2026-04-07T04:20:00+08:00"
+    }
+  ],
   "created_at": "2026-04-07T02:25:00Z",
-  "updated_at": "2026-04-07T02:35:00Z",
+  "updated_at": "2026-04-07T04:20:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "商户 API Key 提供商下拉与 model_providers(active) 同源；GET /merchants/model-providers；ScenarioFilter 命名导出修复 Jest",
+    "task": "商户 API Key 提供商下拉与 GET /merchants/model-providers；merge main；race fix",
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "validation_note": "GOMODCACHE=/Users/4seven/go/pkg/mod make test 全绿；本地若 GOMODCACHE 指向 sandbox 需改用默认或 GOPATH/pkg/mod",
+    "validation_note": "本地 go test -race ./services -run TestValidateAsync|TestIsVerified 通过",
     "next_action": "monitor_ci",
     "pr_url": "https://github.com/sev7n4/pintuotuo/pull/193",
     "deploy_run_id": null
