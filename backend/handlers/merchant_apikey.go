@@ -605,7 +605,16 @@ func VerifyMerchantAPIKey(c *gin.Context) {
 	}
 
 	validator := services.GetAPIKeyValidator()
-	err = validator.ValidateAsync(apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "manual")
+	var req struct {
+		VerificationMode string `json:"verification_mode"` // light(default) / deep
+	}
+	_ = c.ShouldBindJSON(&req)
+	verificationType := "manual"
+	if req.VerificationMode == "deep" {
+		verificationType = "manual_deep"
+	}
+
+	err = validator.ValidateAsync(apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, verificationType)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"VERIFICATION_FAILED",
@@ -617,8 +626,11 @@ func VerifyMerchantAPIKey(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    "Verification started",
-		"api_key_id": apiKey.ID,
+		"message":            "Verification started",
+		"api_key_id":         apiKey.ID,
+		"verification_mode":  req.VerificationMode,
+		"verification_type":  verificationType,
+		"quota_probe_policy": "light(default), optional deep probe for supported providers",
 	})
 }
 

@@ -1,11 +1,14 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -132,7 +135,7 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 		return
 	}
 
-	connectionOK, latency, err := v.testConnection(providerConfig, decryptedKey)
+	connectionOK, latency, providerErrCode, providerErrMsg, err := v.testConnection(providerConfig, decryptedKey)
 	if err != nil {
 		if retryCount < v.maxRetries {
 			metrics.VerificationRetries.WithLabelValues(provider, fmt.Sprintf("%d", retryCount+1)).Inc()
@@ -140,7 +143,15 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 			go v.performVerificationWithRetry(apiKeyID, provider, encryptedKey, verificationType, retryCount+1)
 			return
 		}
-		v.handleVerificationError(ctx, verificationID, apiKeyID, "CONNECTION_FAILED", err.Error(), startTime)
+		msg := err.Error()
+		if providerErrMsg != "" {
+			msg = fmt.Sprintf("%s | provider: %s", msg, providerErrMsg)
+		}
+		code := "CONNECTION_FAILED"
+		if providerErrCode != "" {
+			code = providerErrCode
+		}
+		v.handleVerificationError(ctx, verificationID, apiKeyID, code, msg, startTime)
 		return
 	}
 	result.ConnectionTest = connectionOK
@@ -157,6 +168,18 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 		result.ModelsFound = models
 		result.ModelsCount = len(models)
 		metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(models)))
+	}
+
+	if isDeepVerification(verificationType) {
+		probeSupported := isQuotaProbeSupported(provider)
+		result.PricingVerified = probeSupported
+		if probeSupported {
+			quotaOK, quotaCode, quotaMsg := v.probeQuota(providerConfig, provider, decryptedKey, models)
+			if !quotaOK {
+				v.handleVerificationError(ctx, verificationID, apiKeyID, quotaCode, quotaMsg, startTime)
+				return
+			}
+		}
 	}
 
 	result.Status = "success"
@@ -216,36 +239,44 @@ func (v *APIKeyValidator) ValidateAsync(apiKeyID int, provider, encryptedKey, ve
 	return nil
 }
 
-func (v *APIKeyValidator) testConnection(providerConfig map[string]string, apiKey string) (bool, int, error) {
+func (v *APIKeyValidator) testConnection(providerConfig map[string]string, apiKey string) (bool, int, string, string, error) {
 	startTime := time.Now()
 
 	baseURL := providerConfig["api_base_url"]
 	if baseURL == "" {
-		return false, 0, fmt.Errorf("API base URL not configured")
+		return false, 0, "", "", fmt.Errorf("API base URL not configured")
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	req, err := http.NewRequest("GET", baseURL+"/models", nil)
 	if err != nil {
-		return false, 0, err
+		return false, 0, "", "", err
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return false, 0, err
+		return false, 0, "", "", err
 	}
 	defer resp.Body.Close()
 
 	latency := int(time.Since(startTime).Milliseconds())
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return true, latency, nil
+		return true, latency, "", "", nil
 	}
 
-	return false, latency, fmt.Errorf("connection test failed with status code %d", resp.StatusCode)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	pCode, pMsg := extractProviderError(body)
+	if pCode == "" {
+		pCode = fmt.Sprintf("HTTP_%d", resp.StatusCode)
+	}
+	if pMsg == "" {
+		pMsg = string(body)
+	}
+	return false, latency, pCode, pMsg, fmt.Errorf("connection test failed with status code %d", resp.StatusCode)
 }
 
 func (v *APIKeyValidator) fetchModels(providerConfig map[string]string, apiKey string) ([]string, error) {
@@ -344,17 +375,29 @@ func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]Ver
 		var result VerificationResult
 		var modelsJSON []byte
 		var pricingJSON []byte
+		var latency sql.NullInt64
+		var completedAt sql.NullTime
 
 		err := rows.Scan(
 			&result.ID, &result.APIKeyID, &result.VerificationType, &result.Status,
-			&result.ConnectionTest, &result.ConnectionLatency,
+			&result.ConnectionTest, &latency,
 			&modelsJSON, &result.ModelsCount,
 			&result.PricingVerified, &pricingJSON,
 			&result.ErrorCode, &result.ErrorMessage,
-			&result.StartedAt, &result.CompletedAt,
+			&result.StartedAt, &completedAt,
 		)
 		if err != nil {
+			logger.LogError(context.Background(), "api_key_validator", "GetVerificationHistory scan failed", err, map[string]interface{}{
+				"api_key_id": apiKeyID,
+			})
 			continue
+		}
+
+		if latency.Valid {
+			result.ConnectionLatency = int(latency.Int64)
+		}
+		if completedAt.Valid {
+			result.CompletedAt = completedAt.Time
 		}
 
 		if len(modelsJSON) > 0 {
@@ -400,14 +443,22 @@ func (v *APIKeyValidator) updateVerificationRecord(verificationID int, result Ve
 		`UPDATE api_key_verifications 
 		 SET status = $1, connection_test = $2, connection_latency_ms = $3,
 		     models_found = $4, models_count = $5, pricing_verified = $6, pricing_info = $7,
-		     completed_at = $8
-		 WHERE id = $9`,
+		     completed_at = $8, error_code = $9, error_message = $10
+		 WHERE id = $11`,
 		result.Status, result.ConnectionTest, result.ConnectionLatency,
 		modelsJSON, result.ModelsCount, result.PricingVerified, pricingJSON,
-		result.CompletedAt, verificationID,
+		result.CompletedAt, nullStr(result.ErrorCode), nullStr(result.ErrorMessage),
+		verificationID,
 	)
 
 	return err
+}
+
+func nullStr(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result VerificationResult) error {
@@ -421,12 +472,13 @@ func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result Ve
 	if verifyMsg == "" && result.ErrorCode != "" {
 		verifyMsg = result.ErrorCode
 	}
+	dbResult := normalizeVerificationDBStatus(result.Status)
 
 	_, err := db.Exec(
 		`UPDATE merchant_api_keys 
 		 SET verification_result = $1, verified_at = $2, models_supported = $3, verification_message = $4, updated_at = NOW()
 		 WHERE id = $5`,
-		result.Status, result.CompletedAt, modelsJSON, verifyMsg, apiKeyID,
+		dbResult, result.CompletedAt, modelsJSON, verifyMsg, apiKeyID,
 	)
 
 	return err
@@ -495,4 +547,133 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 		"verification_id": verificationID,
 		"error_code":      errorCode,
 	})
+}
+
+func normalizeVerificationDBStatus(status string) string {
+	if status == "success" {
+		return "verified"
+	}
+	return status
+}
+
+func isDeepVerification(verificationType string) bool {
+	return strings.Contains(strings.ToLower(strings.TrimSpace(verificationType)), "deep")
+}
+
+func isQuotaProbeSupported(provider string) bool {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "openai", "zhipu", "anthropic":
+		return true
+	default:
+		return false
+	}
+}
+
+func (v *APIKeyValidator) probeQuota(providerConfig map[string]string, provider, apiKey string, models []string) (bool, string, string) {
+	baseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
+	if baseURL == "" {
+		return false, "QUOTA_PROBE_CONFIG_ERROR", "provider api_base_url is empty"
+	}
+	model := selectProbeModel(provider, models)
+	if model == "" {
+		return false, "QUOTA_PROBE_MODEL_MISSING", "no model available for quota probe"
+	}
+
+	endpoint := baseURL + "/chat/completions"
+	body := map[string]interface{}{
+		"model": model,
+		"messages": []map[string]string{
+			{"role": "user", "content": "ping"},
+		},
+		"max_tokens": 1,
+	}
+
+	jsonBody, _ := json.Marshal(body)
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return false, "QUOTA_PROBE_REQUEST_BUILD_FAILED", err.Error()
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return false, "QUOTA_PROBE_NETWORK_ERROR", err.Error()
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return true, "", ""
+	}
+
+	rawBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	code, msg := extractProviderError(rawBody)
+	if code == "" {
+		code = fmt.Sprintf("HTTP_%d", resp.StatusCode)
+	}
+	if msg == "" {
+		msg = strings.TrimSpace(string(rawBody))
+	}
+	return false, code, msg
+}
+
+func selectProbeModel(provider string, models []string) string {
+	if len(models) > 0 {
+		return models[0]
+	}
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "zhipu":
+		return "glm-4"
+	case "openai":
+		return "gpt-4o-mini"
+	case "anthropic":
+		return "claude-3-5-sonnet-20241022"
+	default:
+		return ""
+	}
+}
+
+func extractProviderError(body []byte) (string, string) {
+	trimmed := strings.TrimSpace(string(body))
+	if trimmed == "" {
+		return "", ""
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return "", trimmed
+	}
+
+	if errNode, ok := payload["error"].(map[string]interface{}); ok {
+		return getString(errNode, "code"), firstNonEmpty(
+			getString(errNode, "message"),
+			getString(errNode, "msg"),
+		)
+	}
+	return getString(payload, "code"), firstNonEmpty(
+		getString(payload, "message"),
+		getString(payload, "msg"),
+		trimmed,
+	)
+}
+
+func getString(m map[string]interface{}, key string) string {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return ""
+	}
+	switch s := v.(type) {
+	case string:
+		return s
+	default:
+		return fmt.Sprintf("%v", s)
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }

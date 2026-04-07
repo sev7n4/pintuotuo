@@ -17,16 +17,16 @@ func TestAPIKeyValidatorStruct(t *testing.T) {
 
 func TestVerificationResultStruct(t *testing.T) {
 	result := VerificationResult{
-		APIKeyID:           1,
-		Status:             "success",
-		ConnectionTest:     true,
-		ConnectionLatency:  150,
-		ModelsFound:        []string{"gpt-4", "gpt-3.5-turbo"},
-		ModelsCount:        2,
-		PricingVerified:    true,
-		VerificationType:   "initial",
-		StartedAt:          time.Now(),
-		CompletedAt:        time.Now(),
+		APIKeyID:          1,
+		Status:            "success",
+		ConnectionTest:    true,
+		ConnectionLatency: 150,
+		ModelsFound:       []string{"gpt-4", "gpt-3.5-turbo"},
+		ModelsCount:       2,
+		PricingVerified:   true,
+		VerificationType:  "initial",
+		StartedAt:         time.Now(),
+		CompletedAt:       time.Now(),
 	}
 
 	if result.APIKeyID != 1 {
@@ -56,15 +56,43 @@ func TestGetAPIKeyValidator(t *testing.T) {
 	}
 }
 
+func TestNormalizeVerificationDBStatus(t *testing.T) {
+	if got := normalizeVerificationDBStatus("success"); got != "verified" {
+		t.Fatalf("normalizeVerificationDBStatus(success) = %s, want verified", got)
+	}
+	if got := normalizeVerificationDBStatus("failed"); got != "failed" {
+		t.Fatalf("normalizeVerificationDBStatus(failed) = %s, want failed", got)
+	}
+}
+
+func TestExtractProviderError(t *testing.T) {
+	code, msg := extractProviderError([]byte(`{"error":{"code":"insufficient_quota","message":"余额不足"}}`))
+	if code != "insufficient_quota" {
+		t.Fatalf("code = %s, want insufficient_quota", code)
+	}
+	if msg != "余额不足" {
+		t.Fatalf("msg = %s, want 余额不足", msg)
+	}
+}
+
+func TestQuotaProbeSupport(t *testing.T) {
+	if !isQuotaProbeSupported("zhipu") {
+		t.Fatal("zhipu should support quota probe")
+	}
+	if isQuotaProbeSupported("google") {
+		t.Fatal("google should not support quota probe by default")
+	}
+}
+
 func TestValidateAsync(t *testing.T) {
 	validator := GetAPIKeyValidator()
 
 	tests := []struct {
-		name          string
-		apiKeyID      int
-		provider      string
-		encryptedKey  string
-		wantErr       bool
+		name         string
+		apiKeyID     int
+		provider     string
+		encryptedKey string
+		wantErr      bool
 	}{
 		{
 			name:         "Valid API Key ID",
