@@ -137,6 +137,8 @@ export interface SKU {
   spu_total_sales_count?: number;
   /** SPU 维度评分，详情页可与 SKU 销量组合展示 */
   spu_average_rating?: number;
+  /** SPU 缩略图（若后端返回） */
+  thumbnail_url?: string;
 }
 
 export interface SKUWithSPU extends SKU {

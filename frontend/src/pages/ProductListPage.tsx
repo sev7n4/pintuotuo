@@ -18,6 +18,8 @@ import {
   Statistic,
   FloatButton,
   Badge,
+  Segmented,
+  Tooltip,
 } from 'antd';
 import {
   SearchOutlined,
@@ -26,6 +28,8 @@ import {
   ThunderboltOutlined,
   ShoppingCartOutlined,
   GiftOutlined,
+  AppstoreOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCartStore } from '@stores/cartStore';
@@ -34,6 +38,8 @@ import api from '@/services/api';
 import type { SKUWithSPU } from '@/types/sku';
 import dayjs from 'dayjs';
 import { ScenarioFilter } from '@/components/ScenarioFilter';
+import { getSkuCardSubtitle, pushRecentSearch } from '@/utils/productDisplay';
+import styles from './ProductListPage.module.css';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -97,11 +103,8 @@ export const ProductListPage: React.FC = () => {
   const [skuPage, setSkuPage] = useState(1);
   const skuPerPage = 20;
 
-  const [skuFilters, setSkuFilters] = useState<{
-    type?: string;
-    provider?: string;
-    tier?: string;
-  }>({});
+  const [searchInput, setSearchInput] = useState('');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
   const sortParam = searchParams.get('sort');
   const flashParam = searchParams.get('flash');
@@ -124,6 +127,99 @@ export const ProductListPage: React.FC = () => {
     if (sortParam && sortTypeMap[sortParam]) return sortTypeMap[sortParam].icon;
     return null;
   }, [isFlashSale, groupCatalog, sortParam]);
+
+  useEffect(() => {
+    setSearchInput(searchParam || '');
+  }, [searchParam]);
+
+  const effectiveView = screens.xs ? 'grid' : viewMode;
+
+  const filterChips = useMemo(() => {
+    const chips: { key: string; label: string }[] = [];
+    const q = (searchParam || '').trim();
+    if (q) chips.push({ key: 'q', label: `搜索：${q}` });
+
+    const sort = searchParams.get('sort');
+    if (sort) {
+      const map: Record<string, string> = {
+        hot: '热销',
+        new: '最新',
+        price_asc: '价格从低到高',
+        price_desc: '价格从高到低',
+      };
+      chips.push({ key: 'sort', label: `排序：${map[sort] || sort}` });
+    }
+
+    const type = searchParams.get('type');
+    if (type) {
+      const map: Record<string, string> = {
+        token_pack: 'Token 包',
+        subscription: '订阅',
+        concurrent: '并发',
+        trial: '试用',
+      };
+      chips.push({ key: 'type', label: `类型：${map[type] || type}` });
+    }
+
+    const provider = searchParams.get('provider');
+    if (provider) {
+      const map: Record<string, string> = {
+        openai: 'OpenAI',
+        anthropic: 'Anthropic',
+        google: 'Google',
+        deepseek: 'DeepSeek',
+        zhipu: '智谱',
+      };
+      chips.push({ key: 'provider', label: `厂商：${map[provider] || provider}` });
+    }
+
+    const tier = searchParams.get('tier');
+    if (tier) chips.push({ key: 'tier', label: `层级：${tier}` });
+
+    const cat = searchParams.get('category');
+    if (cat) chips.push({ key: 'category', label: `分类：${cat}` });
+
+    const scenario = searchParams.get('scenario');
+    if (scenario) chips.push({ key: 'scenario', label: `场景：${scenario}` });
+
+    if (searchParams.get('group_enabled') === 'true' || searchParams.get('group_enabled') === '1') {
+      chips.push({ key: 'group_enabled', label: '仅拼团' });
+    }
+
+    const pmin = searchParams.get('price_min');
+    const pmax = searchParams.get('price_max');
+    if (pmin != null || pmax != null) {
+      chips.push({
+        key: 'price_range',
+        label: `价格：¥${pmin ?? '—'} ~ ¥${pmax ?? '—'}`,
+      });
+    }
+
+    return chips;
+  }, [searchParams, searchParam]);
+
+  const setSearchParamsNavigate = useCallback(
+    (mutate: (next: URLSearchParams) => void) => {
+      const next = new URLSearchParams(searchParams);
+      mutate(next);
+      navigate(`/catalog?${next.toString()}`);
+    },
+    [navigate, searchParams]
+  );
+
+  const removeFilterChip = (key: string) => {
+    setSearchParamsNavigate((next) => {
+      if (key === 'q') {
+        next.delete('q');
+        next.delete('search');
+      } else if (key === 'price_range') {
+        next.delete('price_min');
+        next.delete('price_max');
+      } else {
+        next.delete(key);
+      }
+    });
+  };
 
   const loadFlashSales = async () => {
     setFlashLoading(true);
@@ -153,10 +249,10 @@ export const ProductListPage: React.FC = () => {
         per_page: skuPerPage,
         q: searchParam || undefined,
         category: searchParams.get('category') || undefined,
-        provider: skuFilters.provider || searchParams.get('provider') || undefined,
-        tier: skuFilters.tier || searchParams.get('tier') || undefined,
+        provider: searchParams.get('provider') || undefined,
+        tier: searchParams.get('tier') || undefined,
         model_name: searchParams.get('model_name') || undefined,
-        type: skuFilters.type || searchParams.get('type') || undefined,
+        type: searchParams.get('type') || undefined,
         group_enabled:
           groupCatalog || searchParams.get('group_enabled') === 'true' ? true : undefined,
         price_min: parseNum(searchParams.get('price_min')),
@@ -175,16 +271,7 @@ export const ProductListPage: React.FC = () => {
     } finally {
       setSkuLoading(false);
     }
-  }, [
-    isFlashSale,
-    searchParams,
-    skuPage,
-    skuFilters.provider,
-    skuFilters.tier,
-    skuFilters.type,
-    searchParam,
-    groupCatalog,
-  ]);
+  }, [isFlashSale, searchParams, skuPage, searchParam, groupCatalog]);
 
   useEffect(() => {
     if (isFlashSale) {
@@ -364,8 +451,12 @@ export const ProductListPage: React.FC = () => {
 
   const handleSearch = (value: string) => {
     const q = value.trim();
+    if (q) pushRecentSearch(q);
     if (!q) {
-      navigate('/catalog');
+      const next = new URLSearchParams(searchParams);
+      next.delete('q');
+      next.delete('search');
+      navigate(next.toString() ? `/catalog?${next.toString()}` : '/catalog');
       return;
     }
     const next = new URLSearchParams(searchParams);
@@ -549,8 +640,19 @@ export const ProductListPage: React.FC = () => {
     );
   }
 
+  const renderSkuTypeTag = (type: string) => {
+    const typeMap: Record<string, { color: string; text: string }> = {
+      token_pack: { color: 'blue', text: 'Token包' },
+      subscription: { color: 'green', text: '订阅' },
+      concurrent: { color: 'orange', text: '并发' },
+      trial: { color: 'purple', text: '试用' },
+    };
+    const config = typeMap[type] || { color: 'default', text: type };
+    return <Tag color={config.color}>{config.text}</Tag>;
+  };
+
   return (
-    <div style={{ padding: screens.xs ? 12 : 24 }}>
+    <div className={styles.wrap} style={{ padding: screens.xs ? 12 : 24 }}>
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col flex="auto">
           <Space>
@@ -564,25 +666,46 @@ export const ProductListPage: React.FC = () => {
 
       <ScenarioFilter />
 
-      <Row gutter={16} style={{ marginBottom: 20 }}>
-        <Col flex="auto">
+      {filterChips.length > 0 && (
+        <div className={styles.chipRow}>
+          <span className={styles.chipLabel}>当前筛选</span>
+          {filterChips.map((c) => (
+            <Tag key={c.key} closable onClose={() => removeFilterChip(c.key)}>
+              {c.label}
+            </Tag>
+          ))}
+          <Button type="link" size="small" onClick={() => navigate('/catalog')}>
+            清除全部
+          </Button>
+        </div>
+      )}
+
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+        <Col xs={24} lg={10}>
           <Input.Search
             placeholder="搜索 SKU / 模型 / 关键词..."
             prefix={<SearchOutlined />}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             onSearch={handleSearch}
-            defaultValue={searchParam || ''}
             allowClear
+            enterButton
             style={{ width: '100%' }}
           />
         </Col>
-        <Col>
-          <Space wrap>
+        <Col xs={24} lg={14}>
+          <Space wrap size="middle" style={{ width: '100%', justifyContent: 'flex-end' }}>
             <Select
               placeholder="类型"
               allowClear
-              style={{ width: 120 }}
-              value={skuFilters.type}
-              onChange={(value) => setSkuFilters((prev) => ({ ...prev, type: value || undefined }))}
+              style={{ width: screens.xs ? '100%' : 120 }}
+              value={searchParams.get('type') || undefined}
+              onChange={(value) => {
+                const next = new URLSearchParams(searchParams);
+                if (value) next.set('type', value);
+                else next.delete('type');
+                navigate(`/catalog?${next.toString()}`);
+              }}
             >
               <Option value="token_pack">Token包</Option>
               <Option value="subscription">订阅</Option>
@@ -592,11 +715,14 @@ export const ProductListPage: React.FC = () => {
             <Select
               placeholder="厂商"
               allowClear
-              style={{ width: 120 }}
-              value={skuFilters.provider}
-              onChange={(value) =>
-                setSkuFilters((prev) => ({ ...prev, provider: value || undefined }))
-              }
+              style={{ width: screens.xs ? '100%' : 120 }}
+              value={searchParams.get('provider') || undefined}
+              onChange={(value) => {
+                const next = new URLSearchParams(searchParams);
+                if (value) next.set('provider', value);
+                else next.delete('provider');
+                navigate(`/catalog?${next.toString()}`);
+              }}
             >
               <Option value="openai">OpenAI</Option>
               <Option value="anthropic">Anthropic</Option>
@@ -607,9 +733,14 @@ export const ProductListPage: React.FC = () => {
             <Select
               placeholder="层级"
               allowClear
-              style={{ width: 100 }}
-              value={skuFilters.tier}
-              onChange={(value) => setSkuFilters((prev) => ({ ...prev, tier: value || undefined }))}
+              style={{ width: screens.xs ? '100%' : 100 }}
+              value={searchParams.get('tier') || undefined}
+              onChange={(value) => {
+                const next = new URLSearchParams(searchParams);
+                if (value) next.set('tier', value);
+                else next.delete('tier');
+                navigate(`/catalog?${next.toString()}`);
+              }}
             >
               <Option value="pro">Pro</Option>
               <Option value="lite">Lite</Option>
@@ -619,7 +750,7 @@ export const ProductListPage: React.FC = () => {
             <Select
               placeholder="排序"
               allowClear
-              style={{ width: 140 }}
+              style={{ width: screens.xs ? '100%' : 140 }}
               value={sortParam || undefined}
               onChange={(value) => {
                 const next = new URLSearchParams(searchParams);
@@ -634,20 +765,101 @@ export const ProductListPage: React.FC = () => {
                 { label: '价格↓', value: 'price_desc' },
               ]}
             />
+            {!screens.xs && (
+              <Tooltip title="移动端默认使用卡片视图，便于浏览">
+                <Segmented
+                  value={viewMode}
+                  onChange={(v) => setViewMode(v as 'table' | 'grid')}
+                  options={[
+                    { value: 'table', icon: <UnorderedListOutlined />, label: '表格' },
+                    { value: 'grid', icon: <AppstoreOutlined />, label: '卡片' },
+                  ]}
+                />
+              </Tooltip>
+            )}
           </Space>
         </Col>
       </Row>
 
       <Spin spinning={skuLoading}>
-        <Table
-          columns={skuColumns}
-          dataSource={skus}
-          rowKey="id"
-          pagination={false}
-          scroll={{ x: 800 }}
-          locale={{ emptyText: <Empty description={catalogEmptyDescription} /> }}
-          size={screens.xs ? 'small' : 'middle'}
-        />
+        {effectiveView === 'grid' ? (
+          skus.length === 0 ? (
+            <Empty description={catalogEmptyDescription} />
+          ) : (
+            <Row gutter={[16, 16]}>
+              {skus.map((record) => (
+                <Col xs={24} sm={12} md={8} lg={6} key={record.id}>
+                  <Card
+                    hoverable
+                    styles={{ body: { padding: 12 } }}
+                    cover={
+                      <div className={styles.cardCover}>
+                        {record.thumbnail_url ? (
+                          <img
+                            className={styles.cardCoverImg}
+                            src={record.thumbnail_url}
+                            alt=""
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className={styles.cardCoverPlaceholder}>
+                            {record.spu_name?.slice(0, 2) || 'SKU'}
+                          </div>
+                        )}
+                      </div>
+                    }
+                    onClick={() => navigate(`/catalog/${record.id}`)}
+                  >
+                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                      <Space wrap size={4}>
+                        {renderSkuTypeTag(record.sku_type)}
+                        {record.group_enabled && (
+                          <Tag color="red">
+                            {record.min_group_size}-{record.max_group_size}人团
+                          </Tag>
+                        )}
+                      </Space>
+                      <Tooltip title={record.spu_name}>
+                        <Text strong ellipsis style={{ width: '100%' }}>
+                          {record.spu_name}
+                        </Text>
+                      </Tooltip>
+                      <div className={styles.cardMeta}>{getSkuCardSubtitle(record)}</div>
+                      <Space
+                        align="baseline"
+                        style={{ width: '100%', justifyContent: 'space-between' }}
+                      >
+                        <Text type="danger" strong style={{ fontSize: 18 }}>
+                          ¥{record.retail_price.toFixed(2)}
+                        </Text>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/catalog/${record.id}`);
+                          }}
+                        >
+                          详情
+                        </Button>
+                      </Space>
+                    </Space>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          )
+        ) : (
+          <Table
+            columns={skuColumns}
+            dataSource={skus}
+            rowKey="id"
+            pagination={false}
+            scroll={{ x: 800 }}
+            locale={{ emptyText: <Empty description={catalogEmptyDescription} /> }}
+            size={screens.xs ? 'small' : 'middle'}
+          />
+        )}
       </Spin>
 
       {skuTotal > 0 && (

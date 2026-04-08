@@ -49,9 +49,15 @@ jest.mock('antd', () => ({
     </div>
   )),
   Input: {
-    Search: jest.fn(({ placeholder, onSearch }) => (
+    Search: jest.fn(({ placeholder, onSearch, value, onChange }) => (
       <div data-testid="search-input">
-        <input type="text" placeholder={placeholder} data-testid="search-input-field" />
+        <input
+          type="text"
+          placeholder={placeholder}
+          data-testid="search-input-field"
+          value={value ?? ''}
+          onChange={(e) => onChange?.(e as React.ChangeEvent<HTMLInputElement>)}
+        />
         <button
           type="button"
           onClick={(e) => {

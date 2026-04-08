@@ -21,6 +21,10 @@ import {
   Badge,
   Alert,
   Progress,
+  Collapse,
+  Tooltip,
+  Table,
+  Grid,
 } from 'antd';
 import {
   ShoppingCartOutlined,
@@ -37,39 +41,13 @@ import { useCartStore } from '@stores/cartStore';
 import { useGroupStore } from '@stores/groupStore';
 import { productService } from '@services/product';
 import { skuService } from '@services/sku';
-import type { Product, GroupPrice, ProductReview, Group } from '@/types';
+import type { Product, GroupPrice, Group } from '@/types';
 import type { SKUWithSPU } from '@/types/sku';
 import { normalizeGroupDiscountRate } from '@/utils/groupDiscount';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
-
-const mockReviews: ProductReview[] = [
-  {
-    id: 1,
-    user_id: 101,
-    user_name: '张三',
-    rating: 5,
-    content: '非常便宜，支持拼团！Token到账很快，模型效果很好。',
-    created_at: '2026-03-13',
-  },
-  {
-    id: 2,
-    user_id: 102,
-    user_name: '李四',
-    rating: 4,
-    content: '性价比很高，拼团省了不少钱。客服响应也很快。',
-    created_at: '2026-03-12',
-  },
-  {
-    id: 3,
-    user_id: 103,
-    user_name: '王五',
-    rating: 5,
-    content: '第二次购买了，一直很稳定，推荐！',
-    created_at: '2026-03-10',
-  },
-];
+const { useBreakpoint } = Grid;
 
 /** 加载失败或未返回 SKU 时：用零售价占位各档位，避免写死 demo 价；折扣为 0。 */
 function buildRetailOnlyGroupTiers(
@@ -140,6 +118,7 @@ function formatCountdown(deadline: Date): string {
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const screens = useBreakpoint();
   const { fetchProductByID, isLoading, error } = useProductStore();
   const { addItem } = useCartStore();
   const { createGroup, joinGroup } = useGroupStore();
@@ -420,12 +399,25 @@ export const ProductDetailPage: React.FC = () => {
   };
 
   const displaySoldCount = Number(selectedSKU?.sales_count ?? product?.sold_count ?? 0);
-  const displayRating = selectedSKU?.spu_average_rating ?? product?.rating ?? 4.8;
-  const reviewCount = product?.review_count ?? 1000;
-  const rating = displayRating;
+  const rawRating = selectedSKU?.spu_average_rating ?? product?.rating;
+  const hasRating = rawRating != null && Number(rawRating) > 0;
+  const rating = hasRating ? Number(rawRating) : null;
+  const reviewCount = product?.review_count ?? 0;
+
+  const coverSrc =
+    selectedSKU?.thumbnail_url ?? product.thumbnail_url ?? product.image_url ?? undefined;
+
+  const pagePadding = screens.xs ? 12 : 20;
 
   return (
-    <div style={{ padding: '20px', maxWidth: 900, margin: '0 auto' }}>
+    <div
+      style={{
+        padding: pagePadding,
+        maxWidth: 900,
+        margin: '0 auto',
+        boxSizing: 'border-box',
+      }}
+    >
       <Space style={{ marginBottom: '20px' }}>
         <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/catalog')}>
           返回列表
@@ -439,25 +431,43 @@ export const ProductDetailPage: React.FC = () => {
               style={{
                 background: '#f5f5f5',
                 borderRadius: 8,
-                height: 300,
+                height: screens.xs ? 220 : 300,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginBottom: 16,
+                overflow: 'hidden',
+                position: 'relative',
               }}
             >
-              <Text type="secondary" style={{ fontSize: 48 }}>
-                📦
-              </Text>
+              {coverSrc ? (
+                <img
+                  src={coverSrc}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  loading="lazy"
+                />
+              ) : (
+                <Text type="secondary" style={{ fontSize: 48 }}>
+                  📦
+                </Text>
+              )}
             </div>
           </Col>
 
           <Col xs={24} md={12}>
             <Title level={3}>{product.name}</Title>
             <Space style={{ marginBottom: 16 }} wrap>
-              <Tag color="blue">已拼 {displaySoldCount.toLocaleString()} 件</Tag>
+              <Tag color="blue">已售 {displaySoldCount.toLocaleString()} 件</Tag>
               <Tag color="gold">
-                ⭐ {Number(rating).toFixed(1)}/5.0 ({reviewCount}+ 评)
+                {hasRating ? (
+                  <>
+                    ⭐ {rating!.toFixed(1)}/5.0
+                    {reviewCount > 0 ? `（${reviewCount} 条评价）` : '（暂无评价）'}
+                  </>
+                ) : (
+                  <>⭐ 暂无评分</>
+                )}
               </Tag>
             </Space>
 
@@ -840,67 +850,142 @@ export const ProductDetailPage: React.FC = () => {
                 <li>可在"API密钥管理"创建和管理API密钥</li>
               </ol>
 
+              {skus.length > 1 && (
+                <>
+                  <Divider />
+                  <Title level={5}>同系列规格对比</Title>
+                  <Table<SKUWithSPU>
+                    size="small"
+                    pagination={false}
+                    scroll={{ x: screens.xs ? 520 : undefined }}
+                    rowKey="id"
+                    dataSource={skus}
+                    columns={[
+                      {
+                        title: '套餐',
+                        dataIndex: 'spu_name',
+                        key: 'spu_name',
+                        ellipsis: true,
+                      },
+                      {
+                        title: '类型',
+                        key: 'sku_type',
+                        width: 88,
+                        render: (_: unknown, r: SKUWithSPU) => {
+                          const map: Record<string, string> = {
+                            token_pack: 'Token包',
+                            subscription: '订阅',
+                            concurrent: '并发',
+                            trial: '试用',
+                          };
+                          return map[r.sku_type] || r.sku_type;
+                        },
+                      },
+                      {
+                        title: '规格摘要',
+                        key: 'spec',
+                        render: (_: unknown, r: SKUWithSPU) => (
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {buildSkuSummary(r)}
+                          </Text>
+                        ),
+                      },
+                      {
+                        title: '价格',
+                        key: 'price',
+                        width: 96,
+                        render: (_: unknown, r: SKUWithSPU) => (
+                          <Text strong>¥{r.retail_price.toFixed(2)}</Text>
+                        ),
+                      },
+                      {
+                        title: '拼团',
+                        key: 'group',
+                        width: 88,
+                        render: (_: unknown, r: SKUWithSPU) =>
+                          r.group_enabled ? (
+                            <Tag color="red">
+                              {r.min_group_size}-{r.max_group_size}人
+                            </Tag>
+                          ) : (
+                            <Text type="secondary">—</Text>
+                          ),
+                      },
+                      {
+                        title: '操作',
+                        key: 'pick',
+                        width: 80,
+                        render: (_: unknown, r: SKUWithSPU) => (
+                          <Button type="link" size="small" onClick={() => setSelectedSKU(r)}>
+                            {selectedSKU?.id === r.id ? '当前' : '选择'}
+                          </Button>
+                        ),
+                      },
+                    ]}
+                  />
+                </>
+              )}
+
               <Divider />
 
               <Title level={5}>常见问题</Title>
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <div>
-                  <Text strong>Q: Token有效期多久？</Text>
-                  <br />
-                  <Text type="secondary">A: Token有效期为1年，从购买之日起计算。</Text>
-                </div>
-                <div>
-                  <Text strong>Q: 拼团失败怎么办？</Text>
-                  <br />
-                  <Text type="secondary">
-                    A: 拼团失败后，系统会自动退款，您可以选择重新发起拼团或单独购买。
-                  </Text>
-                </div>
-                <div>
-                  <Text strong>Q: Token可以转让吗？</Text>
-                  <br />
-                  <Text type="secondary">
-                    A: Token暂不支持转让，但可以通过API为其他项目提供服务。
-                  </Text>
-                </div>
-              </Space>
+              <Collapse
+                bordered={false}
+                items={[
+                  {
+                    key: '1',
+                    label: (
+                      <Text strong>
+                        <Tooltip title="按量计费的模型调用额度单位">Token</Tooltip> 有效期多久？
+                      </Text>
+                    ),
+                    children: (
+                      <Text type="secondary">
+                        套餐标注的有效期内可用；具体以订单与商品说明为准。
+                      </Text>
+                    ),
+                  },
+                  {
+                    key: '2',
+                    label: (
+                      <Text strong>
+                        <Tooltip title="多人成团享受团购价">拼团</Tooltip> 失败怎么办？
+                      </Text>
+                    ),
+                    children: (
+                      <Text type="secondary">
+                        拼团未成团时，请以订单状态与平台规则为准；可联系客服或选择单独购买。
+                      </Text>
+                    ),
+                  },
+                  {
+                    key: '3',
+                    label: <Text strong>额度可以转让吗？</Text>,
+                    children: (
+                      <Text type="secondary">
+                        数字商品一般绑定账户使用，不支持转让；详见服务条款。
+                      </Text>
+                    ),
+                  },
+                ]}
+              />
             </Space>
           </TabPane>
 
           <TabPane tab={`用户评价 (${reviewCount})`} key="reviews">
             <Space direction="vertical" style={{ width: '100%' }} size="large">
-              <Space>
-                <Statistic title="综合评分" value={rating} suffix="/ 5.0" />
-                <Rate disabled defaultValue={rating} allowHalf />
-              </Space>
+              {hasRating && rating != null ? (
+                <Space wrap>
+                  <Statistic title="综合评分" value={rating} suffix="/ 5.0" precision={1} />
+                  <Rate disabled value={rating} allowHalf />
+                </Space>
+              ) : (
+                <Text type="secondary">暂无综合评分数据（以商品与 SPU 汇总为准）。</Text>
+              )}
 
               <Divider />
 
-              <List
-                itemLayout="horizontal"
-                dataSource={mockReviews}
-                renderItem={(review) => (
-                  <List.Item>
-                    <List.Item.Meta
-                      avatar={<Avatar icon={<UserOutlined />} />}
-                      title={
-                        <Space>
-                          <Text strong>{review.user_name}</Text>
-                          <Rate disabled defaultValue={review.rating} style={{ fontSize: 12 }} />
-                        </Space>
-                      }
-                      description={
-                        <Space direction="vertical" size="small">
-                          <Text>{review.content}</Text>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {review.created_at}
-                          </Text>
-                        </Space>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
+              <Empty description="暂无用户评价，接口接入后将在此展示真实评价。" />
             </Space>
           </TabPane>
         </Tabs>

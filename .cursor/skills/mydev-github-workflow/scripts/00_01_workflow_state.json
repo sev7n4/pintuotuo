@@ -1,31 +1,30 @@
 {
-  "current_step": 10,
+  "current_step": 9,
   "current_fix_cases": [
-    "UT-BE-adminSPUListFilters",
-    "FE-typecheck-AdminSPUs",
-    "FE-ADMIN-SPU-LIST-ENHANCEMENT"
+    "FE-typecheck-catalog-pages",
+    "FE-Jest-ProductList-ProductDetail",
+    "FE-Jest-full-runInBand"
   ],
   "retry_count": 0,
-  "pr_number": 210,
+  "pr_number": null,
   "merged": false,
-  "branch": "feature/admin-spu-list-enhancement",
+  "branch": "feature/catalog-pages-responsive-ux",
   "local_validation": "passed",
   "ci_status": {
     "cicd": "pending",
     "integration": "pending",
     "e2e": "pending",
-    "deploy": "pending"
+    "deploy": "idle"
   },
   "error_history": [],
-  "created_at": "2026-04-08T03:00:00Z",
-  "updated_at": "2026-04-08T03:15:00Z",
+  "created_at": "2026-04-07T12:00:00Z",
+  "updated_at": "2026-04-07T12:00:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "管理端 SPU：Alert/Segmented/关键词q/SKU计数/下架与删除防呆/全量厂商/getApiErrorMessage",
+    "task": "用户端：首页 /catalog 卖场列表 /catalog/:id 详情 — 响应式布局、URL 筛选与搜索同步、表格/卡片视图、详情对比表与 FAQ、移除 mock 评价",
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "validation_note": "GOMODCACHE=.cache/gomod make test-backend；frontend npm run type-check",
-    "next_action": "gh pr checks 210 --watch；绿后合并",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/210"
+    "validation_note": "backend: go test ./...（unset GOMODCACHE/GOCACHE 避免沙箱缓存损坏）；frontend: npm run type-check；npm test -- --watchAll=false --runInBand 全量通过",
+    "next_action": "推送分支并 gh pr create --base main；Step10 监控 CI"
   }
 }
