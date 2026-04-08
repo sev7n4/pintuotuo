@@ -1,5 +1,5 @@
 {
-  "current_step": 10,
+  "current_step": 13,
   "current_fix_cases": [
     "UT-BE-adminSPUListFilters",
     "FE-typecheck-AdminSPUs",
@@ -7,25 +7,36 @@
   ],
   "retry_count": 0,
   "pr_number": 210,
-  "merged": false,
-  "branch": "feature/admin-spu-list-enhancement",
+  "merged": true,
+  "branch": "main",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "pending",
-    "integration": "pending",
-    "e2e": "pending",
-    "deploy": "pending"
+    "cicd": "passed",
+    "integration": "passed",
+    "e2e": "passed",
+    "deploy": "failed"
   },
-  "error_history": [],
+  "error_history": [
+    {
+      "at": "2026-04-08T03:10:48Z",
+      "run_id": 24115461556,
+      "phase": "deploy",
+      "summary": "腾讯云上 git fetch 无法连接 github.com:443（超时约 132s）；非应用代码问题。建议：Actions 中 Re-run failed jobs，或排查服务器出网/DNS/防火墙"
+    }
+  ],
   "created_at": "2026-04-08T03:00:00Z",
-  "updated_at": "2026-04-08T03:15:00Z",
+  "updated_at": "2026-04-08T03:20:00Z",
   "metadata": {
     "repo": "pintuotuo",
     "task": "管理端 SPU：Alert/Segmented/关键词q/SKU计数/下架与删除防呆/全量厂商/getApiErrorMessage",
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "validation_note": "GOMODCACHE=.cache/gomod make test-backend；frontend npm run type-check",
-    "next_action": "gh pr checks 210 --watch；绿后合并",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/210"
+    "validation_note": "PR #210 已 squash 合入 main（fe7ace0）；CI 全绿",
+    "next_action": "在 GitHub Actions 重跑 Deploy to Tencent Cloud（run 24115461556）；成功后可将 current_step 置 14、deploy 置 passed",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/210",
+    "merge_commit": "fe7ace084d39c112ccf8dde52a6868dd4d255e09",
+    "deploy_run_id": 24115461556,
+    "deploy_run_url": "https://github.com/sev7n4/pintuotuo/actions/runs/24115461556",
+    "deploy_note": "首次部署失败：服务器侧 git fetch GitHub 超时；待重试或网络恢复"
   }
 }
