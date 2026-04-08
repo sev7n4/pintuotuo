@@ -20,6 +20,11 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
+const (
+	adminSKUListScopeSellable = "sellable"
+	adminSKUListScopeAll      = "all"
+)
+
 func ensureAdmin(c *gin.Context) bool {
 	userRole, exists := c.Get("user_role")
 	if !exists || userRole != roleAdmin {
@@ -433,19 +438,19 @@ func DeleteSPU(c *gin.Context) {
 func ResolveAdminSKUListScope(scopeQuery, statusQuery string) (scope string, skuStatus string) {
 	scope = strings.TrimSpace(scopeQuery)
 	explicitStatus := strings.TrimSpace(statusQuery)
-	statusMeansAllSKUs := explicitStatus == "all"
+	statusMeansAllSKUs := explicitStatus == adminSKUListScopeAll
 	if statusMeansAllSKUs {
 		explicitStatus = ""
 	}
 	if scope == "" {
 		if explicitStatus == "" && !statusMeansAllSKUs {
-			scope = "sellable"
+			scope = adminSKUListScopeSellable
 		} else {
-			scope = "all"
+			scope = adminSKUListScopeAll
 		}
 	}
-	if scope != "sellable" && scope != "all" {
-		scope = "sellable"
+	if scope != adminSKUListScopeSellable && scope != adminSKUListScopeAll {
+		scope = adminSKUListScopeSellable
 	}
 	return scope, explicitStatus
 }
@@ -460,7 +465,7 @@ func adminSKUListFilters(scope, skuStatus, spuStatus, provider, q string, misali
 	args = []interface{}{}
 	n := 1
 
-	if scope == "sellable" {
+	if scope == adminSKUListScopeSellable {
 		parts = append(parts, "s.status = 'active'", "sp.status = 'active'")
 	} else {
 		if skuStatus == "active" || skuStatus == "inactive" {
@@ -497,7 +502,6 @@ func adminSKUListFilters(scope, skuStatus, spuStatus, provider, q string, misali
 	if skuType != "" {
 		parts = append(parts, fmt.Sprintf("s.sku_type = $%d", n))
 		args = append(args, skuType)
-		n++
 	}
 
 	return strings.Join(parts, " AND "), args

@@ -20,7 +20,7 @@ const merchantSKUStatusInactive = "inactive"
 func invalidateMerchantSKUCache(ctx context.Context, merchantID int) {
 	// invalidate all status-filtered sku list cache
 	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, ""))
-	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, "all"))
+	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, allProductStatus))
 	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, merchantStatusActive))
 	cache.Delete(ctx, cache.MerchantSKUsKey(merchantID, merchantSKUStatusInactive))
 	// invalidate all available sku filter cache
@@ -77,7 +77,7 @@ func ListMerchantSKUs(c *gin.Context) {
 		FROM merchant_sku_details WHERE merchant_id = $1`
 	args := []interface{}{merchantID}
 
-	if status != "" && status != "all" {
+	if status != "" && status != allProductStatus {
 		query += " AND status = $" + strconv.Itoa(len(args)+1)
 		args = append(args, status)
 	}
