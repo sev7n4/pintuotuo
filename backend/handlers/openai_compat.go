@@ -9,33 +9,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
+	"github.com/pintuotuo/backend/services"
 )
-
-// resolveOpenAICompatModel maps an OpenAI-style model field to provider + upstream model name.
-// If model contains a slash (e.g. "openai/gpt-4o"), the prefix is the provider code.
-// Otherwise provider is inferred from the model id (e.g. claude-* -> anthropic).
-func resolveOpenAICompatModel(model string) (provider string, modelName string) {
-	model = strings.TrimSpace(model)
-	if model == "" {
-		return "", ""
-	}
-	if idx := strings.Index(model, "/"); idx > 0 {
-		return strings.ToLower(strings.TrimSpace(model[:idx])), strings.TrimSpace(model[idx+1:])
-	}
-	m := strings.ToLower(model)
-	switch {
-	case strings.HasPrefix(m, "claude"):
-		return "anthropic", model
-	case strings.HasPrefix(m, "gemini"):
-		return "google", model
-	case strings.HasPrefix(m, "glm-") || strings.HasPrefix(m, "chatglm") || strings.HasPrefix(m, "cog-"):
-		return "zhipu", model
-	default:
-		return "openai", model
-	}
-}
 
 func respondOpenAIError(c *gin.Context, status int, message string) {
 	c.JSON(status, gin.H{
@@ -105,7 +83,8 @@ func OpenAIChatCompletions(c *gin.Context) {
 		options = optBytes
 	}
 
-	provider, modelName := resolveOpenAICompatModel(modelVal)
+	db := config.GetDB()
+	provider, modelName := services.ResolveOpenAICompatModel(db, modelVal)
 	if provider == "" || modelName == "" {
 		respondOpenAIError(c, http.StatusBadRequest, "Could not resolve provider from model")
 		return

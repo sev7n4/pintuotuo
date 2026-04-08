@@ -387,7 +387,7 @@ export interface MerchantAPIKey {
   merchant_id: number;
   name: string;
   provider: string;
-  quota_limit: number;
+  quota_limit: number | null;
   quota_used: number;
   status: 'active' | 'inactive';
   last_used_at?: string;
@@ -440,7 +440,7 @@ export interface APIKeyUsage {
   id: number;
   name: string;
   provider: string;
-  quota_limit: number;
+  quota_limit: number | null;
   quota_used: number;
   usage_percentage: number;
 }

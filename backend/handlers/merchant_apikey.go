@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -33,11 +35,11 @@ func CreateMerchantAPIKey(c *gin.Context) {
 	}
 
 	var req struct {
-		Name       string  `json:"name" binding:"required"`
-		Provider   string  `json:"provider" binding:"required"`
-		APIKey     string  `json:"api_key" binding:"required"`
-		APISecret  string  `json:"api_secret"`
-		QuotaLimit float64 `json:"quota_limit"`
+		Name       string   `json:"name" binding:"required"`
+		Provider   string   `json:"provider" binding:"required"`
+		APIKey     string   `json:"api_key" binding:"required"`
+		APISecret  string   `json:"api_secret"`
+		QuotaLimit *float64 `json:"quota_limit"`
 	}
 
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
@@ -88,13 +90,22 @@ func CreateMerchantAPIKey(c *gin.Context) {
 		}
 	}
 
+	var quota any
+	if req.QuotaLimit != nil && *req.QuotaLimit > 0 {
+		quota = *req.QuotaLimit
+	} else {
+		quota = nil
+	}
+
 	var apiKey models.MerchantAPIKey
+	var quotaReturned sql.NullFloat64
 	err = db.QueryRow(
 		`INSERT INTO merchant_api_keys (merchant_id, name, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status) 
 		 VALUES ($1, $2, $3, $4, $5, $6, 0, 'active') 
 		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, created_at, updated_at`,
-		merchantID, req.Name, req.Provider, apiKeyEncrypted, apiSecretEncrypted, req.QuotaLimit,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status, &apiKey.CreatedAt, &apiKey.UpdatedAt)
+		merchantID, req.Name, req.Provider, apiKeyEncrypted, apiSecretEncrypted, quota,
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaReturned, &apiKey.QuotaUsed, &apiKey.Status, &apiKey.CreatedAt, &apiKey.UpdatedAt)
+	apiKey.QuotaLimit = utils.NullFloat64Ptr(quotaReturned)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -170,7 +181,9 @@ func ListMerchantAPIKeys(c *gin.Context) {
 	for rows.Next() {
 		var key models.MerchantAPIKey
 		var lastUsedAt sql.NullTime
-		err := rows.Scan(&key.ID, &key.MerchantID, &key.Name, &key.Provider, &key.QuotaLimit, &key.QuotaUsed, &key.Status, &lastUsedAt, &key.CreatedAt, &key.UpdatedAt)
+		var qLim sql.NullFloat64
+		err := rows.Scan(&key.ID, &key.MerchantID, &key.Name, &key.Provider, &qLim, &key.QuotaUsed, &key.Status, &lastUsedAt, &key.CreatedAt, &key.UpdatedAt)
+		key.QuotaLimit = utils.NullFloat64Ptr(qLim)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -208,15 +221,41 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		return
 	}
 
-	var req struct {
-		Name       string  `json:"name"`
-		QuotaLimit float64 `json:"quota_limit"`
-		Status     string  `json:"status"`
-	}
-
-	if bindErr2 := c.ShouldBindJSON(&req); bindErr2 != nil {
+	bodyBytes, readErr := io.ReadAll(c.Request.Body)
+	if readErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
+	}
+	var patch map[string]json.RawMessage
+	if err := json.Unmarshal(bodyBytes, &patch); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	var name, status string
+	if raw, ok := patch["name"]; ok {
+		_ = json.Unmarshal(raw, &name)
+	}
+	if raw, ok := patch["status"]; ok {
+		_ = json.Unmarshal(raw, &status)
+	}
+
+	patchQuota := false
+	unlimitedQuota := false
+	quotaVal := 0.0
+	if raw, ok := patch["quota_limit"]; ok {
+		patchQuota = true
+		if strings.TrimSpace(string(raw)) == "null" {
+			unlimitedQuota = true
+		} else {
+			if err := json.Unmarshal(raw, &quotaVal); err != nil {
+				middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+				return
+			}
+			if quotaVal <= 0 {
+				unlimitedQuota = true
+			}
+		}
 	}
 
 	db := config.GetDB()
@@ -239,16 +278,22 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 
 	var apiKey models.MerchantAPIKey
 	var lastUsedAt sql.NullTime
+	var quotaAfter sql.NullFloat64
 	err = db.QueryRow(
 		`UPDATE merchant_api_keys SET 
 		 name = COALESCE(NULLIF($1, ''), name),
-		 quota_limit = COALESCE(NULLIF($2, 0), quota_limit),
-		 status = COALESCE(NULLIF($3, ''), status),
+		 status = COALESCE(NULLIF($2, ''), status),
+		 quota_limit = CASE
+		   WHEN NOT $3::bool THEN quota_limit
+		   WHEN $4::bool THEN NULL
+		   ELSE $5::numeric
+		 END,
 		 updated_at = CURRENT_TIMESTAMP
-		 WHERE id = $4 AND merchant_id = $5
+		 WHERE id = $6 AND merchant_id = $7
 		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, last_used_at, created_at, updated_at`,
-		req.Name, req.QuotaLimit, req.Status, keyID, merchantID,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status, &lastUsedAt, &apiKey.CreatedAt, &apiKey.UpdatedAt)
+		name, status, patchQuota, unlimitedQuota, quotaVal, keyID, merchantID,
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaAfter, &apiKey.QuotaUsed, &apiKey.Status, &lastUsedAt, &apiKey.CreatedAt, &apiKey.UpdatedAt)
+	apiKey.QuotaLimit = utils.NullFloat64Ptr(quotaAfter)
 
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -367,7 +412,7 @@ func GetMerchantAPIKeyUsage(c *gin.Context) {
 
 	rows, err := db.Query(
 		`SELECT id, name, provider, quota_limit, quota_used, 
-		 CASE WHEN quota_limit > 0 THEN (quota_used / quota_limit * 100) ELSE 0 END as usage_percentage
+		 CASE WHEN quota_limit IS NOT NULL AND quota_limit > 0 THEN (quota_used / quota_limit * 100) ELSE 0 END as usage_percentage
 		 FROM merchant_api_keys WHERE merchant_id = $1 AND status = 'active'`,
 		merchantID,
 	)
@@ -379,18 +424,20 @@ func GetMerchantAPIKeyUsage(c *gin.Context) {
 	defer rows.Close()
 
 	type UsageInfo struct {
-		ID              int     `json:"id"`
-		Name            string  `json:"name"`
-		Provider        string  `json:"provider"`
-		QuotaLimit      float64 `json:"quota_limit"`
-		QuotaUsed       float64 `json:"quota_used"`
-		UsagePercentage float64 `json:"usage_percentage"`
+		ID              int      `json:"id"`
+		Name            string   `json:"name"`
+		Provider        string   `json:"provider"`
+		QuotaLimit      *float64 `json:"quota_limit"`
+		QuotaUsed       float64  `json:"quota_used"`
+		UsagePercentage float64  `json:"usage_percentage"`
 	}
 
 	var usageList []UsageInfo
 	for rows.Next() {
 		var usage UsageInfo
-		err := rows.Scan(&usage.ID, &usage.Name, &usage.Provider, &usage.QuotaLimit, &usage.QuotaUsed, &usage.UsagePercentage)
+		var qLim sql.NullFloat64
+		err := rows.Scan(&usage.ID, &usage.Name, &usage.Provider, &qLim, &usage.QuotaUsed, &usage.UsagePercentage)
+		usage.QuotaLimit = utils.NullFloat64Ptr(qLim)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return

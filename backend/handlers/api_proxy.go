@@ -428,19 +428,31 @@ func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeC
 	return cfg, err
 }
 
+func scanMerchantAPIKeyQuotaRow(row *sql.Row, apiKey *models.MerchantAPIKey) error {
+	var qLim sql.NullFloat64
+	if err := row.Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &qLim, &apiKey.QuotaUsed, &apiKey.Status); err != nil {
+		return err
+	}
+	apiKey.QuotaLimit = utils.NullFloat64Ptr(qLim)
+	return nil
+}
+
 func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequest, apiKey *models.MerchantAPIKey) error {
 	if req.APIKeyID != nil && *req.APIKeyID > 0 {
 		if merchantID <= 0 {
 			return sql.ErrNoRows
 		}
-		err := db.QueryRow(
-			`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
-			 FROM merchant_api_keys
-			 WHERE id = $1 AND provider = $2 AND status = 'active'
-			   AND merchant_id = $3
-			   AND (verified_at IS NOT NULL OR verification_result = 'verified')`,
-			*req.APIKeyID, req.Provider, merchantID,
-		).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
+		err := scanMerchantAPIKeyQuotaRow(
+			db.QueryRow(
+				`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+				 FROM merchant_api_keys
+				 WHERE id = $1 AND provider = $2 AND status = 'active'
+				   AND merchant_id = $3
+				   AND (verified_at IS NOT NULL OR verification_result = 'verified')`,
+				*req.APIKeyID, req.Provider, merchantID,
+			),
+			apiKey,
+		)
 		if err == nil {
 			return nil
 		}
@@ -453,18 +465,21 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 		if merchantID <= 0 {
 			return sql.ErrNoRows
 		}
-		err := db.QueryRow(
-			`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
-			 FROM merchant_skus ms
-			 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
-			 JOIN merchants m ON m.id = ms.merchant_id
-			 WHERE ms.id = $1 AND ms.status = 'active'
-			   AND ms.merchant_id = $2
-			   AND m.user_id = $3
-			   AND mak.provider = $4 AND mak.status = 'active'
-			   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')`,
-			*req.MerchantSKUID, merchantID, userID, req.Provider,
-		).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
+		err := scanMerchantAPIKeyQuotaRow(
+			db.QueryRow(
+				`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
+				 FROM merchant_skus ms
+				 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
+				 JOIN merchants m ON m.id = ms.merchant_id
+				 WHERE ms.id = $1 AND ms.status = 'active'
+				   AND ms.merchant_id = $2
+				   AND m.user_id = $3
+				   AND mak.provider = $4 AND mak.status = 'active'
+				   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')`,
+				*req.MerchantSKUID, merchantID, userID, req.Provider,
+			),
+			apiKey,
+		)
 		if err == nil {
 			return nil
 		}
@@ -474,29 +489,35 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 	}
 
 	if merchantID > 0 {
-		return db.QueryRow(
+		return scanMerchantAPIKeyQuotaRow(
+			db.QueryRow(
+				`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+				 FROM merchant_api_keys
+				 WHERE provider = $1 AND status = 'active'
+				   AND merchant_id = $2
+				   AND (verified_at IS NOT NULL OR verification_result = 'verified')
+				   AND (quota_limit IS NULL OR quota_used < quota_limit)
+				 ORDER BY COALESCE((quota_limit - quota_used)::double precision, 1e30::double precision) DESC
+				 LIMIT 1`,
+				req.Provider, merchantID,
+			),
+			apiKey,
+		)
+	}
+
+	return scanMerchantAPIKeyQuotaRow(
+		db.QueryRow(
 			`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
 			 FROM merchant_api_keys
 			 WHERE provider = $1 AND status = 'active'
-			   AND merchant_id = $2
 			   AND (verified_at IS NOT NULL OR verification_result = 'verified')
-			   AND quota_used < quota_limit
-			 ORDER BY (quota_limit - quota_used) DESC
+			   AND (quota_limit IS NULL OR quota_used < quota_limit)
+			 ORDER BY COALESCE((quota_limit - quota_used)::double precision, 1e30::double precision) DESC
 			 LIMIT 1`,
-			req.Provider, merchantID,
-		).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
-	}
-
-	return db.QueryRow(
-		`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
-		 FROM merchant_api_keys
-		 WHERE provider = $1 AND status = 'active'
-		   AND (verified_at IS NOT NULL OR verification_result = 'verified')
-		   AND quota_used < quota_limit
-		 ORDER BY (quota_limit - quota_used) DESC
-		 LIMIT 1`,
-		req.Provider,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
+			req.Provider,
+		),
+		apiKey,
+	)
 }
 
 func resolveMerchantIDByUser(db *sql.DB, userID int) (int, error) {

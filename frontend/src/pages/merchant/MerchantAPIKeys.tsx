@@ -18,6 +18,7 @@ import {
   Descriptions,
   Divider,
   Spin,
+  Checkbox,
 } from 'antd';
 import {
   PlusOutlined,
@@ -41,9 +42,7 @@ interface VerificationPollResponse {
   history: VerificationResult[];
 }
 
-function normalizeVerificationStatus(
-  raw: string | undefined
-): VerificationResult['status'] {
+function normalizeVerificationStatus(raw: string | undefined): VerificationResult['status'] {
   if (raw === 'verified') return 'success';
   if (raw === 'success') return 'success';
   if (raw === 'failed') return 'failed';
@@ -143,14 +142,17 @@ const MerchantAPIKeys = () => {
   const handleAdd = () => {
     setEditingKey(null);
     form.resetFields();
+    form.setFieldsValue({ unlimited_quota: true });
     setModalVisible(true);
   };
 
   const handleEdit = (record: MerchantAPIKey) => {
     setEditingKey(record);
+    const unlimited = record.quota_limit == null || record.quota_limit === 0;
     form.setFieldsValue({
       name: record.name,
-      quota_limit: record.quota_limit,
+      unlimited_quota: unlimited,
+      quota_limit: unlimited ? undefined : record.quota_limit,
       status: record.status,
       endpoint_url: record.endpoint_url,
       health_check_level: record.health_check_level,
@@ -173,7 +175,18 @@ const MerchantAPIKeys = () => {
     try {
       const values = await form.validateFields();
       if (editingKey) {
-        const success = await updateAPIKey(editingKey.id, values);
+        const unlimited = Boolean(values.unlimited_quota);
+        const patch: Partial<MerchantAPIKey> = {
+          name: values.name as string,
+          status: values.status as MerchantAPIKey['status'],
+          endpoint_url: values.endpoint_url as string | undefined,
+          health_check_level: values.health_check_level as MerchantAPIKey['health_check_level'],
+          cost_input_rate: values.cost_input_rate as number | undefined,
+          cost_output_rate: values.cost_output_rate as number | undefined,
+          profit_margin: values.profit_margin as number | undefined,
+          quota_limit: unlimited ? null : (values.quota_limit as number),
+        };
+        const success = await updateAPIKey(editingKey.id, patch);
         if (!success) {
           const msg = useMerchantStore.getState().error || '更新失败';
           message.error(msg);
@@ -189,7 +202,7 @@ const MerchantAPIKeys = () => {
         provider: values.provider as string,
         api_key: values.api_key as string,
         api_secret: values.api_secret as string | undefined,
-        quota_limit: values.quota_limit as number | undefined,
+        quota_limit: values.unlimited_quota ? null : (values.quota_limit as number),
       };
       const success = await createAPIKey(payload);
       if (!success) {
@@ -345,7 +358,12 @@ const MerchantAPIKeys = () => {
       key: 'quota_limit',
       render: (_: unknown, record: MerchantAPIKey) => {
         const usage = apiKeyUsage.find((u) => u.id === record.id);
-        if (!usage || usage.quota_limit === 0) {
+        if (
+          !usage ||
+          usage.quota_limit === null ||
+          usage.quota_limit === undefined ||
+          usage.quota_limit === 0
+        ) {
           return '无限制';
         }
         const percent = Math.min(usage.usage_percentage, 100);
@@ -415,12 +433,8 @@ const MerchantAPIKeys = () => {
               轻量验证
             </Button>
           </Tooltip>
-          <Tooltip title="深度验证（含配额探测，仅支持部分提供商）">
-            <Button
-              type="link"
-              size="small"
-              onClick={() => handleVerify(record.id, 'deep')}
-            >
+          <Tooltip title="深度验证（api_format=openai 的厂商会探测 /chat/completions 是否可用，含上游余额类错误）">
+            <Button type="link" size="small" onClick={() => handleVerify(record.id, 'deep')}>
               深度验证
             </Button>
           </Tooltip>
@@ -523,13 +537,32 @@ const MerchantAPIKeys = () => {
             <Input placeholder="自定义端点URL（可选，留空使用默认）" />
           </Form.Item>
 
-          <Form.Item name="quota_limit" label="配额限制（美元）">
-            <InputNumber
-              min={0}
-              precision={2}
-              style={{ width: '100%' }}
-              placeholder="0表示无限制"
-            />
+          <Form.Item name="unlimited_quota" valuePropName="checked" initialValue={true}>
+            <Checkbox>无配额上限（quota_limit 为空；代理仍要求上游 Key 有效）</Checkbox>
+          </Form.Item>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, cur) => prev.unlimited_quota !== cur.unlimited_quota}
+          >
+            {({ getFieldValue }) =>
+              !getFieldValue('unlimited_quota') ? (
+                <Form.Item
+                  name="quota_limit"
+                  label="配额上限（美元）"
+                  rules={[
+                    { required: true, message: '请填写限额' },
+                    { type: 'number', min: 0.01, message: '须大于 0' },
+                  ]}
+                >
+                  <InputNumber
+                    min={0.01}
+                    precision={2}
+                    style={{ width: '100%' }}
+                    placeholder="平台侧该商户 Key 用量上限"
+                  />
+                </Form.Item>
+              ) : null
+            }
           </Form.Item>
 
           <Form.Item name="health_check_level" label="健康检查级别">

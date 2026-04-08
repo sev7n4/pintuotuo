@@ -45,7 +45,7 @@ interface MerchantState {
     provider: string;
     api_key: string;
     api_secret?: string;
-    quota_limit?: number;
+    quota_limit?: number | null;
   }) => Promise<boolean>;
   updateAPIKey: (id: number, data: Partial<MerchantAPIKey>) => Promise<boolean>;
   deleteAPIKey: (id: number) => Promise<boolean>;

@@ -178,7 +178,7 @@ type MerchantAPIKey struct {
 	Provider           string    `json:"provider"` // openai, anthropic, etc.
 	APIKeyEncrypted    string    `json:"-"`
 	APISecretEncrypted string    `json:"-"`
-	QuotaLimit         float64   `json:"quota_limit"`
+	QuotaLimit         *float64  `json:"quota_limit"`
 	QuotaUsed          float64   `json:"quota_used"`
 	Status             string    `json:"status"` // active, inactive
 	LastUsedAt         time.Time `json:"last_used_at,omitempty"`

@@ -75,15 +75,6 @@ func TestExtractProviderError(t *testing.T) {
 	}
 }
 
-func TestQuotaProbeSupport(t *testing.T) {
-	if !isQuotaProbeSupported("zhipu") {
-		t.Fatal("zhipu should support quota probe")
-	}
-	if isQuotaProbeSupported("google") {
-		t.Fatal("google should not support quota probe by default")
-	}
-}
-
 func TestValidateAsync(t *testing.T) {
 	validator := GetAPIKeyValidator()
 

@@ -171,7 +171,8 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 	}
 
 	if isDeepVerification(verificationType) {
-		probeSupported := isQuotaProbeSupported(provider)
+		apiFmt := strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
+		probeSupported := apiFmt == "openai"
 		result.PricingVerified = probeSupported
 		if probeSupported {
 			quotaOK, quotaCode, quotaMsg := v.probeQuota(providerConfig, provider, decryptedKey, models)
@@ -502,11 +503,12 @@ func (v *APIKeyValidator) getProviderConfig(provider string) (map[string]string,
 		return nil, fmt.Errorf("database not available")
 	}
 
-	var apiBaseURL string
+	var apiBaseURL, apiFormat string
 	err := db.QueryRow(
-		"SELECT COALESCE(api_base_url, '') FROM model_providers WHERE code = $1 AND status = 'active'",
+		`SELECT COALESCE(api_base_url, ''), COALESCE(NULLIF(trim(api_format), ''), 'openai')
+		 FROM model_providers WHERE code = $1 AND status = 'active'`,
 		provider,
-	).Scan(&apiBaseURL)
+	).Scan(&apiBaseURL, &apiFormat)
 
 	if err != nil {
 		return nil, err
@@ -514,6 +516,7 @@ func (v *APIKeyValidator) getProviderConfig(provider string) (map[string]string,
 
 	return map[string]string{
 		"api_base_url": apiBaseURL,
+		"api_format":   apiFormat,
 	}, nil
 }
 
@@ -570,15 +573,6 @@ func normalizeVerificationDBStatus(status string) string {
 
 func isDeepVerification(verificationType string) bool {
 	return strings.Contains(strings.ToLower(strings.TrimSpace(verificationType)), "deep")
-}
-
-func isQuotaProbeSupported(provider string) bool {
-	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case "openai", "zhipu", "anthropic":
-		return true
-	default:
-		return false
-	}
 }
 
 func (v *APIKeyValidator) probeQuota(providerConfig map[string]string, provider, apiKey string, models []string) (bool, string, string) {
@@ -640,6 +634,8 @@ func selectProbeModel(provider string, models []string) string {
 		return "gpt-4o-mini"
 	case "anthropic":
 		return "claude-3-5-sonnet-20241022"
+	case "deepseek":
+		return "deepseek-chat"
 	default:
 		return ""
 	}
