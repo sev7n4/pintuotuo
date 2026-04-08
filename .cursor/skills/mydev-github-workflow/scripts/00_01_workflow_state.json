@@ -1,12 +1,12 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": [
     "UT-BE-adminSPUListFilters",
     "FE-typecheck-AdminSPUs",
     "FE-ADMIN-SPU-LIST-ENHANCEMENT"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 210,
   "merged": false,
   "branch": "feature/admin-spu-list-enhancement",
   "local_validation": "passed",
@@ -25,7 +25,7 @@
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
     "validation_note": "GOMODCACHE=.cache/gomod make test-backend；frontend npm run type-check",
-    "next_action": "push and open PR; gh pr checks --watch",
-    "pr_url": null
+    "next_action": "gh pr checks 210 --watch；绿后合并",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/210"
   }
 }
