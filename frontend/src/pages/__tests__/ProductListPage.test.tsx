@@ -14,6 +14,12 @@ jest.mock('@/services/sku', () => ({
   },
 }));
 
+jest.mock('@/services/product', () => ({
+  productService: {
+    getCategories: jest.fn().mockResolvedValue({ data: { data: [] } }),
+  },
+}));
+
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: jest.fn(),
@@ -94,7 +100,12 @@ jest.mock('antd', () => ({
       </button>
     </div>
   )),
-  Space: jest.fn(({ children }) => <div data-testid="space">{children}</div>),
+  Space: Object.assign(
+    jest.fn(({ children }) => <div data-testid="space">{children}</div>),
+    {
+      Compact: jest.fn(({ children }) => <div data-testid="space-compact">{children}</div>),
+    }
+  ),
   Badge: jest.fn(({ children }) => <div data-testid="badge">{children}</div>),
   FloatButton: jest.fn(() => null),
 }));

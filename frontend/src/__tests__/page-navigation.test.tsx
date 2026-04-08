@@ -28,6 +28,12 @@ jest.mock('@/services/sku', () => ({
   },
 }));
 
+jest.mock('@/services/product', () => ({
+  productService: {
+    getCategories: jest.fn().mockResolvedValue({ data: { data: [] } }),
+  },
+}));
+
 jest.mock('../pages/merchant/MerchantDashboard.module.css', () => ({}));
 jest.mock('../components/Layout.css', () => ({}));
 

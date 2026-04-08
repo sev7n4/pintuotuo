@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Carousel,
   Card,
@@ -11,12 +11,6 @@ import {
   Typography,
   Space,
   Button,
-  Drawer,
-  Form,
-  Select,
-  InputNumber,
-  Switch,
-  Alert,
   Skeleton,
 } from 'antd';
 import {
@@ -26,16 +20,12 @@ import {
   RightOutlined,
   ThunderboltOutlined,
   GiftOutlined,
-  StarOutlined,
   FilterOutlined,
 } from '@ant-design/icons';
 import { useHomeStore } from '@/stores/homeStore';
-import { skuService } from '@/services/sku';
-import type { SKUWithSPU } from '@/types/sku';
 import { Product } from '@/types';
 import {
   getProductCardSubtitle,
-  getSkuCardSubtitle,
   pushRecentSearch,
   readRecentSearches,
 } from '@/utils/productDisplay';
@@ -48,37 +38,32 @@ interface QuickNav {
   key: string;
   name: string;
   icon: React.ReactNode;
-  color: string;
   link: string;
 }
 
 const quickNavItems: QuickNav[] = [
   {
     key: 'hot',
-    name: '热销爆款',
+    name: '热销',
     icon: <FireOutlined />,
-    color: '#ff4d4f',
     link: '/catalog?sort=hot',
   },
   {
     key: 'group',
-    name: '超值拼团',
+    name: '拼团',
     icon: <GiftOutlined />,
-    color: '#52c41a',
     link: '/catalog?group_enabled=true',
   },
   {
     key: 'flash',
-    name: '限时秒杀',
+    name: '秒杀',
     icon: <ThunderboltOutlined />,
-    color: '#faad14',
     link: '/catalog?flash=true',
   },
   {
     key: 'new',
-    name: '新品上架',
+    name: '新品',
     icon: <ClockCircleOutlined />,
-    color: '#1890ff',
     link: '/catalog?sort=new',
   },
 ];
@@ -89,40 +74,12 @@ const HomePage = () => {
     useHomeStore();
 
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
-  const [groupSkus, setGroupSkus] = useState<SKUWithSPU[]>([]);
-  const [groupSkusLoading, setGroupSkusLoading] = useState(false);
-  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>(() => readRecentSearches());
-  const [filterForm] = Form.useForm();
 
   useEffect(() => {
     fetchHomeData();
   }, [fetchHomeData]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setGroupSkusLoading(true);
-    skuService
-      .getPublicSKUs({
-        page: 1,
-        per_page: 4,
-        group_enabled: true,
-        sort: 'hot',
-      })
-      .then((res) => {
-        if (!cancelled) setGroupSkus(res.data.data || []);
-      })
-      .catch(() => {
-        if (!cancelled) setGroupSkus([]);
-      })
-      .finally(() => {
-        if (!cancelled) setGroupSkusLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     const seen = new Set<number>();
@@ -133,14 +90,8 @@ const HomePage = () => {
         mixed.push(p);
       }
     }
-    setRecommendedProducts(mixed.slice(0, 8));
+    setRecommendedProducts(mixed.slice(0, 12));
   }, [hotProducts, newProducts]);
-
-  useEffect(() => {
-    if (filterDrawerOpen) {
-      filterForm.setFieldsValue({ q: searchKeyword });
-    }
-  }, [filterDrawerOpen, filterForm, searchKeyword]);
 
   const handleSearch = (value: string) => {
     const q = value.trim();
@@ -151,40 +102,12 @@ const HomePage = () => {
     }
   };
 
-  const applyCatalogFilters = (values: Record<string, unknown>) => {
-    const params = new URLSearchParams();
-    const q = String(values.q ?? searchKeyword ?? '').trim();
-    if (q) params.set('q', q);
-    if (values.category) params.set('category', String(values.category));
-    if (values.model_name) params.set('model_name', String(values.model_name).trim());
-    if (values.provider) params.set('provider', String(values.provider));
-    if (values.tier) params.set('tier', String(values.tier));
-    if (values.sku_type) params.set('type', String(values.sku_type));
-    if (values.group_enabled) params.set('group_enabled', 'true');
-    if (values.price_min != null && values.price_min !== '')
-      params.set('price_min', String(values.price_min));
-    if (values.price_max != null && values.price_max !== '')
-      params.set('price_max', String(values.price_max));
-    if (values.valid_days_min != null && values.valid_days_min !== '')
-      params.set('valid_days_min', String(values.valid_days_min));
-    if (values.valid_days_max != null && values.valid_days_max !== '')
-      params.set('valid_days_max', String(values.valid_days_max));
-    if (values.sort) params.set('sort', String(values.sort));
-    const qs = params.toString();
-    navigate(qs ? `/catalog?${qs}` : '/catalog');
-    setFilterDrawerOpen(false);
-  };
-
   const handleProductClick = (productId: number) => {
     navigate(`/catalog/${productId}`);
   };
 
   const handleCategoryClick = (category: string) => {
     navigate(`/catalog?category=${encodeURIComponent(category)}`);
-  };
-
-  const handleQuickNavClick = (link: string) => {
-    navigate(link);
   };
 
   const formatPrice = (price: number) => {
@@ -266,102 +189,7 @@ const HomePage = () => {
     );
   };
 
-  const renderGroupSkuCard = (sku: SKUWithSPU) => {
-    const discount =
-      sku.original_price && sku.original_price > sku.retail_price
-        ? Math.round((1 - sku.retail_price / sku.original_price) * 100)
-        : 0;
-    const imgUrl = sku.thumbnail_url;
-    const subtitle = getSkuCardSubtitle(sku);
-
-    return (
-      <Card
-        hoverable
-        className={styles.productCard}
-        cover={
-          <div className={styles.productImage}>
-            {imgUrl ? (
-              <img
-                src={imgUrl}
-                alt=""
-                className={styles.productCoverImg}
-                loading="lazy"
-                decoding="async"
-              />
-            ) : (
-              <div className={styles.productPlaceholder}>
-                <Text type="secondary">{(sku.spu_name || sku.sku_code).substring(0, 2)}</Text>
-              </div>
-            )}
-            <Tag color="#52c41a" className={styles.groupTag}>
-              拼团
-            </Tag>
-            {discount > 0 && (
-              <Tag color="#ff4d4f" className={styles.discountTag}>
-                -{discount}%
-              </Tag>
-            )}
-          </div>
-        }
-        onClick={() => navigate(`/catalog/${sku.id}`)}
-      >
-        <div className={styles.productInfo}>
-          <Text className={styles.productName} ellipsis>
-            {sku.spu_name}
-          </Text>
-          <Text type="secondary" className={styles.productSubtitle} ellipsis>
-            {subtitle}
-          </Text>
-          <div className={styles.priceRow}>
-            <Text type="danger" strong className={styles.price}>
-              ¥{sku.retail_price.toFixed(2)}
-            </Text>
-            {sku.original_price && sku.original_price > sku.retail_price && (
-              <Text delete type="secondary" className={styles.originalPrice}>
-                ¥{sku.original_price.toFixed(2)}
-              </Text>
-            )}
-          </div>
-          <div className={styles.productMeta}>
-            <Text type="secondary" className={styles.soldCount}>
-              已售 {Number(sku.sales_count ?? 0).toLocaleString()}
-            </Text>
-          </div>
-        </div>
-      </Card>
-    );
-  };
-
-  const renderSection = (
-    title: string,
-    icon: React.ReactNode,
-    products: Product[],
-    viewAllLink?: string,
-    showGroupTag = false
-  ) => (
-    <div className={styles.section}>
-      <div className={styles.sectionHeader}>
-        <Space>
-          {icon}
-          <Title level={4} className={styles.sectionTitle}>
-            {title}
-          </Title>
-        </Space>
-        {viewAllLink && (
-          <Text type="secondary" className={styles.viewAll} onClick={() => navigate(viewAllLink)}>
-            查看全部 <RightOutlined />
-          </Text>
-        )}
-      </div>
-      <Row gutter={[16, 16]}>
-        {products.map((product) => (
-          <Col xs={12} sm={8} md={6} lg={4} key={product.id}>
-            {renderProductCard(product, showGroupTag)}
-          </Col>
-        ))}
-      </Row>
-    </div>
-  );
+  const hasFeed = recommendedProducts.length > 0;
 
   if (error) {
     return (
@@ -373,13 +201,9 @@ const HomePage = () => {
 
   return (
     <div className={styles.container}>
-      <Alert
-        type="info"
-        showIcon
-        className={styles.heroHint}
-        message="数字商品卖场"
-        description="提供 Token 包、订阅、并发套餐等虚拟商品；支付后到账至账户，可在「我的 Token」与 API 密钥中使用。"
-      />
+      <div className={styles.heroHintCompact}>
+        <Text type="secondary">数字商品卖场 · Token / 订阅 / 并发套餐</Text>
+      </div>
 
       <div className={styles.searchSection}>
         <Space.Compact style={{ width: '100%', maxWidth: 720 }}>
@@ -392,9 +216,13 @@ const HomePage = () => {
             onChange={(e) => setSearchKeyword(e.target.value)}
             onSearch={handleSearch}
             className={styles.searchInput}
-            style={{ flex: 1 }}
+            style={{ flex: 1, minWidth: 0 }}
           />
-          <Button size="large" icon={<FilterOutlined />} onClick={() => setFilterDrawerOpen(true)}>
+          <Button
+            size="large"
+            icon={<FilterOutlined />}
+            onClick={() => navigate('/catalog?filters=1')}
+          >
             筛选
           </Button>
         </Space.Compact>
@@ -421,128 +249,20 @@ const HomePage = () => {
         )}
       </div>
 
-      <Drawer
-        title="多维筛选"
-        placement="right"
-        width={360}
-        open={filterDrawerOpen}
-        onClose={() => setFilterDrawerOpen(false)}
-        destroyOnClose
-      >
-        <Form
-          form={filterForm}
-          layout="vertical"
-          onFinish={applyCatalogFilters}
-          initialValues={{ group_enabled: false }}
-        >
-          <Form.Item name="q" label="关键词（可与上方搜索框一致）">
-            <Input placeholder="模型名、套餐名、SKU 编码" allowClear />
-          </Form.Item>
-          <Form.Item name="category" label="品类 / SPU 名称">
-            <Select
-              allowClear
-              placeholder="选择分类"
-              options={categories.map((c) => ({ label: c.name, value: c.name }))}
-            />
-          </Form.Item>
-          <Space style={{ width: '100%' }} size="middle">
-            <Form.Item name="price_min" label="最低价">
-              <InputNumber min={0} style={{ width: 140 }} placeholder="元" />
-            </Form.Item>
-            <Form.Item name="price_max" label="最高价">
-              <InputNumber min={0} style={{ width: 140 }} placeholder="元" />
-            </Form.Item>
-          </Space>
-          <Form.Item name="model_name" label="模型名称">
-            <Input placeholder="如 GLM、DeepSeek" allowClear />
-          </Form.Item>
-          <Form.Item name="provider" label="厂商">
-            <Select
-              allowClear
-              placeholder="厂商"
-              options={[
-                { label: 'OpenAI', value: 'openai' },
-                { label: 'Anthropic', value: 'anthropic' },
-                { label: 'Google', value: 'google' },
-                { label: 'DeepSeek', value: 'deepseek' },
-                { label: '智谱', value: 'zhipu' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="tier" label="模型层级">
-            <Select
-              allowClear
-              options={[
-                { label: 'Pro', value: 'pro' },
-                { label: 'Lite', value: 'lite' },
-                { label: 'Mini', value: 'mini' },
-                { label: 'Vision', value: 'vision' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="sku_type" label="套餐类型">
-            <Select
-              allowClear
-              options={[
-                { label: 'Token包', value: 'token_pack' },
-                { label: '订阅', value: 'subscription' },
-                { label: '并发', value: 'concurrent' },
-                { label: '试用', value: 'trial' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="group_enabled" label="仅看支持拼团" valuePropName="checked">
-            <Switch />
-          </Form.Item>
-          <Space style={{ width: '100%' }} size="middle">
-            <Form.Item name="valid_days_min" label="有效期≥(天)">
-              <InputNumber min={0} style={{ width: 140 }} />
-            </Form.Item>
-            <Form.Item name="valid_days_max" label="有效期≤(天)">
-              <InputNumber min={0} style={{ width: 140 }} />
-            </Form.Item>
-          </Space>
-          <Form.Item name="sort" label="排序">
-            <Select
-              allowClear
-              placeholder="默认推荐"
-              options={[
-                { label: '热销', value: 'hot' },
-                { label: '最新', value: 'new' },
-                { label: '价格从低到高', value: 'price_asc' },
-                { label: '价格从高到低', value: 'price_desc' },
-              ]}
-            />
-          </Form.Item>
-          <Space>
-            <Button type="primary" htmlType="submit">
-              应用并搜索
-            </Button>
-            <Button
-              onClick={() => {
-                filterForm.resetFields();
-                setSearchKeyword('');
-              }}
-            >
-              重置
-            </Button>
-          </Space>
-        </Form>
-      </Drawer>
-
       <div className={styles.quickNavSection}>
-        <Row gutter={[12, 12]}>
+        <div className={styles.quickNavScroll}>
           {quickNavItems.map((item) => (
-            <Col xs={12} sm={6} key={item.key}>
-              <div className={styles.quickNavItem} onClick={() => handleQuickNavClick(item.link)}>
-                <div className={styles.quickNavIcon} style={{ background: item.color }}>
-                  {item.icon}
-                </div>
-                <Text className={styles.quickNavName}>{item.name}</Text>
-              </div>
-            </Col>
+            <button
+              type="button"
+              key={item.key}
+              className={styles.quickNavPill}
+              onClick={() => navigate(item.link)}
+            >
+              <span className={styles.quickNavIconMuted}>{item.icon}</span>
+              <span className={styles.quickNavName}>{item.name}</span>
+            </button>
           ))}
-        </Row>
+        </div>
       </div>
 
       {banners.length > 0 && (
@@ -559,30 +279,31 @@ const HomePage = () => {
 
       {categories.length > 0 && (
         <div className={styles.categorySection}>
-          <div className={styles.categoryHeader}>
+          <div className={styles.categoryHeaderRow}>
             <Title level={5} className={styles.categoryTitle}>
-              商品分类
+              分类
             </Title>
+            <Link to="/categories" className={styles.allCategoriesLink}>
+              全部分类 <RightOutlined />
+            </Link>
           </div>
-          <Row gutter={[12, 12]}>
-            {categories.slice(0, 8).map((category) => (
-              <Col xs={12} sm={6} md={6} key={category.name}>
-                <div
-                  className={styles.categoryItem}
-                  onClick={() => handleCategoryClick(category.name)}
-                >
-                  <Text className={styles.categoryName}>{category.name}</Text>
-                  <Text type="secondary" className={styles.categoryCount}>
-                    {category.count}件
-                  </Text>
-                </div>
-              </Col>
+          <div className={styles.categoryChips}>
+            {categories.map((category) => (
+              <button
+                type="button"
+                key={category.name}
+                className={styles.categoryChip}
+                onClick={() => handleCategoryClick(category.name)}
+              >
+                <span className={styles.categoryChipName}>{category.name}</span>
+                <span className={styles.categoryChipCount}>{category.count}</span>
+              </button>
             ))}
-          </Row>
+          </div>
         </div>
       )}
 
-      {isLoading && hotProducts.length === 0 ? (
+      {isLoading && !hasFeed ? (
         <div className={styles.skeletonWrap}>
           <Skeleton active paragraph={{ rows: 1 }} title={{ width: '40%' }} />
           <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
@@ -598,75 +319,34 @@ const HomePage = () => {
         </div>
       ) : (
         <Spin spinning={isLoading}>
-          {renderSection(
-            '热门推荐',
-            <FireOutlined style={{ color: '#ff4d4f' }} />,
-            hotProducts,
-            '/catalog?sort=hot'
-          )}
-
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <Space>
-                <GiftOutlined style={{ color: '#52c41a' }} />
+                <FireOutlined style={{ color: '#ff4d4f' }} />
                 <Title level={4} className={styles.sectionTitle}>
-                  超值拼团
+                  精选推荐
                 </Title>
               </Space>
               <Text
                 type="secondary"
                 className={styles.viewAll}
-                onClick={() => navigate('/catalog?group_enabled=true')}
+                onClick={() => navigate('/catalog')}
               >
                 查看全部 <RightOutlined />
               </Text>
             </div>
-            <Spin spinning={groupSkusLoading}>
-              {groupSkus.length === 0 && !groupSkusLoading ? (
-                <Text type="secondary">暂无拼团商品，请前往卖场筛选「拼团」</Text>
-              ) : (
-                <Row gutter={[16, 16]}>
-                  {groupSkus.map((sku) => (
-                    <Col xs={12} sm={8} md={6} lg={4} key={`grp-${sku.id}`}>
-                      {renderGroupSkuCard(sku)}
-                    </Col>
-                  ))}
-                </Row>
-              )}
-            </Spin>
-          </div>
-
-          {renderSection(
-            '新品上架',
-            <ClockCircleOutlined style={{ color: '#1890ff' }} />,
-            newProducts,
-            '/catalog?sort=new'
-          )}
-
-          {recommendedProducts.length > 0 && (
-            <div className={styles.recommendedSection}>
-              <div className={styles.sectionHeader}>
-                <Space direction="vertical" size={0}>
-                  <Space>
-                    <StarOutlined style={{ color: '#faad14' }} />
-                    <Title level={4} className={styles.sectionTitle}>
-                      猜你喜欢
-                    </Title>
-                  </Space>
-                  <Text type="secondary" className={styles.recHint}>
-                    根据热销与新品为您组合推荐（去重展示）
-                  </Text>
-                </Space>
-              </div>
+            {hasFeed ? (
               <Row gutter={[16, 16]}>
                 {recommendedProducts.map((product) => (
-                  <Col xs={12} sm={8} md={6} lg={4} key={`rec-${product.id}`}>
+                  <Col xs={12} sm={8} md={6} lg={4} key={product.id}>
                     {renderProductCard(product)}
                   </Col>
                 ))}
               </Row>
-            </div>
-          )}
+            ) : (
+              <Text type="secondary">暂无推荐，请前往卖场浏览全部 SKU。</Text>
+            )}
+          </div>
         </Spin>
       )}
     </div>

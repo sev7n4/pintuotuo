@@ -10,7 +10,13 @@
 .title {
   font-size: 24px;
   font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  display: block;
   margin-bottom: 16px;
+  font-size: 14px;
 }
 
 .searchInput {
@@ -51,6 +57,14 @@
   justify-content: center;
   font-size: 28px;
   margin: 0 auto 12px;
+  background: rgba(22, 119, 255, 0.08);
+  color: #1677ff;
+}
+
+.categoryMeta {
+  display: block;
+  font-size: 13px;
+  margin-top: 4px;
 }
 
 .categoryName {

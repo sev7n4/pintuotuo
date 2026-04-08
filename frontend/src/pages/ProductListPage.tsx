@@ -30,6 +30,7 @@ import {
   GiftOutlined,
   AppstoreOutlined,
   UnorderedListOutlined,
+  FilterOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCartStore } from '@stores/cartStore';
@@ -38,6 +39,9 @@ import api from '@/services/api';
 import type { SKUWithSPU } from '@/types/sku';
 import dayjs from 'dayjs';
 import { ScenarioFilter } from '@/components/ScenarioFilter';
+import { CatalogFilterDrawer, type CatalogFilterValues } from '@/components/CatalogFilterDrawer';
+import { productService } from '@/services/product';
+import type { Category } from '@/types';
 import { getSkuCardSubtitle, pushRecentSearch } from '@/utils/productDisplay';
 import styles from './ProductListPage.module.css';
 
@@ -105,6 +109,8 @@ export const ProductListPage: React.FC = () => {
 
   const [searchInput, setSearchInput] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+  const [catalogCategories, setCatalogCategories] = useState<Category[]>([]);
 
   const sortParam = searchParams.get('sort');
   const flashParam = searchParams.get('flash');
@@ -131,6 +137,70 @@ export const ProductListPage: React.FC = () => {
   useEffect(() => {
     setSearchInput(searchParam || '');
   }, [searchParam]);
+
+  useEffect(() => {
+    productService
+      .getCategories()
+      .then((res) => {
+        const body = res.data as { data?: Category[] };
+        setCatalogCategories(body?.data || []);
+      })
+      .catch(() => setCatalogCategories([]));
+  }, []);
+
+  useEffect(() => {
+    if (searchParams.get('filters') === '1') {
+      setFilterDrawerOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('filters');
+      const qs = next.toString();
+      navigate(qs ? `/catalog?${qs}` : '/catalog', { replace: true });
+    }
+  }, [searchParams, navigate]);
+
+  const filterInitialValues = useMemo((): CatalogFilterValues => {
+    const ge = searchParams.get('group_enabled');
+    return {
+      q: searchParam || '',
+      category: searchParams.get('category') || undefined,
+      model_name: searchParams.get('model_name') || undefined,
+      provider: searchParams.get('provider') || undefined,
+      tier: searchParams.get('tier') || undefined,
+      sku_type: searchParams.get('type') || undefined,
+      group_enabled: ge === 'true' || ge === '1',
+      price_min: parseNum(searchParams.get('price_min')) ?? null,
+      price_max: parseNum(searchParams.get('price_max')) ?? null,
+      valid_days_min: parseIntParam(searchParams.get('valid_days_min')) ?? null,
+      valid_days_max: parseIntParam(searchParams.get('valid_days_max')) ?? null,
+      sort: searchParams.get('sort') || undefined,
+    };
+  }, [searchParams, searchParam]);
+
+  const applyCatalogFilters = useCallback(
+    (values: CatalogFilterValues) => {
+      const params = new URLSearchParams();
+      const q = String(values.q ?? '').trim();
+      if (q) params.set('q', q);
+      if (values.category) params.set('category', String(values.category));
+      if (values.model_name) params.set('model_name', String(values.model_name).trim());
+      if (values.provider) params.set('provider', String(values.provider));
+      if (values.tier) params.set('tier', String(values.tier));
+      if (values.sku_type) params.set('type', String(values.sku_type));
+      if (values.group_enabled) params.set('group_enabled', 'true');
+      if (values.price_min != null && Number.isFinite(Number(values.price_min)))
+        params.set('price_min', String(values.price_min));
+      if (values.price_max != null && Number.isFinite(Number(values.price_max)))
+        params.set('price_max', String(values.price_max));
+      if (values.valid_days_min != null && Number.isFinite(Number(values.valid_days_min)))
+        params.set('valid_days_min', String(values.valid_days_min));
+      if (values.valid_days_max != null && Number.isFinite(Number(values.valid_days_max)))
+        params.set('valid_days_max', String(values.valid_days_max));
+      if (values.sort) params.set('sort', String(values.sort));
+      const qs = params.toString();
+      navigate(qs ? `/catalog?${qs}` : '/catalog');
+    },
+    [navigate]
+  );
 
   const effectiveView = screens.xs ? 'grid' : viewMode;
 
@@ -195,6 +265,18 @@ export const ProductListPage: React.FC = () => {
       });
     }
 
+    const modelName = searchParams.get('model_name');
+    if (modelName) chips.push({ key: 'model_name', label: `模型：${modelName}` });
+
+    const vdMin = searchParams.get('valid_days_min');
+    const vdMax = searchParams.get('valid_days_max');
+    if (vdMin != null || vdMax != null) {
+      chips.push({
+        key: 'valid_days',
+        label: `有效期：${vdMin ?? '—'} ~ ${vdMax ?? '—'} 天`,
+      });
+    }
+
     return chips;
   }, [searchParams, searchParam]);
 
@@ -215,6 +297,9 @@ export const ProductListPage: React.FC = () => {
       } else if (key === 'price_range') {
         next.delete('price_min');
         next.delete('price_max');
+      } else if (key === 'valid_days') {
+        next.delete('valid_days_min');
+        next.delete('valid_days_max');
       } else {
         next.delete(key);
       }
@@ -682,16 +767,26 @@ export const ProductListPage: React.FC = () => {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         <Col xs={24} lg={10}>
-          <Input.Search
-            placeholder="搜索 SKU / 模型 / 关键词..."
-            prefix={<SearchOutlined />}
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onSearch={handleSearch}
-            allowClear
-            enterButton
-            style={{ width: '100%' }}
-          />
+          <Space.Compact style={{ width: '100%', display: 'flex' }}>
+            <Input.Search
+              placeholder="搜索 SKU / 模型 / 关键词..."
+              prefix={<SearchOutlined />}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onSearch={handleSearch}
+              allowClear
+              enterButton
+              style={{ flex: 1, minWidth: 0 }}
+            />
+            <Button
+              type="default"
+              icon={<FilterOutlined />}
+              onClick={() => setFilterDrawerOpen(true)}
+              aria-label="打开筛选抽屉"
+            >
+              {screens.xs ? '' : '筛选'}
+            </Button>
+          </Space.Compact>
         </Col>
         <Col xs={24} lg={14}>
           <Space wrap size="middle" style={{ width: '100%', justifyContent: 'flex-end' }}>
@@ -880,6 +975,14 @@ export const ProductListPage: React.FC = () => {
           style={{ right: 24, bottom: 24 }}
         />
       </Badge>
+
+      <CatalogFilterDrawer
+        open={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+        categories={catalogCategories}
+        initialValues={filterInitialValues}
+        onApply={applyCatalogFilters}
+      />
     </div>
   );
 };
