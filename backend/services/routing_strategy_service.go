@@ -8,21 +8,21 @@ import (
 )
 
 type RoutingStrategyConfig struct {
-	ID                    int       `json:"id"`
-	Name                  string    `json:"name"`
-	Code                  string    `json:"code"`
-	Description           *string   `json:"description"`
-	PriceWeight           float64   `json:"price_weight"`
-	LatencyWeight         float64   `json:"latency_weight"`
-	ReliabilityWeight     float64   `json:"reliability_weight"`
-	MaxRetryCount         int       `json:"max_retry_count"`
-	RetryBackoffBase      int       `json:"retry_backoff_base"`
-	CircuitBreakerThreshold int     `json:"circuit_breaker_threshold"`
-	CircuitBreakerTimeout int       `json:"circuit_breaker_timeout"`
-	IsDefault             bool      `json:"is_default"`
-	Status                string    `json:"status"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
+	ID                      int       `json:"id"`
+	Name                    string    `json:"name"`
+	Code                    string    `json:"code"`
+	Description             *string   `json:"description"`
+	PriceWeight             float64   `json:"price_weight"`
+	LatencyWeight           float64   `json:"latency_weight"`
+	ReliabilityWeight       float64   `json:"reliability_weight"`
+	MaxRetryCount           int       `json:"max_retry_count"`
+	RetryBackoffBase        int       `json:"retry_backoff_base"`
+	CircuitBreakerThreshold int       `json:"circuit_breaker_threshold"`
+	CircuitBreakerTimeout   int       `json:"circuit_breaker_timeout"`
+	IsDefault               bool      `json:"is_default"`
+	Status                  string    `json:"status"`
+	CreatedAt               time.Time `json:"created_at"`
+	UpdatedAt               time.Time `json:"updated_at"`
 }
 
 type RoutingStrategyService struct {
@@ -55,15 +55,14 @@ func (s *RoutingStrategyService) GetStrategies(page, pageSize int) ([]RoutingStr
 	var strategies []RoutingStrategyConfig
 	for rows.Next() {
 		var strategy RoutingStrategyConfig
-		err := rows.Scan(
+		if err = rows.Scan(
 			&strategy.ID, &strategy.Name, &strategy.Code, &strategy.Description,
 			&strategy.PriceWeight, &strategy.LatencyWeight, &strategy.ReliabilityWeight,
 			&strategy.MaxRetryCount, &strategy.RetryBackoffBase,
 			&strategy.CircuitBreakerThreshold, &strategy.CircuitBreakerTimeout,
 			&strategy.IsDefault, &strategy.Status, &strategy.CreatedAt, &strategy.UpdatedAt,
-		)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to scan strategy: %w", err)
+		); err != nil {
+			continue
 		}
 		strategies = append(strategies, strategy)
 	}

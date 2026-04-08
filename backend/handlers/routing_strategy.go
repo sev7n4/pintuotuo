@@ -117,8 +117,7 @@ func AdminCreateRoutingStrategy(c *gin.Context) {
 	}
 
 	service := services.NewRoutingStrategyService(db)
-	err := service.CreateStrategy(&req)
-	if err != nil {
+	if err := service.CreateStrategy(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"STRATEGY_CREATION_FAILED",
 			"Failed to create strategy",
@@ -149,7 +148,7 @@ func AdminUpdateRoutingStrategy(c *gin.Context) {
 	}
 
 	var req services.RoutingStrategyConfig
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err = c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"INVALID_REQUEST",
 			"Invalid request body",
