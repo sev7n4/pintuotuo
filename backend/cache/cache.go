@@ -196,8 +196,8 @@ func SPUKey(id int) string {
 	return fmt.Sprintf("spu:%d", id)
 }
 
-func SPUListKey(page, perPage int, provider, tier, status string) string {
-	return fmt.Sprintf("spus:list:%s:%s:%s:page:%d:limit:%d", provider, tier, status, page, perPage)
+func SPUListKey(page, perPage int, provider, tier, status, q string) string {
+	return fmt.Sprintf("spus:list:%s:%s:%s:%s:page:%d:limit:%d", provider, tier, status, q, page, perPage)
 }
 
 func SKUKey(id int) string {

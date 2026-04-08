@@ -1,38 +1,31 @@
 {
-  "current_step": 12,
+  "current_step": 9,
   "current_fix_cases": [
-    "UT-BE-sku_admin_list_filters",
-    "UT-BE-ResolveAdminSKUListScope",
-    "FE-typecheck-AdminSKUs"
+    "UT-BE-adminSPUListFilters",
+    "FE-typecheck-AdminSPUs",
+    "FE-ADMIN-SPU-LIST-ENHANCEMENT"
   ],
-  "retry_count": 1,
-  "pr_number": 209,
+  "retry_count": 0,
+  "pr_number": null,
   "merged": false,
-  "branch": "feature/admin-sku-list-ops-clarity",
+  "branch": "feature/admin-spu-list-enhancement",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "passed",
-    "integration": "passed",
-    "e2e": "passed",
+    "cicd": "pending",
+    "integration": "pending",
+    "e2e": "pending",
     "deploy": "pending"
   },
-  "error_history": [
-    {
-      "at": "2026-04-08T02:00:00Z",
-      "run_id": 24113525708,
-      "phase": "cicd",
-      "summary": "golangci-lint: goconst (merchant_sku all, sku sellable), ineffassign n++ — fixed in 1b18e19"
-    }
-  ],
-  "created_at": "2026-04-07T16:00:00Z",
-  "updated_at": "2026-04-08T02:45:00Z",
+  "error_history": [],
+  "created_at": "2026-04-08T03:00:00Z",
+  "updated_at": "2026-04-08T03:15:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "管理端 SKU 列表：商户可选范围对齐、全部视图与筛选、SPU 下架防呆与列表字段",
+    "task": "管理端 SPU：Alert/Segmented/关键词q/SKU计数/下架与删除防呆/全量厂商/getApiErrorMessage",
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "validation_note": "PR #209 CI 全绿；已 merge origin/main 解决 workflow 状态冲突；待 squash 合并",
-    "next_action": "在 GitHub 上 squash merge #209（或 gh pr merge 209 --squash）；合并后观察 deploy-tencent",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/209"
+    "validation_note": "GOMODCACHE=.cache/gomod make test-backend；frontend npm run type-check",
+    "next_action": "push and open PR; gh pr checks --watch",
+    "pr_url": null
   }
 }

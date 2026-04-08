@@ -81,6 +81,10 @@ export interface SPU {
   sort_order: number;
   total_sales_count: number;
   average_rating?: number;
+  /** 管理端列表/详情：关联 SKU 总数 */
+  sku_count?: number;
+  /** 管理端列表/详情：在售 SKU 数 */
+  active_sku_count?: number;
   created_at: string;
   updated_at: string;
 }

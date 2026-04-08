@@ -51,12 +51,15 @@ type SPU struct {
 	RoutingRules      RoutingRules   `json:"routing_rules,omitempty"`
 	BatchInference    BatchConfig    `json:"batch_inference,omitempty"`
 
-	Status          string    `json:"status"`
-	SortOrder       int       `json:"sort_order"`
-	TotalSalesCount int64     `json:"total_sales_count"`
-	AverageRating   float64   `json:"average_rating,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	Status          string  `json:"status"`
+	SortOrder       int     `json:"sort_order"`
+	TotalSalesCount int64   `json:"total_sales_count"`
+	AverageRating   float64 `json:"average_rating,omitempty"`
+	// SkuCount / ActiveSkuCount：管理端列表与详情 JOIN 统计，其它接口可能为 0
+	SkuCount       int       `json:"sku_count"`
+	ActiveSkuCount int       `json:"active_sku_count"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type InputRange struct {
