@@ -13,13 +13,24 @@ import {
   Tag,
   Popconfirm,
   Slider,
+  Row,
+  Col,
+  Grid,
+  Tooltip,
+  Alert,
+  Divider,
 } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
+  InfoCircleOutlined,
+  StarOutlined,
+  StarFilled,
 } from '@ant-design/icons';
 import api from '@services/api';
+
+const { useBreakpoint } = Grid;
 
 interface RoutingStrategyConfig {
   id: number;
@@ -39,6 +50,33 @@ interface RoutingStrategyConfig {
   updated_at: string;
 }
 
+const STRATEGY_PRESETS: Record<string, { weights: { price: number; latency: number; reliability: number }; retry: { count: number; backoff: number }; circuitBreaker: { threshold: number; timeout: number }; description: string }> = {
+  price_first: {
+    weights: { price: 60, latency: 20, reliability: 20 },
+    retry: { count: 3, backoff: 1000 },
+    circuitBreaker: { threshold: 5, timeout: 60 },
+    description: '优先选择价格最低的Provider，适合成本敏感场景',
+  },
+  latency_first: {
+    weights: { price: 20, latency: 60, reliability: 20 },
+    retry: { count: 2, backoff: 500 },
+    circuitBreaker: { threshold: 3, timeout: 30 },
+    description: '优先选择延迟最低的Provider，适合实时性要求高的场景',
+  },
+  reliability_first: {
+    weights: { price: 20, latency: 20, reliability: 60 },
+    retry: { count: 5, backoff: 2000 },
+    circuitBreaker: { threshold: 3, timeout: 120 },
+    description: '优先选择最可靠的Provider，适合稳定性要求高的场景',
+  },
+  balanced: {
+    weights: { price: 33, latency: 34, reliability: 33 },
+    retry: { count: 3, backoff: 1000 },
+    circuitBreaker: { threshold: 5, timeout: 60 },
+    description: '均衡考虑价格、延迟和可靠性，适合通用场景',
+  },
+};
+
 const AdminRoutingStrategies: React.FC = () => {
   const [strategies, setStrategies] = useState<RoutingStrategyConfig[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,6 +87,13 @@ const AdminRoutingStrategies: React.FC = () => {
     current: 1,
     pageSize: 20,
     total: 0,
+  });
+  const screens = useBreakpoint();
+
+  const [weightValues, setWeightValues] = useState({
+    price: 33,
+    latency: 34,
+    reliability: 33,
   });
 
   useEffect(() => {
@@ -73,6 +118,8 @@ const AdminRoutingStrategies: React.FC = () => {
   const handleCreate = () => {
     setEditingStrategy(null);
     form.resetFields();
+    const defaultWeights = { price: 33, latency: 34, reliability: 33 };
+    setWeightValues(defaultWeights);
     form.setFieldsValue({
       price_weight: 0.33,
       latency_weight: 0.34,
@@ -89,6 +136,11 @@ const AdminRoutingStrategies: React.FC = () => {
 
   const handleEdit = (strategy: RoutingStrategyConfig) => {
     setEditingStrategy(strategy);
+    setWeightValues({
+      price: Math.round(strategy.price_weight * 100),
+      latency: Math.round(strategy.latency_weight * 100),
+      reliability: Math.round(strategy.reliability_weight * 100),
+    });
     form.setFieldsValue(strategy);
     setModalVisible(true);
   };
@@ -100,6 +152,16 @@ const AdminRoutingStrategies: React.FC = () => {
       fetchStrategies();
     } catch (error) {
       message.error('删除失败');
+    }
+  };
+
+  const handleSetDefault = async (id: number) => {
+    try {
+      await api.put(`/admin/routing-strategies/${id}`, { is_default: true });
+      message.success('已设为默认策略');
+      fetchStrategies();
+    } catch (error) {
+      message.error('设置失败');
     }
   };
 
@@ -120,57 +182,155 @@ const AdminRoutingStrategies: React.FC = () => {
     }
   };
 
+  const handleWeightChange = (type: 'price' | 'latency' | 'reliability', value: number) => {
+    const newValues = { ...weightValues, [type]: value };
+    setWeightValues(newValues);
+    form.setFieldsValue({
+      price_weight: newValues.price / 100,
+      latency_weight: newValues.latency / 100,
+      reliability_weight: newValues.reliability / 100,
+    });
+  };
+
+  const applyPreset = (presetKey: string) => {
+    const preset = STRATEGY_PRESETS[presetKey];
+    if (preset) {
+      setWeightValues(preset.weights);
+      form.setFieldsValue({
+        price_weight: preset.weights.price / 100,
+        latency_weight: preset.weights.latency / 100,
+        reliability_weight: preset.weights.reliability / 100,
+        max_retry_count: preset.retry.count,
+        retry_backoff_base: preset.retry.backoff,
+        circuit_breaker_threshold: preset.circuitBreaker.threshold,
+        circuit_breaker_timeout: preset.circuitBreaker.timeout,
+      });
+    }
+  };
+
+  const isMobile = !screens.md;
+
+  const mobileCard = (record: RoutingStrategyConfig) => (
+    <Card
+      size="small"
+      style={{ marginBottom: 12 }}
+      title={
+        <Space>
+          <span>{record.name}</span>
+          {record.is_default && <Tag color="blue" icon={<StarFilled />}>默认</Tag>}
+          <Tag color={record.status === 'active' ? 'green' : 'default'}>
+            {record.status === 'active' ? '启用' : '禁用'}
+          </Tag>
+        </Space>
+      }
+      extra={
+        <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          />
+          {!record.is_default && (
+            <Tooltip title="设为默认">
+              <Button
+                type="link"
+                size="small"
+                icon={<StarOutlined />}
+                onClick={() => handleSetDefault(record.id)}
+              />
+            </Tooltip>
+          )}
+          <Popconfirm
+            title="确定要删除此策略吗？"
+            onConfirm={() => handleDelete(record.id)}
+            okText="确定"
+            cancelText="取消"
+          >
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+            />
+          </Popconfirm>
+        </Space>
+      }
+    >
+      <Row gutter={[8, 8]}>
+        <Col span={12}>
+          <div style={{ fontSize: 12, color: '#666' }}>编码</div>
+          <div>{record.code}</div>
+        </Col>
+        <Col span={12}>
+          <div style={{ fontSize: 12, color: '#666' }}>描述</div>
+          <div style={{ fontSize: 12 }}>{record.description || '-'}</div>
+        </Col>
+        <Col span={24}>
+          <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>权重配置</div>
+          <Space size={4}>
+            <Tag>价格 {Math.round(record.price_weight * 100)}%</Tag>
+            <Tag>延迟 {Math.round(record.latency_weight * 100)}%</Tag>
+            <Tag>可靠 {Math.round(record.reliability_weight * 100)}%</Tag>
+          </Space>
+        </Col>
+        <Col span={12}>
+          <div style={{ fontSize: 12, color: '#666' }}>重试配置</div>
+          <div style={{ fontSize: 12 }}>最大{record.max_retry_count}次 / 退避{record.retry_backoff_base}ms</div>
+        </Col>
+        <Col span={12}>
+          <div style={{ fontSize: 12, color: '#666' }}>熔断器</div>
+          <div style={{ fontSize: 12 }}>阈值{record.circuit_breaker_threshold}次 / 超时{record.circuit_breaker_timeout}s</div>
+        </Col>
+      </Row>
+    </Card>
+  );
+
   const columns = [
     {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
       width: 60,
+      responsive: ['md'] as any,
     },
     {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
+      render: (name: string, record: RoutingStrategyConfig) => (
+        <Space>
+          {name}
+          {record.is_default && <Tag color="blue" icon={<StarFilled />}>默认</Tag>}
+        </Space>
+      ),
     },
     {
       title: '编码',
       dataIndex: 'code',
       key: 'code',
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      ellipsis: true,
+      responsive: ['lg'] as any,
     },
     {
       title: '权重配置',
       key: 'weights',
+      responsive: ['lg'] as any,
       render: (_: any, record: RoutingStrategyConfig) => (
-        <Space direction="vertical" size="small">
-          <span>价格: {(record.price_weight * 100).toFixed(0)}%</span>
-          <span>延迟: {(record.latency_weight * 100).toFixed(0)}%</span>
-          <span>可靠性: {(record.reliability_weight * 100).toFixed(0)}%</span>
+        <Space size={4}>
+          <Tag>价格 {Math.round(record.price_weight * 100)}%</Tag>
+          <Tag>延迟 {Math.round(record.latency_weight * 100)}%</Tag>
+          <Tag>可靠 {Math.round(record.reliability_weight * 100)}%</Tag>
         </Space>
       ),
     },
     {
-      title: '重试配置',
-      key: 'retry',
+      title: '重试/熔断',
+      key: 'config',
+      responsive: ['xl'] as any,
       render: (_: any, record: RoutingStrategyConfig) => (
-        <Space direction="vertical" size="small">
-          <span>最大重试: {record.max_retry_count}次</span>
-          <span>退避基数: {record.retry_backoff_base}ms</span>
-        </Space>
-      ),
-    },
-    {
-      title: '熔断器',
-      key: 'circuit_breaker',
-      render: (_: any, record: RoutingStrategyConfig) => (
-        <Space direction="vertical" size="small">
-          <span>阈值: {record.circuit_breaker_threshold}次</span>
-          <span>超时: {record.circuit_breaker_timeout}s</span>
+        <Space direction="vertical" size={0}>
+          <span style={{ fontSize: 12 }}>重试: {record.max_retry_count}次/{record.retry_backoff_base}ms</span>
+          <span style={{ fontSize: 12 }}>熔断: {record.circuit_breaker_threshold}次/{record.circuit_breaker_timeout}s</span>
         </Space>
       ),
     },
@@ -178,29 +338,40 @@ const AdminRoutingStrategies: React.FC = () => {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string, record: RoutingStrategyConfig) => (
-        <Space>
-          <Tag color={status === 'active' ? 'green' : 'default'}>
-            {status === 'active' ? '启用' : '禁用'}
-          </Tag>
-          {record.is_default && <Tag color="blue">默认</Tag>}
-        </Space>
+      width: 80,
+      render: (status: string) => (
+        <Tag color={status === 'active' ? 'green' : 'default'}>
+          {status === 'active' ? '启用' : '禁用'}
+        </Tag>
       ),
     },
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: isMobile ? 80 : 200,
+      fixed: isMobile ? 'right' as const : undefined,
       render: (_: any, record: RoutingStrategyConfig) => (
-        <Space>
+        <Space size={isMobile ? 0 : 8}>
           <Button
             type="link"
             size="small"
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
           >
-            编辑
+            {!isMobile && '编辑'}
           </Button>
+          {!record.is_default && (
+            <Tooltip title="设为默认">
+              <Button
+                type="link"
+                size="small"
+                icon={<StarOutlined />}
+                onClick={() => handleSetDefault(record.id)}
+              >
+                {!isMobile && '设为默认'}
+              </Button>
+            </Tooltip>
+          )}
           <Popconfirm
             title="确定要删除此策略吗？"
             onConfirm={() => handleDelete(record.id)}
@@ -213,7 +384,7 @@ const AdminRoutingStrategies: React.FC = () => {
               danger
               icon={<DeleteOutlined />}
             >
-              删除
+              {!isMobile && '删除'}
             </Button>
           </Popconfirm>
         </Space>
@@ -234,19 +405,51 @@ const AdminRoutingStrategies: React.FC = () => {
         </Button>
       }
     >
-      <Table
-        columns={columns}
-        dataSource={strategies}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          ...pagination,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: (page, pageSize) =>
-            setPagination({ ...pagination, current: page, pageSize }),
-        }}
+      <Alert
+        message="策略说明"
+        description="默认策略是系统全局使用的路由策略。每个策略通过权重配置决定Provider选择偏好，重试和熔断器配置控制故障处理行为。"
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
       />
+
+      {isMobile ? (
+        <div>
+          {strategies.map((s) => mobileCard(s))}
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <Space>
+              <Button
+                disabled={pagination.current <= 1}
+                onClick={() => setPagination({ ...pagination, current: pagination.current - 1 })}
+              >
+                上一页
+              </Button>
+              <span>{pagination.current} / {Math.ceil(pagination.total / pagination.pageSize)}</span>
+              <Button
+                disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
+                onClick={() => setPagination({ ...pagination, current: pagination.current + 1 })}
+              >
+                下一页
+              </Button>
+            </Space>
+          </div>
+        </div>
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={strategies}
+          rowKey="id"
+          loading={loading}
+          scroll={{ x: 900 }}
+          pagination={{
+            ...pagination,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: (page, pageSize) =>
+              setPagination({ ...pagination, current: page, pageSize }),
+          }}
+        />
+      )}
 
       <Modal
         title={editingStrategy ? '编辑策略' : '新建策略'}
@@ -256,111 +459,273 @@ const AdminRoutingStrategies: React.FC = () => {
         width={800}
       >
         <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label="策略名称"
-            rules={[{ required: true, message: '请输入策略名称' }]}
-          >
-            <Input placeholder="请输入策略名称" />
-          </Form.Item>
-
-          <Form.Item
-            name="code"
-            label="策略编码"
-            rules={[{ required: true, message: '请输入策略编码' }]}
-          >
-            <Input placeholder="请输入策略编码" disabled={!!editingStrategy} />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="name"
+                label="策略名称"
+                rules={[{ required: true, message: '请输入策略名称' }]}
+              >
+                <Input placeholder="请输入策略名称" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="code"
+                label="策略编码"
+                rules={[{ required: true, message: '请输入策略编码' }]}
+              >
+                <Input placeholder="请输入策略编码" disabled={!!editingStrategy} />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Form.Item name="description" label="策略描述">
-            <Input.TextArea rows={3} placeholder="请输入策略描述" />
+            <Input.TextArea rows={2} placeholder="请输入策略描述" />
           </Form.Item>
 
-          <Form.Item label="权重配置（总和应为100%）">
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Form.Item name="price_weight" noStyle>
-                <div>
-                  <span>价格权重: </span>
-                  <Slider
-                    min={0}
-                    max={100}
-                    value={form.getFieldValue('price_weight') * 100}
-                    onChange={(value) => form.setFieldsValue({ price_weight: value / 100 })}
-                    style={{ width: 300, display: 'inline-block' }}
-                  />
-                  <span> {(form.getFieldValue('price_weight') * 100).toFixed(0)}%</span>
-                </div>
-              </Form.Item>
-              <Form.Item name="latency_weight" noStyle>
-                <div>
-                  <span>延迟权重: </span>
-                  <Slider
-                    min={0}
-                    max={100}
-                    value={form.getFieldValue('latency_weight') * 100}
-                    onChange={(value) => form.setFieldsValue({ latency_weight: value / 100 })}
-                    style={{ width: 300, display: 'inline-block' }}
-                  />
-                  <span> {(form.getFieldValue('latency_weight') * 100).toFixed(0)}%</span>
-                </div>
-              </Form.Item>
-              <Form.Item name="reliability_weight" noStyle>
-                <div>
-                  <span>可靠性权重: </span>
-                  <Slider
-                    min={0}
-                    max={100}
-                    value={form.getFieldValue('reliability_weight') * 100}
-                    onChange={(value) => form.setFieldsValue({ reliability_weight: value / 100 })}
-                    style={{ width: 300, display: 'inline-block' }}
-                  />
-                  <span> {(form.getFieldValue('reliability_weight') * 100).toFixed(0)}%</span>
-                </div>
-              </Form.Item>
-            </Space>
-          </Form.Item>
-
-          <Form.Item label="重试配置">
+          <Divider orientation="left">
             <Space>
-              <Form.Item name="max_retry_count" noStyle>
-                <div>
-                  <span>最大重试次数: </span>
-                  <InputNumber min={0} max={10} />
-                </div>
-              </Form.Item>
-              <Form.Item name="retry_backoff_base" noStyle>
-                <div>
-                  <span>退避基数(ms): </span>
-                  <InputNumber min={100} max={10000} step={100} />
-                </div>
-              </Form.Item>
+              权重配置
+              <Tooltip title="权重总和应为100%，决定Provider选择的偏好程度">
+                <InfoCircleOutlined style={{ color: '#1890ff' }} />
+              </Tooltip>
             </Space>
-          </Form.Item>
+          </Divider>
 
-          <Form.Item label="熔断器配置">
+          <Alert
+            message="预设策略模板"
+            description={
+              <Space wrap>
+                {Object.keys(STRATEGY_PRESETS).map((key) => (
+                  <Button key={key} size="small" onClick={() => applyPreset(key)}>
+                    {key === 'price_first' ? '价格优先' :
+                     key === 'latency_first' ? '延迟优先' :
+                     key === 'reliability_first' ? '可靠性优先' : '均衡策略'}
+                  </Button>
+                ))}
+              </Space>
+            }
+            type="info"
+            style={{ marginBottom: 16 }}
+          />
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item label={
+                <Space>
+                  价格权重
+                  <Tooltip title="价格优先策略建议: 60%">
+                    <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                  </Tooltip>
+                </Space>
+              }>
+                <Row gutter={16} align="middle">
+                  <Col flex="auto">
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={weightValues.price}
+                      onChange={(v) => handleWeightChange('price', v)}
+                    />
+                  </Col>
+                  <Col span={4}>
+                    <InputNumber
+                      min={0}
+                      max={100}
+                      value={weightValues.price}
+                      onChange={(v) => handleWeightChange('price', v || 0)}
+                      formatter={(v) => `${v}%`}
+                      parser={(v) => Number(v?.replace('%', '')) || 0}
+                    />
+                  </Col>
+                </Row>
+                <Form.Item name="price_weight" noStyle>
+                  <input type="hidden" />
+                </Form.Item>
+              </Form.Item>
+            </Col>
+
+            <Col span={24}>
+              <Form.Item label={
+                <Space>
+                  延迟权重
+                  <Tooltip title="延迟优先策略建议: 60%">
+                    <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                  </Tooltip>
+                </Space>
+              }>
+                <Row gutter={16} align="middle">
+                  <Col flex="auto">
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={weightValues.latency}
+                      onChange={(v) => handleWeightChange('latency', v)}
+                    />
+                  </Col>
+                  <Col span={4}>
+                    <InputNumber
+                      min={0}
+                      max={100}
+                      value={weightValues.latency}
+                      onChange={(v) => handleWeightChange('latency', v || 0)}
+                      formatter={(v) => `${v}%`}
+                      parser={(v) => Number(v?.replace('%', '')) || 0}
+                    />
+                  </Col>
+                </Row>
+                <Form.Item name="latency_weight" noStyle>
+                  <input type="hidden" />
+                </Form.Item>
+              </Form.Item>
+            </Col>
+
+            <Col span={24}>
+              <Form.Item label={
+                <Space>
+                  可靠性权重
+                  <Tooltip title="可靠性优先策略建议: 60%">
+                    <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                  </Tooltip>
+                </Space>
+              }>
+                <Row gutter={16} align="middle">
+                  <Col flex="auto">
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={weightValues.reliability}
+                      onChange={(v) => handleWeightChange('reliability', v)}
+                    />
+                  </Col>
+                  <Col span={4}>
+                    <InputNumber
+                      min={0}
+                      max={100}
+                      value={weightValues.reliability}
+                      onChange={(v) => handleWeightChange('reliability', v || 0)}
+                      formatter={(v) => `${v}%`}
+                      parser={(v) => Number(v?.replace('%', '')) || 0}
+                    />
+                  </Col>
+                </Row>
+                <Form.Item name="reliability_weight" noStyle>
+                  <input type="hidden" />
+                </Form.Item>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider orientation="left">
             <Space>
-              <Form.Item name="circuit_breaker_threshold" noStyle>
-                <div>
-                  <span>阈值(次): </span>
-                  <InputNumber min={1} max={20} />
-                </div>
-              </Form.Item>
-              <Form.Item name="circuit_breaker_timeout" noStyle>
-                <div>
-                  <span>超时时间(s): </span>
-                  <InputNumber min={10} max={300} />
-                </div>
-              </Form.Item>
+              重试配置
+              <Tooltip title="控制请求失败后的重试行为">
+                <InfoCircleOutlined style={{ color: '#1890ff' }} />
+              </Tooltip>
             </Space>
-          </Form.Item>
+          </Divider>
 
-          <Form.Item name="is_default" label="设为默认策略" valuePropName="checked">
-            <Switch />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item 
+                name="max_retry_count" 
+                label={
+                  <Space>
+                    最大重试次数
+                    <Tooltip title="建议: 均衡3次 / 延迟优先2次 / 可靠性优先5次">
+                      <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
+                <InputNumber min={0} max={10} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item 
+                name="retry_backoff_base" 
+                label={
+                  <Space>
+                    退避基数(ms)
+                    <Tooltip title="建议: 延迟优先500ms / 均衡1000ms / 可靠性优先2000ms">
+                      <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
+                <InputNumber min={100} max={10000} step={100} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
 
-          <Form.Item name="status" label="状态">
-            <Input disabled />
-          </Form.Item>
+          <Divider orientation="left">
+            <Space>
+              熔断器配置
+              <Tooltip title="控制故障Provider的熔断行为">
+                <InfoCircleOutlined style={{ color: '#1890ff' }} />
+              </Tooltip>
+            </Space>
+          </Divider>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item 
+                name="circuit_breaker_threshold" 
+                label={
+                  <Space>
+                    熔断阈值(次)
+                    <Tooltip title="连续失败多少次后熔断。建议: 延迟优先3次 / 均衡5次 / 可靠性优先3次">
+                      <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
+                <InputNumber min={1} max={20} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item 
+                name="circuit_breaker_timeout" 
+                label={
+                  <Space>
+                    熔断超时(s)
+                    <Tooltip title="熔断后多久尝试恢复。建议: 延迟优先30s / 均衡60s / 可靠性优先120s">
+                      <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
+                <InputNumber min={10} max={300} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider />
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item 
+                name="is_default" 
+                label={
+                  <Space>
+                    设为默认策略
+                    <Tooltip title="设为默认后，系统将使用此策略进行路由选择">
+                      <InfoCircleOutlined style={{ color: '#1890ff' }} />
+                    </Tooltip>
+                  </Space>
+                }
+                valuePropName="checked"
+              >
+                <Switch />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="status" label="状态">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </Card>
