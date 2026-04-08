@@ -16,6 +16,8 @@ import {
   Select,
   InputNumber,
   Switch,
+  Alert,
+  Skeleton,
 } from 'antd';
 import {
   FireOutlined,
@@ -28,7 +30,15 @@ import {
   FilterOutlined,
 } from '@ant-design/icons';
 import { useHomeStore } from '@/stores/homeStore';
+import { skuService } from '@/services/sku';
+import type { SKUWithSPU } from '@/types/sku';
 import { Product } from '@/types';
+import {
+  getProductCardSubtitle,
+  getSkuCardSubtitle,
+  pushRecentSearch,
+  readRecentSearches,
+} from '@/utils/productDisplay';
 import styles from './HomePage.module.css';
 
 const { Title, Text } = Typography;
@@ -79,8 +89,11 @@ const HomePage = () => {
     useHomeStore();
 
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
+  const [groupSkus, setGroupSkus] = useState<SKUWithSPU[]>([]);
+  const [groupSkusLoading, setGroupSkusLoading] = useState(false);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => readRecentSearches());
   const [filterForm] = Form.useForm();
 
   useEffect(() => {
@@ -88,10 +101,39 @@ const HomePage = () => {
   }, [fetchHomeData]);
 
   useEffect(() => {
-    if (hotProducts.length > 0 && newProducts.length > 0) {
-      const mixed = [...hotProducts.slice(0, 2), ...newProducts.slice(0, 2)];
-      setRecommendedProducts(mixed);
+    let cancelled = false;
+    setGroupSkusLoading(true);
+    skuService
+      .getPublicSKUs({
+        page: 1,
+        per_page: 4,
+        group_enabled: true,
+        sort: 'hot',
+      })
+      .then((res) => {
+        if (!cancelled) setGroupSkus(res.data.data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setGroupSkus([]);
+      })
+      .finally(() => {
+        if (!cancelled) setGroupSkusLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const seen = new Set<number>();
+    const mixed: Product[] = [];
+    for (const p of [...hotProducts, ...newProducts]) {
+      if (!seen.has(p.id)) {
+        seen.add(p.id);
+        mixed.push(p);
+      }
     }
+    setRecommendedProducts(mixed.slice(0, 8));
   }, [hotProducts, newProducts]);
 
   useEffect(() => {
@@ -103,6 +145,8 @@ const HomePage = () => {
   const handleSearch = (value: string) => {
     const q = value.trim();
     if (q) {
+      pushRecentSearch(q);
+      setRecentSearches(readRecentSearches());
       navigate(`/catalog?q=${encodeURIComponent(q)}`);
     }
   };
@@ -147,11 +191,15 @@ const HomePage = () => {
     return `¥${price.toFixed(2)}`;
   };
 
+  const coverImageUrl = (p: Product) => p.image_url || p.thumbnail_url;
+
   const renderProductCard = (product: Product, showGroupTag = false) => {
     const discount =
       product.original_price && product.original_price > product.price
         ? Math.round((1 - product.price / product.original_price) * 100)
         : 0;
+    const imgUrl = coverImageUrl(product);
+    const subtitle = getProductCardSubtitle(product);
 
     return (
       <Card
@@ -159,9 +207,19 @@ const HomePage = () => {
         className={styles.productCard}
         cover={
           <div className={styles.productImage}>
-            <div className={styles.productPlaceholder}>
-              <Text type="secondary">{product.name.substring(0, 2)}</Text>
-            </div>
+            {imgUrl ? (
+              <img
+                src={imgUrl}
+                alt=""
+                className={styles.productCoverImg}
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <div className={styles.productPlaceholder}>
+                <Text type="secondary">{product.name.substring(0, 2)}</Text>
+              </div>
+            )}
             {discount > 0 && (
               <Tag color="#ff4d4f" className={styles.discountTag}>
                 -{discount}%
@@ -180,6 +238,9 @@ const HomePage = () => {
           <Text className={styles.productName} ellipsis>
             {product.name}
           </Text>
+          <Text type="secondary" className={styles.productSubtitle} ellipsis>
+            {subtitle}
+          </Text>
           <div className={styles.priceRow}>
             <Text type="danger" strong className={styles.price}>
               {formatPrice(product.price)}
@@ -194,7 +255,77 @@ const HomePage = () => {
             <Text type="secondary" className={styles.soldCount}>
               已售 {product.sold_count || 0}
             </Text>
-            <Text type="secondary">库存 {product.stock}</Text>
+            <Text type="secondary">
+              {product.rating != null && product.rating > 0
+                ? `${product.rating.toFixed(1)}分`
+                : `库存 ${product.stock}`}
+            </Text>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  const renderGroupSkuCard = (sku: SKUWithSPU) => {
+    const discount =
+      sku.original_price && sku.original_price > sku.retail_price
+        ? Math.round((1 - sku.retail_price / sku.original_price) * 100)
+        : 0;
+    const imgUrl = sku.thumbnail_url;
+    const subtitle = getSkuCardSubtitle(sku);
+
+    return (
+      <Card
+        hoverable
+        className={styles.productCard}
+        cover={
+          <div className={styles.productImage}>
+            {imgUrl ? (
+              <img
+                src={imgUrl}
+                alt=""
+                className={styles.productCoverImg}
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <div className={styles.productPlaceholder}>
+                <Text type="secondary">{(sku.spu_name || sku.sku_code).substring(0, 2)}</Text>
+              </div>
+            )}
+            <Tag color="#52c41a" className={styles.groupTag}>
+              拼团
+            </Tag>
+            {discount > 0 && (
+              <Tag color="#ff4d4f" className={styles.discountTag}>
+                -{discount}%
+              </Tag>
+            )}
+          </div>
+        }
+        onClick={() => navigate(`/catalog/${sku.id}`)}
+      >
+        <div className={styles.productInfo}>
+          <Text className={styles.productName} ellipsis>
+            {sku.spu_name}
+          </Text>
+          <Text type="secondary" className={styles.productSubtitle} ellipsis>
+            {subtitle}
+          </Text>
+          <div className={styles.priceRow}>
+            <Text type="danger" strong className={styles.price}>
+              ¥{sku.retail_price.toFixed(2)}
+            </Text>
+            {sku.original_price && sku.original_price > sku.retail_price && (
+              <Text delete type="secondary" className={styles.originalPrice}>
+                ¥{sku.original_price.toFixed(2)}
+              </Text>
+            )}
+          </div>
+          <div className={styles.productMeta}>
+            <Text type="secondary" className={styles.soldCount}>
+              已售 {Number(sku.sales_count ?? 0).toLocaleString()}
+            </Text>
           </div>
         </div>
       </Card>
@@ -242,6 +373,14 @@ const HomePage = () => {
 
   return (
     <div className={styles.container}>
+      <Alert
+        type="info"
+        showIcon
+        className={styles.heroHint}
+        message="数字商品卖场"
+        description="提供 Token 包、订阅、并发套餐等虚拟商品；支付后到账至账户，可在「我的 Token」与 API 密钥中使用。"
+      />
+
       <div className={styles.searchSection}>
         <Space.Compact style={{ width: '100%', maxWidth: 720 }}>
           <Search
@@ -259,6 +398,27 @@ const HomePage = () => {
             筛选
           </Button>
         </Space.Compact>
+        {recentSearches.length > 0 && (
+          <div className={styles.recentSearch}>
+            <Text type="secondary" className={styles.recentLabel}>
+              最近搜索：
+            </Text>
+            <Space size={[8, 8]} wrap>
+              {recentSearches.slice(0, 6).map((q) => (
+                <Tag
+                  key={q}
+                  className={styles.recentTag}
+                  onClick={() => {
+                    setSearchKeyword(q);
+                    handleSearch(q);
+                  }}
+                >
+                  {q}
+                </Tag>
+              ))}
+            </Space>
+          </div>
+        )}
       </div>
 
       <Drawer
@@ -373,7 +533,7 @@ const HomePage = () => {
       <div className={styles.quickNavSection}>
         <Row gutter={[12, 12]}>
           {quickNavItems.map((item) => (
-            <Col span={6} key={item.key}>
+            <Col xs={12} sm={6} key={item.key}>
               <div className={styles.quickNavItem} onClick={() => handleQuickNavClick(item.link)}>
                 <div className={styles.quickNavIcon} style={{ background: item.color }}>
                   {item.icon}
@@ -406,7 +566,7 @@ const HomePage = () => {
           </div>
           <Row gutter={[12, 12]}>
             {categories.slice(0, 8).map((category) => (
-              <Col span={6} key={category.name}>
+              <Col xs={12} sm={6} md={6} key={category.name}>
                 <div
                   className={styles.categoryItem}
                   onClick={() => handleCategoryClick(category.name)}
@@ -422,49 +582,93 @@ const HomePage = () => {
         </div>
       )}
 
-      <Spin spinning={isLoading}>
-        {renderSection(
-          '热门推荐',
-          <FireOutlined style={{ color: '#ff4d4f' }} />,
-          hotProducts,
-          '/catalog?sort=hot'
-        )}
+      {isLoading && hotProducts.length === 0 ? (
+        <div className={styles.skeletonWrap}>
+          <Skeleton active paragraph={{ rows: 1 }} title={{ width: '40%' }} />
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            {[1, 2, 3, 4].map((k) => (
+              <Col xs={12} sm={8} md={6} lg={4} key={k}>
+                <Card>
+                  <Skeleton.Image active className={styles.skeletonImg} />
+                  <Skeleton active paragraph={{ rows: 2 }} style={{ marginTop: 12 }} />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </div>
+      ) : (
+        <Spin spinning={isLoading}>
+          {renderSection(
+            '热门推荐',
+            <FireOutlined style={{ color: '#ff4d4f' }} />,
+            hotProducts,
+            '/catalog?sort=hot'
+          )}
 
-        {renderSection(
-          '超值拼团',
-          <GiftOutlined style={{ color: '#52c41a' }} />,
-          hotProducts.slice(0, 4),
-          '/catalog?group_enabled=true',
-          true
-        )}
-
-        {renderSection(
-          '新品上架',
-          <ClockCircleOutlined style={{ color: '#1890ff' }} />,
-          newProducts,
-          '/catalog?sort=new'
-        )}
-
-        {recommendedProducts.length > 0 && (
-          <div className={styles.recommendedSection}>
+          <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <Space>
-                <StarOutlined style={{ color: '#faad14' }} />
+                <GiftOutlined style={{ color: '#52c41a' }} />
                 <Title level={4} className={styles.sectionTitle}>
-                  猜你喜欢
+                  超值拼团
                 </Title>
               </Space>
+              <Text
+                type="secondary"
+                className={styles.viewAll}
+                onClick={() => navigate('/catalog?group_enabled=true')}
+              >
+                查看全部 <RightOutlined />
+              </Text>
             </div>
-            <Row gutter={[16, 16]}>
-              {recommendedProducts.map((product) => (
-                <Col xs={12} sm={8} md={6} lg={4} key={`rec-${product.id}`}>
-                  {renderProductCard(product)}
-                </Col>
-              ))}
-            </Row>
+            <Spin spinning={groupSkusLoading}>
+              {groupSkus.length === 0 && !groupSkusLoading ? (
+                <Text type="secondary">暂无拼团商品，请前往卖场筛选「拼团」</Text>
+              ) : (
+                <Row gutter={[16, 16]}>
+                  {groupSkus.map((sku) => (
+                    <Col xs={12} sm={8} md={6} lg={4} key={`grp-${sku.id}`}>
+                      {renderGroupSkuCard(sku)}
+                    </Col>
+                  ))}
+                </Row>
+              )}
+            </Spin>
           </div>
-        )}
-      </Spin>
+
+          {renderSection(
+            '新品上架',
+            <ClockCircleOutlined style={{ color: '#1890ff' }} />,
+            newProducts,
+            '/catalog?sort=new'
+          )}
+
+          {recommendedProducts.length > 0 && (
+            <div className={styles.recommendedSection}>
+              <div className={styles.sectionHeader}>
+                <Space direction="vertical" size={0}>
+                  <Space>
+                    <StarOutlined style={{ color: '#faad14' }} />
+                    <Title level={4} className={styles.sectionTitle}>
+                      猜你喜欢
+                    </Title>
+                  </Space>
+                  <Text type="secondary" className={styles.recHint}>
+                    根据热销与新品为您组合推荐（去重展示）
+                  </Text>
+                </Space>
+              </div>
+              <Row gutter={[16, 16]}>
+                {recommendedProducts.map((product) => (
+                  <Col xs={12} sm={8} md={6} lg={4} key={`rec-${product.id}`}>
+                    {renderProductCard(product)}
+                  </Col>
+                ))}
+              </Row>
+            </div>
+          )}
+        </Spin>
+      )}
     </div>
   );
 };

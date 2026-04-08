@@ -21,6 +21,9 @@ export interface Product {
   stock: number;
   sold_count?: number;
   category?: string;
+  /** 列表/卡片主图（若后端返回） */
+  image_url?: string;
+  thumbnail_url?: string;
   status: 'active' | 'inactive' | 'archived';
   created_at: string;
   updated_at: string;
@@ -382,19 +385,19 @@ export interface MerchantAPIKey {
   last_used_at?: string;
   created_at: string;
   updated_at: string;
-  
+
   health_check_interval?: number;
   health_check_level?: 'high' | 'medium' | 'low' | 'daily';
   endpoint_url?: string;
   health_status?: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
   last_health_check_at?: string;
   consecutive_failures?: number;
-  
+
   verified_at?: string;
   verification_result?: 'success' | 'failed' | 'pending';
   verification_message?: string;
   models_supported?: string[];
-  
+
   cost_input_rate?: number;
   cost_output_rate?: number;
   profit_margin?: number;
