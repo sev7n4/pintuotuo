@@ -1,19 +1,19 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": [
     "FE-typecheck-catalog-pages",
     "FE-Jest-ProductList-ProductDetail",
     "FE-Jest-full-runInBand"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 212,
   "merged": false,
   "branch": "feature/catalog-pages-responsive-ux",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "pending",
-    "integration": "pending",
-    "e2e": "pending",
+    "cicd": "passed",
+    "integration": "passed",
+    "e2e": "passed",
     "deploy": "idle"
   },
   "error_history": [],
@@ -25,6 +25,7 @@
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
     "validation_note": "backend: go test ./...（unset GOMODCACHE/GOCACHE 避免沙箱缓存损坏）；frontend: npm run type-check；npm test -- --watchAll=false --runInBand 全量通过",
-    "next_action": "推送分支并 gh pr create --base main；Step10 监控 CI"
+    "next_action": "Step12：PR #212 需至少 1 人 Approve（reviewDecision=REVIEW_REQUIRED）；通过后 gh pr merge 212 --squash --delete-branch；再 Step13 观察部署",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/212"
   }
 }
