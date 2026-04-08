@@ -101,6 +101,34 @@ func loadActiveModelProviders() ([]models.ModelProvider, error) {
 	return providers, nil
 }
 
+// adminSPUListFilters builds WHERE for admin SPU list (table alias p).
+func adminSPUListFilters(status, provider, tier, q string) (where string, args []interface{}) {
+	parts := []string{"1=1"}
+	args = []interface{}{}
+	n := 1
+	if status != "" && status != allProductStatus {
+		parts = append(parts, fmt.Sprintf("p.status = $%d", n))
+		args = append(args, status)
+		n++
+	}
+	if provider != "" {
+		parts = append(parts, fmt.Sprintf("p.model_provider = $%d", n))
+		args = append(args, provider)
+		n++
+	}
+	if tier != "" {
+		parts = append(parts, fmt.Sprintf("p.model_tier = $%d", n))
+		args = append(args, tier)
+		n++
+	}
+	if q != "" {
+		pat := "%" + q + "%"
+		parts = append(parts, fmt.Sprintf("(p.spu_code ILIKE $%d OR p.name ILIKE $%d)", n, n+1))
+		args = append(args, pat, pat)
+	}
+	return strings.Join(parts, " AND "), args
+}
+
 func ListSPUs(c *gin.Context) {
 	if !ensureAdmin(c) {
 		return
@@ -111,6 +139,7 @@ func ListSPUs(c *gin.Context) {
 	provider := c.Query("provider")
 	tier := c.Query("tier")
 	status := c.DefaultQuery("status", "active")
+	q := strings.TrimSpace(c.Query("q"))
 
 	pageNum, _ := strconv.Atoi(page)
 	perPageNum, _ := strconv.Atoi(perPage)
@@ -123,7 +152,7 @@ func ListSPUs(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	cacheKey := cache.SPUListKey(pageNum, perPageNum, provider, tier, status)
+	cacheKey := cache.SPUListKey(pageNum, perPageNum, provider, tier, status, q)
 
 	if cachedList, err := cache.Get(ctx, cacheKey); err == nil {
 		var cachedData struct {
@@ -141,28 +170,18 @@ func ListSPUs(c *gin.Context) {
 	offset := (pageNum - 1) * perPageNum
 	db := config.GetDB()
 
-	query := "SELECT id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, base_compute_points, description, status, sort_order, total_sales_count, COALESCE(average_rating, 0), created_at, updated_at FROM spus WHERE 1=1"
-	args := []interface{}{}
-	argPos := 1
-
-	if status != "" && status != allProductStatus {
-		query += " AND status = $" + strconv.Itoa(argPos)
-		args = append(args, status)
-		argPos++
-	}
-	if provider != "" {
-		query += " AND model_provider = $" + strconv.Itoa(argPos)
-		args = append(args, provider)
-		argPos++
-	}
-	if tier != "" {
-		query += " AND model_tier = $" + strconv.Itoa(argPos)
-		args = append(args, tier)
-		argPos++
-	}
-
-	query += " ORDER BY sort_order ASC, created_at DESC LIMIT $" + strconv.Itoa(argPos) + " OFFSET $" + strconv.Itoa(argPos+1)
-	args = append(args, perPageNum, offset)
+	whereClause, baseArgs := adminSPUListFilters(status, provider, tier, q)
+	limPos := len(baseArgs) + 1
+	offPos := len(baseArgs) + 2
+	query := fmt.Sprintf(
+		`SELECT p.id, p.spu_code, p.name, p.model_provider, p.model_name, p.model_version, p.model_tier, p.context_window, p.base_compute_points, p.description, p.status, p.sort_order, p.total_sales_count, COALESCE(p.average_rating, 0),
+			(SELECT COUNT(*) FROM skus s WHERE s.spu_id = p.id),
+			(SELECT COUNT(*) FROM skus s WHERE s.spu_id = p.id AND s.status = 'active'),
+			p.created_at, p.updated_at
+		 FROM spus p WHERE %s ORDER BY p.sort_order ASC, p.created_at DESC LIMIT $%d OFFSET $%d`,
+		whereClause, limPos, offPos,
+	)
+	args := append(append([]interface{}{}, baseArgs...), perPageNum, offset)
 
 	rows, err := db.Query(query, args...)
 	if err != nil {
@@ -174,7 +193,7 @@ func ListSPUs(c *gin.Context) {
 	var spus []models.SPU
 	for rows.Next() {
 		var s models.SPU
-		err := rows.Scan(&s.ID, &s.SPUCode, &s.Name, &s.ModelProvider, &s.ModelName, &s.ModelVersion, &s.ModelTier, &s.ContextWindow, &s.BaseComputePoints, &s.Description, &s.Status, &s.SortOrder, &s.TotalSalesCount, &s.AverageRating, &s.CreatedAt, &s.UpdatedAt)
+		err := rows.Scan(&s.ID, &s.SPUCode, &s.Name, &s.ModelProvider, &s.ModelName, &s.ModelVersion, &s.ModelTier, &s.ContextWindow, &s.BaseComputePoints, &s.Description, &s.Status, &s.SortOrder, &s.TotalSalesCount, &s.AverageRating, &s.SkuCount, &s.ActiveSkuCount, &s.CreatedAt, &s.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -182,24 +201,9 @@ func ListSPUs(c *gin.Context) {
 		spus = append(spus, s)
 	}
 
-	countQuery := "SELECT COUNT(*) FROM spus WHERE 1=1"
-	countArgs := []interface{}{}
-
-	if status != "" && status != allProductStatus {
-		countQuery += " AND status = $" + strconv.Itoa(len(countArgs)+1)
-		countArgs = append(countArgs, status)
-	}
-	if provider != "" {
-		countQuery += " AND model_provider = $" + strconv.Itoa(len(countArgs)+1)
-		countArgs = append(countArgs, provider)
-	}
-	if tier != "" {
-		countQuery += " AND model_tier = $" + strconv.Itoa(len(countArgs)+1)
-		countArgs = append(countArgs, tier)
-	}
-
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM spus p WHERE %s", whereClause)
 	var total int
-	db.QueryRow(countQuery, countArgs...).Scan(&total)
+	db.QueryRow(countQuery, baseArgs...).Scan(&total)
 
 	result := gin.H{
 		"total":    total,
@@ -241,9 +245,12 @@ func GetSPUByID(c *gin.Context) {
 	db := config.GetDB()
 	var spu models.SPU
 	err := db.QueryRow(
-		"SELECT id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, max_output_tokens, base_compute_points, description, thumbnail_url, status, sort_order, total_sales_count, COALESCE(average_rating, 0), created_at, updated_at FROM spus WHERE id = $1",
+		`SELECT id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, max_output_tokens, base_compute_points, description, thumbnail_url, status, sort_order, total_sales_count, COALESCE(average_rating, 0),
+			(SELECT COUNT(*) FROM skus s WHERE s.spu_id = spus.id),
+			(SELECT COUNT(*) FROM skus s WHERE s.spu_id = spus.id AND s.status = 'active'),
+			created_at, updated_at FROM spus WHERE id = $1`,
 		spuID,
-	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.MaxOutputTokens, &spu.BaseComputePoints, &spu.Description, &spu.ThumbnailURL, &spu.Status, &spu.SortOrder, &spu.TotalSalesCount, &spu.AverageRating, &spu.CreatedAt, &spu.UpdatedAt)
+	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.MaxOutputTokens, &spu.BaseComputePoints, &spu.Description, &spu.ThumbnailURL, &spu.Status, &spu.SortOrder, &spu.TotalSalesCount, &spu.AverageRating, &spu.SkuCount, &spu.ActiveSkuCount, &spu.CreatedAt, &spu.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
@@ -930,7 +937,9 @@ func CreateSKU(c *gin.Context) {
 	}
 
 	ctx := context.Background()
+	cache.Delete(ctx, cache.SPUKey(req.SPUID))
 	cache.InvalidatePatterns(ctx, "skus:list:*")
+	cache.InvalidatePatterns(ctx, "spus:list:*")
 
 	c.JSON(http.StatusCreated, gin.H{"data": sku})
 }
@@ -987,7 +996,9 @@ func UpdateSKU(c *gin.Context) {
 
 	ctx := context.Background()
 	cache.Delete(ctx, cache.SKUKey(skuID))
+	cache.Delete(ctx, cache.SPUKey(sku.SPUID))
 	cache.InvalidatePatterns(ctx, "skus:list:*")
+	cache.InvalidatePatterns(ctx, "spus:list:*")
 
 	c.JSON(http.StatusOK, gin.H{"data": sku})
 }
@@ -1005,8 +1016,13 @@ func DeleteSKU(c *gin.Context) {
 	}
 
 	db := config.GetDB()
-	result, err := db.Exec("DELETE FROM skus WHERE id = $1", skuID)
+	var spuIDForCache int
+	err := db.QueryRow("DELETE FROM skus WHERE id = $1 RETURNING spu_id", skuID).Scan(&spuIDForCache)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+			return
+		}
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SKU_DELETE_FAILED",
 			"删除SKU失败",
@@ -1016,15 +1032,11 @@ func DeleteSKU(c *gin.Context) {
 		return
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-		return
-	}
-
 	ctx := context.Background()
 	cache.Delete(ctx, cache.SKUKey(skuID))
+	cache.Delete(ctx, cache.SPUKey(spuIDForCache))
 	cache.InvalidatePatterns(ctx, "skus:list:*")
+	cache.InvalidatePatterns(ctx, "spus:list:*")
 
 	c.JSON(http.StatusOK, gin.H{"message": "SKU deleted successfully"})
 }

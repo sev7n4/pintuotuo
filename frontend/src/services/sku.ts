@@ -18,6 +18,8 @@ export const skuService = {
     provider?: string;
     tier?: string;
     status?: string;
+    /** spu_code / name ILIKE */
+    q?: string;
   }) =>
     api.get<{ total: number; page: number; per_page: number; data: SPU[] }>('/admin/spus', {
       params,
