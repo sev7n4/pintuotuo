@@ -22,7 +22,7 @@ func ResolveOpenAICompatModel(db *sql.DB, model string) (provider string, modelN
 
 	modelLower := strings.ToLower(model)
 	if db == nil {
-		return "openai", model
+		return modelProviderOpenAI, model
 	}
 
 	rows, err := db.Query(`
@@ -30,7 +30,7 @@ func ResolveOpenAICompatModel(db *sql.DB, model string) (provider string, modelN
 		FROM model_providers
 		WHERE status = 'active' AND cardinality(compat_prefixes) > 0`)
 	if err != nil {
-		return "openai", model
+		return modelProviderOpenAI, model
 	}
 	defer rows.Close()
 
@@ -56,5 +56,5 @@ func ResolveOpenAICompatModel(db *sql.DB, model string) (provider string, modelN
 	if bestCode != "" {
 		return bestCode, model
 	}
-	return "openai", model
+	return modelProviderOpenAI, model
 }

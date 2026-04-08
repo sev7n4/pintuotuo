@@ -54,9 +54,6 @@ const (
 	MaxVerificationRetries     = 3
 	RetryDelayBase             = 2 * time.Second
 	VerificationInterval       = 24 * time.Hour
-
-	// modelProviderOpenAI 同时对应 model_providers.code / api_format 默认值与探针分支
-	modelProviderOpenAI = "openai"
 )
 
 var (
