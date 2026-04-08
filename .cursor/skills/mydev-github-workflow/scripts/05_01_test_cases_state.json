@@ -1,30 +1,41 @@
 {
   "currentIssue": {
-    "id": "ADMIN-SKU-CREATE-500-001",
-    "type": "bugfix",
-    "module": "admin skus",
-    "branch": "fix/admin-sku-create-500",
-    "title": "SKU 创建 subscription_period 空串 500 与前端错误提示"
+    "id": "OPENAI-COMPAT-QUOTA-001",
+    "type": "fix",
+    "module": "api_proxy / openai_compat / merchant_apikey",
+    "branch": "fix/openai-compat-quota-verify-routing",
+    "title": "配额 NULL、compat_prefixes 解析、深度验证 OpenAI 格式"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-BE-VALIDATE-SKU-CREATE",
-        "name": "validateSKUCreateRequest and sqlNullableString for subscription_period",
-        "feature": "CreateSKU",
+        "id": "UT-OPENAI-COMPAT-RESOLVE",
+        "name": "services.ResolveOpenAICompatModel slash + DB prefixes + default",
         "status": "passed",
-        "file": "backend/handlers/sku_create_validate_test.go"
+        "file": "backend/services/openai_compat_resolve_test.go"
+      },
+      {
+        "id": "UT-HANDLERS-SHORT",
+        "name": "handlers package go test -short",
+        "status": "passed",
+        "file": "backend/handlers"
+      },
+      {
+        "id": "FE-MERCHANT-QUOTA-UX",
+        "name": "MerchantAPIKeys.test.tsx",
+        "status": "passed",
+        "file": "frontend/src/pages/merchant/__tests__/MerchantAPIKeys.test.tsx"
       }
     ],
     "integration": [],
     "e2e": []
   },
   "statistics": {
-    "total": 1,
-    "passed": 1,
+    "total": 3,
+    "passed": 3,
     "failed": 0,
     "pending": 0
   },
-  "lastUpdated": "2026-04-07T17:00:00Z",
-  "workflowNote": "PR #206 merged；部署 run 24091351933 success"
+  "lastUpdated": "2026-04-08T15:40:00Z",
+  "workflowNote": "TDD：先补 ResolveOpenAICompatModel 单测与迁移种子前缀，再改 handler 与配额 SQL。"
 }

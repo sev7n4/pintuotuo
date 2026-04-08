@@ -46,7 +46,7 @@ export const merchantService = {
     provider: string;
     api_key: string;
     api_secret?: string;
-    quota_limit?: number;
+    quota_limit?: number | null;
   }) => api.post<MerchantAPIKey>('/merchants/api-keys', data),
 
   updateAPIKey: (id: number, data: Partial<MerchantAPIKey>) =>
