@@ -46,7 +46,7 @@ import type { SKUWithSPU } from '@/types/sku';
 import { normalizeGroupDiscountRate } from '@/utils/groupDiscount';
 import styles from './ProductDetailPage.module.css';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
 const { useBreakpoint } = Grid;
 
@@ -882,13 +882,39 @@ export const ProductDetailPage: React.FC = () => {
 
               <Divider />
 
-              <Title level={5}>使用指南</Title>
+              <Title level={5}>使用指南（商品级）</Title>
+              <Paragraph type="secondary" style={{ marginBottom: 12 }}>
+                以下为通用说明；您实际享有的模型名与调用示例以购买后「我的服务 → 我的 Token」中「本接口调用说明」为准。
+              </Paragraph>
               <ol style={{ paddingLeft: 20 }}>
-                <li>购买成功后，Token将自动充值到您的账户</li>
-                <li>在"我的Token"页面可以查看余额和使用记录</li>
-                <li>支持通过API调用使用Token</li>
-                <li>可在"API密钥管理"创建和管理API密钥</li>
+                <li>购买成功后，Token 将按规则充值到您的账户（以订单为准）</li>
+                <li>在「我的 Token」可查看余额、创建平台 API 密钥（ptd_ 前缀）</li>
+                <li>支持 OpenAI 兼容路径：将 Base URL 设为平台提供的地址，请求体中填写 model（可用「厂商/模型」或兼容前缀匹配）</li>
+                <li>流式（stream）是否开放以平台公告为准</li>
               </ol>
+              {selectedSKU && (
+                <>
+                  <Divider />
+                  <Title level={5}>本商品规格参考（非最终权益）</Title>
+                  <ul style={{ paddingLeft: 20 }}>
+                    <li>
+                      厂商代码（provider）：<Text code>{selectedSKU.model_provider}</Text>
+                    </li>
+                    <li>
+                      模型名参考：{' '}
+                      <Text code>
+                        {selectedSKU.provider_model_id?.trim() || selectedSKU.model_name}
+                      </Text>
+                      {selectedSKU.provider_model_id?.trim() ? (
+                        <Text type="secondary">（SPU 配置的 provider_model_id）</Text>
+                      ) : null}
+                    </li>
+                    <li>
+                      OpenAI 兼容示例：<Text code>{`${selectedSKU.model_provider}/${selectedSKU.provider_model_id?.trim() || selectedSKU.model_name}`}</Text>
+                    </li>
+                  </ul>
+                </>
+              )}
 
               {skus.length > 1 && (
                 <>

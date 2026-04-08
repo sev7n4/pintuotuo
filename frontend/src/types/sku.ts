@@ -5,6 +5,8 @@ export interface ModelProvider {
   api_base_url?: string;
   api_format: string;
   billing_type?: string;
+  /** OpenAI 兼容入口：无前缀 model 名按最长前缀匹配到本厂商 */
+  compat_prefixes?: string[];
   cache_enabled: boolean;
   cache_discount_rate?: number;
   status: string;
@@ -132,6 +134,8 @@ export interface SKU {
   updated_at: string;
   model_provider?: string;
   model_name?: string;
+  /** 上游 model 参数示例，优先于 model_name */
+  provider_model_id?: string;
   model_tier?: string;
   /** SPU 维度累计销量（公开列表/详情由后端 JOIN 返回） */
   spu_total_sales_count?: number;

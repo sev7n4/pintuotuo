@@ -39,6 +39,7 @@ const AdminModelProviders = () => {
       billing_type: 'flat',
       status: 'active',
       sort_order: 0,
+      compat_prefixes: [],
     });
     setModalVisible(true);
   };
@@ -53,6 +54,7 @@ const AdminModelProviders = () => {
       billing_type: record.billing_type ?? '',
       status: record.status,
       sort_order: record.sort_order,
+      compat_prefixes: record.compat_prefixes?.length ? record.compat_prefixes : [],
     });
     setModalVisible(true);
   };
@@ -69,6 +71,9 @@ const AdminModelProviders = () => {
           billing_type: values.billing_type ? String(values.billing_type).trim() : undefined,
           status: values.status,
           sort_order: values.sort_order as number,
+          compat_prefixes: Array.isArray(values.compat_prefixes)
+            ? (values.compat_prefixes as string[]).map((s) => String(s).trim()).filter(Boolean)
+            : undefined,
         });
         message.success('已创建');
       } else {
@@ -80,6 +85,9 @@ const AdminModelProviders = () => {
           billing_type: values.billing_type || undefined,
           status: values.status,
           sort_order: values.sort_order,
+          compat_prefixes: Array.isArray(values.compat_prefixes)
+            ? (values.compat_prefixes as string[]).map((s) => String(s).trim()).filter(Boolean)
+            : [],
         });
         message.success('已保存');
       }
@@ -112,6 +120,15 @@ const AdminModelProviders = () => {
       key: 'api_base_url',
       ellipsis: true,
       render: (v: string) => v || '—',
+    },
+    {
+      title: '兼容前缀',
+      dataIndex: 'compat_prefixes',
+      key: 'compat_prefixes',
+      width: 160,
+      ellipsis: true,
+      render: (v: string[] | undefined) =>
+        v && v.length > 0 ? v.join(', ') : <span style={{ color: '#999' }}>—</span>,
     },
     {
       title: 'API 格式',
@@ -222,6 +239,13 @@ const AdminModelProviders = () => {
           </Form.Item>
           <Form.Item name="api_format" label="API 格式" rules={[{ required: true }]}>
             <Select options={apiFormatOptions} placeholder="选择格式" />
+          </Form.Item>
+          <Form.Item
+            name="compat_prefixes"
+            label="OpenAI 兼容前缀（无前缀 model 名匹配）"
+            tooltip="小写字母/数字/点/下划线/连字符；用于 /openai/v1 下仅写模型名时路由到本厂商。可多个，最长匹配优先。"
+          >
+            <Select mode="tags" placeholder="输入后回车添加，如 deepseek、glm-" tokenSeparators={[',']} />
           </Form.Item>
           <Form.Item name="billing_type" label="计费类型">
             <Input placeholder="可选，默认 flat" />

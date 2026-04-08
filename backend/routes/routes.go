@@ -171,6 +171,8 @@ func RegisterTokenRoutes(router *gin.RouterGroup) {
 			keys.PUT("/:id", handlers.UpdateAPIKey)
 			keys.DELETE("/:id", handlers.DeleteAPIKey)
 		}
+
+		tokens.GET("/api-usage-guide", handlers.GetAPIUsageGuide)
 	}
 
 	router.POST("/tokens/recharge/callback", handlers.HandleRechargeCallback)

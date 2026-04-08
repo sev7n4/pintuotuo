@@ -31,7 +31,8 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import { useTokenStore } from '@/stores/tokenStore';
-import { UserAPIKey, RechargeOrder } from '@/types';
+import { tokenService } from '@/services/token';
+import { UserAPIKey, RechargeOrder, APIUsageGuideResponse } from '@/types';
 import styles from './MyToken.module.css';
 
 const { TabPane } = Tabs;
@@ -79,6 +80,8 @@ const MyToken = () => {
   const [transferForm] = Form.useForm();
   const [rechargeForm] = Form.useForm();
   const [newKeyDisplay, setNewKeyDisplay] = useState<string | null>(null);
+  const [usageGuide, setUsageGuide] = useState<APIUsageGuideResponse | null>(null);
+  const [usageGuideLoading, setUsageGuideLoading] = useState(false);
 
   useEffect(() => {
     fetchBalance();
@@ -86,6 +89,25 @@ const MyToken = () => {
     fetchAPIKeys();
     fetchRechargeOrders();
   }, [fetchBalance, fetchTransactions, fetchAPIKeys, fetchRechargeOrders]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setUsageGuideLoading(true);
+      try {
+        const res = await tokenService.getAPIUsageGuide();
+        const payload = res.data?.data;
+        if (!cancelled && payload) setUsageGuide(payload);
+      } catch {
+        if (!cancelled) setUsageGuide(null);
+      } finally {
+        if (!cancelled) setUsageGuideLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleCreateKey = async () => {
     try {
@@ -493,6 +515,48 @@ const MyToken = () => {
             }
             key="apikeys"
           >
+            <Card
+              size="small"
+              title="本接口调用说明（基于您的订阅与订单）"
+              loading={usageGuideLoading}
+              style={{ marginBottom: 16 }}
+            >
+              {usageGuide && usageGuide.items.length > 0 ? (
+                <>
+                  <Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                    {usageGuide.disclaimer}
+                  </Paragraph>
+                  <ul style={{ paddingLeft: 20, marginBottom: 8 }}>
+                    {usageGuide.items.map((it, idx) => (
+                      <li key={`${it.provider_code}-${it.model_example}-${idx}`}>
+                        <Text strong>{it.provider_code}</Text>：请求体{' '}
+                        <Text code>model</Text> 可写{' '}
+                        <Text code>{it.provider_slash_example || `${it.provider_code}/${it.model_example}`}</Text>
+                        {it.spu_name ? (
+                          <>
+                            {' '}
+                           （来源：{it.source === 'subscription' ? '订阅' : '订单'}
+                            {it.spu_name ? ` · ${it.spu_name}` : ''}
+                            {it.sku_code ? ` / ${it.sku_code}` : ''}）
+                          </>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                  {usageGuide.default_model_example ? (
+                    <Paragraph style={{ marginBottom: 0 }}>
+                      默认示例 <Text code>model</Text>：<Text code>{usageGuide.default_model_example}</Text>
+                    </Paragraph>
+                  ) : null}
+                </>
+              ) : (
+                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                  {usageGuideLoading
+                    ? '加载中…'
+                    : '暂无有效订阅或已支付订单对应的模型示例；购买套餐后此处将展示与您权益一致的 model 写法。'}
+                </Paragraph>
+              )}
+            </Card>
             <Paragraph type="secondary" className={styles.hintParagraph}>
               此处生成的是本平台调用接口用的访问密钥（前缀一般为 <Text code>ptd_</Text>
               ），用于请求拼坨陀 API（含模型代理等），
@@ -503,8 +567,7 @@ const MyToken = () => {
               <strong>OpenAI 兼容：</strong>在支持自定义 Base URL 的客户端中，将 Base URL 设为{' '}
               <Text code>{openAICompatBase}</Text>，API Key 填本平台密钥；请求{' '}
               <Text code>POST /chat/completions</Text>。 模型可写 <Text code>厂商/模型</Text>（如{' '}
-              <Text code>zhipu/glm-4-flash</Text>）或常见模型名（如 <Text code>gpt-3.5-turbo</Text>
-              ，将按名称推断厂商）。流式（stream）暂未支持。
+              <Text code>zhipu/glm-4-flash</Text>）或无前缀模型名（将按平台配置的兼容前缀推断厂商）。流式（stream）暂未支持。
             </Paragraph>
             <div className={styles.tabHeader}>
               <Button
