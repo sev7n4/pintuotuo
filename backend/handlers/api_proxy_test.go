@@ -201,15 +201,6 @@ func TestShouldUseSmartRouting(t *testing.T) {
 	assert.False(t, shouldUseSmartRouting(1, "req-1"))
 }
 
-func TestSelectedRoutingStrategyCode(t *testing.T) {
-	_ = os.Unsetenv("SMART_ROUTING_STRATEGY")
-	code := selectedRoutingStrategyCode()
-	assert.NotEmpty(t, code)
-
-	t.Setenv("SMART_ROUTING_STRATEGY", "latency_first")
-	assert.Equal(t, "latency_first", selectedRoutingStrategyCode())
-}
-
 func TestBuildRetryPolicy(t *testing.T) {
 	policy := buildRetryPolicy(buildStrategyRuntimeSnapshot(""))
 	assert.NotNil(t, policy)
@@ -249,11 +240,11 @@ func TestBuildRoutingDecisionPayload(t *testing.T) {
 	assert.Contains(t, parsed, "strategy_runtime")
 	assert.NotContains(t, parsed, "effective_policy_source")
 
-	withSrc := buildRoutingDecisionPayload(candidates, snapshot, "env")
+	withSrc := buildRoutingDecisionPayload(candidates, snapshot, policySourceEnv)
 	var parsed2 map[string]any
 	err = json.Unmarshal(withSrc, &parsed2)
 	assert.NoError(t, err)
-	assert.Equal(t, "env", parsed2["effective_policy_source"])
+	assert.Equal(t, policySourceEnv, parsed2["effective_policy_source"])
 }
 
 func TestParseRoutingDecisionPayload(t *testing.T) {
@@ -274,12 +265,12 @@ func TestRoutingStrategyWithSource(t *testing.T) {
 	t.Setenv("SMART_ROUTING_STRATEGY", "cost_first")
 	code, src := routingStrategyWithSource()
 	assert.Equal(t, "cost_first", code)
-	assert.Equal(t, "env", src)
+	assert.Equal(t, policySourceEnv, src)
 
 	_ = os.Unsetenv("SMART_ROUTING_STRATEGY")
 	code, src = routingStrategyWithSource()
 	assert.NotEmpty(t, code)
-	assert.Contains(t, []string{"db", "default"}, src)
+	assert.Contains(t, []string{policySourceDB, policySourceDefault}, src)
 }
 
 func TestSummarizeRoutingCandidatesForTrace(t *testing.T) {
@@ -293,9 +284,9 @@ func TestSummarizeRoutingCandidatesForTrace(t *testing.T) {
 }
 
 func TestNormalizeEffectivePolicySource(t *testing.T) {
-	assert.Equal(t, "env", normalizeEffectivePolicySource("env"))
-	assert.Equal(t, "db", normalizeEffectivePolicySource("db"))
-	assert.Equal(t, "default", normalizeEffectivePolicySource("default"))
-	assert.Equal(t, "default", normalizeEffectivePolicySource(""))
-	assert.Equal(t, "default", normalizeEffectivePolicySource("legacy"))
+	assert.Equal(t, policySourceEnv, normalizeEffectivePolicySource(policySourceEnv))
+	assert.Equal(t, policySourceDB, normalizeEffectivePolicySource(policySourceDB))
+	assert.Equal(t, policySourceDefault, normalizeEffectivePolicySource(policySourceDefault))
+	assert.Equal(t, policySourceDefault, normalizeEffectivePolicySource(""))
+	assert.Equal(t, policySourceDefault, normalizeEffectivePolicySource("legacy"))
 }

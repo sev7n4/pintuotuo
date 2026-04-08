@@ -29,6 +29,13 @@ import (
 
 const providerAnthropic = "anthropic"
 
+// 路由策略来源（trace / 落库 effective_policy_source，与 JSON 对外字段一致）
+const (
+	policySourceEnv     = "env"
+	policySourceDB      = "db"
+	policySourceDefault = "default"
+)
+
 type providerRuntimeConfig struct {
 	Code       string
 	Name       string
@@ -559,18 +566,13 @@ func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string) sm
 func routingStrategyWithSource() (code string, source string) {
 	code = strings.TrimSpace(os.Getenv("SMART_ROUTING_STRATEGY"))
 	if code != "" {
-		return code, "env"
+		return code, policySourceEnv
 	}
 	code = strings.TrimSpace(services.GetSmartRouter().GetDefaultStrategyCode())
 	if code != "" {
-		return code, "db"
+		return code, policySourceDB
 	}
-	return string(services.RoutingStrategyBalanced), "default"
-}
-
-func selectedRoutingStrategyCode() string {
-	code, _ := routingStrategyWithSource()
-	return code
+	return string(services.RoutingStrategyBalanced), policySourceDefault
 }
 
 func shouldUseSmartRouting(userID int, requestID string) bool {
@@ -638,7 +640,7 @@ func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request,
 			}
 		}
 
-		resp, err = client.Do(req)
+		resp, err = client.Do(req) // #nosec G704 -- upstream URL from admin-configured model_providers.api_base_url, not user-supplied host
 		if err == nil && resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < http.StatusInternalServerError {
 			return resp, nil
 		}
@@ -811,10 +813,10 @@ func summarizeRoutingCandidatesForTrace(candidatesJSON json.RawMessage) (int, *t
 // normalizeEffectivePolicySource 将 trace 展示的 policy 来源限定为 env / db / default（无落库或非三者之一时视为 default）
 func normalizeEffectivePolicySource(stored string) string {
 	switch strings.TrimSpace(stored) {
-	case "env", "db", "default":
+	case policySourceEnv, policySourceDB, policySourceDefault:
 		return strings.TrimSpace(stored)
 	default:
-		return "default"
+		return policySourceDefault
 	}
 }
 
