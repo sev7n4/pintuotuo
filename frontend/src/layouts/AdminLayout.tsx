@@ -17,7 +17,7 @@ import {
   ThunderboltOutlined,
   WalletOutlined,
   DollarOutlined,
-  RouteOutlined,
+  BranchesOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -62,7 +62,7 @@ const menuItems = [
   },
   {
     key: '/admin/routing-strategies',
-    icon: <RouteOutlined />,
+    icon: <BranchesOutlined />,
     label: '路由策略',
   },
   {
