@@ -151,3 +151,6 @@ alipay_config.txt
 app_private_key.pem
 app_public_key.pem
 *.pem
+
+# Cursor Agent skill: local workflow state (不纳入版本管理)
+.cursor/skills/mydev-github-workflow/scripts/00_01_workflow_state.json
