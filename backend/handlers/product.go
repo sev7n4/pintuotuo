@@ -568,10 +568,10 @@ func GetHomeData(c *gin.Context) {
 	}
 
 	homeData := map[string]interface{}{
-		"banners":              banners,
-		"hot":                  hotProducts,
-		"new":                  newProducts,
-		"categories":           categories,
+		"banners":             banners,
+		"hot":                 hotProducts,
+		"new":                 newProducts,
+		"categories":          categories,
 		"scenario_categories": scenarioCategories,
 	}
 
