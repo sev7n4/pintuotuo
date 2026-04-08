@@ -401,4 +401,14 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 	{
 		adminDisputes.POST("/:id/process", handlers.AdminProcessDispute)
 	}
+
+	adminRoutingStrategies := router.Group("/admin/routing-strategies")
+	adminRoutingStrategies.Use(middleware.AuthMiddleware())
+	{
+		adminRoutingStrategies.GET("", handlers.AdminGetRoutingStrategies)
+		adminRoutingStrategies.GET("/:id", handlers.AdminGetRoutingStrategy)
+		adminRoutingStrategies.POST("", handlers.AdminCreateRoutingStrategy)
+		adminRoutingStrategies.PUT("/:id", handlers.AdminUpdateRoutingStrategy)
+		adminRoutingStrategies.DELETE("/:id", handlers.AdminDeleteRoutingStrategy)
+	}
 }
