@@ -109,7 +109,7 @@ func GetAPIUsageGuide(c *gin.Context) {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	if err := appendRows(subRows, "subscription"); err != nil {
+	if appendErr := appendRows(subRows, "subscription"); appendErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
@@ -127,13 +127,13 @@ func GetAPIUsageGuide(c *gin.Context) {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	if err := appendRows(orderRows, "order"); err != nil {
+	if appendErr := appendRows(orderRows, "order"); appendErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 
 	out := APIUsageGuideResponse{
-		Items: items,
+		Items:      items,
 		Disclaimer: "以下为根据您当前有效订阅与已支付订单汇总的模型调用示例；实际以路由与商户可用密钥为准。也可使用「厂商代码/模型名」形式显式指定上游。",
 	}
 	if len(items) > 0 {

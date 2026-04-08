@@ -1305,14 +1305,14 @@ func CreateModelProvider(c *gin.Context) {
 	}
 
 	var req struct {
-		Code             string   `json:"code" binding:"required"`
-		Name             string   `json:"name" binding:"required"`
-		APIBaseURL       string   `json:"api_base_url"`
-		APIFormat        string   `json:"api_format"`
-		BillingType      string   `json:"billing_type"`
-		Status           string   `json:"status"`
-		SortOrder        int      `json:"sort_order"`
-		CompatPrefixes   []string `json:"compat_prefixes"`
+		Code           string   `json:"code" binding:"required"`
+		Name           string   `json:"name" binding:"required"`
+		APIBaseURL     string   `json:"api_base_url"`
+		APIFormat      string   `json:"api_format"`
+		BillingType    string   `json:"billing_type"`
+		Status         string   `json:"status"`
+		SortOrder      int      `json:"sort_order"`
+		CompatPrefixes []string `json:"compat_prefixes"`
 	}
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
@@ -1415,13 +1415,13 @@ func PatchModelProvider(c *gin.Context) {
 	}
 
 	var req struct {
-		Name             *string   `json:"name"`
-		APIBaseURL       *string   `json:"api_base_url"`
-		APIFormat        *string   `json:"api_format"`
-		BillingType      *string   `json:"billing_type"`
-		Status           *string   `json:"status"`
-		SortOrder        *int      `json:"sort_order"`
-		CompatPrefixes   *[]string `json:"compat_prefixes"`
+		Name           *string   `json:"name"`
+		APIBaseURL     *string   `json:"api_base_url"`
+		APIFormat      *string   `json:"api_format"`
+		BillingType    *string   `json:"billing_type"`
+		Status         *string   `json:"status"`
+		SortOrder      *int      `json:"sort_order"`
+		CompatPrefixes *[]string `json:"compat_prefixes"`
 	}
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
