@@ -740,7 +740,7 @@ export const ProductDetailPage: React.FC = () => {
 
         <Divider />
 
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Space direction="vertical" size="large" style={{ width: '100%', maxWidth: '100%' }}>
           <div>
             <span>购买数量: </span>
             <InputNumber
@@ -755,7 +755,7 @@ export const ProductDetailPage: React.FC = () => {
             </Text>
           </div>
 
-          <Space style={{ width: '100%' }} size="middle">
+          <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
             {purchaseMode === 'single' ? (
               <Button
                 type="primary"
@@ -763,17 +763,17 @@ export const ProductDetailPage: React.FC = () => {
                 icon={<ShoppingCartOutlined />}
                 onClick={handleAddToCart}
                 disabled={product.stock === 0}
-                style={{ flex: 1 }}
+                block
               >
                 {product.stock === 0 ? '暂无库存' : '加入购物车'}
               </Button>
             ) : (
-              <Space style={{ flex: 1, display: 'flex', gap: 8 }} direction="vertical">
+              <Space style={{ width: '100%' }} direction="vertical" size="middle">
                 <Card
                   size="small"
                   style={{ width: '100%', background: '#f6ffed', borderColor: '#b7eb8f' }}
                 >
-                  <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <Space style={{ width: '100%', justifyContent: 'space-between' }} wrap>
                     <Text>当前可加入团数：{activeGroups.length}</Text>
                     <Text type="success">
                       拼团每人最高省 ¥
@@ -783,7 +783,7 @@ export const ProductDetailPage: React.FC = () => {
                     </Text>
                   </Space>
                 </Card>
-                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                <Space style={{ width: '100%' }} wrap size="small">
                   <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
                     <Button
                       type="primary"
@@ -805,7 +805,12 @@ export const ProductDetailPage: React.FC = () => {
                     icon={<TeamOutlined />}
                     onClick={handleGroupPurchase}
                     disabled={product.stock === 0 || groupPrices.length === 0}
-                    style={{ flex: 1, background: '#1890ff', borderColor: '#1890ff' }}
+                    style={{
+                      flex: '1 1 200px',
+                      minWidth: 0,
+                      background: '#1890ff',
+                      borderColor: '#1890ff',
+                    }}
                   >
                     {product.stock === 0
                       ? '暂无库存'
@@ -816,13 +821,40 @@ export const ProductDetailPage: React.FC = () => {
                 </Space>
               </Space>
             )}
-            <Button size="large" icon={<ShareAltOutlined />} onClick={handleShare}>
-              分享
-            </Button>
-            <Button size="large" onClick={() => navigate('/cart')}>
-              查看购物车
-            </Button>
-          </Space>
+
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                marginTop: 12,
+                width: '100%',
+                maxWidth: '100%',
+              }}
+            >
+              <Button
+                size="large"
+                icon={<ShareAltOutlined />}
+                onClick={handleShare}
+                style={{
+                  flex: screens.xs ? '1 1 calc(50% - 4px)' : '1 1 auto',
+                  minWidth: 0,
+                }}
+              >
+                分享
+              </Button>
+              <Button
+                size="large"
+                onClick={() => navigate('/cart')}
+                style={{
+                  flex: screens.xs ? '1 1 calc(50% - 4px)' : '1 1 auto',
+                  minWidth: 0,
+                }}
+              >
+                {screens.xs ? '购物车' : '查看购物车'}
+              </Button>
+            </div>
+          </div>
         </Space>
       </Card>
 

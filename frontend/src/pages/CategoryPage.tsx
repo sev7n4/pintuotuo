@@ -1,106 +1,60 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Card, Row, Col, Input, Tag, List, Empty, Spin } from 'antd';
-import {
-  SearchOutlined,
-  AppstoreOutlined,
-  CodeOutlined,
-  EyeOutlined,
-  ThunderboltOutlined,
-  ApiOutlined,
-} from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { Card, Row, Col, Input, Empty, Spin, Typography } from 'antd';
+import { SearchOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { productService } from '@/services/product';
+import type { Category as ApiCategory } from '@/types';
 import styles from './CategoryPage.module.css';
 
-interface Category {
-  id: string;
-  name: string;
-  icon: React.ReactNode;
-  color: string;
-  description: string;
-  count: number;
-}
+const { Title, Text } = Typography;
 
 const CategoryPage = () => {
+  const navigate = useNavigate();
   const [searchText, setSearchText] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<any[]>([]);
-
-  const categories: Category[] = [
-    {
-      id: 'llm',
-      name: '大模型',
-      icon: <AppstoreOutlined />,
-      color: '#1890ff',
-      description: 'GPT、Claude、Gemini等大语言模型',
-      count: 15,
-    },
-    {
-      id: 'code',
-      name: '编码模型',
-      icon: <CodeOutlined />,
-      color: '#52c41a',
-      description: '代码生成、代码补全模型',
-      count: 8,
-    },
-    {
-      id: 'vision',
-      name: '视觉模型',
-      icon: <EyeOutlined />,
-      color: '#722ed1',
-      description: '图像生成、图像识别模型',
-      count: 12,
-    },
-    {
-      id: 'audio',
-      name: '音频模型',
-      icon: <ThunderboltOutlined />,
-      color: '#faad14',
-      description: '语音合成、语音识别模型',
-      count: 6,
-    },
-    {
-      id: 'embedding',
-      name: '嵌入模型',
-      icon: <ApiOutlined />,
-      color: '#eb2f96',
-      description: '文本嵌入、向量检索模型',
-      count: 10,
-    },
-  ];
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        const response = await productService.listProducts({
-          category: selectedCategory || undefined,
-        });
-        setProducts(response.data?.data?.data || []);
-      } catch {
-        setProducts([]);
-      } finally {
-        setLoading(false);
-      }
+    let cancelled = false;
+    setLoading(true);
+    productService
+      .getCategories()
+      .then((res) => {
+        const body = res.data as { data?: ApiCategory[] };
+        if (!cancelled) setCategories(body?.data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
     };
-    fetchProducts();
-  }, [selectedCategory]);
+  }, []);
 
-  const filteredProducts = products.filter((product: any) => {
-    const matchesSearch =
-      !searchText ||
-      product.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchText.toLowerCase());
-    return matchesSearch;
+  const filteredCategories = categories.filter((c) => {
+    if (!searchText.trim()) return true;
+    const q = searchText.toLowerCase();
+    return c.name.toLowerCase().includes(q);
   });
+
+  const goCatalog = (categoryName: string) => {
+    navigate(`/catalog?category=${encodeURIComponent(categoryName)}`);
+  };
 
   return (
     <div className={styles.categoryPage}>
       <div className={styles.header}>
-        <h1 className={styles.title}>商品分类</h1>
+        <Title level={3} className={styles.title}>
+          商品分类
+        </Title>
+        <Text type="secondary" className={styles.subtitle}>
+          与首页、卖场使用同一套分类数据；点选进入 SKU 列表。
+        </Text>
         <Input
-          placeholder="搜索商品..."
+          placeholder="筛选分类名称..."
           prefix={<SearchOutlined />}
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
@@ -109,74 +63,35 @@ const CategoryPage = () => {
         />
       </div>
 
-      <Row gutter={[16, 16]} className={styles.categoryGrid}>
-        {categories.map((category) => (
-          <Col xs={12} sm={8} md={6} lg={4} key={category.id}>
-            <Card
-              hoverable
-              className={`${styles.categoryCard} ${selectedCategory === category.id ? styles.categoryCardActive : ''}`}
-              onClick={() =>
-                setSelectedCategory(selectedCategory === category.id ? null : category.id)
-              }
-            >
-              <div className={styles.categoryContent}>
-                <div
-                  className={styles.categoryIcon}
-                  style={{ backgroundColor: category.color + '20', color: category.color }}
-                >
-                  {category.icon}
-                </div>
-                <h3 className={styles.categoryName}>{category.name}</h3>
-                <p className={styles.categoryDesc}>{category.description}</p>
-                <Tag color={category.color}>{category.count} 款</Tag>
-              </div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
-      <Card
-        className={styles.productSection}
-        title={
-          selectedCategory
-            ? `${categories.find((c) => c.id === selectedCategory)?.name || ''}商品`
-            : '全部商品'
-        }
-      >
-        {loading ? (
-          <div className={styles.loading}>
-            <Spin />
-          </div>
-        ) : filteredProducts.length > 0 ? (
-          <List
-            grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 4, xl: 4, xxl: 6 }}
-            dataSource={filteredProducts}
-            renderItem={(product: any) => (
-              <List.Item>
-                <Link to={`/catalog/${product.id}`}>
-                  <Card hoverable className={styles.productCard}>
-                    <div className={styles.productImage}>
-                      {product.image_url ? (
-                        <img src={product.image_url} alt={product.name} />
-                      ) : (
-                        <div className={styles.productPlaceholder}>
-                          <AppstoreOutlined />
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.productInfo}>
-                      <h4 className={styles.productName}>{product.name}</h4>
-                      <p className={styles.productPrice}>¥{product.price?.toFixed(2) || '0.00'}</p>
-                    </div>
-                  </Card>
-                </Link>
-              </List.Item>
-            )}
-          />
+      <Spin spinning={loading}>
+        {filteredCategories.length === 0 && !loading ? (
+          <Empty description="暂无分类数据" />
         ) : (
-          <Empty description="暂无商品" />
+          <Row gutter={[16, 16]} className={styles.categoryGrid}>
+            {filteredCategories.map((category) => (
+              <Col xs={12} sm={8} md={6} lg={4} key={category.name}>
+                <Card
+                  hoverable
+                  className={styles.categoryCard}
+                  onClick={() => goCatalog(category.name)}
+                >
+                  <div className={styles.categoryContent}>
+                    <div className={styles.categoryIcon}>
+                      <AppstoreOutlined />
+                    </div>
+                    <Text strong className={styles.categoryName}>
+                      {category.name}
+                    </Text>
+                    <Text type="secondary" className={styles.categoryMeta}>
+                      {category.count} 件在售
+                    </Text>
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
         )}
-      </Card>
+      </Spin>
     </div>
   );
 };

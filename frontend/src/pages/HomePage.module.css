@@ -8,6 +8,12 @@
   margin-bottom: 16px;
 }
 
+.heroHintCompact {
+  margin-bottom: 12px;
+  padding: 0 2px;
+  font-size: 13px;
+}
+
 .recentSearch {
   margin-top: 12px;
   display: flex;
@@ -66,40 +72,64 @@
 
 .quickNavSection {
   margin-bottom: 16px;
-  padding: 16px;
+  padding: 12px 8px;
   background: #fff;
   border-radius: 8px;
 }
 
-.quickNavItem {
+.quickNavScroll {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
+  flex-direction: row;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
-.quickNavItem:hover {
+.quickNavScroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.quickNavPill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid #f0f0f0;
+  border-radius: 999px;
+  background: #fafafa;
+  cursor: pointer;
+  font: inherit;
+  color: rgba(0, 0, 0, 0.85);
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.quickNavPill:hover {
+  border-color: #d9d9d9;
   background: #f5f5f5;
 }
 
-.quickNavIcon {
-  width: 48px;
-  height: 48px;
+.quickNavIconMuted {
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 20px;
-  margin-bottom: 8px;
+  background: rgba(22, 119, 255, 0.12);
+  color: #1677ff;
+  font-size: 16px;
 }
 
 .quickNavName {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   color: #333;
+  white-space: nowrap;
 }
 
 .bannerCarousel {
@@ -246,8 +276,62 @@
   margin-bottom: 12px;
 }
 
+.categoryHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
 .categoryTitle {
   margin: 0 !important;
+}
+
+.allCategoriesLink {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.allCategoriesLink:hover {
+  color: #1677ff;
+}
+
+.categoryChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.categoryChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  color: rgba(0, 0, 0, 0.85);
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+.categoryChip:hover {
+  border-color: #91caff;
+  color: #1677ff;
+}
+
+.categoryChipName {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.categoryChipCount {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .productInfo {

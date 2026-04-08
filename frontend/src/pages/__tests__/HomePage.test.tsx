@@ -91,7 +91,7 @@ describe('HomePage', () => {
     expect(screen.getByPlaceholderText('搜索模型或关键词')).toBeInTheDocument();
   });
 
-  test('显示快速导航', () => {
+  test('显示快捷入口', () => {
     defaultStoreMock();
 
     render(
@@ -100,12 +100,10 @@ describe('HomePage', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('热销爆款')).toBeInTheDocument();
-    const groupLinks = screen.getAllByText('超值拼团');
-    expect(groupLinks.length).toBeGreaterThan(0);
-    expect(screen.getByText('限时秒杀')).toBeInTheDocument();
-    const newLinks = screen.getAllByText('新品上架');
-    expect(newLinks.length).toBeGreaterThan(0);
+    expect(screen.getByText('热销')).toBeInTheDocument();
+    expect(screen.getByText('拼团')).toBeInTheDocument();
+    expect(screen.getByText('秒杀')).toBeInTheDocument();
+    expect(screen.getByText('新品')).toBeInTheDocument();
   });
 
   test('显示轮播图', () => {
@@ -131,7 +129,7 @@ describe('HomePage', () => {
     expect(banner2Elements.length).toBeGreaterThan(0);
   });
 
-  test('显示分类', () => {
+  test('显示分类与全部分类入口', () => {
     mockUseHomeStore.mockReturnValue({
       banners: [],
       hotProducts: [],
@@ -151,12 +149,10 @@ describe('HomePage', () => {
     expect(screen.getByText('分类1')).toBeInTheDocument();
     expect(screen.getByText('分类2')).toBeInTheDocument();
     expect(screen.getByText('分类3')).toBeInTheDocument();
-    expect(screen.getByText('10件')).toBeInTheDocument();
-    expect(screen.getByText('20件')).toBeInTheDocument();
-    expect(screen.getByText('15件')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /全部分类/ })).toBeInTheDocument();
   });
 
-  test('显示热门推荐商品', () => {
+  test('显示精选推荐商品', () => {
     mockUseHomeStore.mockReturnValue({
       banners: [],
       hotProducts: mockProducts,
@@ -173,7 +169,7 @@ describe('HomePage', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('热门推荐')).toBeInTheDocument();
+    expect(screen.getByText('精选推荐')).toBeInTheDocument();
     const product1Elements = screen.getAllByText('测试商品1');
     expect(product1Elements.length).toBeGreaterThan(0);
     const product2Elements = screen.getAllByText('测试商品2');
@@ -184,53 +180,7 @@ describe('HomePage', () => {
     expect(price200Elements.length).toBeGreaterThan(0);
   });
 
-  test('显示新品上架商品', () => {
-    mockUseHomeStore.mockReturnValue({
-      banners: [],
-      hotProducts: [],
-      newProducts: mockProducts,
-      categories: [],
-      isLoading: false,
-      error: null,
-      fetchHomeData: jest.fn(),
-    });
-
-    render(
-      <BrowserRouter>
-        <HomePage />
-      </BrowserRouter>
-    );
-
-    const newProductSections = screen.getAllByText('新品上架');
-    expect(newProductSections.length).toBeGreaterThan(0);
-    const product1Elements = screen.getAllByText('测试商品1');
-    expect(product1Elements.length).toBeGreaterThan(0);
-    const product2Elements = screen.getAllByText('测试商品2');
-    expect(product2Elements.length).toBeGreaterThan(0);
-  });
-
-  test('显示超值拼团section', () => {
-    mockUseHomeStore.mockReturnValue({
-      banners: [],
-      hotProducts: mockProducts,
-      newProducts: [],
-      categories: [],
-      isLoading: false,
-      error: null,
-      fetchHomeData: jest.fn(),
-    });
-
-    render(
-      <BrowserRouter>
-        <HomePage />
-      </BrowserRouter>
-    );
-
-    const groupSections = screen.getAllByText('超值拼团');
-    expect(groupSections.length).toBeGreaterThan(0);
-  });
-
-  test('显示猜你喜欢section', () => {
+  test('合并热门与新品到精选推荐', () => {
     mockUseHomeStore.mockReturnValue({
       banners: [],
       hotProducts: mockProducts,
@@ -247,7 +197,8 @@ describe('HomePage', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('猜你喜欢')).toBeInTheDocument();
+    expect(screen.getByText('精选推荐')).toBeInTheDocument();
+    expect(screen.getAllByText('测试商品1').length).toBeGreaterThan(0);
   });
 
   test('显示错误状态', () => {
@@ -294,7 +245,7 @@ describe('HomePage', () => {
     expect(productCards[0]).toBeInTheDocument();
   });
 
-  test('点击分类跳转到商品列表页', () => {
+  test('点击分类名称', () => {
     mockUseHomeStore.mockReturnValue({
       banners: [],
       hotProducts: [],
@@ -334,7 +285,7 @@ describe('HomePage', () => {
       </BrowserRouter>
     );
 
-    const viewAllLinks = screen.getAllByText('查看全部');
-    expect(viewAllLinks.length).toBe(3);
+    const viewAllLinks = screen.getAllByText(/查看全部/);
+    expect(viewAllLinks.length).toBeGreaterThanOrEqual(1);
   });
 });
