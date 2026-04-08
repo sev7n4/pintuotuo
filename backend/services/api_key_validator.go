@@ -54,6 +54,9 @@ const (
 	MaxVerificationRetries     = 3
 	RetryDelayBase             = 2 * time.Second
 	VerificationInterval       = 24 * time.Hour
+
+	// modelProviderOpenAI 同时对应 model_providers.code / api_format 默认值与探针分支
+	modelProviderOpenAI = "openai"
 )
 
 var (
@@ -172,7 +175,7 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 
 	if isDeepVerification(verificationType) {
 		apiFmt := strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
-		probeSupported := apiFmt == "openai"
+		probeSupported := apiFmt == modelProviderOpenAI
 		result.PricingVerified = probeSupported
 		if probeSupported {
 			quotaOK, quotaCode, quotaMsg := v.probeQuota(providerConfig, provider, decryptedKey, models)
@@ -505,9 +508,9 @@ func (v *APIKeyValidator) getProviderConfig(provider string) (map[string]string,
 
 	var apiBaseURL, apiFormat string
 	err := db.QueryRow(
-		`SELECT COALESCE(api_base_url, ''), COALESCE(NULLIF(trim(api_format), ''), 'openai')
-		 FROM model_providers WHERE code = $1 AND status = 'active'`,
-		provider,
+		`SELECT COALESCE(api_base_url, ''), COALESCE(NULLIF(trim(api_format), ''), $1)
+		 FROM model_providers WHERE code = $2 AND status = 'active'`,
+		modelProviderOpenAI, provider,
 	).Scan(&apiBaseURL, &apiFormat)
 
 	if err != nil {
@@ -630,7 +633,7 @@ func selectProbeModel(provider string, models []string) string {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "zhipu":
 		return "glm-4"
-	case "openai":
+	case modelProviderOpenAI:
 		return "gpt-4o-mini"
 	case "anthropic":
 		return "claude-3-5-sonnet-20241022"

@@ -227,7 +227,7 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		return
 	}
 	var patch map[string]json.RawMessage
-	if err := json.Unmarshal(bodyBytes, &patch); err != nil {
+	if patchErr := json.Unmarshal(bodyBytes, &patch); patchErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
@@ -248,7 +248,7 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		if strings.TrimSpace(string(raw)) == "null" {
 			unlimitedQuota = true
 		} else {
-			if err := json.Unmarshal(raw, &quotaVal); err != nil {
+			if qErr := json.Unmarshal(raw, &quotaVal); qErr != nil {
 				middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 				return
 			}
