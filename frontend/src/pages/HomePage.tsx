@@ -70,8 +70,16 @@ const quickNavItems: QuickNav[] = [
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const { banners, hotProducts, newProducts, categories, isLoading, error, fetchHomeData } =
-    useHomeStore();
+  const {
+    banners,
+    hotProducts,
+    newProducts,
+    categories,
+    scenarioCategories,
+    isLoading,
+    error,
+    fetchHomeData,
+  } = useHomeStore();
 
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -106,8 +114,12 @@ const HomePage = () => {
     navigate(`/catalog/${productId}`);
   };
 
-  const handleCategoryClick = (category: string) => {
-    navigate(`/catalog?category=${encodeURIComponent(category)}`);
+  const handleScenarioNavigate = (code: string) => {
+    navigate(`/catalog?scenario=${encodeURIComponent(code)}`);
+  };
+
+  const handleTierNavigate = (tierName: string) => {
+    navigate(`/catalog?tier=${encodeURIComponent(tierName)}`);
   };
 
   const formatPrice = (price: number) => {
@@ -144,7 +156,7 @@ const HomePage = () => {
               </div>
             )}
             {discount > 0 && (
-              <Tag color="#ff4d4f" className={styles.discountTag}>
+              <Tag className={styles.discountTag} bordered={false}>
                 -{discount}%
               </Tag>
             )}
@@ -277,7 +289,7 @@ const HomePage = () => {
         </Carousel>
       )}
 
-      {categories.length > 0 && (
+      {(scenarioCategories.length > 0 || categories.length > 0) && (
         <div className={styles.categorySection}>
           <div className={styles.categoryHeaderRow}>
             <Title level={5} className={styles.categoryTitle}>
@@ -287,19 +299,46 @@ const HomePage = () => {
               全部分类 <RightOutlined />
             </Link>
           </div>
-          <div className={styles.categoryChips}>
-            {categories.map((category) => (
-              <button
-                type="button"
-                key={category.name}
-                className={styles.categoryChip}
-                onClick={() => handleCategoryClick(category.name)}
-              >
-                <span className={styles.categoryChipName}>{category.name}</span>
-                <span className={styles.categoryChipCount}>{category.count}</span>
-              </button>
-            ))}
-          </div>
+          {scenarioCategories.length > 0 && (
+            <>
+              <Text type="secondary" className={styles.categoryGroupLabel}>
+                使用场景
+              </Text>
+              <div className={styles.categoryChips}>
+                {scenarioCategories.map((s) => (
+                  <button
+                    type="button"
+                    key={s.code}
+                    className={styles.categoryChip}
+                    onClick={() => handleScenarioNavigate(s.code)}
+                  >
+                    <span className={styles.categoryChipName}>{s.name}</span>
+                    <span className={styles.categoryChipCount}>{s.count}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {categories.length > 0 && (
+            <>
+              <Text type="secondary" className={styles.categoryGroupLabel}>
+                模型层级
+              </Text>
+              <div className={styles.categoryChips}>
+                {categories.map((category) => (
+                  <button
+                    type="button"
+                    key={category.name}
+                    className={`${styles.categoryChip} ${styles.categoryChipSubtle}`}
+                    onClick={() => handleTierNavigate(category.name)}
+                  >
+                    <span className={styles.categoryChipName}>{category.name}</span>
+                    <span className={styles.categoryChipCount}>{category.count}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -322,7 +361,7 @@ const HomePage = () => {
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <Space>
-                <FireOutlined style={{ color: '#ff4d4f' }} />
+                <FireOutlined className={styles.sectionIconMuted} />
                 <Title level={4} className={styles.sectionTitle}>
                   精选推荐
                 </Title>

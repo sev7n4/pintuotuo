@@ -2,6 +2,7 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 16px;
+  background: #fafafa;
 }
 
 .heroHint {
@@ -233,16 +234,17 @@
 .productPlaceholder {
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #ececec;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid #f0f0f0;
 }
 
 .productPlaceholder span {
-  color: #fff;
-  font-size: 24px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 20px;
   font-weight: 600;
 }
 
@@ -250,6 +252,16 @@
   position: absolute;
   top: 8px;
   right: 8px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.65);
+  background: rgba(255, 255, 255, 0.92) !important;
+}
+
+.sectionIconMuted {
+  color: rgba(0, 0, 0, 0.35);
+  font-size: 18px;
 }
 
 .groupTag {
@@ -332,6 +344,27 @@
 .categoryChipCount {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
+}
+
+.categoryGroupLabel {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 8px;
+  margin-top: 4px;
+}
+
+.categoryGroupLabel:first-of-type {
+  margin-top: 0;
+}
+
+.categoryChipSubtle {
+  background: #fafafa;
+  border-color: #f5f5f5;
+}
+
+.categoryChipSubtle:hover {
+  border-color: #d9d9d9;
+  color: rgba(0, 0, 0, 0.85);
 }
 
 .productInfo {

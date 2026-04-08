@@ -749,7 +749,7 @@ export const ProductListPage: React.FC = () => {
         </Col>
       </Row>
 
-      <ScenarioFilter />
+      <ScenarioFilter variant={sortParam === 'hot' ? 'rail' : 'panel'} />
 
       {filterChips.length > 0 && (
         <div className={styles.chipRow}>

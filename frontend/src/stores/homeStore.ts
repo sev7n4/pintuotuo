@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Product, Category, Banner, APIResponse } from '@/types';
+import { Product, Category, Banner, APIResponse, ScenarioCategoryItem } from '@/types';
 import { productService } from '@/services/product';
 
 interface HomeState {
@@ -7,6 +7,7 @@ interface HomeState {
   hotProducts: Product[];
   newProducts: Product[];
   categories: Category[];
+  scenarioCategories: ScenarioCategoryItem[];
   isLoading: boolean;
   error: string | null;
 
@@ -22,6 +23,7 @@ export const useHomeStore = create<HomeState>((set) => ({
   hotProducts: [],
   newProducts: [],
   categories: [],
+  scenarioCategories: [],
   isLoading: false,
   error: null,
 
@@ -35,6 +37,7 @@ export const useHomeStore = create<HomeState>((set) => ({
         hotProducts: data.hot || [],
         newProducts: data.new || [],
         categories: data.categories || [],
+        scenarioCategories: data.scenario_categories || [],
         isLoading: false,
       });
     } catch (error) {
