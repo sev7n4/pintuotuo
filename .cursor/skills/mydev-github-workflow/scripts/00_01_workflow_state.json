@@ -1,12 +1,12 @@
 {
-  "current_step": 9,
+  "current_step": 10,
   "current_fix_cases": [
     "UT-BE-sku_admin_list_filters",
     "UT-BE-ResolveAdminSKUListScope",
     "FE-typecheck-AdminSKUs"
   ],
   "retry_count": 0,
-  "pr_number": null,
+  "pr_number": 209,
   "merged": false,
   "branch": "feature/admin-sku-list-ops-clarity",
   "local_validation": "passed",
@@ -25,7 +25,7 @@
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
     "validation_note": "backend: GOMODCACHE 指向可写目录时 go test ./handlers/...；frontend: npm run type-check",
-    "next_action": "push branch and open PR; monitor CI",
-    "pr_url": null
+    "next_action": "monitor CI/CD → Integration → E2E per skill",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/209"
   }
 }
