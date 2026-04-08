@@ -1,0 +1,57 @@
+.railWrap {
+  margin-bottom: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.railScroll {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+
+.railChip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  min-height: 36px;
+  border: 1px solid #f0f0f0;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.85);
+  box-sizing: border-box;
+}
+
+.railChip:hover {
+  border-color: #d9d9d9;
+  color: #1677ff;
+}
+
+.railChipActive {
+  border-color: #1677ff;
+  color: #1677ff;
+  background: rgba(22, 119, 255, 0.06);
+}
+
+.railIcon {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.railChipActive .railIcon {
+  color: #1677ff;
+}
+
+.panelCard {
+  margin-bottom: 16px;
+}

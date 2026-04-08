@@ -5,6 +5,8 @@ import { useProductStore } from '@/stores/productStore';
 import { useCartStore } from '@/stores/cartStore';
 import { useGroupStore } from '@/stores/groupStore';
 
+jest.mock('../ProductDetailPage.module.css', () => ({}));
+
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useParams: jest.fn(),
@@ -224,9 +226,12 @@ describe('ProductDetailPage', () => {
       expect(screen.getByText('测试商品')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('这是一个测试商品')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByText('商品介绍')[0]);
+    await waitFor(() => {
+      expect(screen.getByText('这是一个测试商品')).toBeInTheDocument();
+    });
     expect(screen.getByText('定价信息')).toBeInTheDocument();
-    expect(screen.getByText('优惠权益')).toBeInTheDocument();
+    expect(screen.getByText('商品介绍')).toBeInTheDocument();
     expect(screen.getByText('单独购买')).toBeInTheDocument();
     expect(screen.getByText('拼团购买')).toBeInTheDocument();
   });

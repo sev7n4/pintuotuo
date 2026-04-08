@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '@/services/api';
+import styles from './ScenarioFilter.module.css';
 
 interface UsageScenario {
   id: number;
@@ -46,7 +47,13 @@ const scenarioColorMap: Record<string, string> = {
   reasoning: '#faad14',
 };
 
-export const ScenarioFilter: React.FC = () => {
+export type ScenarioFilterVariant = 'panel' | 'rail';
+
+interface ScenarioFilterProps {
+  variant?: ScenarioFilterVariant;
+}
+
+export const ScenarioFilter: React.FC<ScenarioFilterProps> = ({ variant = 'panel' }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [scenarios, setScenarios] = useState<UsageScenario[]>([]);
@@ -87,9 +94,17 @@ export const ScenarioFilter: React.FC = () => {
     }
   };
 
+  if (loading && variant === 'rail') {
+    return (
+      <div className={styles.railWrap}>
+        <Spin size="small" />
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <Card style={{ marginBottom: 16 }}>
+      <Card className={styles.panelCard}>
         <Spin tip="加载场景分类...">
           <div style={{ height: 80 }} />
         </Spin>
@@ -101,8 +116,37 @@ export const ScenarioFilter: React.FC = () => {
     return null;
   }
 
+  if (variant === 'rail') {
+    return (
+      <div className={styles.railWrap} role="toolbar" aria-label="使用场景筛选">
+        <div className={styles.railScroll}>
+          {scenarios.map((scenario) => {
+            const isActive = activeScenario === scenario.code;
+            const icon = scenarioIconMap[scenario.code] || <BulbOutlined />;
+            return (
+              <button
+                key={scenario.id}
+                type="button"
+                className={`${styles.railChip} ${isActive ? styles.railChipActive : ''}`}
+                onClick={() => handleScenarioClick(scenario.code)}
+                title={
+                  scenario.spu_count != null && scenario.spu_count > 0
+                    ? `${scenario.name}（${scenario.spu_count} 款 SPU）`
+                    : scenario.name
+                }
+              >
+                <span className={styles.railIcon}>{icon}</span>
+                <span>{scenario.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Card title="使用场景" style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 16px' }}>
+    <Card title="使用场景" className={styles.panelCard} bodyStyle={{ padding: '12px 16px' }}>
       <Row gutter={[12, 12]}>
         {scenarios.map((scenario) => {
           const isActive = activeScenario === scenario.code;

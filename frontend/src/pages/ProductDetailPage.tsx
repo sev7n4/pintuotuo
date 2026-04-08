@@ -44,6 +44,7 @@ import { skuService } from '@services/sku';
 import type { Product, GroupPrice, Group } from '@/types';
 import type { SKUWithSPU } from '@/types/sku';
 import { normalizeGroupDiscountRate } from '@/utils/groupDiscount';
+import styles from './ProductDetailPage.module.css';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -339,33 +340,6 @@ export const ProductDetailPage: React.FC = () => {
     return parts.join(' · ');
   };
 
-  const getPromotionHighlights = () => {
-    const sku = selectedSKU;
-    if (!sku) return [];
-    const promoLabels: string[] = [];
-    const dynamic = sku as SKUWithSPU & {
-      promotion_labels?: string[];
-      coupons?: Array<{ name?: string }>;
-      new_user_offer?: string;
-      full_reduction?: string;
-    };
-    if (Array.isArray(dynamic.promotion_labels)) promoLabels.push(...dynamic.promotion_labels);
-    if (Array.isArray(dynamic.coupons)) {
-      dynamic.coupons.forEach((coupon) => {
-        if (coupon?.name) promoLabels.push(coupon.name);
-      });
-    }
-    if (dynamic.new_user_offer) promoLabels.push(dynamic.new_user_offer);
-    if (dynamic.full_reduction) promoLabels.push(dynamic.full_reduction);
-    if (sku.original_price && sku.original_price > sku.retail_price) {
-      promoLabels.push(`直降 ¥${(sku.original_price - sku.retail_price).toFixed(2)}`);
-    }
-    if (sku.group_enabled) {
-      promoLabels.push(`支持${sku.min_group_size}-${sku.max_group_size}人拼团`);
-    }
-    return Array.from(new Set(promoLabels)).slice(0, 4);
-  };
-
   if (error) {
     return <Empty description={`错误: ${error}`} />;
   }
@@ -409,15 +383,12 @@ export const ProductDetailPage: React.FC = () => {
 
   const pagePadding = screens.xs ? 12 : 20;
 
+  const primaryTitle = selectedSKU?.spu_name || product.name;
+  const subtitle =
+    selectedSKU?.spu_name && product.name !== selectedSKU.spu_name ? product.name : null;
+
   return (
-    <div
-      style={{
-        padding: pagePadding,
-        maxWidth: 900,
-        margin: '0 auto',
-        boxSizing: 'border-box',
-      }}
-    >
+    <div className={styles.page} style={{ padding: pagePadding }}>
       <Space style={{ marginBottom: '20px' }}>
         <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/catalog')}>
           返回列表
@@ -428,16 +399,9 @@ export const ProductDetailPage: React.FC = () => {
         <Row gutter={[24, 24]}>
           <Col xs={24} md={12}>
             <div
+              className={styles.heroMedia}
               style={{
-                background: '#f5f5f5',
-                borderRadius: 8,
                 height: screens.xs ? 220 : 300,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 16,
-                overflow: 'hidden',
-                position: 'relative',
               }}
             >
               {coverSrc ? (
@@ -456,7 +420,17 @@ export const ProductDetailPage: React.FC = () => {
           </Col>
 
           <Col xs={24} md={12}>
-            <Title level={3}>{product.name}</Title>
+            <Title level={3} style={{ marginBottom: 8 }}>
+              {primaryTitle}
+            </Title>
+            {subtitle ? (
+              <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+                {subtitle}
+              </Text>
+            ) : null}
+            {selectedSKU?.sku_code ? (
+              <Tag style={{ marginBottom: 12 }}>{selectedSKU.sku_code}</Tag>
+            ) : null}
             <Space style={{ marginBottom: 16 }} wrap>
               <Tag color="blue">已售 {displaySoldCount.toLocaleString()} 件</Tag>
               <Tag color="gold">
@@ -471,36 +445,56 @@ export const ProductDetailPage: React.FC = () => {
               </Tag>
             </Space>
 
-            <div style={{ marginBottom: 16 }}>
-              <Text type="secondary">{product.description}</Text>
-            </div>
-
-            <Divider style={{ margin: '12px 0' }} />
-
-            <div style={{ marginBottom: 16 }}>
-              <Space direction="vertical" size="small">
-                {product.token_count && (
-                  <Text>
-                    包含：<Text strong>{(product.token_count / 10000).toFixed(0)}万 Token</Text>
-                  </Text>
-                )}
-                {product.models && product.models.length > 0 && (
-                  <Text>
-                    模型：<Text strong>{product.models.join(', ')}</Text>
-                  </Text>
-                )}
-                {product.validity_period && (
-                  <Text>
-                    有效期：<Text strong>{product.validity_period}</Text>
-                  </Text>
-                )}
-                {product.context_length && (
-                  <Text>
-                    上下文：<Text strong>{product.context_length}</Text>
-                  </Text>
-                )}
-              </Space>
-            </div>
+            <Collapse
+              bordered={false}
+              size="small"
+              style={{ background: 'transparent', marginBottom: 8 }}
+              items={[
+                {
+                  key: 'intro',
+                  label: '商品介绍',
+                  children: (
+                    <Text type="secondary">
+                      {product.description?.trim() || '暂无介绍'}
+                    </Text>
+                  ),
+                },
+                {
+                  key: 'spec',
+                  label: '规格参数',
+                  children: (
+                    <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                      {product.token_count ? (
+                        <Text>
+                          包含：<Text strong>{(product.token_count / 10000).toFixed(0)}万 Token</Text>
+                        </Text>
+                      ) : null}
+                      {product.models && product.models.length > 0 ? (
+                        <Text>
+                          模型：<Text strong>{product.models.join(', ')}</Text>
+                        </Text>
+                      ) : null}
+                      {product.validity_period ? (
+                        <Text>
+                          有效期：<Text strong>{product.validity_period}</Text>
+                        </Text>
+                      ) : null}
+                      {product.context_length ? (
+                        <Text>
+                          上下文：<Text strong>{product.context_length}</Text>
+                        </Text>
+                      ) : null}
+                      {!product.token_count &&
+                      !(product.models && product.models.length) &&
+                      !product.validity_period &&
+                      !product.context_length ? (
+                        <Text type="secondary">暂无结构化规格，可在下方详情查看。</Text>
+                      ) : null}
+                    </Space>
+                  ),
+                },
+              ]}
+            />
           </Col>
         </Row>
 
@@ -518,61 +512,53 @@ export const ProductDetailPage: React.FC = () => {
                     key={sku.id}
                     size="small"
                     hoverable
+                    className={styles.skuPickCard}
                     style={{
                       border:
                         selectedSKU?.id === sku.id ? '2px solid #1890ff' : '1px solid #d9d9d9',
-                      cursor: 'pointer',
                       background: selectedSKU?.id === sku.id ? '#e6f7ff' : 'white',
                     }}
                     onClick={() => setSelectedSKU(sku)}
                   >
-                    <Row justify="space-between" align="middle">
-                      <Col flex="auto">
-                        <Space direction="vertical" size={0}>
-                          <Space>
-                            <Tag
-                              color={
-                                sku.sku_type === 'token_pack'
-                                  ? 'blue'
-                                  : sku.sku_type === 'subscription'
-                                    ? 'green'
-                                    : 'orange'
-                              }
-                            >
-                              {sku.sku_type === 'token_pack'
-                                ? 'Token包'
+                    <div className={styles.skuPickRow}>
+                      <div className={styles.skuPickMain}>
+                        <div className={styles.skuPickTypeRow}>
+                          <Tag
+                            color={
+                              sku.sku_type === 'token_pack'
+                                ? 'blue'
                                 : sku.sku_type === 'subscription'
-                                  ? '订阅'
-                                  : '并发'}
-                            </Tag>
-                            <Text strong>{sku.spu_name}</Text>
-                            <Tag color="geekblue">{sku.sku_code}</Tag>
-                          </Space>
-                          <Space size="small">
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              {buildSkuSummary(sku)}
-                            </Text>
-                          </Space>
-                        </Space>
-                      </Col>
-                      <Col>
-                        <Space direction="vertical" size={0} align="end">
-                          <Text strong style={{ fontSize: 18, color: '#1890ff' }}>
-                            ¥{sku.retail_price.toFixed(2)}
+                                  ? 'green'
+                                  : 'orange'
+                            }
+                          >
+                            {sku.sku_type === 'token_pack'
+                              ? 'Token包'
+                              : sku.sku_type === 'subscription'
+                                ? '订阅'
+                                : '并发'}
+                          </Tag>
+                          <Tag color="geekblue">{sku.sku_code}</Tag>
+                        </div>
+                        <span className={styles.skuPickName}>{sku.spu_name}</span>
+                        <div className={styles.skuPickSummary}>{buildSkuSummary(sku)}</div>
+                      </div>
+                      <div className={styles.skuPickPriceCol}>
+                        <Text strong style={{ fontSize: 18, color: '#1890ff', display: 'block' }}>
+                          ¥{sku.retail_price.toFixed(2)}
+                        </Text>
+                        {sku.original_price && sku.original_price > sku.retail_price && (
+                          <Text delete type="secondary" style={{ fontSize: 12 }}>
+                            ¥{sku.original_price.toFixed(2)}
                           </Text>
-                          {sku.original_price && sku.original_price > sku.retail_price && (
-                            <Text delete type="secondary" style={{ fontSize: 12 }}>
-                              ¥{sku.original_price.toFixed(2)}
-                            </Text>
-                          )}
-                          {sku.group_enabled && (
-                            <Tag color="red" style={{ marginTop: 4 }}>
-                              <TeamOutlined /> {sku.min_group_size}-{sku.max_group_size}人团
-                            </Tag>
-                          )}
-                        </Space>
-                      </Col>
-                    </Row>
+                        )}
+                        {sku.group_enabled && (
+                          <Tag color="red" style={{ marginTop: 4 }}>
+                            <TeamOutlined /> {sku.min_group_size}-{sku.max_group_size}人团
+                          </Tag>
+                        )}
+                      </div>
+                    </div>
                   </Card>
                 ))}
               </Space>
@@ -584,45 +570,47 @@ export const ProductDetailPage: React.FC = () => {
 
         <div style={{ marginBottom: 24 }}>
           <Title level={4}>定价信息</Title>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12}>
-              <Card
-                size="small"
-                hoverable
-                style={{
-                  border: purchaseMode === 'single' ? '2px solid #1890ff' : '1px solid #d9d9d9',
-                  cursor: 'pointer',
-                }}
+          {screens.xs ? (
+            <div className={styles.pricingRowMobile}>
+              <div
+                role="button"
+                tabIndex={0}
+                className={`${styles.pricingCell} ${purchaseMode === 'single' ? styles.pricingCellActive : ''}`}
                 onClick={() => setPurchaseMode('single')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setPurchaseMode('single');
+                  }
+                }}
               >
-                <Space direction="vertical" style={{ width: '100%' }}>
+                <Space direction="vertical" style={{ width: '100%' }} size={4}>
                   <Text type="secondary">单独购买</Text>
                   <Statistic
                     value={selectedSKU?.retail_price || product.price}
                     prefix="¥"
-                    valueStyle={{ color: '#333', fontSize: 24 }}
+                    valueStyle={{ color: '#333', fontSize: 22 }}
                   />
-                  <Text type="secondary">
-                    直接下单，预计到手 ¥{estimatedFinalPrice().toFixed(2)}
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    到手约 ¥{estimatedFinalPrice().toFixed(2)}
                   </Text>
                 </Space>
-              </Card>
-            </Col>
-
-            <Col xs={24} sm={12}>
-              <Card
-                size="small"
-                hoverable
-                style={{
-                  border: purchaseMode === 'group' ? '2px solid #52c41a' : '1px solid #d9d9d9',
-                  cursor: 'pointer',
-                  background: '#f6ffed',
-                }}
+              </div>
+              <div
+                role="button"
+                tabIndex={0}
+                className={`${styles.pricingCell} ${purchaseMode === 'group' ? styles.pricingCellGroupActive : ''}`}
                 onClick={() => setPurchaseMode('group')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setPurchaseMode('group');
+                  }
+                }}
               >
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Space>
-                    <Text type="secondary">拼团购买</Text>
+                <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                  <Space size={4} wrap>
+                    <Text type="secondary">拼团</Text>
                     <Tag color="green">推荐</Tag>
                   </Space>
                   <Statistic
@@ -632,21 +620,85 @@ export const ProductDetailPage: React.FC = () => {
                       product.price
                     }
                     prefix="¥"
-                    valueStyle={{ color: '#52c41a', fontSize: 24 }}
+                    valueStyle={{ color: '#52c41a', fontSize: 22 }}
                     suffix={
-                      <Text type="secondary" style={{ fontSize: 14 }}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
                         /人
                       </Text>
                     }
                   />
-                  <Text type="success">
-                    预计到手 ¥{estimatedFinalPrice().toFixed(2)}
-                    {calculateDiscount() > 0 ? `，立省 ${calculateDiscount()}%` : ''}
+                  <Text type="success" style={{ fontSize: 12 }}>
+                    到手 ¥{estimatedFinalPrice().toFixed(2)}
+                    {calculateDiscount() > 0 ? ` · 省${calculateDiscount()}%` : ''}
                   </Text>
                 </Space>
-              </Card>
-            </Col>
-          </Row>
+              </div>
+            </div>
+          ) : (
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={12}>
+                <Card
+                  size="small"
+                  hoverable
+                  style={{
+                    border: purchaseMode === 'single' ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => setPurchaseMode('single')}
+                >
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Text type="secondary">单独购买</Text>
+                    <Statistic
+                      value={selectedSKU?.retail_price || product.price}
+                      prefix="¥"
+                      valueStyle={{ color: '#333', fontSize: 24 }}
+                    />
+                    <Text type="secondary">
+                      直接下单，预计到手 ¥{estimatedFinalPrice().toFixed(2)}
+                    </Text>
+                  </Space>
+                </Card>
+              </Col>
+
+              <Col xs={24} sm={12}>
+                <Card
+                  size="small"
+                  hoverable
+                  style={{
+                    border: purchaseMode === 'group' ? '2px solid #52c41a' : '1px solid #d9d9d9',
+                    cursor: 'pointer',
+                    background: '#f6ffed',
+                  }}
+                  onClick={() => setPurchaseMode('group')}
+                >
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Space>
+                      <Text type="secondary">拼团购买</Text>
+                      <Tag color="green">推荐</Tag>
+                    </Space>
+                    <Statistic
+                      value={
+                        effectiveGroupTier?.price_per_person ??
+                        selectedSKU?.retail_price ??
+                        product.price
+                      }
+                      prefix="¥"
+                      valueStyle={{ color: '#52c41a', fontSize: 24 }}
+                      suffix={
+                        <Text type="secondary" style={{ fontSize: 14 }}>
+                          /人
+                        </Text>
+                      }
+                    />
+                    <Text type="success">
+                      预计到手 ¥{estimatedFinalPrice().toFixed(2)}
+                      {calculateDiscount() > 0 ? `，立省 ${calculateDiscount()}%` : ''}
+                    </Text>
+                  </Space>
+                </Card>
+              </Col>
+            </Row>
+          )}
         </div>
 
         {purchaseMode === 'group' && (
@@ -657,15 +709,6 @@ export const ProductDetailPage: React.FC = () => {
                 showIcon
                 message="当前规格不支持拼团"
                 description="请选择支持拼团的 SKU 规格，或使用单独购买。"
-                style={{ marginBottom: 16 }}
-              />
-            )}
-            {(selectedSKU?.is_promoted || selectedSKU?.group_enabled) && groupPrices.length > 0 && (
-              <Alert
-                type="warning"
-                showIcon
-                message="大促特惠 · 拼团省更多"
-                description="以下人数为常用成团档位，具体以支付页与 SKU 配置为准。"
                 style={{ marginBottom: 16 }}
               />
             )}
@@ -710,36 +753,6 @@ export const ProductDetailPage: React.FC = () => {
           </div>
         )}
 
-        <Divider />
-
-        <Alert
-          type="info"
-          showIcon
-          message="优惠权益"
-          description={
-            <Space direction="vertical" style={{ width: '100%' }} size={8}>
-              <Space wrap>
-                {getPromotionHighlights().length > 0 ? (
-                  getPromotionHighlights().map((label) => (
-                    <Tag key={label} color="magenta">
-                      {label}
-                    </Tag>
-                  ))
-                ) : (
-                  <Text type="secondary">当前套餐暂无活动优惠，后续可关注商家券与拼团优惠。</Text>
-                )}
-              </Space>
-              <Text strong>
-                预计到手价：
-                <span style={{ color: '#cf1322' }}>¥{estimatedFinalPrice().toFixed(2)}</span>
-              </Text>
-            </Space>
-          }
-          style={{ marginBottom: 24 }}
-        />
-
-        <Divider />
-
         <Space direction="vertical" size="large" style={{ width: '100%', maxWidth: '100%' }}>
           <div>
             <span>购买数量: </span>
@@ -783,55 +796,50 @@ export const ProductDetailPage: React.FC = () => {
                     </Text>
                   </Space>
                 </Card>
-                <Space style={{ width: '100%' }} wrap size="small">
-                  <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
+                <div className={styles.groupActionsRow}>
+                  <div className={styles.groupActionCell}>
+                    <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
+                      <Button
+                        type="primary"
+                        size="large"
+                        block
+                        icon={<TeamOutlined />}
+                        onClick={() => {
+                          loadActiveGroups();
+                          setShowGroupsModal(true);
+                        }}
+                        disabled={product.stock === 0}
+                        style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                      >
+                        立即加入团
+                      </Button>
+                    </Badge>
+                  </div>
+                  <div className={styles.groupActionCell}>
                     <Button
                       type="primary"
                       size="large"
+                      block
                       icon={<TeamOutlined />}
-                      onClick={() => {
-                        loadActiveGroups();
-                        setShowGroupsModal(true);
+                      onClick={handleGroupPurchase}
+                      disabled={product.stock === 0 || groupPrices.length === 0}
+                      style={{
+                        background: '#1890ff',
+                        borderColor: '#1890ff',
                       }}
-                      disabled={product.stock === 0}
-                      style={{ background: '#52c41a', borderColor: '#52c41a' }}
                     >
-                      立即加入团
+                      {product.stock === 0
+                        ? '暂无库存'
+                        : groupPrices.length === 0
+                          ? '当前规格不可拼团'
+                          : '发起拼团并支付'}
                     </Button>
-                  </Badge>
-                  <Button
-                    type="primary"
-                    size="large"
-                    icon={<TeamOutlined />}
-                    onClick={handleGroupPurchase}
-                    disabled={product.stock === 0 || groupPrices.length === 0}
-                    style={{
-                      flex: '1 1 200px',
-                      minWidth: 0,
-                      background: '#1890ff',
-                      borderColor: '#1890ff',
-                    }}
-                  >
-                    {product.stock === 0
-                      ? '暂无库存'
-                      : groupPrices.length === 0
-                        ? '当前规格不可拼团'
-                        : '发起拼团并支付'}
-                  </Button>
-                </Space>
+                  </div>
+                </div>
               </Space>
             )}
 
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 8,
-                marginTop: 12,
-                width: '100%',
-                maxWidth: '100%',
-              }}
-            >
+            <div className={styles.secondaryRow}>
               <Button
                 size="large"
                 icon={<ShareAltOutlined />}
@@ -858,7 +866,7 @@ export const ProductDetailPage: React.FC = () => {
         </Space>
       </Card>
 
-      <Card style={{ marginTop: 16 }}>
+      <Card className={styles.tabsCard}>
         <Tabs defaultActiveKey="detail">
           <TabPane tab="商品详情" key="detail">
             <Space direction="vertical" style={{ width: '100%' }}>

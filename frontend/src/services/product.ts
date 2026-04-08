@@ -34,6 +34,12 @@ export const productService = {
   // Get categories
   getCategories: () => api.get<APIResponse<Category[]>>('/catalog/categories'),
 
+  // Usage scenarios (C 端卖场筛选)
+  getCatalogScenarios: () =>
+    api.get<{ scenarios: Array<{ id: number; code: string; name: string; spu_count?: number }> }>(
+      '/catalog/scenarios'
+    ),
+
   // List products
   listProducts: (filters?: ProductFilters) =>
     api.get<APIResponse<PaginatedResponse<Product>>>('/catalog', { params: filters }),

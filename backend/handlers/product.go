@@ -449,7 +449,7 @@ func GetCategories(c *gin.Context) {
 // GetHomeData retrieves all data needed for homepage
 func GetHomeData(c *gin.Context) {
 	ctx := context.Background()
-	cacheKey := "home:data:sku:v1"
+	cacheKey := "home:data:sku:v2"
 
 	// Try cache first
 	if cachedData, err := cache.Get(ctx, cacheKey); err == nil {
@@ -532,6 +532,34 @@ func GetHomeData(c *gin.Context) {
 		})
 	}
 
+	var scenarioCategories []map[string]interface{}
+	scenarioRows, errSc := db.Query(`
+		SELECT us.code, us.name, COUNT(DISTINCT s.id)::bigint AS cnt
+		FROM usage_scenarios us
+		INNER JOIN spu_scenarios ss ON us.id = ss.scenario_id
+		INNER JOIN spus sp ON ss.spu_id = sp.id AND sp.status = 'active'
+		INNER JOIN skus s ON s.spu_id = sp.id AND s.status = 'active' AND (s.stock > 0 OR s.stock = -1)
+		WHERE us.status = 'active'
+		GROUP BY us.id, us.code, us.name, us.sort_order
+		HAVING COUNT(DISTINCT s.id) > 0
+		ORDER BY us.sort_order ASC
+	`)
+	if errSc == nil {
+		defer scenarioRows.Close()
+		for scenarioRows.Next() {
+			var code, name string
+			var cnt int64
+			if err := scenarioRows.Scan(&code, &name, &cnt); err != nil {
+				break
+			}
+			scenarioCategories = append(scenarioCategories, map[string]interface{}{
+				"code":  code,
+				"name":  name,
+				"count": int(cnt),
+			})
+		}
+	}
+
 	// Get banners (placeholder for now)
 	banners := []map[string]interface{}{
 		{"id": 1, "title": "新人专享", "image": "/banners/newuser.png", "link": "/catalog?category=newuser"},
@@ -540,10 +568,11 @@ func GetHomeData(c *gin.Context) {
 	}
 
 	homeData := map[string]interface{}{
-		"banners":    banners,
-		"hot":        hotProducts,
-		"new":        newProducts,
-		"categories": categories,
+		"banners":             banners,
+		"hot":                 hotProducts,
+		"new":                 newProducts,
+		"categories":          categories,
+		"scenario_categories": scenarioCategories,
 	}
 
 	// Cache for 5 minutes

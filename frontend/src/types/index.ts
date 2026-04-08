@@ -53,8 +53,15 @@ export interface ProductReview {
   created_at: string;
 }
 
-// Category type
+// Category type（卖场/首页辅料：按 model_tier 聚合）
 export interface Category {
+  name: string;
+  count: number;
+}
+
+/** 首页主分类：使用场景（与 usage_scenarios + 在售 SKU 统计一致） */
+export interface ScenarioCategoryItem {
+  code: string;
   name: string;
   count: number;
 }
@@ -73,6 +80,7 @@ export interface HomeData {
   hot: Product[];
   new: Product[];
   categories: Category[];
+  scenario_categories?: ScenarioCategoryItem[];
 }
 
 // Order related types
