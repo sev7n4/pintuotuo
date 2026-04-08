@@ -352,6 +352,7 @@ describe('ProductDetailPage', () => {
       expect(screen.getByText('测试商品')).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByText('拼团购买'));
     const startGroupButton = screen.getByRole('button', { name: /发起拼团/ });
     fireEvent.click(startGroupButton);
 

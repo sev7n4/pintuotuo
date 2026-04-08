@@ -5,11 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/services"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResolveOpenAICompatModel(t *testing.T) {
@@ -183,4 +187,115 @@ func TestProxyAPIRequest(t *testing.T) {
 
 	// 检查响应状态码
 	// assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestShouldUseSmartRouting(t *testing.T) {
+	t.Setenv("SMART_ROUTING_ENABLE", "true")
+	t.Setenv("SMART_ROUTING_GRAY_PERCENT", "0")
+	assert.False(t, shouldUseSmartRouting(1, "req-1"))
+
+	t.Setenv("SMART_ROUTING_GRAY_PERCENT", "100")
+	assert.True(t, shouldUseSmartRouting(1, "req-1"))
+
+	t.Setenv("SMART_ROUTING_ENABLE", "false")
+	assert.False(t, shouldUseSmartRouting(1, "req-1"))
+}
+
+func TestSelectedRoutingStrategyCode(t *testing.T) {
+	_ = os.Unsetenv("SMART_ROUTING_STRATEGY")
+	code := selectedRoutingStrategyCode()
+	assert.NotEmpty(t, code)
+
+	t.Setenv("SMART_ROUTING_STRATEGY", "latency_first")
+	assert.Equal(t, "latency_first", selectedRoutingStrategyCode())
+}
+
+func TestBuildRetryPolicy(t *testing.T) {
+	policy := buildRetryPolicy(buildStrategyRuntimeSnapshot(""))
+	assert.NotNil(t, policy)
+	assert.Equal(t, services.DefaultRetryPolicy.MaxRetries, policy.MaxRetries)
+
+	known := buildRetryPolicy(buildStrategyRuntimeSnapshot("balanced"))
+	assert.NotNil(t, known)
+	assert.Equal(t, 3, known.MaxRetries)
+	assert.Equal(t, 1000*time.Millisecond, known.InitialDelay)
+
+	unknown := buildRetryPolicy(buildStrategyRuntimeSnapshot("not_exists"))
+	assert.NotNil(t, unknown)
+	assert.Equal(t, services.DefaultRetryPolicy.MaxRetries, unknown.MaxRetries)
+}
+
+func TestApplyCircuitBreakerConfig(t *testing.T) {
+	apiKeyID := 10001
+	applyCircuitBreakerConfig(apiKeyID, buildStrategyRuntimeSnapshot(""))
+	cb := services.GetCircuitBreaker(apiKeyID)
+	assert.NotNil(t, cb)
+	assert.Equal(t, services.CircuitStateOpen, cb.GetState())
+
+	applyCircuitBreakerConfig(apiKeyID, buildStrategyRuntimeSnapshot("balanced"))
+	assert.NotNil(t, cb)
+}
+
+func TestBuildRoutingDecisionPayload(t *testing.T) {
+	candidates := []byte(`[{"api_key_id":1,"score":0.9}]`)
+	snapshot := buildStrategyRuntimeSnapshot("balanced")
+	payload := buildRoutingDecisionPayload(candidates, snapshot, "")
+	assert.NotEmpty(t, payload)
+
+	var parsed map[string]any
+	err := json.Unmarshal(payload, &parsed)
+	assert.NoError(t, err)
+	assert.Contains(t, parsed, "candidates")
+	assert.Contains(t, parsed, "strategy_runtime")
+	assert.NotContains(t, parsed, "effective_policy_source")
+
+	withSrc := buildRoutingDecisionPayload(candidates, snapshot, "env")
+	var parsed2 map[string]any
+	err = json.Unmarshal(withSrc, &parsed2)
+	assert.NoError(t, err)
+	assert.Equal(t, "env", parsed2["effective_policy_source"])
+}
+
+func TestParseRoutingDecisionPayload(t *testing.T) {
+	snapshot := buildStrategyRuntimeSnapshot("balanced")
+	raw := buildRoutingDecisionPayload([]byte(`[{"api_key_id":1}]`), snapshot, "db")
+	parsed, err := parseRoutingDecisionPayload(raw)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, parsed.Candidates)
+	assert.Equal(t, "balanced", parsed.StrategyRuntime.StrategyCode)
+	assert.Equal(t, "db", parsed.EffectivePolicySource)
+
+	legacyRaw := json.RawMessage(`[{"api_key_id":2}]`)
+	_, legacyErr := parseRoutingDecisionPayload(legacyRaw)
+	assert.Error(t, legacyErr)
+}
+
+func TestRoutingStrategyWithSource(t *testing.T) {
+	t.Setenv("SMART_ROUTING_STRATEGY", "cost_first")
+	code, src := routingStrategyWithSource()
+	assert.Equal(t, "cost_first", code)
+	assert.Equal(t, "env", src)
+
+	_ = os.Unsetenv("SMART_ROUTING_STRATEGY")
+	code, src = routingStrategyWithSource()
+	assert.NotEmpty(t, code)
+	assert.Contains(t, []string{"db", "default"}, src)
+}
+
+func TestSummarizeRoutingCandidatesForTrace(t *testing.T) {
+	raw := json.RawMessage(`[{"APIKeyID":1,"Provider":"openai","Model":"gpt-4","Score":0.5},{"api_key_id":2,"provider":"anthropic","score":0.9}]`)
+	n, top := summarizeRoutingCandidatesForTrace(raw)
+	assert.Equal(t, 2, n)
+	require.NotNil(t, top)
+	assert.Equal(t, 2, top.APIKeyID)
+	assert.Equal(t, "anthropic", top.Provider)
+	assert.InDelta(t, 0.9, top.Score, 0.0001)
+}
+
+func TestNormalizeEffectivePolicySource(t *testing.T) {
+	assert.Equal(t, "env", normalizeEffectivePolicySource("env"))
+	assert.Equal(t, "db", normalizeEffectivePolicySource("db"))
+	assert.Equal(t, "default", normalizeEffectivePolicySource("default"))
+	assert.Equal(t, "default", normalizeEffectivePolicySource(""))
+	assert.Equal(t, "default", normalizeEffectivePolicySource("legacy"))
 }

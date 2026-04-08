@@ -5,9 +5,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -127,6 +130,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
+	c.Header("X-Request-ID", requestID)
+	c.Header("X-Trace-ID", requestID)
 
 	var tokenBalance float64
 	err := db.QueryRow("SELECT balance FROM tokens WHERE user_id = $1", userIDInt).Scan(&tokenBalance)
@@ -140,9 +145,38 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
+	merchantID, merchantErr := resolveMerchantIDByUser(db, userIDInt)
+	if merchantErr != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	selectedStrategy := "legacy_fallback"
+	effectivePolicySource := ""
+	var smartCandidatesJSON []byte
+	decisionStart := time.Now()
+	if req.APIKeyID == nil && req.MerchantSKUID == nil && shouldUseSmartRouting(userIDInt, requestID) {
+		strategyCode, policySrc := routingStrategyWithSource()
+		if smartReq := trySelectAPIKeyWithSmartRouter(req, strategyCode); smartReq.APIKeyID != nil {
+			req.APIKeyID = smartReq.APIKeyID
+			selectedStrategy = strategyCode
+			smartCandidatesJSON = smartReq.CandidatesJSON
+			effectivePolicySource = policySrc
+		}
+	}
+
 	var apiKey models.MerchantAPIKey
-	err = selectAPIKeyForRequest(db, req, &apiKey)
+	err = selectAPIKeyForRequest(db, userIDInt, merchantID, req, &apiKey)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"API_KEY_NOT_AUTHORIZED",
+				"No authorized API key available for this provider",
+				http.StatusForbidden,
+				nil,
+			))
+			return
+		}
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"API_KEY_NOT_FOUND",
 			"No available API key for this provider",
@@ -230,6 +264,9 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		))
 		return
 	}
+	httpReq.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonBody)), nil
+	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	switch providerCfg.APIFormat {
@@ -241,8 +278,12 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	}
 
 	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Do(httpReq)
+	strategySnapshot := buildStrategyRuntimeSnapshot(selectedStrategy)
+	applyCircuitBreakerConfig(apiKey.ID, strategySnapshot)
+	retryPolicy := buildRetryPolicy(strategySnapshot)
+	resp, err := executeProviderRequestWithRetry(client, httpReq, retryPolicy)
 	if err != nil {
+		services.GetSmartRouter().RecordRequestResult(apiKey.ID, false)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"API_REQUEST_FAILED",
 			"Failed to send request to provider",
@@ -252,6 +293,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 	defer resp.Body.Close()
+	services.GetSmartRouter().RecordRequestResult(apiKey.ID, resp.StatusCode < http.StatusInternalServerError && resp.StatusCode != http.StatusTooManyRequests)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -284,10 +326,18 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	if cost > 0 {
 		tx, err := db.Begin()
 		if err == nil {
-			_, err = tx.Exec(
-				"UPDATE tokens SET balance = balance - $1, total_used = total_used + $1 WHERE user_id = $2",
+			res, updateErr := tx.Exec(
+				"UPDATE tokens SET balance = balance - $1, total_used = total_used + $1 WHERE user_id = $2 AND balance >= $1",
 				cost, userIDInt,
 			)
+			err = updateErr
+			if err == nil {
+				var rowsAffected int64
+				rowsAffected, err = res.RowsAffected()
+				if err == nil && rowsAffected == 0 {
+					err = apperrors.ErrInsufficientBalance
+				}
+			}
 			if err == nil {
 				_, err = tx.Exec(
 					"INSERT INTO token_transactions (user_id, type, amount, reason) VALUES ($1, $2, $3, $4)",
@@ -338,6 +388,9 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		cache.Delete(ctx, cache.TokenBalanceKey(userIDInt))
 	}
 
+	decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
+	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, apiKey.ID, int(time.Since(decisionStart).Milliseconds()))
+
 	c.Data(resp.StatusCode, "application/json", body)
 }
 
@@ -368,13 +421,18 @@ func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeC
 	return cfg, err
 }
 
-func selectAPIKeyForRequest(db *sql.DB, req APIProxyRequest, apiKey *models.MerchantAPIKey) error {
+func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequest, apiKey *models.MerchantAPIKey) error {
 	if req.APIKeyID != nil && *req.APIKeyID > 0 {
+		if merchantID <= 0 {
+			return sql.ErrNoRows
+		}
 		err := db.QueryRow(
 			`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
 			 FROM merchant_api_keys
-			 WHERE id = $1 AND provider = $2 AND status = 'active'`,
-			*req.APIKeyID, req.Provider,
+			 WHERE id = $1 AND provider = $2 AND status = 'active'
+			   AND merchant_id = $3
+			   AND (verified_at IS NOT NULL OR verification_result = 'verified')`,
+			*req.APIKeyID, req.Provider, merchantID,
 		).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
 		if err == nil {
 			return nil
@@ -385,12 +443,20 @@ func selectAPIKeyForRequest(db *sql.DB, req APIProxyRequest, apiKey *models.Merc
 	}
 
 	if req.MerchantSKUID != nil && *req.MerchantSKUID > 0 {
+		if merchantID <= 0 {
+			return sql.ErrNoRows
+		}
 		err := db.QueryRow(
 			`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
 			 FROM merchant_skus ms
 			 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
-			 WHERE ms.id = $1 AND ms.status = 'active' AND mak.provider = $2 AND mak.status = 'active'`,
-			*req.MerchantSKUID, req.Provider,
+			 JOIN merchants m ON m.id = ms.merchant_id
+			 WHERE ms.id = $1 AND ms.status = 'active'
+			   AND ms.merchant_id = $2
+			   AND m.user_id = $3
+			   AND mak.provider = $4 AND mak.status = 'active'
+			   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')`,
+			*req.MerchantSKUID, merchantID, userID, req.Provider,
 		).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
 		if err == nil {
 			return nil
@@ -400,14 +466,367 @@ func selectAPIKeyForRequest(db *sql.DB, req APIProxyRequest, apiKey *models.Merc
 		}
 	}
 
+	if merchantID > 0 {
+		return db.QueryRow(
+			`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+			 FROM merchant_api_keys
+			 WHERE provider = $1 AND status = 'active'
+			   AND merchant_id = $2
+			   AND (verified_at IS NOT NULL OR verification_result = 'verified')
+			   AND quota_used < quota_limit
+			 ORDER BY (quota_limit - quota_used) DESC
+			 LIMIT 1`,
+			req.Provider, merchantID,
+		).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
+	}
+
 	return db.QueryRow(
 		`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
 		 FROM merchant_api_keys
 		 WHERE provider = $1 AND status = 'active'
+		   AND (verified_at IS NOT NULL OR verification_result = 'verified')
+		   AND quota_used < quota_limit
 		 ORDER BY (quota_limit - quota_used) DESC
 		 LIMIT 1`,
 		req.Provider,
 	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &apiKey.QuotaLimit, &apiKey.QuotaUsed, &apiKey.Status)
+}
+
+func resolveMerchantIDByUser(db *sql.DB, userID int) (int, error) {
+	var merchantID int
+	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1 AND status = 'active' LIMIT 1", userID).Scan(&merchantID)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return merchantID, nil
+}
+
+type smartRoutingPick struct {
+	APIKeyID       *int
+	CandidatesJSON []byte
+}
+
+type strategyRuntimeSnapshot struct {
+	StrategyCode      string `json:"strategy_code"`
+	MaxRetries        int    `json:"max_retries"`
+	InitialDelayMs    int    `json:"initial_delay_ms"`
+	CircuitThreshold  int    `json:"circuit_breaker_threshold"`
+	CircuitTimeoutSec int    `json:"circuit_breaker_timeout_sec"`
+}
+
+type routingDecisionPayload struct {
+	Candidates            json.RawMessage         `json:"candidates"`
+	StrategyRuntime       strategyRuntimeSnapshot `json:"strategy_runtime"`
+	EffectivePolicySource string                  `json:"effective_policy_source,omitempty"`
+}
+
+// traceTopCandidate 用于 trace 列表页展示的候选摘要（得分最高的一条）
+type traceTopCandidate struct {
+	APIKeyID int     `json:"api_key_id"`
+	Provider string  `json:"provider"`
+	Model    string  `json:"model,omitempty"`
+	Score    float64 `json:"score"`
+}
+
+func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string) smartRoutingPick {
+	router := services.GetSmartRouter()
+	choice, err := router.SelectProvider(context.Background(), req.Model, services.RoutingStrategy(strategyCode))
+	if err != nil || choice == nil {
+		return smartRoutingPick{}
+	}
+
+	candidates, cErr := router.GetCandidates(context.Background(), req.Model)
+	if cErr == nil {
+		router.CalculateScores(candidates, services.RoutingStrategy(strategyCode))
+	}
+
+	apiKeyID := choice.APIKeyID
+	var candidatesJSON []byte
+	if cErr == nil {
+		candidatesJSON, _ = json.Marshal(candidates)
+	}
+
+	return smartRoutingPick{
+		APIKeyID:       &apiKeyID,
+		CandidatesJSON: candidatesJSON,
+	}
+}
+
+// routingStrategyWithSource 返回策略代码及其来源：env（环境变量）、db（库里的默认策略）、default（内置 balanced）
+func routingStrategyWithSource() (code string, source string) {
+	code = strings.TrimSpace(os.Getenv("SMART_ROUTING_STRATEGY"))
+	if code != "" {
+		return code, "env"
+	}
+	code = strings.TrimSpace(services.GetSmartRouter().GetDefaultStrategyCode())
+	if code != "" {
+		return code, "db"
+	}
+	return string(services.RoutingStrategyBalanced), "default"
+}
+
+func selectedRoutingStrategyCode() string {
+	code, _ := routingStrategyWithSource()
+	return code
+}
+
+func shouldUseSmartRouting(userID int, requestID string) bool {
+	enabled := strings.TrimSpace(strings.ToLower(os.Getenv("SMART_ROUTING_ENABLE")))
+	if enabled == "false" || enabled == "0" || enabled == "off" {
+		return false
+	}
+	percent := 100
+	if raw := strings.TrimSpace(os.Getenv("SMART_ROUTING_GRAY_PERCENT")); raw != "" {
+		if p, err := strconv.Atoi(raw); err == nil {
+			if p < 0 {
+				p = 0
+			}
+			if p > 100 {
+				p = 100
+			}
+			percent = p
+		}
+	}
+	if percent == 0 {
+		return false
+	}
+	if percent == 100 {
+		return true
+	}
+	seed := userID*31 + len(requestID)*17
+	for _, ch := range requestID {
+		seed += int(ch)
+	}
+	slot := seed % 100
+	if slot < 0 {
+		slot = -slot
+	}
+	return slot < percent
+}
+
+func insertRoutingDecision(db *sql.DB, requestID string, userID int, req APIProxyRequest, strategy string, candidatesJSON []byte, selectedAPIKeyID int, latencyMs int) error {
+	if db == nil {
+		return nil
+	}
+	_, err := db.Exec(
+		`INSERT INTO routing_decisions
+		(request_id, user_id, model_requested, strategy_used, candidates, selected_provider, selected_api_key_id, decision_latency_ms, was_retry, retry_count)
+		VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, FALSE, 0)`,
+		requestID, userID, req.Model, strategy, candidatesJSON, selectedAPIKeyID, latencyMs,
+	)
+	return err
+}
+
+func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request, policy *services.RetryPolicy) (*http.Response, error) {
+	if policy == nil {
+		policy = services.DefaultRetryPolicy
+	}
+	var (
+		resp *http.Response
+		err  error
+	)
+	ctx := baseReq.Context()
+	for i := 0; i <= policy.MaxRetries; i++ {
+		req := baseReq.Clone(ctx)
+		if baseReq.GetBody != nil {
+			body, bodyErr := baseReq.GetBody()
+			if bodyErr == nil {
+				req.Body = body
+			}
+		}
+
+		resp, err = client.Do(req)
+		if err == nil && resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < http.StatusInternalServerError {
+			return resp, nil
+		}
+
+		if resp != nil && (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= http.StatusInternalServerError) {
+			resp.Body.Close()
+			err = fmt.Errorf("upstream status %d", resp.StatusCode)
+		}
+
+		shouldRetry, delay := policy.ShouldRetry(err, i)
+		if !shouldRetry {
+			return nil, err
+		}
+		time.Sleep(delay)
+	}
+	return nil, err
+}
+
+func buildRetryPolicy(snapshot strategyRuntimeSnapshot) *services.RetryPolicy {
+	policy := *services.DefaultRetryPolicy
+	if snapshot.MaxRetries > 0 {
+		policy.MaxRetries = snapshot.MaxRetries
+	}
+	if snapshot.InitialDelayMs > 0 {
+		policy.InitialDelay = time.Duration(snapshot.InitialDelayMs) * time.Millisecond
+	}
+	return &policy
+}
+
+func applyCircuitBreakerConfig(apiKeyID int, snapshot strategyRuntimeSnapshot) {
+	if apiKeyID <= 0 {
+		return
+	}
+	threshold := snapshot.CircuitThreshold
+	if threshold <= 0 {
+		threshold = 5
+	}
+	timeoutSeconds := snapshot.CircuitTimeoutSec
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 60
+	}
+	services.GetSmartRouter().ConfigureCircuitBreaker(apiKeyID, threshold, time.Duration(timeoutSeconds)*time.Second)
+}
+
+func buildStrategyRuntimeSnapshot(strategyCode string) strategyRuntimeSnapshot {
+	snapshot := strategyRuntimeSnapshot{
+		StrategyCode:      strategyCode,
+		MaxRetries:        services.DefaultRetryPolicy.MaxRetries,
+		InitialDelayMs:    int(services.DefaultRetryPolicy.InitialDelay / time.Millisecond),
+		CircuitThreshold:  5,
+		CircuitTimeoutSec: 60,
+	}
+	if strategyCode == "" {
+		return snapshot
+	}
+	cfg, ok := services.GetSmartRouter().GetStrategyConfig(strategyCode)
+	if !ok {
+		return snapshot
+	}
+	if cfg.MaxRetryCount > 0 {
+		snapshot.MaxRetries = cfg.MaxRetryCount
+	}
+	if cfg.RetryBackoffBase > 0 {
+		snapshot.InitialDelayMs = cfg.RetryBackoffBase
+	}
+	if cfg.CircuitBreakerThreshold > 0 {
+		snapshot.CircuitThreshold = cfg.CircuitBreakerThreshold
+	}
+	if cfg.CircuitBreakerTimeout > 0 {
+		snapshot.CircuitTimeoutSec = cfg.CircuitBreakerTimeout
+	}
+	return snapshot
+}
+
+func buildRoutingDecisionPayload(candidatesJSON []byte, snapshot strategyRuntimeSnapshot, effectivePolicySource string) []byte {
+	var candidates any = []any{}
+	if len(candidatesJSON) > 0 {
+		var parsed []map[string]any
+		if err := json.Unmarshal(candidatesJSON, &parsed); err == nil {
+			candidates = parsed
+		}
+	}
+	body := map[string]any{
+		"candidates":       candidates,
+		"strategy_runtime": snapshot,
+	}
+	if strings.TrimSpace(effectivePolicySource) != "" {
+		body["effective_policy_source"] = strings.TrimSpace(effectivePolicySource)
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return candidatesJSON
+	}
+	return payload
+}
+
+func candidateScoreFromMap(m map[string]any) float64 {
+	if m == nil {
+		return 0
+	}
+	for _, k := range []string{"Score", "score"} {
+		if v, ok := m[k]; ok {
+			switch x := v.(type) {
+			case float64:
+				return x
+			case json.Number:
+				f, _ := x.Float64()
+				return f
+			}
+		}
+	}
+	return 0
+}
+
+func intFromMap(m map[string]any, keys ...string) int {
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			switch x := v.(type) {
+			case float64:
+				return int(x)
+			case int:
+				return x
+			case json.Number:
+				i64, _ := x.Int64()
+				return int(i64)
+			}
+		}
+	}
+	return 0
+}
+
+func stringFromMap(m map[string]any, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			if s, ok := v.(string); ok {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// summarizeRoutingCandidatesForTrace 从 candidates JSON 解析条数与得分最高项（供 trace 摘要）
+func summarizeRoutingCandidatesForTrace(candidatesJSON json.RawMessage) (int, *traceTopCandidate) {
+	if len(candidatesJSON) == 0 {
+		return 0, nil
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(candidatesJSON, &items); err != nil || len(items) == 0 {
+		return 0, nil
+	}
+	bestIdx := 0
+	bestScore := candidateScoreFromMap(items[0])
+	for i := 1; i < len(items); i++ {
+		s := candidateScoreFromMap(items[i])
+		if s > bestScore {
+			bestScore = s
+			bestIdx = i
+		}
+	}
+	best := items[bestIdx]
+	return len(items), &traceTopCandidate{
+		APIKeyID: intFromMap(best, "APIKeyID", "api_key_id", "ApiKeyID"),
+		Provider: stringFromMap(best, "Provider", "provider"),
+		Model:    stringFromMap(best, "Model", "model"),
+		Score:    candidateScoreFromMap(best),
+	}
+}
+
+// normalizeEffectivePolicySource 将 trace 展示的 policy 来源限定为 env / db / default（无落库或非三者之一时视为 default）
+func normalizeEffectivePolicySource(stored string) string {
+	switch strings.TrimSpace(stored) {
+	case "env", "db", "default":
+		return strings.TrimSpace(stored)
+	default:
+		return "default"
+	}
+}
+
+func parseRoutingDecisionPayload(raw json.RawMessage) (routingDecisionPayload, error) {
+	if len(raw) == 0 {
+		return routingDecisionPayload{}, nil
+	}
+	var wrapped routingDecisionPayload
+	if err := json.Unmarshal(raw, &wrapped); err == nil && (len(wrapped.Candidates) > 0 || wrapped.StrategyRuntime.StrategyCode != "" || strings.TrimSpace(wrapped.EffectivePolicySource) != "") {
+		return wrapped, nil
+	}
+	return routingDecisionPayload{}, fmt.Errorf("invalid routing decision payload")
 }
 
 func GetAPIProviders(c *gin.Context) {
@@ -503,5 +922,101 @@ func GetAPIUsageStats(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"stats":       stats,
 		"by_provider": byProvider,
+	})
+}
+
+func GetAPIRequestTrace(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	requestID := strings.TrimSpace(c.Param("request_id"))
+	if requestID == "" {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var usage struct {
+		RequestID    string  `json:"request_id"`
+		Provider     string  `json:"provider"`
+		Model        string  `json:"model"`
+		StatusCode   int     `json:"status_code"`
+		LatencyMS    int     `json:"latency_ms"`
+		InputTokens  int     `json:"input_tokens"`
+		OutputTokens int     `json:"output_tokens"`
+		Cost         float64 `json:"cost"`
+	}
+	err := db.QueryRow(
+		`SELECT request_id, provider, model, status_code, latency_ms, input_tokens, output_tokens, cost
+		 FROM api_usage_logs WHERE request_id = $1 AND user_id = $2 LIMIT 1`,
+		requestID, userIDInt,
+	).Scan(&usage.RequestID, &usage.Provider, &usage.Model, &usage.StatusCode, &usage.LatencyMS, &usage.InputTokens, &usage.OutputTokens, &usage.Cost)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"TRACE_NOT_FOUND",
+				"Trace not found",
+				http.StatusNotFound,
+				nil,
+			))
+			return
+		}
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var decision struct {
+		StrategyUsed          string                  `json:"strategy_used"`
+		Candidates            json.RawMessage         `json:"candidates"`
+		StrategyRuntime       strategyRuntimeSnapshot `json:"strategy_runtime"`
+		SelectedAPIKeyID      *int                    `json:"selected_api_key_id"`
+		DecisionLatencyMS     int                     `json:"decision_latency_ms"`
+		WasRetry              bool                    `json:"was_retry"`
+		RetryCount            int                     `json:"retry_count"`
+		CandidatesCount       int                     `json:"candidates_count"`
+		TopCandidate          *traceTopCandidate      `json:"top_candidate,omitempty"`
+		EffectivePolicySource string                  `json:"effective_policy_source"`
+	}
+	var selectedID sql.NullInt64
+	var decisionRaw json.RawMessage
+	rdErr := db.QueryRow(
+		`SELECT strategy_used, COALESCE(candidates, '[]'::jsonb), selected_api_key_id, decision_latency_ms, was_retry, retry_count
+		 FROM routing_decisions WHERE request_id = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT 1`,
+		requestID, userIDInt,
+	).Scan(&decision.StrategyUsed, &decisionRaw, &selectedID, &decision.DecisionLatencyMS, &decision.WasRetry, &decision.RetryCount)
+	if rdErr == nil && selectedID.Valid {
+		val := int(selectedID.Int64)
+		decision.SelectedAPIKeyID = &val
+	}
+	storedPolicySource := ""
+	if rdErr == nil {
+		parsedPayload, parseErr := parseRoutingDecisionPayload(decisionRaw)
+		if parseErr == nil {
+			decision.Candidates = parsedPayload.Candidates
+			decision.StrategyRuntime = parsedPayload.StrategyRuntime
+			storedPolicySource = parsedPayload.EffectivePolicySource
+		} else {
+			decision.Candidates = decisionRaw
+		}
+		decision.CandidatesCount, decision.TopCandidate = summarizeRoutingCandidatesForTrace(decision.Candidates)
+		decision.EffectivePolicySource = normalizeEffectivePolicySource(storedPolicySource)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"usage":    usage,
+		"decision": decision,
 	})
 }

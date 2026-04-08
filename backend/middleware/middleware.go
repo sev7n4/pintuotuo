@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,10 +19,20 @@ type RateLimitData struct {
 	ResetTime time.Time
 }
 
+var (
+	rateLimitStore = map[string]RateLimitData{}
+	rateLimitMu    sync.Mutex
+)
+
 func CORSMiddleware() gin.HandlerFunc {
+	allowList := parseAllowedOrigins()
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		origin := c.GetHeader("Origin")
+		if origin != "" && isOriginAllowed(origin, allowList) {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			c.Writer.Header().Set("Vary", "Origin")
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 
@@ -71,6 +83,18 @@ func LoggingMiddleware() gin.HandlerFunc {
 }
 
 var jwtSecret = []byte(getEnv("JWT_SECRET", "pintuotuo-secret-key-dev"))
+
+func ValidateSecurityConfig() error {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
+		if strings.TrimSpace(os.Getenv("JWT_SECRET")) == "" {
+			return fmt.Errorf("JWT_SECRET is required in production")
+		}
+		if len(parseAllowedOrigins()) == 0 {
+			return fmt.Errorf("CORS_ALLOWED_ORIGINS is required in production")
+		}
+	}
+	return nil
+}
 
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -155,7 +179,75 @@ func RespondWithError(c *gin.Context, appErr *errors.AppError) {
 }
 
 func RateLimitMiddleware() gin.HandlerFunc {
+	limit := mustParseInt(getEnv("RATE_LIMIT_PER_MINUTE", "120"), 120)
+	window := time.Minute
 	return func(c *gin.Context) {
+		userKey := c.ClientIP()
+		if userID, exists := c.Get("user_id"); exists {
+			userKey = fmt.Sprintf("u:%v", userID)
+		}
+		key := fmt.Sprintf("%s:%s", userKey, c.FullPath())
+		now := time.Now()
+
+		rateLimitMu.Lock()
+		entry, exists := rateLimitStore[key]
+		if !exists || now.After(entry.ResetTime) {
+			entry = RateLimitData{
+				Count:     0,
+				ResetTime: now.Add(window),
+			}
+		}
+		entry.Count++
+		rateLimitStore[key] = entry
+		rateLimitMu.Unlock()
+
+		remaining := limit - entry.Count
+		if remaining < 0 {
+			remaining = 0
+		}
+		c.Header("X-RateLimit-Limit", strconv.Itoa(limit))
+		c.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
+		c.Header("X-RateLimit-Reset", strconv.FormatInt(entry.ResetTime.Unix(), 10))
+
+		if entry.Count > limit {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":   "rate limit exceeded",
+				"message": "too many requests",
+				"code":    "RATE_LIMIT_EXCEEDED",
+			})
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
+}
+
+func parseAllowedOrigins() map[string]bool {
+	origins := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS"))
+	if origins == "" {
+		return map[string]bool{}
+	}
+	out := map[string]bool{}
+	for _, origin := range strings.Split(origins, ",") {
+		o := strings.TrimSpace(origin)
+		if o != "" {
+			out[o] = true
+		}
+	}
+	return out
+}
+
+func isOriginAllowed(origin string, allowList map[string]bool) bool {
+	if len(allowList) == 0 {
+		return false
+	}
+	return allowList[origin]
+}
+
+func mustParseInt(v string, fallback int) int {
+	parsed, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }

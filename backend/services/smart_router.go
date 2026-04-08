@@ -303,6 +303,28 @@ func (r *SmartRouter) RecordRequestResult(apiKeyID int, success bool) {
 	}
 }
 
+func (r *SmartRouter) ConfigureCircuitBreaker(apiKeyID int, threshold int, timeout time.Duration) {
+	r.cbMutex.Lock()
+	defer r.cbMutex.Unlock()
+	if threshold <= 0 {
+		threshold = 5
+	}
+	if timeout <= 0 {
+		timeout = 60 * time.Second
+	}
+
+	cb, exists := r.circuitBreaker[apiKeyID]
+	if !exists {
+		r.circuitBreaker[apiKeyID] = NewCircuitBreaker(threshold, timeout)
+		return
+	}
+
+	cb.mu.Lock()
+	cb.threshold = threshold
+	cb.timeout = timeout
+	cb.mu.Unlock()
+}
+
 func (r *SmartRouter) GetRoutingStats(ctx context.Context) (map[string]interface{}, error) {
 	if r.db == nil {
 		r.db = config.GetDB()
@@ -376,6 +398,25 @@ func (r *SmartRouter) GetStrategyConfig(strategyCode string) (StrategyConfig, bo
 	strategyCacheMu.RUnlock()
 
 	return config, found
+}
+
+func (r *SmartRouter) GetDefaultStrategyCode() string {
+	strategyCacheOnce.Do(func() {
+		strategyCache = make(map[string]StrategyConfig)
+		r.loadStrategyCache()
+		if len(strategyCache) == 0 {
+			r.loadDefaultStrategies()
+		}
+	})
+
+	strategyCacheMu.RLock()
+	defer strategyCacheMu.RUnlock()
+	for code, cfg := range strategyCache {
+		if cfg.IsDefault {
+			return code
+		}
+	}
+	return ""
 }
 
 func (r *SmartRouter) loadDefaultStrategies() {
