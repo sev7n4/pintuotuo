@@ -58,6 +58,7 @@ import AdminFlashSales from '@pages/admin/AdminFlashSales';
 import AdminBillings from '@pages/admin/AdminBillings';
 import AdminUserBillings from '@pages/admin/AdminUserBillings';
 import AdminSettlements from '@pages/admin/AdminSettlements';
+import AdminRoutingStrategies from '@pages/admin/AdminRoutingStrategies';
 
 function LegacyProductDetailRedirect() {
   const { id } = useParams();
@@ -160,6 +161,7 @@ function App() {
             <Route path="spus" element={<AdminSPUs />} />
             <Route path="skus" element={<AdminSKUs />} />
             <Route path="model-providers" element={<AdminModelProviders />} />
+            <Route path="routing-strategies" element={<AdminRoutingStrategies />} />
             <Route path="flash-sales" element={<AdminFlashSales />} />
           </Route>
         </Routes>

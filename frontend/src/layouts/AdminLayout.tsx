@@ -17,6 +17,7 @@ import {
   ThunderboltOutlined,
   WalletOutlined,
   DollarOutlined,
+  RouteOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -58,6 +59,11 @@ const menuItems = [
     key: '/admin/model-providers',
     icon: <ApiOutlined />,
     label: '模型厂商',
+  },
+  {
+    key: '/admin/routing-strategies',
+    icon: <RouteOutlined />,
+    label: '路由策略',
   },
   {
     key: '/admin/flash-sales',
