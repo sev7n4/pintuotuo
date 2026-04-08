@@ -1,7 +1,16 @@
 import api from './api';
-import { Token, TokenTransaction, UserAPIKey, APIResponse, RechargeOrder } from '@/types';
+import {
+  Token,
+  TokenTransaction,
+  UserAPIKey,
+  APIResponse,
+  RechargeOrder,
+  APIUsageGuideResponse,
+} from '@/types';
 
 export const tokenService = {
+  getAPIUsageGuide: () => api.get<{ data: APIUsageGuideResponse }>('/tokens/api-usage-guide'),
+
   getBalance: () => api.get<Token>('/tokens/balance'),
 
   getConsumption: () => api.get<TokenTransaction[]>('/tokens/consumption'),

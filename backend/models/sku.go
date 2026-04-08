@@ -3,19 +3,20 @@ package models
 import "time"
 
 type ModelProvider struct {
-	ID            int            `json:"id"`
-	Code          string         `json:"code"`
-	Name          string         `json:"name"`
-	APIBaseURL    string         `json:"api_base_url,omitempty"`
-	APIFormat     string         `json:"api_format"`
-	BillingType   string         `json:"billing_type,omitempty"`
-	SegmentConfig map[string]any `json:"segment_config,omitempty"`
-	CacheEnabled  bool           `json:"cache_enabled"`
-	CacheDiscount float64        `json:"cache_discount_rate,omitempty"`
-	Status        string         `json:"status"`
-	SortOrder     int            `json:"sort_order"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
+	ID             int            `json:"id"`
+	Code           string         `json:"code"`
+	Name           string         `json:"name"`
+	APIBaseURL     string         `json:"api_base_url,omitempty"`
+	APIFormat      string         `json:"api_format"`
+	BillingType    string         `json:"billing_type,omitempty"`
+	CompatPrefixes []string       `json:"compat_prefixes,omitempty"`
+	SegmentConfig  map[string]any `json:"segment_config,omitempty"`
+	CacheEnabled   bool           `json:"cache_enabled"`
+	CacheDiscount  float64        `json:"cache_discount_rate,omitempty"`
+	Status         string         `json:"status"`
+	SortOrder      int            `json:"sort_order"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 type SPU struct {

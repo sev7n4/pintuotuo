@@ -171,6 +171,22 @@ export interface UserAPIKey {
   updated_at: string;
 }
 
+/** GET /tokens/api-usage-guide — 基于订阅与已支付订单的调用示例 */
+export interface APIUsageGuideItem {
+  source: string;
+  spu_name?: string;
+  sku_code?: string;
+  provider_code: string;
+  model_example: string;
+  provider_slash_example?: string;
+}
+
+export interface APIUsageGuideResponse {
+  items: APIUsageGuideItem[];
+  default_model_example?: string;
+  disclaimer: string;
+}
+
 // Payment related types
 export interface Payment {
   id: number;

@@ -89,6 +89,7 @@ export const skuService = {
     billing_type?: string;
     status?: string;
     sort_order?: number;
+    compat_prefixes?: string[];
   }) => api.post<{ data: ModelProvider }>('/admin/model-providers', data),
 
   patchModelProvider: (
@@ -100,6 +101,7 @@ export const skuService = {
       billing_type: string;
       status: string;
       sort_order: number;
+      compat_prefixes: string[];
     }>
   ) => api.patch<{ data: ModelProvider }>(`/admin/model-providers/${id}`, data),
 

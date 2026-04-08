@@ -18,6 +18,7 @@ import (
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/services"
 )
 
 const (
@@ -70,7 +71,9 @@ func loadActiveModelProviders() ([]models.ModelProvider, error) {
 		return nil, errors.New("database not available")
 	}
 	rows, err := db.Query(
-		"SELECT id, code, name, api_base_url, api_format, billing_type, cache_enabled, COALESCE(cache_discount_rate, 0), status, sort_order, created_at, updated_at FROM model_providers WHERE status = 'active' ORDER BY sort_order ASC",
+		`SELECT id, code, name, api_base_url, api_format, billing_type, cache_enabled, COALESCE(cache_discount_rate, 0),
+			compat_prefixes, status, sort_order, created_at, updated_at
+		 FROM model_providers WHERE status = 'active' ORDER BY sort_order ASC`,
 	)
 	if err != nil {
 		return nil, err
@@ -81,7 +84,9 @@ func loadActiveModelProviders() ([]models.ModelProvider, error) {
 	for rows.Next() {
 		var p models.ModelProvider
 		var apiBaseURL, billingType sql.NullString
-		err := rows.Scan(&p.ID, &p.Code, &p.Name, &apiBaseURL, &p.APIFormat, &billingType, &p.CacheEnabled, &p.CacheDiscount, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+		var compatPfx pq.StringArray
+		err := rows.Scan(&p.ID, &p.Code, &p.Name, &apiBaseURL, &p.APIFormat, &billingType, &p.CacheEnabled, &p.CacheDiscount,
+			&compatPfx, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -90,6 +95,9 @@ func loadActiveModelProviders() ([]models.ModelProvider, error) {
 		}
 		if billingType.Valid {
 			p.BillingType = billingType.String
+		}
+		if len(compatPfx) > 0 {
+			p.CompatPrefixes = []string(compatPfx)
 		}
 		providers = append(providers, p)
 	}
@@ -1252,7 +1260,8 @@ func ListAllModelProviders(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		`SELECT id, code, name, api_base_url, api_format, billing_type, cache_enabled, COALESCE(cache_discount_rate, 0), status, sort_order, created_at, updated_at
+		`SELECT id, code, name, api_base_url, api_format, billing_type, cache_enabled, COALESCE(cache_discount_rate, 0),
+			compat_prefixes, status, sort_order, created_at, updated_at
 		 FROM model_providers ORDER BY sort_order ASC, id ASC`,
 	)
 	if err != nil {
@@ -1265,7 +1274,9 @@ func ListAllModelProviders(c *gin.Context) {
 	for rows.Next() {
 		var p models.ModelProvider
 		var apiBaseURL, billingType sql.NullString
-		err := rows.Scan(&p.ID, &p.Code, &p.Name, &apiBaseURL, &p.APIFormat, &billingType, &p.CacheEnabled, &p.CacheDiscount, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+		var compatPfx pq.StringArray
+		err := rows.Scan(&p.ID, &p.Code, &p.Name, &apiBaseURL, &p.APIFormat, &billingType, &p.CacheEnabled, &p.CacheDiscount,
+			&compatPfx, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -1275,6 +1286,9 @@ func ListAllModelProviders(c *gin.Context) {
 		}
 		if billingType.Valid {
 			p.BillingType = billingType.String
+		}
+		if len(compatPfx) > 0 {
+			p.CompatPrefixes = []string(compatPfx)
 		}
 		providers = append(providers, p)
 	}
@@ -1291,13 +1305,14 @@ func CreateModelProvider(c *gin.Context) {
 	}
 
 	var req struct {
-		Code        string `json:"code" binding:"required"`
-		Name        string `json:"name" binding:"required"`
-		APIBaseURL  string `json:"api_base_url"`
-		APIFormat   string `json:"api_format"`
-		BillingType string `json:"billing_type"`
-		Status      string `json:"status"`
-		SortOrder   int    `json:"sort_order"`
+		Code             string   `json:"code" binding:"required"`
+		Name             string   `json:"name" binding:"required"`
+		APIBaseURL       string   `json:"api_base_url"`
+		APIFormat        string   `json:"api_format"`
+		BillingType      string   `json:"billing_type"`
+		Status           string   `json:"status"`
+		SortOrder        int      `json:"sort_order"`
+		CompatPrefixes   []string `json:"compat_prefixes"`
 	}
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
@@ -1339,6 +1354,18 @@ func CreateModelProvider(c *gin.Context) {
 		apiBaseArg = apiBase
 	}
 
+	normalizedPrefixes, nErr := services.NormalizeCompatPrefixes(req.CompatPrefixes)
+	if nErr != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_COMPAT_PREFIXES",
+			nErr.Error(),
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+	compatArg := pq.Array(normalizedPrefixes)
+
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -1346,12 +1373,13 @@ func CreateModelProvider(c *gin.Context) {
 	}
 
 	var p models.ModelProvider
+	var compatScan pq.StringArray
 	err := db.QueryRow(
-		`INSERT INTO model_providers (code, name, api_base_url, api_format, billing_type, status, sort_order)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), status, sort_order, created_at, updated_at`,
-		code, name, apiBaseArg, apiFormat, billingType, status, req.SortOrder,
-	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+		`INSERT INTO model_providers (code, name, api_base_url, api_format, billing_type, status, sort_order, compat_prefixes)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), compat_prefixes, status, sort_order, created_at, updated_at`,
+		code, name, apiBaseArg, apiFormat, billingType, status, req.SortOrder, compatArg,
+	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &compatScan, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
@@ -1365,6 +1393,9 @@ func CreateModelProvider(c *gin.Context) {
 		}
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
+	}
+	if len(compatScan) > 0 {
+		p.CompatPrefixes = []string(compatScan)
 	}
 
 	cache.Delete(context.Background(), "model_providers:all")
@@ -1384,12 +1415,13 @@ func PatchModelProvider(c *gin.Context) {
 	}
 
 	var req struct {
-		Name        *string `json:"name"`
-		APIBaseURL  *string `json:"api_base_url"`
-		APIFormat   *string `json:"api_format"`
-		BillingType *string `json:"billing_type"`
-		Status      *string `json:"status"`
-		SortOrder   *int    `json:"sort_order"`
+		Name             *string   `json:"name"`
+		APIBaseURL       *string   `json:"api_base_url"`
+		APIFormat        *string   `json:"api_format"`
+		BillingType      *string   `json:"billing_type"`
+		Status           *string   `json:"status"`
+		SortOrder        *int      `json:"sort_order"`
+		CompatPrefixes   *[]string `json:"compat_prefixes"`
 	}
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
@@ -1403,6 +1435,23 @@ func PatchModelProvider(c *gin.Context) {
 		}
 	}
 
+	compatSet := false
+	var compatArg interface{}
+	if req.CompatPrefixes != nil {
+		normalized, nErr := services.NormalizeCompatPrefixes(*req.CompatPrefixes)
+		if nErr != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_COMPAT_PREFIXES",
+				nErr.Error(),
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+		compatSet = true
+		compatArg = pq.Array(normalized)
+	}
+
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -1410,6 +1459,7 @@ func PatchModelProvider(c *gin.Context) {
 	}
 
 	var p models.ModelProvider
+	var compatScan pq.StringArray
 	err = db.QueryRow(
 		`UPDATE model_providers SET
 			name = COALESCE($1, name),
@@ -1418,11 +1468,12 @@ func PatchModelProvider(c *gin.Context) {
 			billing_type = COALESCE($4, billing_type),
 			status = COALESCE($5, status),
 			sort_order = COALESCE($6, sort_order),
+			compat_prefixes = CASE WHEN $7::boolean THEN COALESCE($8, '{}') ELSE compat_prefixes END,
 			updated_at = CURRENT_TIMESTAMP
-		WHERE id = $7
-		RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), status, sort_order, created_at, updated_at`,
-		req.Name, req.APIBaseURL, req.APIFormat, req.BillingType, req.Status, req.SortOrder, id,
-	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+		WHERE id = $9
+		RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), compat_prefixes, status, sort_order, created_at, updated_at`,
+		req.Name, req.APIBaseURL, req.APIFormat, req.BillingType, req.Status, req.SortOrder, compatSet, compatArg, id,
+	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &compatScan, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MODEL_PROVIDER_NOT_FOUND",
@@ -1435,6 +1486,9 @@ func PatchModelProvider(c *gin.Context) {
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
+	}
+	if len(compatScan) > 0 {
+		p.CompatPrefixes = []string(compatScan)
 	}
 
 	cache.Delete(context.Background(), "model_providers:all")
