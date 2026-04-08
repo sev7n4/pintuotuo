@@ -19,7 +19,7 @@ import {
   EditOutlined,
   DeleteOutlined,
 } from '@ant-design/icons';
-import { api } from '@services/api';
+import api from '@services/api';
 
 interface RoutingStrategyConfig {
   id: number;
