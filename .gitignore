@@ -36,6 +36,7 @@ out/
 # Go
 bin/
 vendor/
+.gomodcache/
 !**/go.sum
 *.exe
 *.exe~

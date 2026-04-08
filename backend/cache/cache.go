@@ -204,8 +204,9 @@ func SKUKey(id int) string {
 	return fmt.Sprintf("sku:%d", id)
 }
 
-func SKUListKey(page, perPage int, spuID, skuType, status string) string {
-	return fmt.Sprintf("skus:list:%s:%s:%s:page:%d:limit:%d", spuID, skuType, status, page, perPage)
+func SKUListKey(page, perPage int, spuID, skuType, scope, skuStatus, spuStatus, provider, q, misaligned string) string {
+	return fmt.Sprintf("skus:list:%s:%s:%s:%s:%s:%s:%s:%s:page:%d:limit:%d",
+		spuID, skuType, scope, skuStatus, spuStatus, provider, q, misaligned, page, perPage)
 }
 
 func ComputePointBalanceKey(userID int) string {

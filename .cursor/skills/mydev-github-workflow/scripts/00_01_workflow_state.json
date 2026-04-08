@@ -1,34 +1,31 @@
 {
-  "current_step": 14,
+  "current_step": 9,
   "current_fix_cases": [
-    "UT-BE-CREATE-MODEL-PROVIDER",
-    "IT-BE-ADMIN-MODEL-PROVIDER-POST-AUTH",
-    "FE-ADMIN-MODEL-PROVIDER-CREATE-MODAL"
+    "UT-BE-sku_admin_list_filters",
+    "UT-BE-ResolveAdminSKUListScope",
+    "FE-typecheck-AdminSKUs"
   ],
   "retry_count": 0,
-  "pr_number": 204,
-  "merged": true,
-  "branch": "feature/admin-model-provider-create",
+  "pr_number": null,
+  "merged": false,
+  "branch": "feature/admin-sku-list-ops-clarity",
   "local_validation": "passed",
   "ci_status": {
-    "cicd": "passed",
-    "integration": "passed",
-    "e2e": "passed",
-    "deploy": "passed"
+    "cicd": "pending",
+    "integration": "pending",
+    "e2e": "pending",
+    "deploy": "pending"
   },
   "error_history": [],
-  "created_at": "2026-04-07T14:00:00Z",
-  "updated_at": "2026-04-07T15:18:54Z",
+  "created_at": "2026-04-07T16:00:00Z",
+  "updated_at": "2026-04-07T16:30:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "POST /admin/model-providers 创建厂商；Admin 新增厂商表单；迁移 038 插入 minimax / moonshot / stepfun",
+    "task": "管理端 SKU 列表：商户可选范围对齐、全部视图与筛选、SPU 下架防呆与列表字段",
     "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "validation_note": "backend: GOMODCACHE/GOCACHE 于仓库 .cache 下 go test ./...；frontend: npm run type-check",
-    "next_action": "completed",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/204",
-    "deploy_run_id": 24087868849,
-    "deploy_run_url": "https://github.com/sev7n4/pintuotuo/actions/runs/24087868849",
-    "deploy_note": "Deploy to Tencent Cloud 随 main push 触发，#204 对应 run completed:success"
+    "validation_note": "backend: GOMODCACHE 指向可写目录时 go test ./handlers/...；frontend: npm run type-check",
+    "next_action": "push branch and open PR; monitor CI",
+    "pr_url": null
   }
 }

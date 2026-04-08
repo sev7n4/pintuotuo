@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Card,
   Table,
@@ -17,6 +17,9 @@ import {
   Switch,
   Divider,
   Grid,
+  Segmented,
+  Checkbox,
+  Alert,
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
@@ -34,10 +37,15 @@ const AdminSKUs = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSKU, setEditingSKU] = useState<SKUWithSPU | null>(null);
   const [form] = Form.useForm();
+  const [listScope, setListScope] = useState<'sellable' | 'all'>('sellable');
   const [filters, setFilters] = useState({
     spu_id: '',
     type: '',
-    status: 'active',
+    sku_status: 'all' as 'all' | 'active' | 'inactive',
+    spu_status: '' as '' | 'active' | 'inactive',
+    provider: '',
+    q: '',
+    misaligned: false,
   });
   const [pagination, setPagination] = useState({
     current: 1,
@@ -46,21 +54,42 @@ const AdminSKUs = () => {
   });
   const [selectedSKUType, setSelectedSKUType] = useState<string>('token_pack');
 
+  const providerOptions = useMemo(
+    () => [...new Set(spus.map((s) => s.model_provider))].filter(Boolean).sort(),
+    [spus]
+  );
+
   useEffect(() => {
     fetchSKUs();
+  }, [listScope, filters, pagination.current, pagination.pageSize]);
+
+  useEffect(() => {
     fetchSPUs();
-  }, [filters, pagination.current, pagination.pageSize]);
+  }, []);
 
   const fetchSKUs = async () => {
     setLoading(true);
     try {
-      const response = await skuService.getSKUs({
+      const params: Parameters<typeof skuService.getSKUs>[0] = {
         page: pagination.current,
         per_page: pagination.pageSize,
-        ...(filters.spu_id ? { spu_id: parseInt(filters.spu_id, 10) } : {}),
-        ...(filters.type ? { type: filters.type } : {}),
-        ...(filters.status ? { status: filters.status } : {}),
-      });
+        scope: listScope,
+      };
+      if (filters.spu_id) params.spu_id = parseInt(filters.spu_id, 10);
+      if (filters.type) params.type = filters.type;
+      if (listScope === 'all') {
+        params.status = filters.sku_status === 'all' ? 'all' : filters.sku_status;
+        if (filters.spu_status) params.spu_status = filters.spu_status;
+        if (filters.provider) params.provider = filters.provider;
+        const qq = filters.q.trim();
+        if (qq) params.q = qq;
+        if (filters.misaligned) params.misaligned = '1';
+      } else {
+        if (filters.provider) params.provider = filters.provider;
+        const qq = filters.q.trim();
+        if (qq) params.q = qq;
+      }
+      const response = await skuService.getSKUs(params);
       setSKUs(response.data.data || []);
       setPagination((prev) => ({ ...prev, total: response.data.total }));
     } catch (e) {
@@ -72,7 +101,7 @@ const AdminSKUs = () => {
 
   const fetchSPUs = async () => {
     try {
-      const response = await skuService.getSPUs({ status: 'active', per_page: 100 });
+      const response = await skuService.getSPUs({ status: 'all', per_page: 200 });
       setSPUs(response.data.data || []);
     } catch {
       console.error('Failed to fetch SPUs');
@@ -115,9 +144,27 @@ const AdminSKUs = () => {
     }
   };
 
+  const confirmInactiveSPUWithActiveSKU = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      Modal.confirm({
+        title: 'SPU 已下架',
+        content:
+          '商户端仍无法勾选该 SKU（需 SPU 在售）。若仍保存为「在售」，仅作后台记录，请确认是否继续。',
+        okText: '仍要保存',
+        cancelText: '取消',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+      const spu = spus.find((s) => s.id === values.spu_id);
+      if (spu && spu.status !== 'active' && values.status === 'active') {
+        const ok = await confirmInactiveSPUWithActiveSKU();
+        if (!ok) return;
+      }
 
       if (editingSKU) {
         const updateData: SKUUpdateRequest = {
@@ -179,6 +226,23 @@ const AdminSKUs = () => {
       key: 'sku_type',
       width: 100,
       render: (type: string) => <Tag color="blue">{SKU_TYPE_LABELS[type]}</Tag>,
+    },
+    {
+      title: 'SPU状态',
+      key: 'spu_status',
+      width: 96,
+      render: (_: unknown, record: SKUWithSPU) => (
+        <Tag color={record.spu_status === 'active' ? 'processing' : 'default'}>
+          {record.spu_status === 'active' ? 'SPU在售' : 'SPU下架'}
+        </Tag>
+      ),
+    },
+    {
+      title: '商户可选',
+      key: 'sellable',
+      width: 92,
+      render: (_: unknown, record: SKUWithSPU) =>
+        record.sellable === true ? <Tag color="success">是</Tag> : <Tag color="warning">否</Tag>,
     },
     {
       title: '规格',
@@ -286,30 +350,48 @@ const AdminSKUs = () => {
   return (
     <div>
       <Card>
+        <Alert
+          type="info"
+          showIcon
+          message="说明：商户上架可勾选的 SKU =「SKU 在售」且「所属 SPU 在售」。默认列表与商户端一致；切换到「全部 SKU」可查看下架、配置异常等。"
+          style={{ marginBottom: 16 }}
+        />
+        <Segmented
+          value={listScope}
+          onChange={(v) => {
+            setListScope(v as 'sellable' | 'all');
+            setPagination((p) => ({ ...p, current: 1 }));
+          }}
+          options={[
+            { label: '商户可选（默认）', value: 'sellable' },
+            { label: '全部 SKU', value: 'all' },
+          ]}
+          style={{ marginBottom: 16 }}
+        />
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col xs={24} sm={12} md={8}>
+          <Col xs={24} sm={12} md={6}>
             <Select
-              value={filters.spu_id}
-              onChange={(v) => setFilters({ ...filters, spu_id: v })}
+              value={filters.spu_id || undefined}
+              onChange={(v) => setFilters({ ...filters, spu_id: v ?? '' })}
               style={{ width: '100%' }}
-              placeholder="选择SPU"
+              placeholder="筛选 SPU"
               allowClear
               showSearch
               optionFilterProp="label"
             >
               {spus.map((s) => (
-                <Select.Option key={s.id} value={s.id} label={s.name}>
+                <Select.Option key={s.id} value={String(s.id)} label={s.name}>
                   {s.name}
                 </Select.Option>
               ))}
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={8}>
+          <Col xs={24} sm={12} md={6}>
             <Select
-              value={filters.type}
-              onChange={(v) => setFilters({ ...filters, type: v })}
+              value={filters.type || undefined}
+              onChange={(v) => setFilters({ ...filters, type: v ?? '' })}
               style={{ width: '100%' }}
-              placeholder="类型"
+              placeholder="SKU 类型"
               allowClear
             >
               <Select.Option value="token_pack">Token包</Select.Option>
@@ -318,10 +400,75 @@ const AdminSKUs = () => {
               <Select.Option value="trial">试用套餐</Select.Option>
             </Select>
           </Col>
-          <Col xs={24} sm={24} md={8} style={{ textAlign: 'right' }}>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} block={!screens?.md}>
-              新增SKU
-            </Button>
+          <Col xs={24} sm={12} md={6}>
+            <Select
+              value={filters.provider || undefined}
+              onChange={(v) => setFilters({ ...filters, provider: v ?? '' })}
+              style={{ width: '100%' }}
+              placeholder="厂商 model_provider"
+              allowClear
+              showSearch
+            >
+              {providerOptions.map((p) => (
+                <Select.Option key={p} value={p}>
+                  {p}
+                </Select.Option>
+              ))}
+            </Select>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Input
+              allowClear
+              placeholder="编码 / SPU名 / spu_code"
+              value={filters.q}
+              onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+            />
+          </Col>
+        </Row>
+        {listScope === 'all' && (
+          <Row gutter={[16, 16]} style={{ marginBottom: 16 }} align="middle">
+            <Col xs={24} sm={8} md={5}>
+              <Select
+                value={filters.sku_status}
+                onChange={(v) => setFilters({ ...filters, sku_status: v })}
+                style={{ width: '100%' }}
+                placeholder="SKU 状态"
+              >
+                <Select.Option value="all">全部状态</Select.Option>
+                <Select.Option value="active">SKU 在售</Select.Option>
+                <Select.Option value="inactive">SKU 下架</Select.Option>
+              </Select>
+            </Col>
+            <Col xs={24} sm={8} md={5}>
+              <Select
+                value={filters.spu_status || undefined}
+                onChange={(v) => setFilters({ ...filters, spu_status: (v ?? '') as '' | 'active' | 'inactive' })}
+                style={{ width: '100%' }}
+                placeholder="SPU 状态"
+                allowClear
+              >
+                <Select.Option value="active">SPU 在售</Select.Option>
+                <Select.Option value="inactive">SPU 下架</Select.Option>
+              </Select>
+            </Col>
+            <Col xs={24} sm={12} md={10}>
+              <Checkbox
+                checked={filters.misaligned}
+                onChange={(e) => setFilters({ ...filters, misaligned: e.target.checked })}
+              >
+                仅「SKU在售但SPU下架」
+              </Checkbox>
+            </Col>
+          </Row>
+        )}
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={24} style={{ textAlign: screens?.md ? 'right' : 'left' }}>
+            <Space wrap>
+              <Button onClick={() => fetchSKUs()}>刷新</Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+                新增SKU
+              </Button>
+            </Space>
           </Col>
         </Row>
 
@@ -330,7 +477,7 @@ const AdminSKUs = () => {
           dataSource={skus}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1380 }}
           pagination={{
             ...pagination,
             showSizeChanger: true,
@@ -366,9 +513,27 @@ const AdminSKUs = () => {
                   {spus.map((s) => (
                     <Select.Option key={s.id} value={s.id} label={s.name}>
                       {s.name} ({s.spu_code})
+                      {s.status !== 'active' ? ' · SPU下架' : ''}
                     </Select.Option>
                   ))}
                 </Select>
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.spu_id !== cur.spu_id}>
+                {() => {
+                  const sid = form.getFieldValue('spu_id') as number | undefined;
+                  const spu = spus.find((x) => x.id === sid);
+                  if (!spu || spu.status === 'active') return null;
+                  return (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      style={{ marginBottom: 16 }}
+                      message="该 SPU 已下架：商户端无法勾选此 SKU；请先上架 SPU 或仍保存为后台记录。"
+                    />
+                  );
+                }}
               </Form.Item>
             </Col>
             <Col span={12}>

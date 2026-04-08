@@ -428,6 +428,81 @@ func DeleteSPU(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "SPU deleted successfully"})
 }
 
+// ResolveAdminSKUListScope 解析管理端 SKU 列表 scope（供单测与 ListSKUs 使用）。
+// 未传 scope 且未传 status → sellable；传了 status → all；status=all 表示不按 SKU 状态过滤。
+func ResolveAdminSKUListScope(scopeQuery, statusQuery string) (scope string, skuStatus string) {
+	scope = strings.TrimSpace(scopeQuery)
+	explicitStatus := strings.TrimSpace(statusQuery)
+	statusMeansAllSKUs := explicitStatus == "all"
+	if statusMeansAllSKUs {
+		explicitStatus = ""
+	}
+	if scope == "" {
+		if explicitStatus == "" && !statusMeansAllSKUs {
+			scope = "sellable"
+		} else {
+			scope = "all"
+		}
+	}
+	if scope != "sellable" && scope != "all" {
+		scope = "sellable"
+	}
+	return scope, explicitStatus
+}
+
+func resolveAdminSKUScope(c *gin.Context) (scope string, skuStatus string) {
+	return ResolveAdminSKUListScope(c.Query("scope"), c.Query("status"))
+}
+
+// adminSKUListFilters builds WHERE (JOIN spus) for admin SKU list. scope=sellable → SKU+SPU 均在售（与商户可选列表一致）。
+func adminSKUListFilters(scope, skuStatus, spuStatus, provider, q string, misaligned bool, spuID, skuType string) (where string, args []interface{}) {
+	parts := []string{"1=1"}
+	args = []interface{}{}
+	n := 1
+
+	if scope == "sellable" {
+		parts = append(parts, "s.status = 'active'", "sp.status = 'active'")
+	} else {
+		if skuStatus == "active" || skuStatus == "inactive" {
+			parts = append(parts, fmt.Sprintf("s.status = $%d", n))
+			args = append(args, skuStatus)
+			n++
+		}
+		if spuStatus == "active" || spuStatus == "inactive" {
+			parts = append(parts, fmt.Sprintf("sp.status = $%d", n))
+			args = append(args, spuStatus)
+			n++
+		}
+	}
+
+	if misaligned {
+		parts = append(parts, "s.status = 'active'", "sp.status = 'inactive'")
+	}
+	if provider != "" {
+		parts = append(parts, fmt.Sprintf("sp.model_provider = $%d", n))
+		args = append(args, provider)
+		n++
+	}
+	if q != "" {
+		pat := "%" + q + "%"
+		parts = append(parts, fmt.Sprintf("(s.sku_code ILIKE $%d OR sp.name ILIKE $%d OR sp.spu_code ILIKE $%d)", n, n+1, n+2))
+		args = append(args, pat, pat, pat)
+		n += 3
+	}
+	if spuID != "" {
+		parts = append(parts, fmt.Sprintf("s.spu_id = $%d", n))
+		args = append(args, idToInt(spuID))
+		n++
+	}
+	if skuType != "" {
+		parts = append(parts, fmt.Sprintf("s.sku_type = $%d", n))
+		args = append(args, skuType)
+		n++
+	}
+
+	return strings.Join(parts, " AND "), args
+}
+
 func ListSKUs(c *gin.Context) {
 	if !ensureAdmin(c) {
 		return
@@ -437,7 +512,11 @@ func ListSKUs(c *gin.Context) {
 	perPage := c.DefaultQuery("per_page", "20")
 	spuID := c.Query("spu_id")
 	skuType := c.Query("type")
-	status := c.DefaultQuery("status", "active")
+	scope, skuStatus := resolveAdminSKUScope(c)
+	spuStatus := strings.TrimSpace(c.Query("spu_status"))
+	provider := strings.TrimSpace(c.Query("provider"))
+	q := strings.TrimSpace(c.Query("q"))
+	misaligned := c.Query("misaligned") == "1" || strings.EqualFold(c.Query("misaligned"), "true")
 
 	pageNum, _ := strconv.Atoi(page)
 	perPageNum, _ := strconv.Atoi(perPage)
@@ -449,8 +528,12 @@ func ListSKUs(c *gin.Context) {
 		perPageNum = 20
 	}
 
+	misalignedKey := "0"
+	if misaligned {
+		misalignedKey = "1"
+	}
 	ctx := context.Background()
-	cacheKey := cache.SKUListKey(pageNum, perPageNum, spuID, skuType, status)
+	cacheKey := cache.SKUListKey(pageNum, perPageNum, spuID, skuType, scope, skuStatus, spuStatus, provider, q, misalignedKey)
 
 	if cachedList, err := cache.Get(ctx, cacheKey); err == nil {
 		var cachedData struct {
@@ -468,36 +551,22 @@ func ListSKUs(c *gin.Context) {
 	offset := (pageNum - 1) * perPageNum
 	db := config.GetDB()
 
+	whereClause, baseArgs := adminSKUListFilters(scope, skuStatus, spuStatus, provider, q, misaligned, spuID, skuType)
+	limitPos := len(baseArgs) + 1
+	offsetPos := len(baseArgs) + 2
+
 	query := `SELECT s.id, s.spu_id, s.sku_code, s.merchant_id, s.sku_type, s.token_amount, s.compute_points, 
 		s.subscription_period, s.is_unlimited, s.fair_use_limit, s.tpm_limit, s.rpm_limit, s.concurrent_requests,
 		s.valid_days, s.retail_price, s.wholesale_price, s.original_price, s.stock, s.daily_limit,
 		s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
 		s.is_trial, s.trial_duration_days, s.status, s.is_promoted, s.sales_count, s.created_at, s.updated_at,
-		sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier
-		FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE 1=1`
-	args := []interface{}{}
-	argPos := 1
+		sp.name as spu_name, sp.status as spu_status, sp.model_provider, sp.model_name, sp.model_tier
+		FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE ` + whereClause +
+		fmt.Sprintf(" ORDER BY s.created_at DESC LIMIT $%d OFFSET $%d", limitPos, offsetPos)
 
-	if status != "" && status != allProductStatus {
-		query += " AND s.status = $" + strconv.Itoa(argPos)
-		args = append(args, status)
-		argPos++
-	}
-	if spuID != "" {
-		query += " AND s.spu_id = $" + strconv.Itoa(argPos)
-		args = append(args, idToInt(spuID))
-		argPos++
-	}
-	if skuType != "" {
-		query += " AND s.sku_type = $" + strconv.Itoa(argPos)
-		args = append(args, skuType)
-		argPos++
-	}
+	listArgs := append(append([]interface{}{}, baseArgs...), perPageNum, offset)
 
-	query += " ORDER BY s.created_at DESC LIMIT $" + strconv.Itoa(argPos) + " OFFSET $" + strconv.Itoa(argPos+1)
-	args = append(args, perPageNum, offset)
-
-	rows, err := db.Query(query, args...)
+	rows, err := db.Query(query, listArgs...)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
@@ -523,7 +592,7 @@ func ListSKUs(c *gin.Context) {
 			&s.ValidDays, &s.RetailPrice, &wholesalePrice, &originalPrice, &s.Stock, &dailyLimit,
 			&s.GroupEnabled, &s.MinGroupSize, &s.MaxGroupSize, &groupDiscountRate,
 			&s.IsTrial, &trialDurationDays, &s.Status, &s.IsPromoted, &s.SalesCount, &s.CreatedAt, &s.UpdatedAt,
-			&s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier)
+			&s.SPUName, &s.SpuStatus, &s.ModelProvider, &s.ModelName, &s.ModelTier)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -570,27 +639,16 @@ func ListSKUs(c *gin.Context) {
 			s.TrialDurationDays = int(trialDurationDays.Int64)
 		}
 
+		s.Sellable = s.Status == merchantStatusActive && s.SpuStatus == merchantStatusActive
 		skus = append(skus, s)
 	}
 
-	countQuery := "SELECT COUNT(*) FROM skus s WHERE 1=1"
-	countArgs := []interface{}{}
-
-	if status != "" && status != allProductStatus {
-		countQuery += " AND s.status = $" + strconv.Itoa(len(countArgs)+1)
-		countArgs = append(countArgs, status)
-	}
-	if spuID != "" {
-		countQuery += " AND s.spu_id = $" + strconv.Itoa(len(countArgs)+1)
-		countArgs = append(countArgs, idToInt(spuID))
-	}
-	if skuType != "" {
-		countQuery += " AND s.sku_type = $" + strconv.Itoa(len(countArgs)+1)
-		countArgs = append(countArgs, skuType)
-	}
-
+	countQuery := "SELECT COUNT(*) FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE " + whereClause
 	var total int
-	db.QueryRow(countQuery, countArgs...).Scan(&total)
+	if err := db.QueryRow(countQuery, baseArgs...).Scan(&total); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	result := gin.H{
 		"total":    total,
@@ -648,7 +706,7 @@ func GetSKUByID(c *gin.Context) {
 		s.valid_days, s.retail_price, s.wholesale_price, s.original_price, s.stock, s.daily_limit,
 		s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
 		s.is_trial, s.trial_duration_days, s.status, s.is_promoted, s.sales_count, s.created_at, s.updated_at,
-		sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier
+		sp.name as spu_name, sp.status as spu_status, sp.model_provider, sp.model_name, sp.model_tier
 		FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.id = $1`,
 		skuID,
 	).Scan(&s.ID, &s.SPUID, &s.SKUCode, &merchantID, &s.SKUType, &tokenAmount, &computePoints,
@@ -656,7 +714,7 @@ func GetSKUByID(c *gin.Context) {
 		&s.ValidDays, &s.RetailPrice, &wholesalePrice, &originalPrice, &s.Stock, &dailyLimit,
 		&s.GroupEnabled, &s.MinGroupSize, &s.MaxGroupSize, &groupDiscountRate,
 		&s.IsTrial, &trialDurationDays, &s.Status, &s.IsPromoted, &s.SalesCount, &s.CreatedAt, &s.UpdatedAt,
-		&s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier)
+		&s.SPUName, &s.SpuStatus, &s.ModelProvider, &s.ModelName, &s.ModelTier)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
@@ -703,6 +761,8 @@ func GetSKUByID(c *gin.Context) {
 	if trialDurationDays.Valid {
 		s.TrialDurationDays = int(trialDurationDays.Int64)
 	}
+
+	s.Sellable = s.Status == merchantStatusActive && s.SpuStatus == merchantStatusActive
 
 	if skuJSON, err := json.Marshal(s); err == nil {
 		cache.Set(ctx, cacheKey, string(skuJSON), cache.ProductCacheTTL)
