@@ -1,34 +1,38 @@
 {
-  "current_step": 14,
+  "current_step": 12,
   "current_fix_cases": [
-    "BUG-ADMIN-SKU-CREATE-500-SUBSCRIPTION-PERIOD",
-    "UT-BE-VALIDATE-SKU-CREATE",
-    "FE-ADMIN-SKU-API-ERROR-MESSAGE"
+    "UT-BE-sku_admin_list_filters",
+    "UT-BE-ResolveAdminSKUListScope",
+    "FE-typecheck-AdminSKUs"
   ],
-  "retry_count": 0,
-  "pr_number": 206,
-  "merged": true,
-  "branch": "fix/admin-sku-create-500",
+  "retry_count": 1,
+  "pr_number": 209,
+  "merged": false,
+  "branch": "feature/admin-sku-list-ops-clarity",
   "local_validation": "passed",
   "ci_status": {
     "cicd": "passed",
     "integration": "passed",
     "e2e": "passed",
-    "deploy": "passed"
+    "deploy": "pending"
   },
-  "error_history": [],
-  "created_at": "2026-04-07T15:30:00Z",
-  "updated_at": "2026-04-07T17:00:00Z",
+  "error_history": [
+    {
+      "at": "2026-04-08T02:00:00Z",
+      "run_id": 24113525708,
+      "phase": "cicd",
+      "summary": "golangci-lint: goconst (merchant_sku all, sku sellable), ineffassign n++ — fixed in 1b18e19"
+    }
+  ],
+  "created_at": "2026-04-07T16:00:00Z",
+  "updated_at": "2026-04-08T02:45:00Z",
   "metadata": {
     "repo": "pintuotuo",
-    "task": "SKU CreateSKU：subscription_period 空串改 NULL；按类型校验；PQ 映射；RespondWithError details；Admin getApiErrorMessage",
-    "issue_type": "bugfix",
+    "task": "管理端 SKU 列表：商户可选范围对齐、全部视图与筛选、SPU 下架防呆与列表字段",
+    "issue_type": "feature",
     "skill": "mydev-github-workflow",
-    "validation_note": "go test ./handlers/... ./middleware/...；npm run type-check",
-    "next_action": "completed",
-    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/206",
-    "deploy_run_id": 24091351933,
-    "deploy_run_url": "https://github.com/sev7n4/pintuotuo/actions/runs/24091351933",
-    "deploy_note": "Deploy to Tencent Cloud #206：run 24091351933 completed:success（用户确认已部署成功）"
+    "validation_note": "PR #209 CI 全绿；已 merge origin/main 解决 workflow 状态冲突；待 squash 合并",
+    "next_action": "在 GitHub 上 squash merge #209（或 gh pr merge 209 --squash）；合并后观察 deploy-tencent",
+    "pr_url": "https://github.com/sev7n4/pintuotuo/pull/209"
   }
 }

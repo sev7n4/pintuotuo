@@ -52,7 +52,14 @@ export const skuService = {
     per_page?: number;
     spu_id?: number;
     type?: string;
+    /** SKU 状态：active | inactive | all（仅 scope=all 时生效） */
     status?: string;
+    /** sellable=商户可选；all=全部 SKU */
+    scope?: 'sellable' | 'all';
+    spu_status?: string;
+    provider?: string;
+    q?: string;
+    misaligned?: string;
   }) =>
     api.get<{ total: number; page: number; per_page: number; data: SKUWithSPU[] }>('/admin/skus', {
       params,

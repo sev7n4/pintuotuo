@@ -137,6 +137,10 @@ export interface SKU {
 
 export interface SKUWithSPU extends SKU {
   spu_name: string;
+  /** 关联 SPU 上下架状态 */
+  spu_status?: string;
+  /** SKU+SPU 均在售时商户端可选，与 /merchants/skus/available 一致 */
+  sellable?: boolean;
   model_provider: string;
   model_name: string;
   model_tier: string;
