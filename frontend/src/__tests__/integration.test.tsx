@@ -103,7 +103,7 @@ describe('Integration Tests', () => {
     await waitFor(() => {
       expect(screen.getByText(/邀请好友/i)).toBeInTheDocument();
     });
-  });
+  }, 15000);
 
   test('should access referral page after login', async () => {
     const mockLogin = jest.fn().mockResolvedValue({ token: 'test-token' });

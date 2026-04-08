@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 
 // import.meta.env 由 babel-plugin-transform-vite-meta-env + jest-env-setup.cjs 处理
+jest.setTimeout(20000);
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

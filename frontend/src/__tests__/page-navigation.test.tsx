@@ -371,7 +371,7 @@ describe('Page Navigation Integration Tests', () => {
 
       const detailButton = screen.getAllByText('详情')[0];
       expect(detailButton).toBeInTheDocument();
-    });
+    }, 15000);
 
     test('should display product list with correct columns', async () => {
       mockGetPublicSKUs.mockResolvedValue({

@@ -59,11 +59,13 @@ func RegisterUserRoutes(router *gin.RouterGroup) {
 func RegisterAPIRoutes(router *gin.RouterGroup) {
 	api := router.Group("/proxy")
 	api.Use(middleware.AuthMiddleware())
+	api.Use(middleware.RateLimitMiddleware())
 	{
 		api.POST("/chat", handlers.ProxyAPIRequest)
 		api.POST("/completions", handlers.ProxyAPIRequest)
 		api.GET("/providers", handlers.GetAPIProviders)
 		api.GET("/usage", handlers.GetAPIUsageStats)
+		api.GET("/trace/:request_id", handlers.GetAPIRequestTrace)
 	}
 }
 
@@ -71,6 +73,7 @@ func RegisterAPIRoutes(router *gin.RouterGroup) {
 func RegisterOpenAICompatRoutes(router *gin.RouterGroup) {
 	openai := router.Group("/openai/v1")
 	openai.Use(middleware.APIKeyOrJWTAuthMiddleware())
+	openai.Use(middleware.RateLimitMiddleware())
 	{
 		openai.POST("/chat/completions", handlers.OpenAIChatCompletions)
 	}

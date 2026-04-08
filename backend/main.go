@@ -30,6 +30,9 @@ func init() {
 	if err := config.LoadConfig(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+	if err := middleware.ValidateSecurityConfig(); err != nil {
+		log.Fatalf("Failed security config validation: %v", err)
+	}
 	if err := utils.InitEncryption(); err != nil {
 		log.Fatalf("Failed to initialize encryption: %v", err)
 	}
@@ -78,6 +81,7 @@ func main() {
 	router.Use(middleware.CORSMiddleware())
 	router.Use(middleware.ErrorHandlingMiddleware())
 	router.Use(middleware.LoggingMiddleware())
+	router.Use(middleware.MetricsMiddleware())
 
 	router.Static("/uploads", "./uploads")
 
