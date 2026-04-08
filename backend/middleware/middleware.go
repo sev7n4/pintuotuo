@@ -24,12 +24,27 @@ var (
 	rateLimitMu    sync.Mutex
 )
 
+func isProductionEnv() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
+}
+
 func CORSMiddleware() gin.HandlerFunc {
 	allowList := parseAllowedOrigins()
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
-		if origin != "" && isOriginAllowed(origin, allowList) {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		allowOrigin := ""
+		if origin != "" {
+			if len(allowList) > 0 {
+				if allowList[origin] {
+					allowOrigin = origin
+				}
+			} else if !isProductionEnv() {
+				// 非生产且未配置白名单时反射 Origin，避免本地与 CI（Vite 端口 ≠ API 端口）跨域被浏览器拦截
+				allowOrigin = origin
+			}
+		}
+		if allowOrigin != "" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigin)
 			c.Writer.Header().Set("Vary", "Origin")
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
@@ -235,13 +250,6 @@ func parseAllowedOrigins() map[string]bool {
 		}
 	}
 	return out
-}
-
-func isOriginAllowed(origin string, allowList map[string]bool) bool {
-	if len(allowList) == 0 {
-		return false
-	}
-	return allowList[origin]
 }
 
 func mustParseInt(v string, fallback int) int {
