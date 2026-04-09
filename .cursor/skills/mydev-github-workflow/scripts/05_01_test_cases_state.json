@@ -1,41 +1,42 @@
 {
   "currentIssue": {
-    "id": "OPENAI-COMPAT-QUOTA-001",
-    "type": "fix",
-    "module": "api_proxy / openai_compat / merchant_apikey",
-    "branch": "fix/openai-compat-quota-verify-routing",
-    "title": "配额 NULL、compat_prefixes 解析、深度验证 OpenAI 格式"
+    "id": "ISSUE-PLATFORM-HEALTH-001",
+    "type": "feature",
+    "module": "services/platform_settings / health_scheduler / admin settings",
+    "branch": "feature/issue-platform-health-scheduler",
+    "title": "平台设置：健康调度成本配置、热更新、被动+主动健康"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-OPENAI-COMPAT-RESOLVE",
-        "name": "services.ResolveOpenAICompatModel slash + DB prefixes + default",
+        "id": "UT-PLATFORM-SETTINGS-VALIDATE",
+        "name": "TestValidateHealthSchedulerPlatformConfig",
         "status": "passed",
-        "file": "backend/services/openai_compat_resolve_test.go"
+        "file": "backend/services/platform_settings_test.go"
       },
       {
-        "id": "UT-HANDLERS-SHORT",
-        "name": "handlers package go test -short",
+        "id": "UT-ADMIN-PLATFORM-SETTINGS-FORBIDDEN",
+        "name": "TestGetAdminPlatformSettings_ForbiddenNonAdmin / TestUpdateAdminPlatformSettings_ForbiddenNonAdmin",
         "status": "passed",
-        "file": "backend/handlers"
-      },
-      {
-        "id": "FE-MERCHANT-QUOTA-UX",
-        "name": "MerchantAPIKeys.test.tsx",
-        "status": "passed",
-        "file": "frontend/src/pages/merchant/__tests__/MerchantAPIKeys.test.tsx"
+        "file": "backend/handlers/admin_platform_settings_test.go"
       }
     ],
     "integration": [],
-    "e2e": []
+    "e2e": [
+      {
+        "id": "E2E-PLATFORM-HEALTH-SETTINGS",
+        "name": "GitHub Actions CI on PR (full suite)",
+        "status": "pending",
+        "file": ".github/workflows"
+      }
+    ]
   },
   "statistics": {
     "total": 3,
-    "passed": 3,
+    "passed": 2,
     "failed": 0,
-    "pending": 0
+    "pending": 1
   },
-  "lastUpdated": "2026-04-08T15:40:00Z",
-  "workflowNote": "TDD：先补 ResolveOpenAICompatModel 单测与迁移种子前缀，再改 handler 与配额 SQL。"
+  "lastUpdated": "2026-04-09T12:00:00Z",
+  "workflowNote": "Step 5-7：单元测试已绿；E2E 待 PR 触发"
 }

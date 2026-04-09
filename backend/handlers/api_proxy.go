@@ -291,6 +291,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	resp, err := executeProviderRequestWithRetry(client, httpReq, retryPolicy)
 	if err != nil {
 		services.GetSmartRouter().RecordRequestResult(apiKey.ID, false)
+		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"API_REQUEST_FAILED",
 			"Failed to send request to provider",
@@ -300,10 +301,13 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 	defer resp.Body.Close()
-	services.GetSmartRouter().RecordRequestResult(apiKey.ID, resp.StatusCode < http.StatusInternalServerError && resp.StatusCode != http.StatusTooManyRequests)
+	proxyTransportOK := resp.StatusCode < http.StatusInternalServerError && resp.StatusCode != http.StatusTooManyRequests
+	services.GetSmartRouter().RecordRequestResult(apiKey.ID, proxyTransportOK)
+	recordHealthCheckerProxyOutcome(c, apiKey.ID, proxyTransportOK, startTime)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"RESPONSE_READ_FAILED",
 			"Failed to read response",
@@ -628,6 +632,19 @@ func shouldUseSmartRouting(userID int, requestID string) bool {
 		slot = -slot
 	}
 	return slot < percent
+}
+
+// recordHealthCheckerProxyOutcome 将上游请求成败写入 merchant_api_keys（被动健康），与 SmartRouter 熔断分离。
+func recordHealthCheckerProxyOutcome(c *gin.Context, apiKeyID int, success bool, startTime time.Time) {
+	if apiKeyID <= 0 {
+		return
+	}
+	latencyMs := int(time.Since(startTime).Milliseconds())
+	if err := services.NewHealthChecker().RecordRequestResult(c.Request.Context(), apiKeyID, success, latencyMs); err != nil {
+		logger.LogError(c.Request.Context(), "api_proxy", "RecordRequestResult failed", err, map[string]interface{}{
+			"api_key_id": apiKeyID,
+		})
+	}
 }
 
 func insertRoutingDecision(db *sql.DB, requestID string, userID int, req APIProxyRequest, strategy string, candidatesJSON []byte, selectedAPIKeyID int, latencyMs int) error {

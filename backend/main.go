@@ -56,6 +56,7 @@ func main() {
 
 	services.GetSmartRouter().ReloadRoutingStrategies()
 	services.StartRoutingStrategiesListener(config.DatabaseURL())
+	services.StartPlatformSettingsListener(config.DatabaseURL())
 
 	if err := cache.Init(); err != nil {
 		log.Fatalf("Failed to initialize Redis: %v", err)
@@ -79,6 +80,9 @@ func main() {
 	subscriptionScheduler = scheduler.NewSubscriptionScheduler(1*time.Hour, notifySvc)
 	subscriptionScheduler.Start()
 	defer subscriptionScheduler.Stop()
+
+	services.GetHealthScheduler().Start()
+	defer services.GetHealthScheduler().Stop()
 
 	router := gin.Default()
 

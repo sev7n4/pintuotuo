@@ -222,10 +222,14 @@ func (s *HealthChecker) RecordRequestResult(ctx context.Context, apiKeyID int, i
 	}
 
 	if isSuccess {
+		// 被动健康：真实请求成功时，将曾失败或尚未探测的状态收敛为 healthy，供 SmartRouter 等使用。
 		_, err := db.ExecContext(ctx, `
 			UPDATE merchant_api_keys 
 			SET consecutive_failures = 0, 
-			    health_status = CASE WHEN health_status IN ('unhealthy', 'degraded') THEN 'healthy' ELSE health_status END,
+			    health_status = CASE
+			      WHEN health_status IN ('unhealthy', 'degraded', 'unknown') OR health_status IS NULL THEN 'healthy'
+			      ELSE health_status
+			    END,
 			    last_health_check_at = CURRENT_TIMESTAMP
 			WHERE id = $1`,
 			apiKeyID,
