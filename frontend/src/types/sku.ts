@@ -117,6 +117,9 @@ export interface SKU {
   min_group_size: number;
   max_group_size: number;
   group_discount_rate?: number;
+  cost_input_rate?: number;
+  cost_output_rate?: number;
+  inherit_spu_cost?: boolean;
   is_trial: boolean;
   trial_duration_days?: number;
   status: string;
@@ -242,6 +245,9 @@ export interface SKUCreateRequest {
   min_group_size?: number;
   max_group_size?: number;
   group_discount_rate?: number;
+  cost_input_rate?: number;
+  cost_output_rate?: number;
+  inherit_spu_cost?: boolean;
   is_trial?: boolean;
   trial_duration_days?: number;
   status?: string;
@@ -258,6 +264,9 @@ export interface SKUUpdateRequest {
   min_group_size?: number;
   max_group_size?: number;
   group_discount_rate?: number;
+  cost_input_rate?: number;
+  cost_output_rate?: number;
+  inherit_spu_cost?: boolean;
   status?: string;
   is_promoted?: boolean;
 }

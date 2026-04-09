@@ -120,6 +120,9 @@ type SKU struct {
 	MinGroupSize       int       `json:"min_group_size"`
 	MaxGroupSize       int       `json:"max_group_size"`
 	GroupDiscountRate  float64   `json:"group_discount_rate,omitempty"`
+	CostInputRate      float64   `json:"cost_input_rate,omitempty"`
+	CostOutputRate     float64   `json:"cost_output_rate,omitempty"`
+	InheritSPUCost     bool      `json:"inherit_spu_cost"`
 	IsTrial            bool      `json:"is_trial"`
 	TrialDurationDays  int       `json:"trial_duration_days,omitempty"`
 	Status             string    `json:"status"`
@@ -247,6 +250,9 @@ type SKUCreateRequest struct {
 	MinGroupSize       int     `json:"min_group_size"`
 	MaxGroupSize       int     `json:"max_group_size"`
 	GroupDiscountRate  float64 `json:"group_discount_rate"`
+	CostInputRate      float64 `json:"cost_input_rate"`
+	CostOutputRate     float64 `json:"cost_output_rate"`
+	InheritSPUCost     bool    `json:"inherit_spu_cost"`
 	IsTrial            bool    `json:"is_trial"`
 	TrialDurationDays  int     `json:"trial_duration_days"`
 	Status             string  `json:"status"`
@@ -266,6 +272,9 @@ type SKUUpdateRequest struct {
 	MinGroupSize      int     `json:"min_group_size"`
 	MaxGroupSize      int     `json:"max_group_size"`
 	GroupDiscountRate float64 `json:"group_discount_rate"`
+	CostInputRate     float64 `json:"cost_input_rate"`
+	CostOutputRate    float64 `json:"cost_output_rate"`
+	InheritSPUCost    bool    `json:"inherit_spu_cost"`
 	Status            string  `json:"status"`
 	IsPromoted        bool    `json:"is_promoted"`
 }

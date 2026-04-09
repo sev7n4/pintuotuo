@@ -588,6 +588,7 @@ func ListSKUs(c *gin.Context) {
 		s.subscription_period, s.is_unlimited, s.fair_use_limit, s.tpm_limit, s.rpm_limit, s.concurrent_requests,
 		s.valid_days, s.retail_price, s.wholesale_price, s.original_price, s.stock, s.daily_limit,
 		s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
+		COALESCE(s.cost_input_rate, 0), COALESCE(s.cost_output_rate, 0), COALESCE(s.inherit_spu_cost, true),
 		s.is_trial, s.trial_duration_days, s.status, s.is_promoted, s.sales_count, s.created_at, s.updated_at,
 		sp.name as spu_name, sp.status as spu_status, sp.model_provider, sp.model_name, sp.model_tier
 		FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE ` + whereClause +
@@ -620,6 +621,7 @@ func ListSKUs(c *gin.Context) {
 			&subscriptionPeriod, &s.IsUnlimited, &fairUseLimit, &tpmLimit, &rpmLimit, &concurrentReqs,
 			&s.ValidDays, &s.RetailPrice, &wholesalePrice, &originalPrice, &s.Stock, &dailyLimit,
 			&s.GroupEnabled, &s.MinGroupSize, &s.MaxGroupSize, &groupDiscountRate,
+			&s.CostInputRate, &s.CostOutputRate, &s.InheritSPUCost,
 			&s.IsTrial, &trialDurationDays, &s.Status, &s.IsPromoted, &s.SalesCount, &s.CreatedAt, &s.UpdatedAt,
 			&s.SPUName, &s.SpuStatus, &s.ModelProvider, &s.ModelName, &s.ModelTier)
 		if err != nil {
@@ -734,6 +736,7 @@ func GetSKUByID(c *gin.Context) {
 		s.subscription_period, s.is_unlimited, s.fair_use_limit, s.tpm_limit, s.rpm_limit, s.concurrent_requests,
 		s.valid_days, s.retail_price, s.wholesale_price, s.original_price, s.stock, s.daily_limit,
 		s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
+		COALESCE(s.cost_input_rate, 0), COALESCE(s.cost_output_rate, 0), COALESCE(s.inherit_spu_cost, true),
 		s.is_trial, s.trial_duration_days, s.status, s.is_promoted, s.sales_count, s.created_at, s.updated_at,
 		sp.name as spu_name, sp.status as spu_status, sp.model_provider, sp.model_name, sp.model_tier
 		FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.id = $1`,
@@ -742,6 +745,7 @@ func GetSKUByID(c *gin.Context) {
 		&subscriptionPeriod, &s.IsUnlimited, &fairUseLimit, &tpmLimit, &rpmLimit, &concurrentReqs,
 		&s.ValidDays, &s.RetailPrice, &wholesalePrice, &originalPrice, &s.Stock, &dailyLimit,
 		&s.GroupEnabled, &s.MinGroupSize, &s.MaxGroupSize, &groupDiscountRate,
+		&s.CostInputRate, &s.CostOutputRate, &s.InheritSPUCost,
 		&s.IsTrial, &trialDurationDays, &s.Status, &s.IsPromoted, &s.SalesCount, &s.CreatedAt, &s.UpdatedAt,
 		&s.SPUName, &s.SpuStatus, &s.ModelProvider, &s.ModelName, &s.ModelTier)
 
@@ -901,6 +905,38 @@ func CreateSKU(c *gin.Context) {
 		return
 	}
 
+	inheritSPUCost := req.InheritSPUCost
+	if !req.InheritSPUCost && req.CostInputRate == 0 && req.CostOutputRate == 0 {
+		// 未显式传值时，保持默认继承
+		inheritSPUCost = true
+	}
+	costInputRate := req.CostInputRate
+	costOutputRate := req.CostOutputRate
+	if inheritSPUCost {
+		err = db.QueryRow(
+			`SELECT COALESCE(provider_input_rate, 0), COALESCE(provider_output_rate, 0) FROM spus WHERE id = $1`,
+			req.SPUID,
+		).Scan(&costInputRate, &costOutputRate)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"SPU_QUERY_FAILED",
+				"读取SPU参考成本失败",
+				http.StatusInternalServerError,
+				err,
+			))
+			return
+		}
+	}
+	if !inheritSPUCost && (costInputRate <= 0 || costOutputRate <= 0) {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SKU_COST_REQUIRED",
+			"关闭继承后，SKU输入/输出成本必须大于0",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
 	subscriptionPeriod := sqlNullableString(req.SubscriptionPeriod)
 
 	var sku models.SKU
@@ -909,15 +945,15 @@ func CreateSKU(c *gin.Context) {
 		 subscription_period, is_unlimited, fair_use_limit, tpm_limit, rpm_limit, concurrent_requests,
 		 valid_days, retail_price, wholesale_price, original_price, stock, daily_limit,
 		 group_enabled, min_group_size, max_group_size, group_discount_rate,
-		 is_trial, trial_duration_days, status, is_promoted) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) 
-		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, created_at, updated_at`,
+		 cost_input_rate, cost_output_rate, inherit_spu_cost, is_trial, trial_duration_days, status, is_promoted) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28) 
+		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, cost_input_rate, cost_output_rate, inherit_spu_cost, created_at, updated_at`,
 		req.SPUID, req.SKUCode, req.SKUType, req.TokenAmount, req.ComputePoints,
 		subscriptionPeriod, req.IsUnlimited, req.FairUseLimit, req.TPMLimit, req.RPMLimit, req.ConcurrentReqs,
 		req.ValidDays, req.RetailPrice, req.WholesalePrice, req.OriginalPrice, req.Stock, req.DailyLimit,
 		req.GroupEnabled, req.MinGroupSize, req.MaxGroupSize, req.GroupDiscountRate,
-		req.IsTrial, req.TrialDurationDays, req.Status, req.IsPromoted,
-	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.CreatedAt, &sku.UpdatedAt)
+		costInputRate, costOutputRate, inheritSPUCost, req.IsTrial, req.TrialDurationDays, req.Status, req.IsPromoted,
+	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.CostInputRate, &sku.CostOutputRate, &sku.InheritSPUCost, &sku.CreatedAt, &sku.UpdatedAt)
 
 	if err != nil {
 		var pqErr *pq.Error
@@ -981,6 +1017,41 @@ func UpdateSKU(c *gin.Context) {
 	}
 
 	db := config.GetDB()
+	var spuID int
+	if err := db.QueryRow("SELECT spu_id FROM skus WHERE id = $1", skuID).Scan(&spuID); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SKU_NOT_FOUND",
+			"SKU不存在",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+	costInputRate := req.CostInputRate
+	costOutputRate := req.CostOutputRate
+	if req.InheritSPUCost {
+		if err := db.QueryRow(
+			"SELECT COALESCE(provider_input_rate, 0), COALESCE(provider_output_rate, 0) FROM spus WHERE id = $1",
+			spuID,
+		).Scan(&costInputRate, &costOutputRate); err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"SPU_QUERY_FAILED",
+				"读取SPU参考成本失败",
+				http.StatusInternalServerError,
+				err,
+			))
+			return
+		}
+	}
+	if !req.InheritSPUCost && (costInputRate <= 0 || costOutputRate <= 0) {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SKU_COST_REQUIRED",
+			"关闭继承后，SKU输入/输出成本必须大于0",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
 	var sku models.SKU
 	err := db.QueryRow(
 		`UPDATE skus SET 
@@ -994,13 +1065,16 @@ func UpdateSKU(c *gin.Context) {
 		 max_group_size = CASE WHEN $8 > 0 THEN $8 ELSE max_group_size END,
 		 group_discount_rate = CASE WHEN $9 > 0 THEN $9 ELSE group_discount_rate END,
 		 status = COALESCE(NULLIF($10, ''), status),
-		 is_promoted = $11
-		 WHERE id = $12 
-		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, created_at, updated_at`,
+		 is_promoted = $11,
+		 cost_input_rate = $12,
+		 cost_output_rate = $13,
+		 inherit_spu_cost = $14
+		 WHERE id = $15 
+		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, cost_input_rate, cost_output_rate, inherit_spu_cost, created_at, updated_at`,
 		req.RetailPrice, req.WholesalePrice, req.OriginalPrice, req.Stock, req.DailyLimit,
 		req.GroupEnabled, req.MinGroupSize, req.MaxGroupSize, req.GroupDiscountRate,
-		req.Status, req.IsPromoted, skuID,
-	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.CreatedAt, &sku.UpdatedAt)
+		req.Status, req.IsPromoted, costInputRate, costOutputRate, req.InheritSPUCost, skuID,
+	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.CostInputRate, &sku.CostOutputRate, &sku.InheritSPUCost, &sku.CreatedAt, &sku.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(

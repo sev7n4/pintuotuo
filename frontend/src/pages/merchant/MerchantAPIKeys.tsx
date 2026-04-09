@@ -34,7 +34,9 @@ import { MerchantAPIKey, VerificationResult } from '@/types';
 import type { ModelProvider } from '@/types/sku';
 import api from '@/services/api';
 import { merchantService } from '@/services/merchant';
+import { merchantSkuService } from '@/services/merchantSku';
 import styles from './MerchantAPIKeys.module.css';
+import type { MerchantSKUDetail } from '@/types/merchantSku';
 
 /** GET /merchants/api-keys/:id/verification response shape */
 interface VerificationPollResponse {
@@ -109,6 +111,7 @@ const MerchantAPIKeys = () => {
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [modelProviders, setModelProviders] = useState<ModelProvider[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
+  const [merchantSKUs, setMerchantSKUs] = useState<MerchantSKUDetail[]>([]);
 
   useEffect(() => {
     fetchAPIKeys();
@@ -139,6 +142,27 @@ const MerchantAPIKeys = () => {
     };
   }, []);
 
+  useEffect(() => {
+    merchantSkuService
+      .getMerchantSKUs('active')
+      .then((data) => setMerchantSKUs(data || []))
+      .catch(() => setMerchantSKUs([]));
+  }, []);
+
+  const getCostSource = (key: MerchantAPIKey): { label: string; color: string; hint: string } => {
+    if ((key.cost_input_rate ?? 0) > 0 || (key.cost_output_rate ?? 0) > 0) {
+      return { label: 'Key自定义', color: 'blue', hint: '已在 API Key 直接配置' };
+    }
+    const linked = merchantSKUs.find((s) => s.api_key_id === key.id);
+    if (linked?.custom_pricing_enabled) {
+      return { label: 'SKU自定义', color: 'gold', hint: '来自商户上架SKU自定义成本' };
+    }
+    if (linked) {
+      return { label: 'SPU继承', color: 'green', hint: '来自SKU继承的SPU参考价' };
+    }
+    return { label: '未绑定', color: 'default', hint: '建议先绑定SKU继承默认成本' };
+  };
+
   const handleAdd = () => {
     setEditingKey(null);
     form.resetFields();
@@ -148,6 +172,18 @@ const MerchantAPIKeys = () => {
 
   const handleEdit = (record: MerchantAPIKey) => {
     setEditingKey(record);
+    const linked = merchantSKUs.find((s) => s.api_key_id === record.id);
+    const fallbackInput = linked
+      ? linked.custom_pricing_enabled
+        ? linked.cost_input_rate
+        : linked.spu_input_rate
+      : undefined;
+    const fallbackOutput = linked
+      ? linked.custom_pricing_enabled
+        ? linked.cost_output_rate
+        : linked.spu_output_rate
+      : undefined;
+    const fallbackMargin = linked?.profit_margin;
     const unlimited = record.quota_limit == null || record.quota_limit === 0;
     form.setFieldsValue({
       name: record.name,
@@ -156,9 +192,9 @@ const MerchantAPIKeys = () => {
       status: record.status,
       endpoint_url: record.endpoint_url,
       health_check_level: record.health_check_level,
-      cost_input_rate: record.cost_input_rate,
-      cost_output_rate: record.cost_output_rate,
-      profit_margin: record.profit_margin,
+      cost_input_rate: record.cost_input_rate ?? fallbackInput,
+      cost_output_rate: record.cost_output_rate ?? fallbackOutput,
+      profit_margin: record.profit_margin ?? fallbackMargin,
     });
     setModalVisible(true);
   };
@@ -371,7 +407,7 @@ const MerchantAPIKeys = () => {
           <div className={styles.quotaCell}>
             <Progress percent={percent} size="small" />
             <span className={styles.quotaText}>
-              ${usage.quota_used.toFixed(2)} / ${usage.quota_limit.toFixed(2)}
+              ¥{usage.quota_used.toFixed(2)} / ¥{usage.quota_limit.toFixed(2)}
             </span>
           </div>
         );
@@ -406,6 +442,19 @@ const MerchantAPIKeys = () => {
           )}
         </Space>
       ),
+    },
+    {
+      title: '成本来源',
+      key: 'cost_source',
+      render: (_: unknown, record: MerchantAPIKey) => {
+        const source = getCostSource(record);
+        return (
+          <Space direction="vertical" size={0}>
+            <Tag color={source.color}>{source.label}</Tag>
+            <span style={{ fontSize: 12, color: '#999' }}>{source.hint}</span>
+          </Space>
+        );
+      },
     },
     {
       title: '状态',
@@ -548,7 +597,7 @@ const MerchantAPIKeys = () => {
               !getFieldValue('unlimited_quota') ? (
                 <Form.Item
                   name="quota_limit"
-                  label="配额上限（美元）"
+                  label="配额上限（元）"
                   rules={[
                     { required: true, message: '请填写限额' },
                     { type: 'number', min: 0.01, message: '须大于 0' },
@@ -576,7 +625,7 @@ const MerchantAPIKeys = () => {
 
           <Divider>成本定价配置</Divider>
 
-          <Form.Item name="cost_input_rate" label="输入成本率（$/1K tokens）">
+          <Form.Item name="cost_input_rate" label="输入成本率（元/1K tokens）">
             <InputNumber
               min={0}
               precision={6}
@@ -585,7 +634,7 @@ const MerchantAPIKeys = () => {
             />
           </Form.Item>
 
-          <Form.Item name="cost_output_rate" label="输出成本率（$/1K tokens）">
+          <Form.Item name="cost_output_rate" label="输出成本率（元/1K tokens）">
             <InputNumber
               min={0}
               precision={6}

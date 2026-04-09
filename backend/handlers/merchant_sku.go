@@ -18,10 +18,12 @@ import (
 const merchantSKUStatusInactive = "inactive"
 const defaultMerchantProfitMargin = 20.0
 
-func resolveSPUCostBySKUID(db *sql.DB, skuID int) (float64, float64, error) {
+func resolveSKUDefaultCostBySKUID(db *sql.DB, skuID int) (float64, float64, error) {
 	var inputRate, outputRate float64
 	err := db.QueryRow(
-		`SELECT COALESCE(sp.provider_input_rate, 0), COALESCE(sp.provider_output_rate, 0)
+		`SELECT
+			CASE WHEN COALESCE(s.inherit_spu_cost, true) THEN COALESCE(sp.provider_input_rate, 0) ELSE COALESCE(s.cost_input_rate, 0) END,
+			CASE WHEN COALESCE(s.inherit_spu_cost, true) THEN COALESCE(sp.provider_output_rate, 0) ELSE COALESCE(s.cost_output_rate, 0) END
 		 FROM skus s
 		 JOIN spus sp ON sp.id = s.spu_id
 		 WHERE s.id = $1`,
@@ -399,7 +401,7 @@ func CreateMerchantSKU(c *gin.Context) {
 	}
 	if err == nil && existingStatus == merchantSKUStatusInactive {
 		var spuInputRate, spuOutputRate float64
-		spuInputRate, spuOutputRate, err = resolveSPUCostBySKUID(db, req.SKUID)
+		spuInputRate, spuOutputRate, err = resolveSKUDefaultCostBySKUID(db, req.SKUID)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -462,7 +464,7 @@ func CreateMerchantSKU(c *gin.Context) {
 		}
 	}
 
-	spuInputRate, spuOutputRate, err := resolveSPUCostBySKUID(db, req.SKUID)
+	spuInputRate, spuOutputRate, err := resolveSKUDefaultCostBySKUID(db, req.SKUID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
