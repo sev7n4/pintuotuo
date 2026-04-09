@@ -1019,7 +1019,9 @@ func UpdateSKU(c *gin.Context) {
 
 	db := config.GetDB()
 	var spuID int
-	if err := db.QueryRow("SELECT spu_id FROM skus WHERE id = $1", skuID).Scan(&spuID); err != nil {
+	var dbInheritSPUCost bool
+	var dbCostInputRate, dbCostOutputRate float64
+	if err := db.QueryRow("SELECT spu_id, inherit_spu_cost, COALESCE(cost_input_rate, 0), COALESCE(cost_output_rate, 0) FROM skus WHERE id = $1", skuID).Scan(&spuID, &dbInheritSPUCost, &dbCostInputRate, &dbCostOutputRate); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SKU_NOT_FOUND",
 			"SKU不存在",
@@ -1028,23 +1030,24 @@ func UpdateSKU(c *gin.Context) {
 		))
 		return
 	}
-	costInputRate := req.CostInputRate
-	costOutputRate := req.CostOutputRate
-	if req.InheritSPUCost {
-		if err := db.QueryRow(
-			"SELECT COALESCE(provider_input_rate, 0), COALESCE(provider_output_rate, 0) FROM spus WHERE id = $1",
-			spuID,
-		).Scan(&costInputRate, &costOutputRate); err != nil {
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"SPU_QUERY_FAILED",
-				"读取SPU参考成本失败",
-				http.StatusInternalServerError,
-				err,
-			))
-			return
-		}
+
+	var spuInputRate, spuOutputRate float64
+	if err := db.QueryRow(
+		"SELECT COALESCE(provider_input_rate, 0), COALESCE(provider_output_rate, 0) FROM spus WHERE id = $1",
+		spuID,
+	).Scan(&spuInputRate, &spuOutputRate); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SPU_QUERY_FAILED",
+			"读取SPU参考成本失败",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
 	}
-	if !req.InheritSPUCost && (costInputRate <= 0 || costOutputRate <= 0) {
+
+	inherit, costInputRate, costOutputRate := resolveSKUUpdateInherit(req, dbInheritSPUCost, dbCostInputRate, dbCostOutputRate, spuInputRate, spuOutputRate)
+
+	if !inherit && (costInputRate <= 0 || costOutputRate <= 0) {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SKU_COST_REQUIRED",
 			"关闭继承后，SKU输入/输出成本必须大于0",
@@ -1074,7 +1077,7 @@ func UpdateSKU(c *gin.Context) {
 		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, cost_input_rate, cost_output_rate, inherit_spu_cost, created_at, updated_at`,
 		req.RetailPrice, req.WholesalePrice, req.OriginalPrice, req.Stock, req.DailyLimit,
 		req.GroupEnabled, req.MinGroupSize, req.MaxGroupSize, req.GroupDiscountRate,
-		req.Status, req.IsPromoted, costInputRate, costOutputRate, req.InheritSPUCost, skuID,
+		req.Status, req.IsPromoted, costInputRate, costOutputRate, inherit, skuID,
 	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.CostInputRate, &sku.CostOutputRate, &sku.InheritSPUCost, &sku.CreatedAt, &sku.UpdatedAt)
 
 	if err != nil {
@@ -1095,6 +1098,24 @@ func UpdateSKU(c *gin.Context) {
 	cache.InvalidatePatterns(ctx, "spus:list:*")
 
 	c.JSON(http.StatusOK, gin.H{"data": sku})
+}
+
+func resolveSKUUpdateInherit(req models.SKUUpdateRequest, dbInherit bool, dbInputRate, dbOutputRate, spuInputRate, spuOutputRate float64) (inherit bool, inputRate, outputRate float64) {
+	if req.InheritSPUCost == nil {
+		return dbInherit, dbInputRate, dbOutputRate
+	}
+	if *req.InheritSPUCost {
+		return true, spuInputRate, spuOutputRate
+	}
+	reqInputRate := req.CostInputRate
+	reqOutputRate := req.CostOutputRate
+	if reqInputRate <= 0 {
+		reqInputRate = dbInputRate
+	}
+	if reqOutputRate <= 0 {
+		reqOutputRate = dbOutputRate
+	}
+	return false, reqInputRate, reqOutputRate
 }
 
 func DeleteSKU(c *gin.Context) {

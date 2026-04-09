@@ -274,7 +274,7 @@ type SKUUpdateRequest struct {
 	GroupDiscountRate float64 `json:"group_discount_rate"`
 	CostInputRate     float64 `json:"cost_input_rate"`
 	CostOutputRate    float64 `json:"cost_output_rate"`
-	InheritSPUCost    bool    `json:"inherit_spu_cost"`
+	InheritSPUCost    *bool   `json:"inherit_spu_cost"`
 	Status            string  `json:"status"`
 	IsPromoted        bool    `json:"is_promoted"`
 }
