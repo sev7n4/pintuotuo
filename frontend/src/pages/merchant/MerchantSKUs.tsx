@@ -15,6 +15,9 @@ import {
   Row,
   Col,
   Grid,
+  InputNumber,
+  Segmented,
+  Alert,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, ApiOutlined, ShopOutlined } from '@ant-design/icons';
 import { merchantSkuService } from '@/services/merchantSku';
@@ -43,6 +46,11 @@ const MerchantSKUs = () => {
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [selectedSKUs, setSelectedSKUs] = useState<number[]>([]);
   const [selectedAPIKey, setSelectedAPIKey] = useState<number | undefined>();
+  const [costGuideMode, setCostGuideMode] = useState<'official' | 'self_hosted'>('official');
+  const [customPricingEnabled, setCustomPricingEnabled] = useState(false);
+  const [customInputRate, setCustomInputRate] = useState<number | undefined>();
+  const [customOutputRate, setCustomOutputRate] = useState<number | undefined>();
+  const [customProfitMargin, setCustomProfitMargin] = useState<number>(20);
   const [submitting, setSubmitting] = useState(false);
   const [providerOptions, setProviderOptions] = useState<string[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
@@ -105,6 +113,11 @@ const MerchantSKUs = () => {
   const handleSelectSKU = () => {
     setSelectedSKUs([]);
     setSelectedAPIKey(undefined);
+    setCostGuideMode('official');
+    setCustomPricingEnabled(false);
+    setCustomInputRate(undefined);
+    setCustomOutputRate(undefined);
+    setCustomProfitMargin(20);
     setSelectModalVisible(true);
   };
 
@@ -116,10 +129,19 @@ const MerchantSKUs = () => {
 
     setSubmitting(true);
     try {
+      if (customPricingEnabled && (customInputRate == null || customOutputRate == null)) {
+        message.warning('自定义成本模式下，请填写输入/输出成本');
+        setSubmitting(false);
+        return;
+      }
       for (const skuId of selectedSKUs) {
         const data: MerchantSKUCreateRequest = {
           sku_id: skuId,
           api_key_id: selectedAPIKey,
+          custom_pricing_enabled: customPricingEnabled,
+          cost_input_rate: customPricingEnabled ? customInputRate : undefined,
+          cost_output_rate: customPricingEnabled ? customOutputRate : undefined,
+          profit_margin: customPricingEnabled ? customProfitMargin : undefined,
         };
         await merchantSkuService.createMerchantSKU(data);
       }
@@ -503,6 +525,31 @@ const MerchantSKUs = () => {
           />
 
           <div style={{ marginTop: 16 }}>
+            <Alert
+              type={costGuideMode === 'official' ? 'info' : 'warning'}
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={costGuideMode === 'official' ? '官方目录默认成本向导' : '自部署自定义成本向导'}
+              description={
+                costGuideMode === 'official'
+                  ? '默认继承平台目录（SPU）参考成本并同步到上架 SKU；适用于官方代理/托管场景。'
+                  : '若为自部署同名模型，建议填写真实推理成本。系统会显示官方参考价供对照，避免长期沿用官方默认。'
+              }
+            />
+            <Segmented
+              value={costGuideMode}
+              onChange={(v) => {
+                const mode = v as 'official' | 'self_hosted';
+                setCostGuideMode(mode);
+                setCustomPricingEnabled(mode === 'self_hosted');
+              }}
+              options={[
+                { label: '官方目录默认', value: 'official' },
+                { label: '自部署自定义', value: 'self_hosted' },
+              ]}
+              style={{ marginBottom: 12 }}
+            />
+
             <label style={{ display: 'block', marginBottom: 8 }}>选择API Key（可选）</label>
             <Select
               style={{ width: '100%' }}
@@ -520,6 +567,45 @@ const MerchantSKUs = () => {
                 </Select.Option>
               ))}
             </Select>
+
+            {customPricingEnabled && (
+              <Row gutter={12} style={{ marginTop: 12 }}>
+                <Col xs={24} md={8}>
+                  <label style={{ display: 'block', marginBottom: 6 }}>输入成本(元/1K)</label>
+                  <InputNumber
+                    min={0}
+                    step={0.000001}
+                    precision={6}
+                    value={customInputRate}
+                    onChange={(v) => setCustomInputRate(v ?? undefined)}
+                    style={{ width: '100%' }}
+                  />
+                </Col>
+                <Col xs={24} md={8}>
+                  <label style={{ display: 'block', marginBottom: 6 }}>输出成本(元/1K)</label>
+                  <InputNumber
+                    min={0}
+                    step={0.000001}
+                    precision={6}
+                    value={customOutputRate}
+                    onChange={(v) => setCustomOutputRate(v ?? undefined)}
+                    style={{ width: '100%' }}
+                  />
+                </Col>
+                <Col xs={24} md={8}>
+                  <label style={{ display: 'block', marginBottom: 6 }}>利润率(%)</label>
+                  <InputNumber
+                    min={0}
+                    max={200}
+                    step={0.1}
+                    precision={2}
+                    value={customProfitMargin}
+                    onChange={(v) => setCustomProfitMargin(v ?? 20)}
+                    style={{ width: '100%' }}
+                  />
+                </Col>
+              </Row>
+            )}
           </div>
         </Modal>
       </div>

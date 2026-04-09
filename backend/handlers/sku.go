@@ -182,7 +182,8 @@ func ListSPUs(c *gin.Context) {
 	limPos := len(baseArgs) + 1
 	offPos := len(baseArgs) + 2
 	query := fmt.Sprintf(
-		`SELECT p.id, p.spu_code, p.name, p.model_provider, p.model_name, p.model_version, p.model_tier, p.context_window, p.base_compute_points, p.description, p.status, p.sort_order, p.total_sales_count, COALESCE(p.average_rating, 0),
+		`SELECT p.id, p.spu_code, p.name, p.model_provider, p.model_name, p.model_version, p.model_tier, p.context_window, p.base_compute_points,
+			COALESCE(p.provider_input_rate, 0), COALESCE(p.provider_output_rate, 0), p.description, p.status, p.sort_order, p.total_sales_count, COALESCE(p.average_rating, 0),
 			(SELECT COUNT(*) FROM skus s WHERE s.spu_id = p.id),
 			(SELECT COUNT(*) FROM skus s WHERE s.spu_id = p.id AND s.status = 'active'),
 			p.created_at, p.updated_at
@@ -201,7 +202,7 @@ func ListSPUs(c *gin.Context) {
 	var spus []models.SPU
 	for rows.Next() {
 		var s models.SPU
-		err := rows.Scan(&s.ID, &s.SPUCode, &s.Name, &s.ModelProvider, &s.ModelName, &s.ModelVersion, &s.ModelTier, &s.ContextWindow, &s.BaseComputePoints, &s.Description, &s.Status, &s.SortOrder, &s.TotalSalesCount, &s.AverageRating, &s.SkuCount, &s.ActiveSkuCount, &s.CreatedAt, &s.UpdatedAt)
+		err := rows.Scan(&s.ID, &s.SPUCode, &s.Name, &s.ModelProvider, &s.ModelName, &s.ModelVersion, &s.ModelTier, &s.ContextWindow, &s.BaseComputePoints, &s.ProviderInputRate, &s.ProviderOutputRate, &s.Description, &s.Status, &s.SortOrder, &s.TotalSalesCount, &s.AverageRating, &s.SkuCount, &s.ActiveSkuCount, &s.CreatedAt, &s.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -253,12 +254,13 @@ func GetSPUByID(c *gin.Context) {
 	db := config.GetDB()
 	var spu models.SPU
 	err := db.QueryRow(
-		`SELECT id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, max_output_tokens, base_compute_points, description, thumbnail_url, status, sort_order, total_sales_count, COALESCE(average_rating, 0),
+		`SELECT id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, max_output_tokens, base_compute_points,
+			COALESCE(provider_input_rate, 0), COALESCE(provider_output_rate, 0), description, thumbnail_url, status, sort_order, total_sales_count, COALESCE(average_rating, 0),
 			(SELECT COUNT(*) FROM skus s WHERE s.spu_id = spus.id),
 			(SELECT COUNT(*) FROM skus s WHERE s.spu_id = spus.id AND s.status = 'active'),
 			created_at, updated_at FROM spus WHERE id = $1`,
 		spuID,
-	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.MaxOutputTokens, &spu.BaseComputePoints, &spu.Description, &spu.ThumbnailURL, &spu.Status, &spu.SortOrder, &spu.TotalSalesCount, &spu.AverageRating, &spu.SkuCount, &spu.ActiveSkuCount, &spu.CreatedAt, &spu.UpdatedAt)
+	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.MaxOutputTokens, &spu.BaseComputePoints, &spu.ProviderInputRate, &spu.ProviderOutputRate, &spu.Description, &spu.ThumbnailURL, &spu.Status, &spu.SortOrder, &spu.TotalSalesCount, &spu.AverageRating, &spu.SkuCount, &spu.ActiveSkuCount, &spu.CreatedAt, &spu.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
@@ -293,11 +295,11 @@ func CreateSPU(c *gin.Context) {
 	db := config.GetDB()
 	var spu models.SPU
 	err := db.QueryRow(
-		`INSERT INTO spus (spu_code, name, model_provider, model_name, model_version, model_tier, context_window, max_output_tokens, base_compute_points, description, thumbnail_url, status, sort_order) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
-		 RETURNING id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, base_compute_points, description, status, sort_order, created_at, updated_at`,
-		req.SPUCode, req.Name, req.ModelProvider, req.ModelName, req.ModelVersion, req.ModelTier, req.ContextWindow, req.MaxOutputTokens, req.BaseComputePoints, req.Description, req.ThumbnailURL, req.Status, req.SortOrder,
-	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.BaseComputePoints, &spu.Description, &spu.Status, &spu.SortOrder, &spu.CreatedAt, &spu.UpdatedAt)
+		`INSERT INTO spus (spu_code, name, model_provider, model_name, model_version, model_tier, context_window, max_output_tokens, base_compute_points, provider_input_rate, provider_output_rate, description, thumbnail_url, status, sort_order) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
+		 RETURNING id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, base_compute_points, provider_input_rate, provider_output_rate, description, status, sort_order, created_at, updated_at`,
+		req.SPUCode, req.Name, req.ModelProvider, req.ModelName, req.ModelVersion, req.ModelTier, req.ContextWindow, req.MaxOutputTokens, req.BaseComputePoints, req.ProviderInputRate, req.ProviderOutputRate, req.Description, req.ThumbnailURL, req.Status, req.SortOrder,
+	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.BaseComputePoints, &spu.ProviderInputRate, &spu.ProviderOutputRate, &spu.Description, &spu.Status, &spu.SortOrder, &spu.CreatedAt, &spu.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -337,7 +339,7 @@ func UpdateSPU(c *gin.Context) {
 
 	var name, modelProvider, modelName, modelVersion, modelTier, description, status interface{}
 	var contextWindow, maxOutputTokens interface{}
-	var baseComputePoints interface{}
+	var baseComputePoints, providerInputRate, providerOutputRate interface{}
 	var sortOrder interface{}
 
 	if req.Name != nil {
@@ -367,6 +369,12 @@ func UpdateSPU(c *gin.Context) {
 	if req.Description != nil {
 		description = *req.Description
 	}
+	if req.ProviderInputRate != nil {
+		providerInputRate = *req.ProviderInputRate
+	}
+	if req.ProviderOutputRate != nil {
+		providerOutputRate = *req.ProviderOutputRate
+	}
 	if req.Status != nil {
 		status = *req.Status
 	}
@@ -385,13 +393,15 @@ func UpdateSPU(c *gin.Context) {
 		 context_window = COALESCE($6, context_window),
 		 max_output_tokens = COALESCE($7, max_output_tokens),
 		 base_compute_points = COALESCE($8, base_compute_points),
-		 description = COALESCE($9, description),
-		 status = COALESCE($10, status),
-		 sort_order = COALESCE($11, sort_order)
-		 WHERE id = $12 
-		 RETURNING id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, max_output_tokens, base_compute_points, description, status, sort_order, created_at, updated_at`,
-		name, modelProvider, modelName, modelVersion, modelTier, contextWindow, maxOutputTokens, baseComputePoints, description, status, sortOrder, spuID,
-	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.MaxOutputTokens, &spu.BaseComputePoints, &spu.Description, &spu.Status, &spu.SortOrder, &spu.CreatedAt, &spu.UpdatedAt)
+		 provider_input_rate = COALESCE($9, provider_input_rate),
+		 provider_output_rate = COALESCE($10, provider_output_rate),
+		 description = COALESCE($11, description),
+		 status = COALESCE($12, status),
+		 sort_order = COALESCE($13, sort_order)
+		 WHERE id = $14 
+		 RETURNING id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, max_output_tokens, base_compute_points, provider_input_rate, provider_output_rate, description, status, sort_order, created_at, updated_at`,
+		name, modelProvider, modelName, modelVersion, modelTier, contextWindow, maxOutputTokens, baseComputePoints, providerInputRate, providerOutputRate, description, status, sortOrder, spuID,
+	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.MaxOutputTokens, &spu.BaseComputePoints, &spu.ProviderInputRate, &spu.ProviderOutputRate, &spu.Description, &spu.Status, &spu.SortOrder, &spu.CreatedAt, &spu.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(

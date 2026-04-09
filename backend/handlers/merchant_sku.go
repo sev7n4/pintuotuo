@@ -16,6 +16,86 @@ import (
 )
 
 const merchantSKUStatusInactive = "inactive"
+const defaultMerchantProfitMargin = 20.0
+
+func resolveSPUCostBySKUID(db *sql.DB, skuID int) (float64, float64, error) {
+	var inputRate, outputRate float64
+	err := db.QueryRow(
+		`SELECT COALESCE(sp.provider_input_rate, 0), COALESCE(sp.provider_output_rate, 0)
+		 FROM skus s
+		 JOIN spus sp ON sp.id = s.spu_id
+		 WHERE s.id = $1`,
+		skuID,
+	).Scan(&inputRate, &outputRate)
+	return inputRate, outputRate, err
+}
+
+func normalizeMerchantSKUCost(req models.MerchantSKUCreateRequest, spuInput, spuOutput float64) (float64, float64, float64, bool, *apperrors.AppError) {
+	profit := defaultMerchantProfitMargin
+	if req.ProfitMargin != nil && *req.ProfitMargin >= 0 {
+		profit = *req.ProfitMargin
+	}
+	if req.CustomPricingEnabled {
+		if req.CostInputRate == nil || req.CostOutputRate == nil {
+			return 0, 0, 0, false, apperrors.NewAppError(
+				"COST_REQUIRED",
+				"开启自定义成本时，输入/输出成本为必填",
+				http.StatusBadRequest,
+				nil,
+			)
+		}
+		return *req.CostInputRate, *req.CostOutputRate, profit, true, nil
+	}
+	return spuInput, spuOutput, profit, false, nil
+}
+
+func normalizeMerchantSKUCostUpdate(req models.MerchantSKUUpdateRequest, currentInput, currentOutput, currentProfit float64, currentCustom bool) (float64, float64, float64, bool, *apperrors.AppError) {
+	custom := currentCustom
+	if req.CustomPricingEnabled != nil {
+		custom = *req.CustomPricingEnabled
+	}
+	inputRate := currentInput
+	outputRate := currentOutput
+	profit := currentProfit
+	if req.CostInputRate != nil {
+		inputRate = *req.CostInputRate
+	}
+	if req.CostOutputRate != nil {
+		outputRate = *req.CostOutputRate
+	}
+	if req.ProfitMargin != nil && *req.ProfitMargin >= 0 {
+		profit = *req.ProfitMargin
+	}
+	if custom && (inputRate <= 0 || outputRate <= 0) {
+		return 0, 0, 0, false, apperrors.NewAppError(
+			"COST_REQUIRED",
+			"开启自定义成本时，输入/输出成本必须大于 0",
+			http.StatusBadRequest,
+			nil,
+		)
+	}
+	return inputRate, outputRate, profit, custom, nil
+}
+
+func syncMerchantAPIKeyCostByID(db *sql.DB, merchantSKUID int) error {
+	var apiKeyID sql.NullInt64
+	var inputRate, outputRate, profit float64
+	err := db.QueryRow(
+		`SELECT api_key_id, COALESCE(cost_input_rate, 0), COALESCE(cost_output_rate, 0), COALESCE(profit_margin, 20)
+		 FROM merchant_skus WHERE id = $1`,
+		merchantSKUID,
+	).Scan(&apiKeyID, &inputRate, &outputRate, &profit)
+	if err != nil || !apiKeyID.Valid || apiKeyID.Int64 <= 0 {
+		return err
+	}
+	_, err = db.Exec(
+		`UPDATE merchant_api_keys
+		 SET cost_input_rate = $1, cost_output_rate = $2, profit_margin = $3, updated_at = CURRENT_TIMESTAMP
+		 WHERE id = $4`,
+		inputRate, outputRate, profit, apiKeyID.Int64,
+	)
+	return err
+}
 
 func invalidateMerchantSKUCache(ctx context.Context, merchantID int) {
 	// invalidate all status-filtered sku list cache
@@ -73,7 +153,9 @@ func ListMerchantSKUs(c *gin.Context) {
 
 	query := `SELECT id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at,
 		sku_code, sku_type, token_amount, compute_points, retail_price, original_price, valid_days, 
-		group_enabled, group_discount_rate, spu_name, model_provider, model_name, model_tier, api_key_name, api_key_provider
+		group_enabled, group_discount_rate, spu_name, model_provider, model_name, model_tier, api_key_name, api_key_provider,
+		COALESCE(cost_input_rate, 0), COALESCE(cost_output_rate, 0), COALESCE(profit_margin, 20), COALESCE(custom_pricing_enabled, false),
+		COALESCE(spu_input_rate, 0), COALESCE(spu_output_rate, 0)
 		FROM merchant_sku_details WHERE merchant_id = $1`
 	args := []interface{}{merchantID}
 
@@ -101,7 +183,8 @@ func ListMerchantSKUs(c *gin.Context) {
 
 		err := rows.Scan(&s.ID, &s.MerchantID, &s.SKUID, &apiKeyID, &s.Status, &s.SalesCount, &s.TotalSalesAmount, &s.CreatedAt, &s.UpdatedAt,
 			&s.SKUCode, &s.SKUType, &tokenAmount, &computePoints, &s.RetailPrice, &originalPrice, &s.ValidDays,
-			&s.GroupEnabled, &groupDiscountRate, &s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier, &apiKeyName, &apiKeyProvider)
+			&s.GroupEnabled, &groupDiscountRate, &s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier, &apiKeyName, &apiKeyProvider,
+			&s.CostInputRate, &s.CostOutputRate, &s.ProfitMargin, &s.CustomPricing, &s.SPUInputRate, &s.SPUOutputRate)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -175,7 +258,8 @@ func GetAvailableSKUs(c *gin.Context) {
 	skuType := c.Query("type")
 
 	query := `SELECT s.id, s.sku_code, s.sku_type, s.token_amount, s.compute_points, s.retail_price, s.original_price, 
-		s.valid_days, s.group_enabled, s.group_discount_rate, s.spu_id, sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier
+		s.valid_days, s.group_enabled, s.group_discount_rate, s.spu_id, sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier,
+		COALESCE(sp.provider_input_rate, 0), COALESCE(sp.provider_output_rate, 0)
 		FROM skus s JOIN spus sp ON s.spu_id = sp.id 
 		WHERE s.status = 'active' AND sp.status = 'active'`
 	args := []interface{}{}
@@ -205,7 +289,7 @@ func GetAvailableSKUs(c *gin.Context) {
 		var computePoints, originalPrice, groupDiscountRate sql.NullFloat64
 
 		scanErr := rows.Scan(&s.ID, &s.SKUCode, &s.SKUType, &tokenAmount, &computePoints, &s.RetailPrice, &originalPrice,
-			&s.ValidDays, &s.GroupEnabled, &groupDiscountRate, &s.SPUID, &s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier)
+			&s.ValidDays, &s.GroupEnabled, &groupDiscountRate, &s.SPUID, &s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier, &s.SPUInputRate, &s.SPUOutputRate)
 		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -314,12 +398,24 @@ func CreateMerchantSKU(c *gin.Context) {
 		return
 	}
 	if err == nil && existingStatus == merchantSKUStatusInactive {
+		var spuInputRate, spuOutputRate float64
+		spuInputRate, spuOutputRate, err = resolveSPUCostBySKUID(db, req.SKUID)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		costInputRate, costOutputRate, profitMargin, customPricing, appErr := normalizeMerchantSKUCost(req, spuInputRate, spuOutputRate)
+		if appErr != nil {
+			middleware.RespondWithError(c, appErr)
+			return
+		}
 		var reactivated models.MerchantSKUDetail
 		err = db.QueryRow(
-			`UPDATE merchant_skus SET status = $1, api_key_id = $2, updated_at = CURRENT_TIMESTAMP
-			 WHERE id = $3
+			`UPDATE merchant_skus SET status = $1, api_key_id = $2, cost_input_rate = $3, cost_output_rate = $4,
+			 profit_margin = $5, custom_pricing_enabled = $6, updated_at = CURRENT_TIMESTAMP
+			 WHERE id = $7
 			 RETURNING id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
-			merchantStatusActive, req.APIKeyID, existingID,
+			merchantStatusActive, req.APIKeyID, costInputRate, costOutputRate, profitMargin, customPricing, existingID,
 		).Scan(&reactivated.ID, &reactivated.MerchantID, &reactivated.SKUID, &reactivated.APIKeyID, &reactivated.Status,
 			&reactivated.SalesCount, &reactivated.TotalSalesAmount, &reactivated.CreatedAt, &reactivated.UpdatedAt)
 		if err != nil {
@@ -339,6 +435,13 @@ func CreateMerchantSKU(c *gin.Context) {
 		if reactivated.APIKeyID != nil && *reactivated.APIKeyID > 0 {
 			_ = db.QueryRow("SELECT name, provider FROM merchant_api_keys WHERE id = $1", *reactivated.APIKeyID).Scan(&reactivated.APIKeyName, &reactivated.APIKeyProvider)
 		}
+		reactivated.CostInputRate = costInputRate
+		reactivated.CostOutputRate = costOutputRate
+		reactivated.ProfitMargin = profitMargin
+		reactivated.CustomPricing = customPricing
+		reactivated.SPUInputRate = spuInputRate
+		reactivated.SPUOutputRate = spuOutputRate
+		_ = syncMerchantAPIKeyCostByID(db, reactivated.ID)
 		ctx := context.Background()
 		invalidateMerchantSKUCache(ctx, merchantID)
 		c.JSON(http.StatusOK, gin.H{"data": reactivated})
@@ -359,12 +462,23 @@ func CreateMerchantSKU(c *gin.Context) {
 		}
 	}
 
+	spuInputRate, spuOutputRate, err := resolveSPUCostBySKUID(db, req.SKUID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	costInputRate, costOutputRate, profitMargin, customPricing, appErr := normalizeMerchantSKUCost(req, spuInputRate, spuOutputRate)
+	if appErr != nil {
+		middleware.RespondWithError(c, appErr)
+		return
+	}
+
 	var merchantSKU models.MerchantSKUDetail
 	err = db.QueryRow(
-		`INSERT INTO merchant_skus (merchant_id, sku_id, api_key_id, status) 
-		 VALUES ($1, $2, $3, 'active') 
+		`INSERT INTO merchant_skus (merchant_id, sku_id, api_key_id, status, cost_input_rate, cost_output_rate, profit_margin, custom_pricing_enabled) 
+		 VALUES ($1, $2, $3, 'active', $4, $5, $6, $7) 
 		 RETURNING id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
-		merchantID, req.SKUID, req.APIKeyID,
+		merchantID, req.SKUID, req.APIKeyID, costInputRate, costOutputRate, profitMargin, customPricing,
 	).Scan(&merchantSKU.ID, &merchantSKU.MerchantID, &merchantSKU.SKUID, &merchantSKU.APIKeyID, &merchantSKU.Status, &merchantSKU.SalesCount, &merchantSKU.TotalSalesAmount, &merchantSKU.CreatedAt, &merchantSKU.UpdatedAt)
 
 	if err != nil {
@@ -395,6 +509,13 @@ func CreateMerchantSKU(c *gin.Context) {
 			merchantSKU.APIKeyProvider = ""
 		}
 	}
+	merchantSKU.CostInputRate = costInputRate
+	merchantSKU.CostOutputRate = costOutputRate
+	merchantSKU.ProfitMargin = profitMargin
+	merchantSKU.CustomPricing = customPricing
+	merchantSKU.SPUInputRate = spuInputRate
+	merchantSKU.SPUOutputRate = spuOutputRate
+	_ = syncMerchantAPIKeyCostByID(db, merchantSKU.ID)
 
 	ctx := context.Background()
 	invalidateMerchantSKUCache(ctx, merchantID)
@@ -460,12 +581,36 @@ func UpdateMerchantSKU(c *gin.Context) {
 		}
 	}
 
+	var currentInput, currentOutput, currentProfit float64
+	var currentCustom bool
+	err = db.QueryRow(
+		`SELECT COALESCE(cost_input_rate, 0), COALESCE(cost_output_rate, 0), COALESCE(profit_margin, 20), COALESCE(custom_pricing_enabled, false)
+		 FROM merchant_skus WHERE id = $1 AND merchant_id = $2`,
+		id, merchantID,
+	).Scan(&currentInput, &currentOutput, &currentProfit, &currentCustom)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_SKU_NOT_FOUND",
+			"商户SKU不存在",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+	newInput, newOutput, newProfit, newCustom, appErr := normalizeMerchantSKUCostUpdate(req, currentInput, currentOutput, currentProfit, currentCustom)
+	if appErr != nil {
+		middleware.RespondWithError(c, appErr)
+		return
+	}
+
 	var merchantSKU models.MerchantSKUDetail
 	err = db.QueryRow(
-		`UPDATE merchant_skus SET api_key_id = $1, status = COALESCE($2, status), updated_at = CURRENT_TIMESTAMP 
-		 WHERE id = $3 AND merchant_id = $4 
+		`UPDATE merchant_skus SET api_key_id = $1, status = COALESCE($2, status),
+		 cost_input_rate = $3, cost_output_rate = $4, profit_margin = $5, custom_pricing_enabled = $6,
+		 updated_at = CURRENT_TIMESTAMP 
+		 WHERE id = $7 AND merchant_id = $8
 		 RETURNING id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
-		req.APIKeyID, req.Status, id, merchantID,
+		req.APIKeyID, req.Status, newInput, newOutput, newProfit, newCustom, id, merchantID,
 	).Scan(&merchantSKU.ID, &merchantSKU.MerchantID, &merchantSKU.SKUID, &merchantSKU.APIKeyID, &merchantSKU.Status, &merchantSKU.SalesCount, &merchantSKU.TotalSalesAmount, &merchantSKU.CreatedAt, &merchantSKU.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -499,6 +644,11 @@ func UpdateMerchantSKU(c *gin.Context) {
 			merchantSKU.APIKeyProvider = ""
 		}
 	}
+	merchantSKU.CostInputRate = newInput
+	merchantSKU.CostOutputRate = newOutput
+	merchantSKU.ProfitMargin = newProfit
+	merchantSKU.CustomPricing = newCustom
+	_ = syncMerchantAPIKeyCostByID(db, merchantSKU.ID)
 
 	ctx := context.Background()
 	invalidateMerchantSKUCache(ctx, merchantID)

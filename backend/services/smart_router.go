@@ -101,8 +101,18 @@ func (r *SmartRouter) GetCandidates(ctx context.Context, model string) ([]Routin
 			mak.provider, 
 			mak.health_status,
 			mak.verified_at IS NOT NULL as verified,
-			mak.cost_input_rate,
-			mak.cost_output_rate,
+			COALESCE(
+				mak.cost_input_rate,
+				MAX(ms.cost_input_rate),
+				MAX(sp.provider_input_rate),
+				0
+			) as effective_input_rate,
+			COALESCE(
+				mak.cost_output_rate,
+				MAX(ms.cost_output_rate),
+				MAX(sp.provider_output_rate),
+				0
+			) as effective_output_rate,
 			COALESCE(AVG(h.latency_ms), 0) as avg_latency,
 			COALESCE(
 				COUNT(CASE WHEN h.status = 'healthy' THEN 1 END)::float / 
@@ -111,6 +121,9 @@ func (r *SmartRouter) GetCandidates(ctx context.Context, model string) ([]Routin
 			) as success_rate
 		FROM merchant_api_keys mak
 		LEFT JOIN api_key_health_history h ON mak.id = h.api_key_id
+		LEFT JOIN merchant_skus ms ON ms.api_key_id = mak.id AND ms.status = 'active'
+		LEFT JOIN skus s ON s.id = ms.sku_id
+		LEFT JOIN spus sp ON sp.id = s.spu_id
 		WHERE mak.status = 'active'
 		AND mak.health_status IN ('healthy', 'degraded')
 		AND mak.verified_at IS NOT NULL

@@ -31,16 +31,30 @@ type MerchantSKUDetail struct {
 	ModelTier         string  `json:"model_tier"`
 	APIKeyName        string  `json:"api_key_name,omitempty"`
 	APIKeyProvider    string  `json:"api_key_provider,omitempty"`
+	CostInputRate     float64 `json:"cost_input_rate"`
+	CostOutputRate    float64 `json:"cost_output_rate"`
+	ProfitMargin      float64 `json:"profit_margin"`
+	CustomPricing     bool    `json:"custom_pricing_enabled"`
+	SPUInputRate      float64 `json:"spu_input_rate,omitempty"`
+	SPUOutputRate     float64 `json:"spu_output_rate,omitempty"`
 }
 
 type MerchantSKUCreateRequest struct {
-	SKUID    int  `json:"sku_id" binding:"required"`
-	APIKeyID *int `json:"api_key_id"`
+	SKUID                int      `json:"sku_id" binding:"required"`
+	APIKeyID             *int     `json:"api_key_id"`
+	CustomPricingEnabled bool     `json:"custom_pricing_enabled"`
+	CostInputRate        *float64 `json:"cost_input_rate"`
+	CostOutputRate       *float64 `json:"cost_output_rate"`
+	ProfitMargin         *float64 `json:"profit_margin"`
 }
 
 type MerchantSKUUpdateRequest struct {
-	APIKeyID *int   `json:"api_key_id"`
-	Status   string `json:"status"`
+	APIKeyID             *int     `json:"api_key_id"`
+	Status               string   `json:"status"`
+	CustomPricingEnabled *bool    `json:"custom_pricing_enabled"`
+	CostInputRate        *float64 `json:"cost_input_rate"`
+	CostOutputRate       *float64 `json:"cost_output_rate"`
+	ProfitMargin         *float64 `json:"profit_margin"`
 }
 
 type AvailableSKU struct {
@@ -59,5 +73,7 @@ type AvailableSKU struct {
 	ModelProvider     string  `json:"model_provider"`
 	ModelName         string  `json:"model_name"`
 	ModelTier         string  `json:"model_tier"`
+	SPUInputRate      float64 `json:"spu_input_rate,omitempty"`
+	SPUOutputRate     float64 `json:"spu_output_rate,omitempty"`
 	IsSelected        bool    `json:"is_selected"`
 }
