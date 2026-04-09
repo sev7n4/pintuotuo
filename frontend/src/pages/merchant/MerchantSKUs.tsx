@@ -55,6 +55,23 @@ const MerchantSKUs = () => {
   const [providerOptions, setProviderOptions] = useState<string[]>([]);
   const [typeOptions, setTypeOptions] = useState<string[]>([]);
 
+  const selectedOfficialRef = selectedSKUs.reduce(
+    (acc, id) => {
+      const hit = availableSKUs.find((s) => s.id === id);
+      if (!hit) return acc;
+      return {
+        input: acc.input + Number(hit.spu_input_rate || 0),
+        output: acc.output + Number(hit.spu_output_rate || 0),
+        count: acc.count + 1,
+      };
+    },
+    { input: 0, output: 0, count: 0 }
+  );
+  const avgOfficialInput =
+    selectedOfficialRef.count > 0 ? selectedOfficialRef.input / selectedOfficialRef.count : 0;
+  const avgOfficialOutput =
+    selectedOfficialRef.count > 0 ? selectedOfficialRef.output / selectedOfficialRef.count : 0;
+
   const fetchMerchantSKUs = useCallback(async () => {
     setLoading(true);
     try {
@@ -279,6 +296,17 @@ const MerchantSKUs = () => {
       key: 'retail_price',
       width: 80,
       render: (price: number) => <Text strong>{formatPrice(price)}</Text>,
+    },
+    {
+      title: '官方参考成本(元/1K)',
+      key: 'spu_ref_cost',
+      width: 180,
+      render: (_: unknown, record: MerchantSKUDetail) => (
+        <span>
+          in {Number(record.spu_input_rate || 0).toFixed(6)} / out{' '}
+          {Number(record.spu_output_rate || 0).toFixed(6)}
+        </span>
+      ),
     },
     {
       title: '关联API Key',
@@ -533,7 +561,7 @@ const MerchantSKUs = () => {
               description={
                 costGuideMode === 'official'
                   ? '默认继承平台目录（SPU）参考成本并同步到上架 SKU；适用于官方代理/托管场景。'
-                  : '若为自部署同名模型，建议填写真实推理成本。系统会显示官方参考价供对照，避免长期沿用官方默认。'
+                  : `若为自部署同名模型，建议填写真实推理成本。当前所选SKU官方参考均值：输入 ${avgOfficialInput.toFixed(6)} / 输出 ${avgOfficialOutput.toFixed(6)} 元/1K（仅供对照）。`
               }
             />
             <Segmented

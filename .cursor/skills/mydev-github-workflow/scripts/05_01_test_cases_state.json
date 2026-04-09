@@ -1,16 +1,16 @@
 {
   "currentIssue": {
-    "id": "ISSUE-COST-INHERITANCE-001",
+    "id": "ISSUE-CNY-COST-UNIT-001",
     "type": "enhancement",
-    "module": "spu/sku/merchant_sku/smart_router",
-    "branch": "feature/issue-cost-inheritance-chain",
-    "title": "SPU参考成本->商户上架SKU继承->Key同步与路由解析链"
+    "module": "admin_sku/merchant_sku/merchant_api_keys",
+    "branch": "feature/cny-unit-cost-and-sku-inheritance-ui",
+    "title": "单位统一元/1K与SKU继承链UI补齐"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-BACKEND-ALL-SHORT",
-        "name": "go test ./... -short",
+        "id": "UT-BACKEND-HANDLERS-SERVICES-SHORT",
+        "name": "go test ./handlers ./services -short",
         "status": "passed",
         "file": "backend"
       },
@@ -24,7 +24,7 @@
     "integration": [],
     "e2e": [
       {
-        "id": "E2E-COST-INHERITANCE-CHAIN",
+        "id": "E2E-CNY-COST-UNIT-AND-GUIDE",
         "name": "GitHub Actions CI on PR",
         "status": "pending",
         "file": ".github/workflows"
@@ -37,6 +37,6 @@
     "failed": 0,
     "pending": 1
   },
-  "lastUpdated": "2026-04-09T08:10:00Z",
-  "workflowNote": "已完成本地后端全量短测与前端类型检查，待PR触发CI/E2E。"
+  "lastUpdated": "2026-04-09T16:20:00Z",
+  "workflowNote": "本地验证已通过（make test + type-check），待PR触发并完成CI链路。"
 }

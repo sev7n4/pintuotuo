@@ -122,6 +122,7 @@ const AdminSKUs = () => {
       is_trial: false,
       is_unlimited: false,
       is_promoted: false,
+      inherit_spu_cost: true,
     });
     setSelectedSKUType('token_pack');
     setModalVisible(true);
@@ -179,6 +180,9 @@ const AdminSKUs = () => {
           group_discount_rate: values.group_discount_rate,
           status: values.status,
           is_promoted: values.is_promoted,
+          cost_input_rate: values.cost_input_rate,
+          cost_output_rate: values.cost_output_rate,
+          inherit_spu_cost: values.inherit_spu_cost,
         };
         await skuService.updateSKU(editingSKU.id, updateData);
         message.success('SKU已更新');
@@ -306,6 +310,22 @@ const AdminSKUs = () => {
         ) : (
           <Tag>不支持</Tag>
         ),
+    },
+    {
+      title: '单位成本(元/1K)',
+      key: 'unit_cost',
+      width: 200,
+      render: (_: unknown, record: SKUWithSPU) => (
+        <Space direction="vertical" size={0}>
+          <Tag color={record.inherit_spu_cost ? 'blue' : 'gold'}>
+            {record.inherit_spu_cost ? '继承SPU' : 'SKU覆盖'}
+          </Tag>
+          <span>
+            in {Number(record.cost_input_rate || 0).toFixed(6)} / out{' '}
+            {Number(record.cost_output_rate || 0).toFixed(6)}
+          </span>
+        </Space>
+      ),
     },
     {
       title: '状态',
@@ -477,7 +497,7 @@ const AdminSKUs = () => {
           dataSource={skus}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1380 }}
+          scroll={{ x: 1560 }}
           pagination={{
             ...pagination,
             showSizeChanger: true,
@@ -720,6 +740,81 @@ const AdminSKUs = () => {
               </Form.Item>
             </Col>
           </Row>
+
+          <Divider orientation="left">高级：单位成本（元/1K tokens）</Divider>
+          <Form.Item name="inherit_spu_cost" label="继承 SPU 参考价" valuePropName="checked">
+            <Switch checkedChildren="继承" unCheckedChildren="手填" />
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.inherit_spu_cost !== cur.inherit_spu_cost}>
+            {({ getFieldValue }) => {
+              const inherit = getFieldValue('inherit_spu_cost') !== false;
+              const sid = getFieldValue('spu_id') as number | undefined;
+              const spu = spus.find((x) => x.id === sid);
+              return (
+                <>
+                  {inherit ? (
+                    <Alert
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 12 }}
+                      message={`当前将继承 SPU 参考价：输入 ${Number(spu?.provider_input_rate || 0).toFixed(6)} / 输出 ${Number(spu?.provider_output_rate || 0).toFixed(6)}（元/1K）`}
+                    />
+                  ) : (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      style={{ marginBottom: 12 }}
+                      message="已关闭继承：请填写非空单位成本，系统会用于商户上架默认值与路由成本基线。"
+                    />
+                  )}
+                  {!inherit && (
+                    <>
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item
+                            name="cost_input_rate"
+                            label="输入成本（元/1K）"
+                            rules={[{ required: true, message: '请填写输入成本' }]}
+                          >
+                            <InputNumber min={0.000001} step={0.000001} precision={6} style={{ width: '100%' }} />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item
+                            name="cost_output_rate"
+                            label="输出成本（元/1K）"
+                            rules={[{ required: true, message: '请填写输出成本' }]}
+                          >
+                            <InputNumber min={0.000001} step={0.000001} precision={6} style={{ width: '100%' }} />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      <Form.Item noStyle shouldUpdate>
+                        {({ getFieldValue }) => {
+                          const inCost = Number(getFieldValue('cost_input_rate') || 0);
+                          const outCost = Number(getFieldValue('cost_output_rate') || 0);
+                          const spuIn = Number(spu?.provider_input_rate || 0);
+                          const spuOut = Number(spu?.provider_output_rate || 0);
+                          const inDelta = spuIn > 0 ? Math.abs(inCost-spuIn) / spuIn : 0;
+                          const outDelta = spuOut > 0 ? Math.abs(outCost-spuOut) / spuOut : 0;
+                          if (inDelta <= 0.2 && outDelta <= 0.2) return null;
+                          return (
+                            <Alert
+                              type="warning"
+                              showIcon
+                              style={{ marginBottom: 12 }}
+                              message="手填成本与 SPU 参考价偏差超过 20%"
+                              description={`SPU参考：输入 ${spuIn.toFixed(6)} / 输出 ${spuOut.toFixed(6)}；当前：输入 ${inCost.toFixed(6)} / 输出 ${outCost.toFixed(6)}（元/1K）`}
+                            />
+                          );
+                        }}
+                      </Form.Item>
+                    </>
+                  )}
+                </>
+              );
+            }}
+          </Form.Item>
 
           {selectedSKUType !== 'trial' && (
             <>
