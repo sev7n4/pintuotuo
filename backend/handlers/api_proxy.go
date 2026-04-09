@@ -176,6 +176,17 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	err = selectAPIKeyForRequest(db, userIDInt, merchantID, req, &apiKey)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			logger.LogWarn(c.Request.Context(), "api_proxy", "API key authorization miss", map[string]interface{}{
+				"request_id":        requestID,
+				"request_path":      requestPath,
+				"user_id":           userIDInt,
+				"merchant_id":       merchantID,
+				"provider":          req.Provider,
+				"model":             req.Model,
+				"api_key_id":        req.APIKeyID,
+				"merchant_sku_id":   req.MerchantSKUID,
+				"selected_strategy": selectedStrategy,
+			})
 			middleware.RespondWithError(c, apperrors.NewAppError(
 				"API_KEY_NOT_AUTHORIZED",
 				"No authorized API key available for this provider",
