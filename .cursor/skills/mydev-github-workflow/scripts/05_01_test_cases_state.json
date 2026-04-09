@@ -1,31 +1,31 @@
 {
   "currentIssue": {
-    "id": "ISSUE-PLATFORM-HEALTH-001",
-    "type": "feature",
-    "module": "services/platform_settings / health_scheduler / admin settings",
-    "branch": "feature/issue-platform-health-scheduler",
-    "title": "平台设置：健康调度成本配置、热更新、被动+主动健康"
+    "id": "ISSUE-COST-INHERITANCE-001",
+    "type": "enhancement",
+    "module": "spu/sku/merchant_sku/smart_router",
+    "branch": "feature/issue-cost-inheritance-chain",
+    "title": "SPU参考成本->商户上架SKU继承->Key同步与路由解析链"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-PLATFORM-SETTINGS-VALIDATE",
-        "name": "TestValidateHealthSchedulerPlatformConfig",
+        "id": "UT-BACKEND-ALL-SHORT",
+        "name": "go test ./... -short",
         "status": "passed",
-        "file": "backend/services/platform_settings_test.go"
+        "file": "backend"
       },
       {
-        "id": "UT-ADMIN-PLATFORM-SETTINGS-FORBIDDEN",
-        "name": "TestGetAdminPlatformSettings_ForbiddenNonAdmin / TestUpdateAdminPlatformSettings_ForbiddenNonAdmin",
+        "id": "UT-FRONTEND-TYPECHECK",
+        "name": "npm run type-check",
         "status": "passed",
-        "file": "backend/handlers/admin_platform_settings_test.go"
+        "file": "frontend"
       }
     ],
     "integration": [],
     "e2e": [
       {
-        "id": "E2E-PLATFORM-HEALTH-SETTINGS",
-        "name": "GitHub Actions CI on PR (full suite)",
+        "id": "E2E-COST-INHERITANCE-CHAIN",
+        "name": "GitHub Actions CI on PR",
         "status": "pending",
         "file": ".github/workflows"
       }
@@ -37,6 +37,6 @@
     "failed": 0,
     "pending": 1
   },
-  "lastUpdated": "2026-04-09T12:00:00Z",
-  "workflowNote": "Step 5-7：单元测试已绿；E2E 待 PR 触发"
+  "lastUpdated": "2026-04-09T08:10:00Z",
+  "workflowNote": "已完成本地后端全量短测与前端类型检查，待PR触发CI/E2E。"
 }

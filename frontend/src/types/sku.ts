@@ -211,6 +211,8 @@ export interface SPUCreateRequest {
   max_output_tokens?: number;
   supported_functions?: string[];
   base_compute_points?: number;
+  provider_input_rate?: number;
+  provider_output_rate?: number;
   description?: string;
   features?: string[];
   thumbnail_url?: string;

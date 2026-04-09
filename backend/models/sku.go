@@ -200,6 +200,8 @@ type SPUCreateRequest struct {
 	Description        string   `json:"description"`
 	Features           []string `json:"features"`
 	ThumbnailURL       string   `json:"thumbnail_url"`
+	ProviderInputRate  float64  `json:"provider_input_rate"`
+	ProviderOutputRate float64  `json:"provider_output_rate"`
 	Status             string   `json:"status"`
 	SortOrder          int      `json:"sort_order"`
 }
@@ -217,6 +219,8 @@ type SPUUpdateRequest struct {
 	Description        *string  `json:"description"`
 	Features           []string `json:"features"`
 	ThumbnailURL       *string  `json:"thumbnail_url"`
+	ProviderInputRate  *float64 `json:"provider_input_rate"`
+	ProviderOutputRate *float64 `json:"provider_output_rate"`
 	Status             *string  `json:"status"`
 	SortOrder          *int     `json:"sort_order"`
 }

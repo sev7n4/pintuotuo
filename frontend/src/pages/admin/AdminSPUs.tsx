@@ -116,6 +116,8 @@ const AdminSPUs = () => {
     form.setFieldsValue({
       spu_code: `SPU-${timestamp}`,
       base_compute_points: 1.0,
+      provider_input_rate: 0,
+      provider_output_rate: 0,
       status: 'active',
       sort_order: 0,
     });
@@ -309,6 +311,12 @@ const AdminSPUs = () => {
       key: 'base_compute_points',
       width: 100,
       render: (v: number) => v.toFixed(4),
+    },
+    {
+      title: '参考成本(输入/输出)',
+      key: 'provider_rates',
+      width: 170,
+      render: (_: unknown, r: SPU) => `${(r.provider_input_rate ?? 0).toFixed(6)} / ${(r.provider_output_rate ?? 0).toFixed(6)}`,
     },
     {
       title: '销量',
@@ -520,12 +528,12 @@ const AdminSPUs = () => {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="model_version" label="模型版本">
                 <Input placeholder="v3" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item
                 name="model_tier"
                 label="模型层级"
@@ -539,7 +547,7 @@ const AdminSPUs = () => {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item
                 name="base_compute_points"
                 label="算力点消耗系数"
@@ -547,6 +555,26 @@ const AdminSPUs = () => {
                 extra="1.0 = 基准系数"
               >
                 <InputNumber min={0.0001} step={0.1} precision={4} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item
+                name="provider_input_rate"
+                label="参考输入成本(元/1K)"
+                rules={[{ required: true, message: '请输入参考输入成本' }]}
+              >
+                <InputNumber min={0} step={0.000001} precision={6} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={6}>
+              <Form.Item
+                name="provider_output_rate"
+                label="参考输出成本(元/1K)"
+                rules={[{ required: true, message: '请输入参考输出成本' }]}
+              >
+                <InputNumber min={0} step={0.000001} precision={6} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>
