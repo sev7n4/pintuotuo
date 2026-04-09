@@ -121,7 +121,7 @@ const Consumption: React.FC = () => {
         'Model',
         '输入Tokens',
         '输出Tokens',
-        '费用($)',
+        '费用(元)',
         '延迟(ms)',
         '状态码',
         '时间',
@@ -224,7 +224,7 @@ const Consumption: React.FC = () => {
         key: 'cost',
         width: 90,
         align: 'right',
-        render: (cost: number) => <span style={{ color: '#f5222d' }}>${cost.toFixed(4)}</span>,
+        render: (cost: number) => <span style={{ color: '#f5222d' }}>¥{cost.toFixed(6)}</span>,
       },
       ...(screens.sm
         ? [
@@ -307,7 +307,7 @@ const Consumption: React.FC = () => {
               title="总费用"
               value={stats?.total_cost || 0}
               precision={4}
-              prefix="$"
+              prefix="¥"
               valueStyle={{ color: '#f5222d', fontSize: isMobile ? 18 : 24 }}
             />
           </Col>
@@ -333,7 +333,7 @@ const Consumption: React.FC = () => {
                       <Tag color={getProviderColor(p.provider)}>{p.provider.toUpperCase()}</Tag>
                     }
                     value={p.count}
-                    suffix={`次 / $${p.cost.toFixed(4)}`}
+                    suffix={`次 / ¥${p.cost.toFixed(6)}`}
                     valueStyle={{ fontSize: isMobile ? 14 : 16 }}
                   />
                 </Card>
@@ -431,7 +431,7 @@ const Consumption: React.FC = () => {
             </Descriptions.Item>
             <Descriptions.Item label="费用">
               <span style={{ color: '#f5222d', fontWeight: 'bold' }}>
-                ${selectedRecord.cost.toFixed(6)}
+                ¥{selectedRecord.cost.toFixed(6)}
               </span>
             </Descriptions.Item>
             <Descriptions.Item label="延迟">{selectedRecord.latency_ms} ms</Descriptions.Item>

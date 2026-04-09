@@ -362,8 +362,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			}
 			if err == nil {
 				_, err = tx.Exec(
-					"INSERT INTO token_transactions (user_id, type, amount, reason) VALUES ($1, $2, $3, $4)",
-					userIDInt, "usage", -cost, fmt.Sprintf("API call: %s/%s", req.Provider, req.Model),
+					"INSERT INTO token_transactions (user_id, type, amount, reason, request_id) VALUES ($1, $2, $3, $4, $5)",
+					userIDInt, "usage", -cost, fmt.Sprintf("API call: %s/%s", req.Provider, req.Model), requestID,
 				)
 			}
 			if err == nil {
