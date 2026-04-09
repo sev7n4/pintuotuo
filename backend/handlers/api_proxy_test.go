@@ -2,15 +2,19 @@ package handlers
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"testing"
 	"time"
 
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -263,4 +267,73 @@ func TestNormalizeEffectivePolicySource(t *testing.T) {
 	assert.Equal(t, policySourceDefault, normalizeEffectivePolicySource(policySourceDefault))
 	assert.Equal(t, policySourceDefault, normalizeEffectivePolicySource(""))
 	assert.Equal(t, policySourceDefault, normalizeEffectivePolicySource("legacy"))
+}
+
+func TestSelectAPIKeyForRequest_NonMerchantWithAPIKeyID(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	req := APIProxyRequest{
+		Provider: "stepfun",
+		Model:    "step-1-8k",
+		APIKeyID: func() *int { v := 22; return &v }(),
+	}
+
+	rows := sqlmock.NewRows([]string{
+		"id", "merchant_id", "provider", "api_key_encrypted", "api_secret_encrypted", "quota_limit", "quota_used", "status",
+	}).AddRow(22, 4, "stepfun", "enc_key", "enc_secret", nil, 0.0, "active")
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+			 FROM merchant_api_keys
+			 WHERE id = $1 AND provider = $2 AND status = 'active'
+			   AND (verified_at IS NOT NULL OR verification_result = 'verified')
+			   AND (quota_limit IS NULL OR quota_used < quota_limit) LIMIT 1`)).
+		WithArgs(22, "stepfun").
+		WillReturnRows(rows)
+
+	var apiKey models.MerchantAPIKey
+	err = selectAPIKeyForRequest(db, 13, 0, req, &apiKey)
+	require.NoError(t, err)
+	assert.Equal(t, 22, apiKey.ID)
+	assert.Equal(t, 4, apiKey.MerchantID)
+	assert.Equal(t, "stepfun", apiKey.Provider)
+	assert.Nil(t, apiKey.QuotaLimit)
+	assert.Equal(t, 0.0, apiKey.QuotaUsed)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSelectAPIKeyForRequest_MerchantWithAPIKeyIDBoundedByMerchant(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	req := APIProxyRequest{
+		Provider: "stepfun",
+		Model:    "step-1-8k",
+		APIKeyID: func() *int { v := 22; return &v }(),
+	}
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+			 FROM merchant_api_keys
+			 WHERE id = $1 AND provider = $2 AND status = 'active'
+			   AND (verified_at IS NOT NULL OR verification_result = 'verified')
+			   AND (quota_limit IS NULL OR quota_used < quota_limit) AND merchant_id = $3 LIMIT 1`)).
+		WithArgs(22, "stepfun", 99).
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+				 FROM merchant_api_keys
+				 WHERE provider = $1 AND status = 'active'
+				   AND merchant_id = $2
+				   AND (verified_at IS NOT NULL OR verification_result = 'verified')
+				   AND (quota_limit IS NULL OR quota_used < quota_limit)
+				 ORDER BY COALESCE((quota_limit - quota_used)::double precision, 1e30::double precision) DESC
+				 LIMIT 1`)).
+		WithArgs("stepfun", 99).
+		WillReturnError(sql.ErrNoRows)
+
+	var apiKey models.MerchantAPIKey
+	err = selectAPIKeyForRequest(db, 15, 99, req, &apiKey)
+	require.ErrorIs(t, err, sql.ErrNoRows)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
