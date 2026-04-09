@@ -398,7 +398,8 @@ func CreateMerchantSKU(c *gin.Context) {
 		return
 	}
 	if err == nil && existingStatus == merchantSKUStatusInactive {
-		spuInputRate, spuOutputRate, err := resolveSPUCostBySKUID(db, req.SKUID)
+		var spuInputRate, spuOutputRate float64
+		spuInputRate, spuOutputRate, err = resolveSPUCostBySKUID(db, req.SKUID)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
