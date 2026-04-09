@@ -176,7 +176,18 @@ func AdminUpdateRoutingStrategy(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"strategy": req})
+	updated, err := service.GetStrategyByID(id)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"STRATEGY_QUERY_FAILED",
+			"Failed to load updated strategy",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"strategy": updated})
 }
 
 func AdminDeleteRoutingStrategy(c *gin.Context) {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pintuotuo/backend/config"
@@ -116,7 +117,7 @@ func (r *SmartRouter) GetCandidates(ctx context.Context, model string) ([]Routin
 		GROUP BY mak.id, mak.provider, mak.health_status, mak.verified_at, 
 		         mak.cost_input_rate, mak.cost_output_rate
 		ORDER BY mak.last_health_check_at DESC
-	`, model)
+	`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query candidates: %w", err)
 	}
@@ -378,51 +379,73 @@ type StrategyConfig struct {
 	IsDefault               bool
 }
 
-var (
-	strategyCache     map[string]StrategyConfig
-	strategyCacheOnce sync.Once
-	strategyCacheMu   sync.RWMutex
-)
+// strategyCacheAtomic holds map[string]StrategyConfig (hot-reloaded via ReloadRoutingStrategies).
+var strategyCacheAtomic atomic.Value
+
+func init() {
+	strategyCacheAtomic.Store(make(map[string]StrategyConfig))
+}
+
+func snapshotStrategyCache() map[string]StrategyConfig {
+	v := strategyCacheAtomic.Load()
+	if v == nil {
+		return make(map[string]StrategyConfig)
+	}
+	m, ok := v.(map[string]StrategyConfig)
+	if !ok {
+		return make(map[string]StrategyConfig)
+	}
+	return m
+}
+
+// ReloadRoutingStrategies rebuilds the in-memory routing strategy cache from the database (or built-in defaults).
+func (r *SmartRouter) ReloadRoutingStrategies() {
+	m := r.loadStrategyCacheMapFromDB()
+	if len(m) == 0 {
+		m = defaultStrategiesMap()
+	}
+	strategyCacheAtomic.Store(m)
+}
 
 func (r *SmartRouter) GetStrategyConfig(strategyCode string) (StrategyConfig, bool) {
-	strategyCacheOnce.Do(func() {
-		strategyCache = make(map[string]StrategyConfig)
-		r.loadStrategyCache()
-		if len(strategyCache) == 0 {
-			r.loadDefaultStrategies()
-		}
-	})
-
-	strategyCacheMu.RLock()
-	config, found := strategyCache[strategyCode]
-	strategyCacheMu.RUnlock()
-
+	m := snapshotStrategyCache()
+	if len(m) == 0 {
+		r.ReloadRoutingStrategies()
+		m = snapshotStrategyCache()
+	}
+	config, found := m[strategyCode]
 	return config, found
 }
 
 func (r *SmartRouter) GetDefaultStrategyCode() string {
-	strategyCacheOnce.Do(func() {
-		strategyCache = make(map[string]StrategyConfig)
-		r.loadStrategyCache()
-		if len(strategyCache) == 0 {
-			r.loadDefaultStrategies()
-		}
-	})
-
-	strategyCacheMu.RLock()
-	defer strategyCacheMu.RUnlock()
-	for code, cfg := range strategyCache {
+	m := snapshotStrategyCache()
+	if len(m) == 0 {
+		r.ReloadRoutingStrategies()
+		m = snapshotStrategyCache()
+	}
+	type pair struct {
+		code string
+		id   int
+	}
+	var defaults []pair
+	for code, cfg := range m {
 		if cfg.IsDefault {
-			return code
+			defaults = append(defaults, pair{code: code, id: cfg.ID})
 		}
+	}
+	sort.Slice(defaults, func(i, j int) bool {
+		if defaults[i].id != defaults[j].id {
+			return defaults[i].id < defaults[j].id
+		}
+		return defaults[i].code < defaults[j].code
+	})
+	if len(defaults) > 0 {
+		return defaults[0].code
 	}
 	return ""
 }
 
-func (r *SmartRouter) loadDefaultStrategies() {
-	strategyCacheMu.Lock()
-	defer strategyCacheMu.Unlock()
-
+func defaultStrategiesMap() map[string]StrategyConfig {
 	defaultStrategies := []StrategyConfig{
 		{
 			ID:                      1,
@@ -477,18 +500,19 @@ func (r *SmartRouter) loadDefaultStrategies() {
 			IsDefault:               false,
 		},
 	}
-
+	out := make(map[string]StrategyConfig, len(defaultStrategies))
 	for _, s := range defaultStrategies {
-		strategyCache[s.Code] = s
+		out[s.Code] = s
 	}
+	return out
 }
 
-func (r *SmartRouter) loadStrategyCache() {
+func (r *SmartRouter) loadStrategyCacheMapFromDB() map[string]StrategyConfig {
 	if r.db == nil {
 		r.db = config.GetDB()
 	}
 	if r.db == nil {
-		return
+		return nil
 	}
 
 	rows, err := r.db.Query(`
@@ -500,15 +524,14 @@ func (r *SmartRouter) loadStrategyCache() {
 			is_default
 		FROM routing_strategies
 		WHERE status = 'active'
+		ORDER BY id ASC
 	`)
 	if err != nil {
-		return
+		return nil
 	}
 	defer rows.Close()
 
-	strategyCacheMu.Lock()
-	defer strategyCacheMu.Unlock()
-
+	m := make(map[string]StrategyConfig)
 	for rows.Next() {
 		var config StrategyConfig
 		err := rows.Scan(
@@ -519,7 +542,8 @@ func (r *SmartRouter) loadStrategyCache() {
 			&config.IsDefault,
 		)
 		if err == nil {
-			strategyCache[config.Code] = config
+			m[config.Code] = config
 		}
 	}
+	return m
 }

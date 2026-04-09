@@ -10,6 +10,15 @@ import (
 
 var DB *sql.DB
 
+// DatabaseURL returns the PostgreSQL connection string used by InitDB (for LISTEN / tooling).
+func DatabaseURL() string {
+	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+		return dbURL
+	}
+	//nolint:gosec,G101
+	return "postgresql://pintuotuo:dev_password_123@localhost:5432/pintuotuo_db?sslmode=disable"
+}
+
 // LoadConfig loads environment variables and initializes configuration
 func LoadConfig() error {
 	// Environment variables are loaded from .env files
@@ -19,12 +28,7 @@ func LoadConfig() error {
 
 // InitDB initializes database connection
 func InitDB() error {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		// Default to development database
-		//nolint:gosec,G101
-		dbURL = "postgresql://pintuotuo:dev_password_123@localhost:5432/pintuotuo_db?sslmode=disable"
-	}
+	dbURL := DatabaseURL()
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {

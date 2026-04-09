@@ -16,6 +16,7 @@ import (
 	"github.com/pintuotuo/backend/notification"
 	"github.com/pintuotuo/backend/routes"
 	"github.com/pintuotuo/backend/scheduler"
+	"github.com/pintuotuo/backend/services"
 	"github.com/pintuotuo/backend/utils"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	swaggerFiles "github.com/swaggo/files"
@@ -52,6 +53,9 @@ func main() {
 		log.Fatalf("Failed to initialize config database: %v", err)
 	}
 	defer config.CloseDB()
+
+	services.GetSmartRouter().ReloadRoutingStrategies()
+	services.StartRoutingStrategiesListener(config.DatabaseURL())
 
 	if err := cache.Init(); err != nil {
 		log.Fatalf("Failed to initialize Redis: %v", err)
