@@ -60,7 +60,14 @@ const AdminUserBillings: React.FC = () => {
     fetchBillings();
     fetchStats();
     fetchProviders();
-  }, [pagination.current, pagination.pageSize, filterUserId, filterProvider, filterModel, dateRange]);
+  }, [
+    pagination.current,
+    pagination.pageSize,
+    filterUserId,
+    filterProvider,
+    filterModel,
+    dateRange,
+  ]);
 
   useEffect(() => {
     fetchModels();
@@ -234,7 +241,7 @@ const AdminUserBillings: React.FC = () => {
       dataIndex: 'cost',
       key: 'cost',
       width: 100,
-      render: (cost: number) => `$${(cost || 0).toFixed(4)}`,
+      render: (cost: number) => `¥${(cost || 0).toFixed(6)}`,
     },
     {
       title: '延迟(ms)',
@@ -248,11 +255,7 @@ const AdminUserBillings: React.FC = () => {
       dataIndex: 'status_code',
       key: 'status_code',
       width: 80,
-      render: (code: number) => (
-        <Tag color={code === 200 ? 'success' : 'error'}>
-          {code}
-        </Tag>
-      ),
+      render: (code: number) => <Tag color={code === 200 ? 'success' : 'error'}>{code}</Tag>,
     },
     {
       title: '创建时间',
@@ -291,7 +294,7 @@ const AdminUserBillings: React.FC = () => {
               value={stats?.total_cost || 0}
               precision={2}
               prefix={<DollarOutlined />}
-              suffix="USD"
+              suffix="元"
               valueStyle={{ fontSize: '20px' }}
             />
           </Card>
@@ -425,14 +428,26 @@ const AdminUserBillings: React.FC = () => {
             <Descriptions.Item label="ID">{selectedBilling.id}</Descriptions.Item>
             <Descriptions.Item label="用户ID">{selectedBilling.user_id}</Descriptions.Item>
             <Descriptions.Item label="用户名">{selectedBilling.username || '-'}</Descriptions.Item>
-            <Descriptions.Item label="商户">{selectedBilling.company_name || '-'}</Descriptions.Item>
+            <Descriptions.Item label="商户">
+              {selectedBilling.company_name || '-'}
+            </Descriptions.Item>
             <Descriptions.Item label="Provider">{selectedBilling.provider}</Descriptions.Item>
             <Descriptions.Item label="Model">{selectedBilling.model}</Descriptions.Item>
-            <Descriptions.Item label="输入Tokens">{selectedBilling.input_tokens?.toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="输出Tokens">{selectedBilling.output_tokens?.toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="总Tokens">{selectedBilling.total_tokens?.toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="成本">${(selectedBilling.cost || 0).toFixed(6)}</Descriptions.Item>
-            <Descriptions.Item label="延迟">{(selectedBilling.request_time || 0).toFixed(2)} ms</Descriptions.Item>
+            <Descriptions.Item label="输入Tokens">
+              {selectedBilling.input_tokens?.toLocaleString()}
+            </Descriptions.Item>
+            <Descriptions.Item label="输出Tokens">
+              {selectedBilling.output_tokens?.toLocaleString()}
+            </Descriptions.Item>
+            <Descriptions.Item label="总Tokens">
+              {selectedBilling.total_tokens?.toLocaleString()}
+            </Descriptions.Item>
+            <Descriptions.Item label="成本">
+              ¥{(selectedBilling.cost || 0).toFixed(6)}
+            </Descriptions.Item>
+            <Descriptions.Item label="延迟">
+              {(selectedBilling.request_time || 0).toFixed(2)} ms
+            </Descriptions.Item>
             <Descriptions.Item label="状态码">
               <Tag color={selectedBilling.status_code === 200 ? 'success' : 'error'}>
                 {selectedBilling.status_code}

@@ -90,7 +90,7 @@ func (s *PricingService) loadPricing() {
 				model_name as model,
 				provider_input_rate as input_price,
 				provider_output_rate as output_price,
-				'USD' as currency,
+				'CNY' as currency,
 				COALESCE(updated_at, created_at) as effective_at
 			FROM spus
 			WHERE status = 'active'
@@ -136,18 +136,18 @@ func (s *PricingService) loadPricing() {
 
 func (s *PricingService) loadDefaultPricing() {
 	defaultPricing := []PricingData{
-		{Provider: "openai", Model: "gpt-4-turbo-preview", InputPrice: 10, OutputPrice: 30, Currency: "USD"},
-		{Provider: "openai", Model: "gpt-4", InputPrice: 30, OutputPrice: 60, Currency: "USD"},
-		{Provider: "openai", Model: "gpt-4o", InputPrice: 5, OutputPrice: 15, Currency: "USD"},
-		{Provider: "openai", Model: "gpt-4o-mini", InputPrice: 0.15, OutputPrice: 0.6, Currency: "USD"},
-		{Provider: "openai", Model: "gpt-3.5-turbo", InputPrice: 0.5, OutputPrice: 1.5, Currency: "USD"},
-		{Provider: "anthropic", Model: "claude-3-opus-20240229", InputPrice: 15, OutputPrice: 75, Currency: "USD"},
-		{Provider: "anthropic", Model: "claude-3-sonnet-20240229", InputPrice: 3, OutputPrice: 15, Currency: "USD"},
-		{Provider: "anthropic", Model: "claude-3-haiku-20240307", InputPrice: 0.25, OutputPrice: 1.25, Currency: "USD"},
-		{Provider: "anthropic", Model: "claude-3-5-sonnet-20241022", InputPrice: 3, OutputPrice: 15, Currency: "USD"},
-		{Provider: "google", Model: "gemini-pro", InputPrice: 0.5, OutputPrice: 1.5, Currency: "USD"},
-		{Provider: "google", Model: "gemini-1.5-pro", InputPrice: 3.5, OutputPrice: 10.5, Currency: "USD"},
-		{Provider: "google", Model: "gemini-1.5-flash", InputPrice: 0.075, OutputPrice: 0.3, Currency: "USD"},
+		{Provider: "openai", Model: "gpt-4-turbo-preview", InputPrice: 0.01, OutputPrice: 0.03, Currency: "CNY"},
+		{Provider: "openai", Model: "gpt-4", InputPrice: 0.03, OutputPrice: 0.06, Currency: "CNY"},
+		{Provider: "openai", Model: "gpt-4o", InputPrice: 0.005, OutputPrice: 0.015, Currency: "CNY"},
+		{Provider: "openai", Model: "gpt-4o-mini", InputPrice: 0.00015, OutputPrice: 0.0006, Currency: "CNY"},
+		{Provider: "openai", Model: "gpt-3.5-turbo", InputPrice: 0.0005, OutputPrice: 0.0015, Currency: "CNY"},
+		{Provider: "anthropic", Model: "claude-3-opus-20240229", InputPrice: 0.015, OutputPrice: 0.075, Currency: "CNY"},
+		{Provider: "anthropic", Model: "claude-3-sonnet-20240229", InputPrice: 0.003, OutputPrice: 0.015, Currency: "CNY"},
+		{Provider: "anthropic", Model: "claude-3-haiku-20240307", InputPrice: 0.00025, OutputPrice: 0.00125, Currency: "CNY"},
+		{Provider: "anthropic", Model: "claude-3-5-sonnet-20241022", InputPrice: 0.003, OutputPrice: 0.015, Currency: "CNY"},
+		{Provider: "google", Model: "gemini-pro", InputPrice: 0.0005, OutputPrice: 0.0015, Currency: "CNY"},
+		{Provider: "google", Model: "gemini-1.5-pro", InputPrice: 0.0035, OutputPrice: 0.0105, Currency: "CNY"},
+		{Provider: "google", Model: "gemini-1.5-flash", InputPrice: 0.000075, OutputPrice: 0.0003, Currency: "CNY"},
 	}
 
 	for _, p := range defaultPricing {
@@ -191,13 +191,14 @@ func (s *PricingService) CalculateCost(provider, model string, inputTokens, outp
 	pricing, ok := s.GetPricing(provider, model)
 	if !ok {
 		pricing = PricingData{
-			InputPrice:  1,
-			OutputPrice: 2,
+			InputPrice:  0.001,
+			OutputPrice: 0.002,
 		}
 	}
 
-	inputCost := float64(inputTokens) * pricing.InputPrice / 1_000_000
-	outputCost := float64(outputTokens) * pricing.OutputPrice / 1_000_000
+	// 统一计费口径：价格字段为 元/1K tokens，按 token 精算。
+	inputCost := float64(inputTokens) * pricing.InputPrice / 1_000
+	outputCost := float64(outputTokens) * pricing.OutputPrice / 1_000
 	totalCost := inputCost + outputCost
 
 	duration := time.Since(startTime).Seconds()

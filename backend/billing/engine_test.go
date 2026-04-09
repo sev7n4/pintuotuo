@@ -144,11 +144,12 @@ func TestPricingTier_Values(t *testing.T) {
 		if !found {
 			t.Fatal("GPT-4 Turbo pricing not found")
 		}
-		if pricing.InputPrice != 10 {
-			t.Errorf("GPT-4 Turbo input price = %v, want 10", pricing.InputPrice)
+		// 元/1K tokens（与 SPU/定价缓存口径一致）
+		if pricing.InputPrice != 0.01 {
+			t.Errorf("GPT-4 Turbo input price = %v, want 0.01", pricing.InputPrice)
 		}
-		if pricing.OutputPrice != 30 {
-			t.Errorf("GPT-4 Turbo output price = %v, want 30", pricing.OutputPrice)
+		if pricing.OutputPrice != 0.03 {
+			t.Errorf("GPT-4 Turbo output price = %v, want 0.03", pricing.OutputPrice)
 		}
 	})
 

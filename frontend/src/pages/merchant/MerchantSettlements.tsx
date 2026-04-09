@@ -1,5 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col, Input, Form, Space, Pagination } from 'antd';
+import {
+  Card,
+  Table,
+  Tag,
+  Button,
+  Modal,
+  Descriptions,
+  message,
+  Statistic,
+  Row,
+  Col,
+  Input,
+  Form,
+  Space,
+  Pagination,
+} from 'antd';
 import dayjs from 'dayjs';
 import {
   DollarOutlined,
@@ -66,7 +81,7 @@ const MerchantSettlements = () => {
 
       const response = await fetch(`/api/v1/merchant/billings?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -86,16 +101,19 @@ const MerchantSettlements = () => {
 
   const handleConfirmSettlement = async () => {
     if (!selectedSettlement) return;
-    
+
     setConfirmLoading(true);
     try {
-      const response = await fetch(`/api/v1/merchant/settlements/${selectedSettlement.id}/confirm`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`,
-        },
-      });
+      const response = await fetch(
+        `/api/v1/merchant/settlements/${selectedSettlement.id}/confirm`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${getAuthToken()}`,
+          },
+        }
+      );
 
       if (response.ok) {
         message.success('结算已确认');
@@ -120,14 +138,17 @@ const MerchantSettlements = () => {
 
     setDisputeLoading(true);
     try {
-      const response = await fetch(`/api/v1/merchant/settlements/${selectedSettlement.id}/dispute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`,
-        },
-        body: JSON.stringify({ reason: disputeReason }),
-      });
+      const response = await fetch(
+        `/api/v1/merchant/settlements/${selectedSettlement.id}/dispute`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${getAuthToken()}`,
+          },
+          body: JSON.stringify({ reason: disputeReason }),
+        }
+      );
 
       if (response.ok) {
         message.success('争议已提交');
@@ -271,7 +292,7 @@ const MerchantSettlements = () => {
       dataIndex: 'cost',
       key: 'cost',
       width: 100,
-      render: (cost: number) => `$${cost.toFixed(4)}`,
+      render: (cost: number) => `¥${cost.toFixed(6)}`,
     },
     {
       title: '延迟(ms)',
@@ -285,11 +306,7 @@ const MerchantSettlements = () => {
       dataIndex: 'status_code',
       key: 'status_code',
       width: 80,
-      render: (code: number) => (
-        <Tag color={code === 200 ? 'success' : 'error'}>
-          {code}
-        </Tag>
-      ),
+      render: (code: number) => <Tag color={code === 200 ? 'success' : 'error'}>{code}</Tag>,
     },
     {
       title: '创建时间',
@@ -417,37 +434,38 @@ const MerchantSettlements = () => {
             </Descriptions>
 
             <div style={{ marginTop: 24, textAlign: 'right' }}>
-              {!selectedSettlement.merchant_confirmed && selectedSettlement.status === 'pending' && (
-                <>
-                  <Button
-                    style={{ marginRight: 8 }}
-                    onClick={() => {
-                      setDetailVisible(false);
-                      handleViewBilling(selectedSettlement);
-                    }}
-                  >
-                    查看账单明细
-                  </Button>
-                  <Button
-                    type="primary"
-                    onClick={handleConfirmSettlement}
-                    loading={confirmLoading}
-                    style={{ marginRight: 8 }}
-                  >
-                    确认结算
-                  </Button>
-                  <Button
-                    danger
-                    icon={<WarningOutlined />}
-                    onClick={() => {
-                      setDetailVisible(false);
-                      setDisputeVisible(true);
-                    }}
-                  >
-                    提交争议
-                  </Button>
-                </>
-              )}
+              {!selectedSettlement.merchant_confirmed &&
+                selectedSettlement.status === 'pending' && (
+                  <>
+                    <Button
+                      style={{ marginRight: 8 }}
+                      onClick={() => {
+                        setDetailVisible(false);
+                        handleViewBilling(selectedSettlement);
+                      }}
+                    >
+                      查看账单明细
+                    </Button>
+                    <Button
+                      type="primary"
+                      onClick={handleConfirmSettlement}
+                      loading={confirmLoading}
+                      style={{ marginRight: 8 }}
+                    >
+                      确认结算
+                    </Button>
+                    <Button
+                      danger
+                      icon={<WarningOutlined />}
+                      onClick={() => {
+                        setDetailVisible(false);
+                        setDisputeVisible(true);
+                      }}
+                    >
+                      提交争议
+                    </Button>
+                  </>
+                )}
             </div>
           </>
         )}
@@ -468,7 +486,10 @@ const MerchantSettlements = () => {
           <>
             <div style={{ marginBottom: 16 }}>
               <Space>
-                <span>结算周期: {dayjs(selectedSettlement.period_start).format('YYYY-MM-DD')} - {dayjs(selectedSettlement.period_end).format('YYYY-MM-DD')}</span>
+                <span>
+                  结算周期: {dayjs(selectedSettlement.period_start).format('YYYY-MM-DD')} -{' '}
+                  {dayjs(selectedSettlement.period_end).format('YYYY-MM-DD')}
+                </span>
                 <Button icon={<DownloadOutlined />} onClick={handleExportBilling}>
                   导出
                 </Button>

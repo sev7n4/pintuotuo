@@ -1,5 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col, Select, DatePicker, Space, Pagination } from 'antd';
+import {
+  Card,
+  Table,
+  Tag,
+  Button,
+  Modal,
+  Descriptions,
+  message,
+  Statistic,
+  Row,
+  Col,
+  Select,
+  DatePicker,
+  Space,
+  Pagination,
+} from 'antd';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import {
@@ -40,12 +55,15 @@ interface BillingStats {
   total_tokens: number;
   average_latency: number;
   success_rate: number;
-  provider_breakdown: Record<string, {
-    provider: string;
-    total_cost: number;
-    total_requests: number;
-    percentage: number;
-  }>;
+  provider_breakdown: Record<
+    string,
+    {
+      provider: string;
+      total_cost: number;
+      total_requests: number;
+      percentage: number;
+    }
+  >;
 }
 
 const AdminBillings = () => {
@@ -53,7 +71,7 @@ const AdminBillings = () => {
   const [loading, setLoading] = useState(false);
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedBilling, setSelectedBilling] = useState<BillingRecord | null>(null);
-  const [merchants, setMerchants] = useState<Array<{id: number; company_name: string}>>([]);
+  const [merchants, setMerchants] = useState<Array<{ id: number; company_name: string }>>([]);
   const [stats, setStats] = useState<BillingStats | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
@@ -73,7 +91,15 @@ const AdminBillings = () => {
     fetchMerchants();
     fetchStats();
     fetchProviders();
-  }, [page, pageSize, filterMerchantId, filterProvider, filterModel, filterStartDate, filterEndDate]);
+  }, [
+    page,
+    pageSize,
+    filterMerchantId,
+    filterProvider,
+    filterModel,
+    filterStartDate,
+    filterEndDate,
+  ]);
 
   useEffect(() => {
     fetchModels();
@@ -94,7 +120,7 @@ const AdminBillings = () => {
 
       const response = await fetch(`/api/v1/admin/billings?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -116,7 +142,7 @@ const AdminBillings = () => {
     try {
       const response = await fetch('/api/v1/admin/merchants', {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -138,7 +164,7 @@ const AdminBillings = () => {
 
       const response = await fetch(`/api/v1/admin/billings/stats?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -155,7 +181,7 @@ const AdminBillings = () => {
     try {
       const response = await fetch('/api/v1/admin/billings/providers', {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -175,7 +201,7 @@ const AdminBillings = () => {
 
       const response = await fetch(`/api/v1/admin/billings/models?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -208,7 +234,7 @@ const AdminBillings = () => {
 
       const response = await fetch(`/api/v1/admin/billings/export?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -287,7 +313,7 @@ const AdminBillings = () => {
       dataIndex: 'cost',
       key: 'cost',
       width: 100,
-      render: (cost: number) => `$${cost.toFixed(4)}`,
+      render: (cost: number) => `¥${cost.toFixed(6)}`,
     },
     {
       title: '延迟(ms)',
@@ -301,11 +327,7 @@ const AdminBillings = () => {
       dataIndex: 'status_code',
       key: 'status_code',
       width: 80,
-      render: (code: number) => (
-        <Tag color={code === 200 ? 'success' : 'error'}>
-          {code}
-        </Tag>
-      ),
+      render: (code: number) => <Tag color={code === 200 ? 'success' : 'error'}>{code}</Tag>,
     },
     {
       title: '创建时间',
@@ -344,7 +366,7 @@ const AdminBillings = () => {
               value={stats?.total_cost || 0}
               precision={2}
               prefix={<DollarOutlined />}
-              suffix="USD"
+              suffix="元"
               valueStyle={{ fontSize: '20px' }}
             />
           </Card>
@@ -508,11 +530,19 @@ const AdminBillings = () => {
             <Descriptions.Item label="Provider">{selectedBilling.provider}</Descriptions.Item>
             <Descriptions.Item label="Model">{selectedBilling.model}</Descriptions.Item>
             <Descriptions.Item label="状态码">{selectedBilling.status_code}</Descriptions.Item>
-            <Descriptions.Item label="输入Tokens">{selectedBilling.input_tokens.toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="输出Tokens">{selectedBilling.output_tokens.toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="总Tokens">{selectedBilling.total_tokens.toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="成本">${selectedBilling.cost.toFixed(4)}</Descriptions.Item>
-            <Descriptions.Item label="延迟">{selectedBilling.request_time.toFixed(2)} ms</Descriptions.Item>
+            <Descriptions.Item label="输入Tokens">
+              {selectedBilling.input_tokens.toLocaleString()}
+            </Descriptions.Item>
+            <Descriptions.Item label="输出Tokens">
+              {selectedBilling.output_tokens.toLocaleString()}
+            </Descriptions.Item>
+            <Descriptions.Item label="总Tokens">
+              {selectedBilling.total_tokens.toLocaleString()}
+            </Descriptions.Item>
+            <Descriptions.Item label="成本">¥{selectedBilling.cost.toFixed(6)}</Descriptions.Item>
+            <Descriptions.Item label="延迟">
+              {selectedBilling.request_time.toFixed(2)} ms
+            </Descriptions.Item>
             <Descriptions.Item label="创建时间">
               {dayjs(selectedBilling.created_at).format('YYYY-MM-DD HH:mm:ss')}
             </Descriptions.Item>
