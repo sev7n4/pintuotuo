@@ -260,23 +260,23 @@ type SKUCreateRequest struct {
 }
 
 type SKUUpdateRequest struct {
-	Name              string   `json:"name"`
-	TokenAmount       int64    `json:"token_amount"`
-	ComputePoints     float64  `json:"compute_points"`
-	RetailPrice       float64  `json:"retail_price"`
-	WholesalePrice    float64  `json:"wholesale_price"`
-	OriginalPrice     float64  `json:"original_price"`
-	Stock             int      `json:"stock"`
-	DailyLimit        int      `json:"daily_limit"`
-	GroupEnabled      bool     `json:"group_enabled"`
-	MinGroupSize      int      `json:"min_group_size"`
-	MaxGroupSize      int      `json:"max_group_size"`
-	GroupDiscountRate float64  `json:"group_discount_rate"`
-	CostInputRate     float64  `json:"cost_input_rate"`
-	CostOutputRate    float64  `json:"cost_output_rate"`
-	InheritSPUCost    *bool    `json:"inherit_spu_cost"`
-	Status            string   `json:"status"`
-	IsPromoted        bool     `json:"is_promoted"`
+	Name              string  `json:"name"`
+	TokenAmount       int64   `json:"token_amount"`
+	ComputePoints     float64 `json:"compute_points"`
+	RetailPrice       float64 `json:"retail_price"`
+	WholesalePrice    float64 `json:"wholesale_price"`
+	OriginalPrice     float64 `json:"original_price"`
+	Stock             int     `json:"stock"`
+	DailyLimit        int     `json:"daily_limit"`
+	GroupEnabled      bool    `json:"group_enabled"`
+	MinGroupSize      int     `json:"min_group_size"`
+	MaxGroupSize      int     `json:"max_group_size"`
+	GroupDiscountRate float64 `json:"group_discount_rate"`
+	CostInputRate     float64 `json:"cost_input_rate"`
+	CostOutputRate    float64 `json:"cost_output_rate"`
+	InheritSPUCost    *bool   `json:"inherit_spu_cost"`
+	Status            string  `json:"status"`
+	IsPromoted        bool    `json:"is_promoted"`
 }
 
 type ComputePointBalanceResponse struct {
