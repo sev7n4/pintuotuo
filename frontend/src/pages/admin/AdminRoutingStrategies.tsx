@@ -19,6 +19,7 @@ import {
   Tooltip,
   Alert,
   Divider,
+  Select,
 } from 'antd';
 import {
   PlusOutlined,
@@ -157,7 +158,11 @@ const AdminRoutingStrategies: React.FC = () => {
 
   const handleSetDefault = async (id: number) => {
     try {
-      await api.put(`/admin/routing-strategies/${id}`, { is_default: true });
+      const { data } = await api.get<{ strategy: RoutingStrategyConfig }>(
+        `/admin/routing-strategies/${id}`
+      );
+      const s = data.strategy;
+      await api.put(`/admin/routing-strategies/${id}`, { ...s, is_default: true });
       message.success('已设为默认策略');
       fetchStrategies();
     } catch (error) {
@@ -341,7 +346,7 @@ const AdminRoutingStrategies: React.FC = () => {
       width: 80,
       render: (status: string) => (
         <Tag color={status === 'active' ? 'green' : 'default'}>
-          {status === 'active' ? '启用' : '禁用'}
+          {status === 'active' ? '启用' : status === 'inactive' ? '禁用' : status || '-'}
         </Tag>
       ),
     },
@@ -721,8 +726,18 @@ const AdminRoutingStrategies: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="status" label="状态">
-                <Input disabled />
+              <Form.Item
+                name="status"
+                label="状态"
+                rules={[{ required: true, message: '请选择启用或禁用' }]}
+              >
+                <Select
+                  placeholder="启用或禁用"
+                  options={[
+                    { value: 'active', label: '启用' },
+                    { value: 'inactive', label: '禁用' },
+                  ]}
+                />
               </Form.Item>
             </Col>
           </Row>
