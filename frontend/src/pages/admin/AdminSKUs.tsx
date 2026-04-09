@@ -27,6 +27,14 @@ import type { SKUWithSPU, SPU, SKUCreateRequest, SKUUpdateRequest } from '@/type
 import { SKU_TYPE_LABELS, MODEL_TIER_LABELS, SUBSCRIPTION_PERIOD_LABELS } from '@/types/sku';
 import { getApiErrorMessage } from '@/utils/apiError';
 
+/** 管理端 InputNumber 可能产生小数，PostgreSQL 整型列会拒绝（生产曾出现 stock=9.9 导致更新失败） */
+function intFormValue(v: unknown, fallback: number): number {
+  if (v === null || v === undefined) return fallback;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.trunc(n);
+}
+
 const { useBreakpoint } = Grid;
 
 const AdminSKUs = () => {
@@ -172,11 +180,11 @@ const AdminSKUs = () => {
           retail_price: values.retail_price,
           wholesale_price: values.wholesale_price,
           original_price: values.original_price,
-          stock: values.stock,
-          daily_limit: values.daily_limit,
+          stock: intFormValue(values.stock, editingSKU.stock ?? -1),
+          daily_limit: intFormValue(values.daily_limit, editingSKU.daily_limit ?? 0),
           group_enabled: values.group_enabled,
-          min_group_size: values.min_group_size,
-          max_group_size: values.max_group_size,
+          min_group_size: intFormValue(values.min_group_size, editingSKU.min_group_size ?? 2),
+          max_group_size: intFormValue(values.max_group_size, editingSKU.max_group_size ?? 10),
           group_discount_rate: values.group_discount_rate,
           status: values.status,
           is_promoted: values.is_promoted,
@@ -187,9 +195,30 @@ const AdminSKUs = () => {
         await skuService.updateSKU(editingSKU.id, updateData);
         message.success('SKU已更新');
       } else {
+        const { sku_code: codeRaw, ...rest } = values;
         const createData: SKUCreateRequest = {
-          ...values,
-          sku_code: values.sku_code.toUpperCase(),
+          ...rest,
+          sku_code: codeRaw.toUpperCase(),
+          token_amount: rest.token_amount != null ? intFormValue(rest.token_amount, 0) : undefined,
+          fair_use_limit:
+            rest.fair_use_limit != null ? intFormValue(rest.fair_use_limit, 0) : undefined,
+          valid_days: rest.valid_days != null ? intFormValue(rest.valid_days, 365) : undefined,
+          concurrent_requests:
+            rest.concurrent_requests != null
+              ? intFormValue(rest.concurrent_requests, 0)
+              : undefined,
+          tpm_limit: rest.tpm_limit != null ? intFormValue(rest.tpm_limit, 0) : undefined,
+          rpm_limit: rest.rpm_limit != null ? intFormValue(rest.rpm_limit, 0) : undefined,
+          stock: rest.stock != null ? intFormValue(rest.stock, -1) : undefined,
+          daily_limit: rest.daily_limit != null ? intFormValue(rest.daily_limit, 0) : undefined,
+          min_group_size:
+            rest.min_group_size != null ? intFormValue(rest.min_group_size, 2) : undefined,
+          max_group_size:
+            rest.max_group_size != null ? intFormValue(rest.max_group_size, 10) : undefined,
+          trial_duration_days:
+            rest.trial_duration_days != null
+              ? intFormValue(rest.trial_duration_days, 0)
+              : undefined,
         };
         await skuService.createSKU(createData);
         message.success('SKU已创建');
@@ -462,7 +491,9 @@ const AdminSKUs = () => {
             <Col xs={24} sm={8} md={5}>
               <Select
                 value={filters.spu_status || undefined}
-                onChange={(v) => setFilters({ ...filters, spu_status: (v ?? '') as '' | 'active' | 'inactive' })}
+                onChange={(v) =>
+                  setFilters({ ...filters, spu_status: (v ?? '') as '' | 'active' | 'inactive' })
+                }
                 style={{ width: '100%' }}
                 placeholder="SPU 状态"
                 allowClear
@@ -532,8 +563,7 @@ const AdminSKUs = () => {
                 >
                   {spus.map((s) => (
                     <Select.Option key={s.id} value={s.id} label={s.name}>
-                      {s.name} ({s.spu_code})
-                      {s.status !== 'active' ? ' · SPU下架' : ''}
+                      {s.name} ({s.spu_code}){s.status !== 'active' ? ' · SPU下架' : ''}
                     </Select.Option>
                   ))}
                 </Select>
@@ -615,6 +645,8 @@ const AdminSKUs = () => {
                   >
                     <InputNumber
                       min={1}
+                      precision={0}
+                      step={1}
                       style={{ width: '100%' }}
                       placeholder="100000"
                       formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
@@ -637,7 +669,7 @@ const AdminSKUs = () => {
                 </Col>
                 <Col span={8}>
                   <Form.Item name="valid_days" label="有效天数">
-                    <InputNumber min={1} style={{ width: '100%' }} />
+                    <InputNumber min={1} precision={0} step={1} style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
               </Row>
@@ -672,7 +704,13 @@ const AdminSKUs = () => {
                     label="公平使用上限"
                     extra="无限量套餐的每日使用上限"
                   >
-                    <InputNumber min={1} style={{ width: '100%' }} placeholder="Tokens/天" />
+                    <InputNumber
+                      min={1}
+                      precision={0}
+                      step={1}
+                      style={{ width: '100%' }}
+                      placeholder="Tokens/天"
+                    />
                   </Form.Item>
                 </Col>
               </Row>
@@ -689,17 +727,29 @@ const AdminSKUs = () => {
                     label="并发请求数"
                     rules={[{ required: true, message: '请输入并发请求数' }]}
                   >
-                    <InputNumber min={1} style={{ width: '100%' }} />
+                    <InputNumber min={1} precision={0} step={1} style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
                 <Col span={8}>
                   <Form.Item name="tpm_limit" label="TPM限制">
-                    <InputNumber min={1} style={{ width: '100%' }} placeholder="Tokens/分钟" />
+                    <InputNumber
+                      min={1}
+                      precision={0}
+                      step={1}
+                      style={{ width: '100%' }}
+                      placeholder="Tokens/分钟"
+                    />
                   </Form.Item>
                 </Col>
                 <Col span={8}>
                   <Form.Item name="rpm_limit" label="RPM限制">
-                    <InputNumber min={1} style={{ width: '100%' }} placeholder="请求/分钟" />
+                    <InputNumber
+                      min={1}
+                      precision={0}
+                      step={1}
+                      style={{ width: '100%' }}
+                      placeholder="请求/分钟"
+                    />
                   </Form.Item>
                 </Col>
               </Row>
@@ -736,7 +786,13 @@ const AdminSKUs = () => {
             </Col>
             <Col span={8}>
               <Form.Item name="stock" label="库存" extra="-1表示无限库存">
-                <InputNumber style={{ width: '100%' }} placeholder="-1" />
+                <InputNumber
+                  min={-1}
+                  precision={0}
+                  step={1}
+                  style={{ width: '100%' }}
+                  placeholder="-1"
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -745,7 +801,10 @@ const AdminSKUs = () => {
           <Form.Item name="inherit_spu_cost" label="继承 SPU 参考价" valuePropName="checked">
             <Switch checkedChildren="继承" unCheckedChildren="手填" />
           </Form.Item>
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.inherit_spu_cost !== cur.inherit_spu_cost}>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, cur) => prev.inherit_spu_cost !== cur.inherit_spu_cost}
+          >
             {({ getFieldValue }) => {
               const inherit = getFieldValue('inherit_spu_cost') !== false;
               const sid = getFieldValue('spu_id') as number | undefined;
@@ -776,7 +835,12 @@ const AdminSKUs = () => {
                             label="输入成本（元/1K）"
                             rules={[{ required: true, message: '请填写输入成本' }]}
                           >
-                            <InputNumber min={0.000001} step={0.000001} precision={6} style={{ width: '100%' }} />
+                            <InputNumber
+                              min={0.000001}
+                              step={0.000001}
+                              precision={6}
+                              style={{ width: '100%' }}
+                            />
                           </Form.Item>
                         </Col>
                         <Col span={12}>
@@ -785,7 +849,12 @@ const AdminSKUs = () => {
                             label="输出成本（元/1K）"
                             rules={[{ required: true, message: '请填写输出成本' }]}
                           >
-                            <InputNumber min={0.000001} step={0.000001} precision={6} style={{ width: '100%' }} />
+                            <InputNumber
+                              min={0.000001}
+                              step={0.000001}
+                              precision={6}
+                              style={{ width: '100%' }}
+                            />
                           </Form.Item>
                         </Col>
                       </Row>
@@ -795,8 +864,8 @@ const AdminSKUs = () => {
                           const outCost = Number(getFieldValue('cost_output_rate') || 0);
                           const spuIn = Number(spu?.provider_input_rate || 0);
                           const spuOut = Number(spu?.provider_output_rate || 0);
-                          const inDelta = spuIn > 0 ? Math.abs(inCost-spuIn) / spuIn : 0;
-                          const outDelta = spuOut > 0 ? Math.abs(outCost-spuOut) / spuOut : 0;
+                          const inDelta = spuIn > 0 ? Math.abs(inCost - spuIn) / spuIn : 0;
+                          const outDelta = spuOut > 0 ? Math.abs(outCost - spuOut) / spuOut : 0;
                           if (inDelta <= 0.2 && outDelta <= 0.2) return null;
                           return (
                             <Alert
@@ -827,12 +896,12 @@ const AdminSKUs = () => {
                 </Col>
                 <Col span={6}>
                   <Form.Item name="min_group_size" label="最小人数">
-                    <InputNumber min={2} style={{ width: '100%' }} />
+                    <InputNumber min={2} precision={0} step={1} style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
                 <Col span={6}>
                   <Form.Item name="max_group_size" label="最大人数">
-                    <InputNumber min={2} style={{ width: '100%' }} />
+                    <InputNumber min={2} precision={0} step={1} style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
                 <Col span={6}>
@@ -856,7 +925,13 @@ const AdminSKUs = () => {
             </Col>
             <Col span={12}>
               <Form.Item name="daily_limit" label="每日购买限制">
-                <InputNumber min={0} style={{ width: '100%' }} placeholder="0表示不限制" />
+                <InputNumber
+                  min={0}
+                  precision={0}
+                  step={1}
+                  style={{ width: '100%' }}
+                  placeholder="0表示不限制"
+                />
               </Form.Item>
             </Col>
           </Row>
