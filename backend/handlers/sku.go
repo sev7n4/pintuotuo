@@ -913,10 +913,11 @@ func CreateSKU(c *gin.Context) {
 	costInputRate := req.CostInputRate
 	costOutputRate := req.CostOutputRate
 	if inheritSPUCost {
-		if err := db.QueryRow(
+		err = db.QueryRow(
 			`SELECT COALESCE(provider_input_rate, 0), COALESCE(provider_output_rate, 0) FROM spus WHERE id = $1`,
 			req.SPUID,
-		).Scan(&costInputRate, &costOutputRate); err != nil {
+		).Scan(&costInputRate, &costOutputRate)
+		if err != nil {
 			middleware.RespondWithError(c, apperrors.NewAppError(
 				"SPU_QUERY_FAILED",
 				"读取SPU参考成本失败",
