@@ -292,6 +292,9 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.GET("/model-providers", handlers.GetModelProviders)
 		admin.POST("/model-providers", handlers.CreateModelProvider)
 		admin.PATCH("/model-providers/:id", handlers.PatchModelProvider)
+
+		admin.GET("/platform-settings", handlers.GetAdminPlatformSettings)
+		admin.PUT("/platform-settings", handlers.UpdateAdminPlatformSettings)
 	}
 }
 
