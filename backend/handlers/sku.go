@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -1080,6 +1081,7 @@ func UpdateSKU(c *gin.Context) {
 	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.CostInputRate, &sku.CostOutputRate, &sku.InheritSPUCost, &sku.CreatedAt, &sku.UpdatedAt)
 
 	if err != nil {
+		log.Printf("[UpdateSKU] sku_id=%d: %v", skuID, err)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SKU_UPDATE_FAILED",
 			"更新SKU失败",
