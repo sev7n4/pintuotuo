@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+// routing_strategies.status 与 goconst：与 DB 中 VARCHAR 取值一致。
+const (
+	routingStrategyStatusActive   = "active"
+	routingStrategyStatusInactive = "inactive"
+)
+
 type RoutingStrategyConfig struct {
 	ID                      int       `json:"id"`
 	Name                    string    `json:"name"`
@@ -174,10 +180,10 @@ func (s *RoutingStrategyService) GetStrategyByID(id int) (*RoutingStrategyConfig
 
 func applyRoutingStrategyBusinessRules(merged *RoutingStrategyConfig) {
 	if merged.IsDefault {
-		merged.Status = "active"
+		merged.Status = routingStrategyStatusActive
 		return
 	}
-	if merged.Status == "inactive" {
+	if merged.Status == routingStrategyStatusInactive {
 		merged.IsDefault = false
 	}
 }
@@ -190,16 +196,16 @@ func (s *RoutingStrategyService) CreateStrategy(strategy *RoutingStrategyConfig)
 	defer tx.Rollback()
 
 	if strategy.Status == "" {
-		strategy.Status = "active"
+		strategy.Status = routingStrategyStatusActive
 	}
 	strategy.Status = strings.TrimSpace(strategy.Status)
 	if strategy.IsDefault {
 		if _, err = tx.Exec(`UPDATE routing_strategies SET is_default = false WHERE status != 'deleted'`); err != nil {
 			return fmt.Errorf("failed to clear default flags: %w", err)
 		}
-		strategy.Status = "active"
+		strategy.Status = routingStrategyStatusActive
 	}
-	if strategy.Status == "inactive" {
+	if strategy.Status == routingStrategyStatusInactive {
 		strategy.IsDefault = false
 	}
 
