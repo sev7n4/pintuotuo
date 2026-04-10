@@ -180,8 +180,22 @@ const AdminSKUs = () => {
           retail_price: values.retail_price,
           wholesale_price: values.wholesale_price,
           original_price: values.original_price,
+          token_amount:
+            values.token_amount != null ? intFormValue(values.token_amount, 0) : undefined,
+          compute_points: values.compute_points,
+          subscription_period: values.subscription_period ?? editingSKU.subscription_period,
+          is_unlimited: values.is_unlimited ?? editingSKU.is_unlimited,
+          fair_use_limit:
+            values.fair_use_limit != null ? intFormValue(values.fair_use_limit, 0) : undefined,
+          concurrent_requests:
+            values.concurrent_requests != null
+              ? intFormValue(values.concurrent_requests, 0)
+              : undefined,
+          tpm_limit: values.tpm_limit != null ? intFormValue(values.tpm_limit, 0) : undefined,
+          rpm_limit: values.rpm_limit != null ? intFormValue(values.rpm_limit, 0) : undefined,
           stock: intFormValue(values.stock, editingSKU.stock ?? -1),
           daily_limit: intFormValue(values.daily_limit, editingSKU.daily_limit ?? 0),
+          valid_days: intFormValue(values.valid_days, editingSKU.valid_days ?? 365),
           group_enabled: values.group_enabled,
           min_group_size: intFormValue(values.min_group_size, editingSKU.min_group_size ?? 2),
           max_group_size: intFormValue(values.max_group_size, editingSKU.max_group_size ?? 10),

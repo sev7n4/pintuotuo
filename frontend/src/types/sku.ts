@@ -258,8 +258,17 @@ export interface SKUUpdateRequest {
   retail_price?: number;
   wholesale_price?: number;
   original_price?: number;
+  token_amount?: number;
+  compute_points?: number;
+  subscription_period?: string;
+  is_unlimited?: boolean;
+  fair_use_limit?: number;
+  tpm_limit?: number;
+  rpm_limit?: number;
+  concurrent_requests?: number;
   stock?: number;
   daily_limit?: number;
+  valid_days?: number;
   group_enabled?: boolean;
   min_group_size?: number;
   max_group_size?: number;

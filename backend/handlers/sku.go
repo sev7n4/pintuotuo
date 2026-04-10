@@ -1057,28 +1057,43 @@ func UpdateSKU(c *gin.Context) {
 		return
 	}
 	var sku models.SKU
+	subscriptionPeriod := strings.TrimSpace(req.SubscriptionPeriod)
 	err := db.QueryRow(
+		// 价格/折扣参数须显式 ::numeric：否则在扩展查询中「$n > 0」会与整型字面量 0 比较，导致小数绑定失败（pq: invalid input syntax for type integer: "9.9"）。
 		`UPDATE skus SET 
-		 retail_price = CASE WHEN $1 > 0 THEN $1 ELSE retail_price END,
-		 wholesale_price = CASE WHEN $2 > 0 THEN $2 ELSE wholesale_price END,
-		 original_price = CASE WHEN $3 > 0 THEN $3 ELSE original_price END,
-		 stock = CASE WHEN $4 != 0 THEN $4 ELSE stock END,
-		 daily_limit = CASE WHEN $5 > 0 THEN $5 ELSE daily_limit END,
-		 group_enabled = $6,
-		 min_group_size = CASE WHEN $7 > 0 THEN $7 ELSE min_group_size END,
-		 max_group_size = CASE WHEN $8 > 0 THEN $8 ELSE max_group_size END,
-		 group_discount_rate = CASE WHEN $9 > 0 THEN $9 ELSE group_discount_rate END,
-		 status = COALESCE(NULLIF($10, ''), status),
-		 is_promoted = $11,
-		 cost_input_rate = $12,
-		 cost_output_rate = $13,
-		 inherit_spu_cost = $14
-		 WHERE id = $15 
-		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, cost_input_rate, cost_output_rate, inherit_spu_cost, created_at, updated_at`,
-		req.RetailPrice, req.WholesalePrice, req.OriginalPrice, req.Stock, req.DailyLimit,
+		 retail_price = CASE WHEN $1::numeric > 0 THEN $1::numeric ELSE retail_price END,
+		 wholesale_price = CASE WHEN $2::numeric > 0 THEN $2::numeric ELSE wholesale_price END,
+		 original_price = CASE WHEN $3::numeric > 0 THEN $3::numeric ELSE original_price END,
+		 token_amount = CASE WHEN $4 > 0 THEN $4 ELSE token_amount END,
+		 compute_points = CASE WHEN $5::numeric > 0 THEN $5::numeric ELSE compute_points END,
+		 subscription_period = COALESCE(NULLIF($6::text, ''), subscription_period),
+		 is_unlimited = $7,
+		 fair_use_limit = CASE WHEN $8 > 0 THEN $8 ELSE fair_use_limit END,
+		 tpm_limit = CASE WHEN $9 > 0 THEN $9 ELSE tpm_limit END,
+		 rpm_limit = CASE WHEN $10 > 0 THEN $10 ELSE rpm_limit END,
+		 concurrent_requests = CASE WHEN $11 > 0 THEN $11 ELSE concurrent_requests END,
+		 valid_days = CASE WHEN $12 > 0 THEN $12 ELSE valid_days END,
+		 stock = CASE WHEN $13 != 0 THEN $13 ELSE stock END,
+		 daily_limit = CASE WHEN $14 > 0 THEN $14 ELSE daily_limit END,
+		 group_enabled = $15,
+		 min_group_size = CASE WHEN $16 > 0 THEN $16 ELSE min_group_size END,
+		 max_group_size = CASE WHEN $17 > 0 THEN $17 ELSE max_group_size END,
+		 group_discount_rate = CASE WHEN $18::numeric > 0 THEN $18::numeric ELSE group_discount_rate END,
+		 status = COALESCE(NULLIF($19, ''), status),
+		 is_promoted = $20,
+		 cost_input_rate = $21,
+		 cost_output_rate = $22,
+		 inherit_spu_cost = $23
+		 WHERE id = $24 
+		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, valid_days, cost_input_rate, cost_output_rate, inherit_spu_cost, created_at, updated_at`,
+		req.RetailPrice, req.WholesalePrice, req.OriginalPrice,
+		req.TokenAmount, req.ComputePoints,
+		subscriptionPeriod,
+		req.IsUnlimited, req.FairUseLimit, req.TPMLimit, req.RPMLimit, req.ConcurrentReqs,
+		req.ValidDays, req.Stock, req.DailyLimit,
 		req.GroupEnabled, req.MinGroupSize, req.MaxGroupSize, req.GroupDiscountRate,
 		req.Status, req.IsPromoted, costInputRate, costOutputRate, inherit, skuID,
-	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.CostInputRate, &sku.CostOutputRate, &sku.InheritSPUCost, &sku.CreatedAt, &sku.UpdatedAt)
+	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.ValidDays, &sku.CostInputRate, &sku.CostOutputRate, &sku.InheritSPUCost, &sku.CreatedAt, &sku.UpdatedAt)
 
 	if err != nil {
 		log.Printf("[UpdateSKU] sku_id=%d: %v", skuID, err)
