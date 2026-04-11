@@ -26,17 +26,17 @@
       {
         "id": "E2E-CI-PR-PIPELINE",
         "name": "PR 触发 CI/CD → Integration → E2E",
-        "status": "pending",
+        "status": "passed",
         "file": ".github/workflows"
       }
     ]
   },
   "statistics": {
     "total": 3,
-    "passed": 2,
+    "passed": 3,
     "failed": 0,
-    "pending": 1
+    "pending": 0
   },
-  "lastUpdated": "2026-04-11T16:10:00Z",
-  "workflowNote": "Step 8 本地验证 → Step 9 push/PR → Step 10 CI 监控"
+  "lastUpdated": "2026-04-11T16:35:00Z",
+  "workflowNote": "PR #241 CI 全绿；待合并（Squash）或需人工审批"
 }
