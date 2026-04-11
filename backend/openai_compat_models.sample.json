@@ -1,0 +1,18 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "deepseek/deepseek-chat",
+      "object": "model",
+      "created": 1735689600,
+      "owned_by": "deepseek"
+    },
+    {
+      "id": "zhipu/glm-4-air",
+      "object": "model",
+      "created": 1735689600,
+      "owned_by": "zhipu"
+    }
+  ],
+  "_comment": "示例结构，与 GET /api/v1/openai/v1/models 返回形态一致；线上数据以库内 spus + model_providers 为准，可定期导出替换此文件作离线参考。"
+}

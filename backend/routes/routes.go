@@ -75,6 +75,7 @@ func RegisterOpenAICompatRoutes(router *gin.RouterGroup) {
 	openai.Use(middleware.APIKeyOrJWTAuthMiddleware())
 	openai.Use(middleware.RateLimitMiddleware())
 	{
+		openai.GET("/models", handlers.OpenAIListModels)
 		openai.POST("/chat/completions", handlers.OpenAIChatCompletions)
 	}
 }

@@ -16,6 +16,8 @@ import (
 	"github.com/pintuotuo/backend/models"
 )
 
+// SettlementService derives merchant-side figures from api_usage_logs (per-request usage and recorded cost).
+// It does not use user order SKU token_amount or tokens.balance; those are retail fulfillment / user ledger fields.
 type SettlementService struct {
 	db *sql.DB
 }
