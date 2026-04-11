@@ -181,12 +181,20 @@ func CreateOrder(c *gin.Context) {
 
 	var pid interface{} = nil
 	var productID sql.NullInt64
+	pv := services.BaselinePricingVersionID(tx)
+	var pvArg interface{}
+	if pv.Valid {
+		pvArg = pv.Int64
+	} else {
+		pvArg = nil
+	}
+	var pricingVID sql.NullInt64
 	err = tx.QueryRow(
-		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
-		 RETURNING id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at`,
-		userID, pid, skuID, spuID, groupID, req.Quantity, unitPrice, totalPrice, orderStatusPending,
-	).Scan(&order.ID, &order.UserID, &productID, &order.SKUID, &order.SPUID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+		 RETURNING id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id, created_at, updated_at`,
+		userID, pid, skuID, spuID, groupID, req.Quantity, unitPrice, totalPrice, orderStatusPending, pvArg,
+	).Scan(&order.ID, &order.UserID, &productID, &order.SKUID, &order.SPUID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &pricingVID, &order.CreatedAt, &order.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -198,6 +206,10 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 	applyNullOrderProductID(&order, productID)
+	if pricingVID.Valid {
+		v := int(pricingVID.Int64)
+		order.PricingVersionID = &v
+	}
 
 	if err := tx.Commit(); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -565,11 +577,18 @@ func CreateGroup(c *gin.Context) {
 
 	var orderID int
 	groupPrice := retailPrice * (1 - utils.NormalizeGroupDiscountRateNull(groupDiscountRate))
+	pvCreate := services.BaselinePricingVersionID(db)
+	var pvCreateArg interface{}
+	if pvCreate.Valid {
+		pvCreateArg = pvCreate.Int64
+	} else {
+		pvCreateArg = nil
+	}
 
 	err = db.QueryRow(
-		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-		userID, nilPID, skuID, spuID, group.ID, 1, groupPrice, groupPrice, orderStatusPending,
+		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+		userID, nilPID, skuID, spuID, group.ID, 1, groupPrice, groupPrice, orderStatusPending, pvCreateArg,
 	).Scan(&orderID)
 
 	if err != nil {
@@ -853,10 +872,17 @@ func JoinGroup(c *gin.Context) {
 
 	var nilPID interface{} = nil
 	var orderID int
+	pvJoin := services.BaselinePricingVersionID(db)
+	var pvJoinArg interface{}
+	if pvJoin.Valid {
+		pvJoinArg = pvJoin.Int64
+	} else {
+		pvJoinArg = nil
+	}
 	err = db.QueryRow(
-		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-		userID, nilPID, group.SKUID, group.SPUID, group.ID, 1, unitPrice, unitPrice, orderStatusPending,
+		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+		userID, nilPID, group.SKUID, group.SPUID, group.ID, 1, unitPrice, unitPrice, orderStatusPending, pvJoinArg,
 	).Scan(&orderID)
 
 	if err != nil {
