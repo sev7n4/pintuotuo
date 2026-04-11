@@ -1,31 +1,31 @@
 {
   "currentIssue": {
-    "id": "ISSUE-CNY-COST-UNIT-001",
-    "type": "enhancement",
-    "module": "admin_sku/merchant_sku/merchant_api_keys",
-    "branch": "feature/cny-unit-cost-and-sku-inheritance-ui",
-    "title": "单位统一元/1K与SKU继承链UI补齐"
+    "id": "ISSUE-GMVTREND-001",
+    "type": "feature",
+    "module": "reconciliation/admin_gmv",
+    "branch": "feature/gmv-trend-curves",
+    "title": "GMV 日/周/月趋势 API 与前端曲线"
   },
   "testCases": {
     "unit": [
       {
-        "id": "UT-BACKEND-HANDLERS-SERVICES-SHORT",
-        "name": "go test ./handlers ./services -short",
+        "id": "UT-RECON-GMVTREND-GetGMVTrends",
+        "name": "GetGMVTrends day 聚合（sqlmock）",
         "status": "passed",
-        "file": "backend"
+        "file": "backend/services/reconciliation_gmv_trends_test.go"
       },
       {
-        "id": "UT-FRONTEND-TYPECHECK",
-        "name": "npm run type-check",
+        "id": "UT-MAKE-TEST-FULL",
+        "name": "make test（根目录全量）",
         "status": "passed",
-        "file": "frontend"
+        "file": "Makefile"
       }
     ],
     "integration": [],
     "e2e": [
       {
-        "id": "E2E-CNY-COST-UNIT-AND-GUIDE",
-        "name": "GitHub Actions CI on PR",
+        "id": "E2E-CI-PR-PIPELINE",
+        "name": "PR 触发 CI/CD → Integration → E2E",
         "status": "pending",
         "file": ".github/workflows"
       }
@@ -37,6 +37,6 @@
     "failed": 0,
     "pending": 1
   },
-  "lastUpdated": "2026-04-09T16:36:00Z",
-  "workflowNote": "PR #224 已创建，进入 CI/CD -> Integration -> E2E 监控阶段。"
+  "lastUpdated": "2026-04-11T16:10:00Z",
+  "workflowNote": "Step 8 本地验证 → Step 9 push/PR → Step 10 CI 监控"
 }

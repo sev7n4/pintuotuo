@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -147,4 +148,57 @@ func GetGMVReportSummary(db *sql.DB, start, end *time.Time) (GMVReportSummary, e
 	}
 	out.Currency = "CNY"
 	return out, err
+}
+
+// GMVTrendPoint is GMV aggregated for one period (day / calendar week / month).
+type GMVTrendPoint struct {
+	Period     string  `json:"period"`
+	OrderCount int     `json:"order_count"`
+	GMVCNY     float64 `json:"gmv_cny"`
+}
+
+// GetGMVTrends returns paid/completed order GMV series by granularity within [start, end] on orders.created_at.
+func GetGMVTrends(db *sql.DB, granularity string, start, end time.Time) ([]GMVTrendPoint, error) {
+	var periodExpr, groupByExpr string
+	switch granularity {
+	case "week":
+		periodExpr = "to_char(date_trunc('week', o.created_at), 'YYYY-MM-DD')"
+		groupByExpr = "date_trunc('week', o.created_at)"
+	case "month":
+		periodExpr = "to_char(date_trunc('month', o.created_at), 'YYYY-MM')"
+		groupByExpr = "date_trunc('month', o.created_at)"
+	default:
+		periodExpr = "to_char((o.created_at)::date, 'YYYY-MM-DD')"
+		groupByExpr = "(o.created_at)::date"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT %s AS period,
+			COUNT(*)::int,
+			COALESCE(SUM(o.total_price), 0)::float8
+		FROM orders o
+		WHERE o.status IN ('paid', 'completed')
+		  AND o.created_at >= $1 AND o.created_at <= $2
+		GROUP BY %s
+		ORDER BY %s ASC
+	`, periodExpr, groupByExpr, groupByExpr)
+
+	rows, err := db.Query(query, start, end)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []GMVTrendPoint
+	for rows.Next() {
+		var p GMVTrendPoint
+		if err := rows.Scan(&p.Period, &p.OrderCount, &p.GMVCNY); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	if out == nil {
+		out = []GMVTrendPoint{}
+	}
+	return out, rows.Err()
 }

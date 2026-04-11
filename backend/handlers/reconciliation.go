@@ -199,3 +199,67 @@ func AdminGetGMVReport(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, summary)
 }
+
+// AdminGetGMVTrends returns GMV time series (CNY) by day / week / month for paid & completed orders.
+// Query: granularity=day|week|month, start_date & end_date (YYYY-MM-DD). If dates omitted, last 90 days.
+func AdminGetGMVTrends(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+	granularity := c.DefaultQuery("granularity", "day")
+	switch granularity {
+	case "day", "week", "month":
+	default:
+		granularity = "day"
+	}
+
+	startStr := c.Query("start_date")
+	endStr := c.Query("end_date")
+	now := time.Now()
+	var startAt, endAt time.Time
+
+	if startStr == "" || endStr == "" {
+		endAt = time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, time.Local)
+		startAt = endAt.AddDate(0, 0, -89)
+		startAt = time.Date(startAt.Year(), startAt.Month(), startAt.Day(), 0, 0, 0, 0, time.Local)
+	} else {
+		tStart, err := time.ParseInLocation("2006-01-02", startStr, time.Local)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError("INVALID_DATE", "Invalid start_date", http.StatusBadRequest, err))
+			return
+		}
+		tEnd, err := time.ParseInLocation("2006-01-02", endStr, time.Local)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError("INVALID_DATE", "Invalid end_date", http.StatusBadRequest, err))
+			return
+		}
+		if tEnd.Before(tStart) {
+			middleware.RespondWithError(c, apperrors.NewAppError("INVALID_RANGE", "end_date must be on or after start_date", http.StatusBadRequest, nil))
+			return
+		}
+		startAt = time.Date(tStart.Year(), tStart.Month(), tStart.Day(), 0, 0, 0, 0, time.Local)
+		endAt = time.Date(tEnd.Year(), tEnd.Month(), tEnd.Day(), 23, 59, 59, 999999999, time.Local)
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	trends, err := services.GetGMVTrends(db, granularity, startAt, endAt)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"GMV_TRENDS_FAILED", "Failed to load GMV trends", http.StatusInternalServerError, err))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"currency":    "CNY",
+		"granularity": granularity,
+		"start_date":  startAt.Format("2006-01-02"),
+		"end_date":    endAt.Format("2006-01-02"),
+		"trends":      trends,
+		"checked_at":  time.Now().UTC().Format(time.RFC3339),
+	})
+}
