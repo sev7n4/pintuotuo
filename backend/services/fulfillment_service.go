@@ -181,35 +181,23 @@ func (s *FulfillmentService) fulfillComputePoints(tx *sql.Tx, userID, skuID, ord
 	if !computePoints.Valid || computePoints.Float64 <= 0 {
 		return fmt.Errorf("compute_points sku %d has no compute_points", skuID)
 	}
-	points := computePoints.Float64 * float64(qty)
-
-	var balance float64
-	err := tx.QueryRow(
-		`SELECT balance FROM compute_point_accounts WHERE user_id = $1 FOR UPDATE`,
-		userID,
-	).Scan(&balance)
-	if err == sql.ErrNoRows {
-		_, err = tx.Exec(`INSERT INTO compute_point_accounts (user_id, balance) VALUES ($1, 0)`, userID)
-		if err != nil {
-			return fmt.Errorf("compute account create: %w", err)
-		}
-		balance = 0
-	} else if err != nil {
-		return fmt.Errorf("compute account load: %w", err)
-	}
-
-	newBal := balance + points
-	_, err = tx.Exec(
-		`UPDATE compute_point_accounts SET balance = $1, total_earned = total_earned + $2, updated_at = NOW() WHERE user_id = $3`,
-		newBal, points, userID,
+	add := computePoints.Float64 * float64(qty)
+	// Single retail ledger: same as token_pack, credits `tokens` (internal units per order snapshot).
+	_, err := tx.Exec(`
+		INSERT INTO tokens (user_id, balance, total_used, total_earned)
+		VALUES ($1, $2, 0, $2)
+		ON CONFLICT (user_id) DO UPDATE SET
+			balance = tokens.balance + EXCLUDED.balance,
+			total_earned = tokens.total_earned + EXCLUDED.balance,
+			updated_at = NOW()`,
+		userID, add,
 	)
 	if err != nil {
-		return fmt.Errorf("compute credit: %w", err)
+		return fmt.Errorf("compute_points credit (tokens ledger): %w", err)
 	}
 	_, err = tx.Exec(
-		`INSERT INTO compute_point_transactions (user_id, type, amount, balance_after, order_id, sku_id, description)
-		 VALUES ($1, 'purchase', $2, $3, $4, $5, $6)`,
-		userID, points, newBal, orderID, skuID, fmt.Sprintf("订单 #%d", orderID),
+		`INSERT INTO token_transactions (user_id, type, amount, reason, order_id) VALUES ($1, 'purchase', $2, $3, $4)`,
+		userID, add, fmt.Sprintf("订单商品 #%d (compute_points SKU)", orderID), orderID,
 	)
 	return err
 }

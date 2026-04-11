@@ -398,4 +398,5 @@ Phase 4 (用户体验) - 独立实现
 
 - **IE-1**：已合入 `main`（迁移 045）。
 - **IE-2a**：下单写入 `pricing_version_id`（无 baseline 行时保持 `NULL`，兼容未迁移库）。
-- **IE-2** 剩余：履约侧单一账本与 `compute_points` / `token_pack` 收敛（见 `fulfillment_service`）。
+- **IE-2 / IE-3**：履约与算力点 API 已用 `tokens`；046 一次性合并历史 `compute_point_accounts`（IE-3 与迁移合并交付）。
+- **IE-4**：`api_proxy` 仍按当前 `PricingService` 扣 `tokens`；按订单 `pricing_version_id` 扣费待做。
