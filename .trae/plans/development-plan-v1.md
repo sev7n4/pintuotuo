@@ -353,6 +353,42 @@ Phase 4 (用户体验) - 独立实现
 
 ---
 
-**文档版本**: v1.0
-**最后更新**: 2026-04-04
+**文档版本**: v1.1
+**最后更新**: 2026-04-10
 **状态**: ⏳ 待审核
+
+---
+
+## 附录 A：内部经济与单一账本（2026-04-10 补充）
+
+> 技术口径与原则索引：[backend/doc_internal_token_economics.md](../../backend/doc_internal_token_economics.md)（`docs/` 目录在仓库中 gitignore，本地可保留副本）
+
+本附录补齐总计划中**未单独展开**的「零售余额 / 扣费 / 价目版本」链路，与 Phase 1.4 动态定价、api_proxy 重构**强相关但范围不同**：Phase 1.4 侧重定价服务与代理接入 DB；本附录侧重**账本语义统一**与**订单快照 + pricing_version** 全链路。
+
+### A.1 目标原则（已拍板）
+
+| 原则 | 说明 |
+|------|------|
+| 单一账本 | 用户可消费余额只对应一条主账本；代理扣费与履约入账对齐同一内部单位 |
+| 订单快照入账 1:1 | 订单（快照）写多少，履约加多少；入账阶段不乘「元/K token」 |
+| 换算层扣费 | 按次用价目版本中的元/1K（或等价）将 usage 换为应扣内部单位，再扣同一账本 |
+| 价目与下单时点一致 | 订单或权益绑定 `pricing_version_id`，避免 live 改价导致买用不一致 |
+
+### A.2 建议任务清单（可与 Phase 1.4 并行或前置评审）
+
+| 任务ID | 任务描述 | 依赖 | 建议落点 |
+|--------|----------|------|----------|
+| IE-1 | 评审：`pricing_versions`（或等价）表结构与订单/权益外键 | 无 | `migrations/`、设计文档 |
+| IE-2 | 订单履约：快照字段 1:1 入账单一账本（收敛 `compute_points` SKU 与 `token_pack`） | IE-1 草案 | `services/fulfillment_service.go` |
+| IE-3 | 数据迁移：历史 `compute_point_accounts` → 主账本策略与对账 | IE-2 | `migrations/`、一次性脚本 |
+| IE-4 | `api_proxy`：解析调用 → 权益/订单 → `pricing_version` → 扣减内部单位 | IE-1、IE-2 | `handlers/api_proxy.go`、`services/pricing_service.go` |
+| IE-5 | 清理：`token_pack` 上无效必填 `compute_points` 或纳入唯一公式 | IE-2 | `handlers/sku.go`、管理端表单 |
+| IE-6 | 验收：入账/扣费/报表单位一致性测试与对账用例 | IE-2–IE-4 | 集成测试、运维 Runbook |
+
+### A.3 启动条件检查
+
+- [ ] IE-1 数据模型评审通过（含老订单无 `pricing_version` 的默认策略）
+- [ ] IE-2 / IE-4 技术方案与 Phase 1.4 边界对齐（避免重复或遗漏）
+- [ ] IE-3 迁移方案与回滚路径书面确认
+
+未勾选前，仍可启动 Phase 1.4 中「定价从 DB 读取、缓存」等子任务；**全量上线「单一账本 + 版本扣费」**建议以上条件满足后再合入生产。

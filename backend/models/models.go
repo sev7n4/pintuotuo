@@ -46,8 +46,10 @@ type Order struct {
 	UnitPrice  float64     `json:"unit_price"`
 	TotalPrice float64     `json:"total_price"`
 	Status     string      `json:"status"` // pending, paid, completed, failed
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
+	// PricingVersionID binds retail usage pricing to order time; nil = legacy / not set (migration 045).
+	PricingVersionID *int      `json:"pricing_version_id,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 // Group represents a group purchase
