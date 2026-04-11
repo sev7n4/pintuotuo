@@ -401,3 +401,4 @@ Phase 4 (用户体验) - 独立实现
 - **IE-2 / IE-3**：履约与算力点 API 已用 `tokens`；046 一次性合并历史 `compute_point_accounts`（IE-3 与迁移合并交付）。
 - **IE-4**：`api_proxy` 已按 **最近履约订单** `pricing_version_id` 解析 `pricing_version_spu_rates`；无版本或快照缺模型时回退 `PricingService`（live SPU）。
 - **IE-5**：`token_pack` 创建校验与管理端表单中 **`compute_points` 已非必填**；履约仍以 `token_amount` 为准。
+- **IE-6（部分）**：后端单测覆盖 **扣费与价目快照一致**：`pricing_version` 命中时使用 `pricing_version_spu_rates`；快照无该模型时回退 **live SPU**（与无绑定订单路径一致）。入账侧/报表/运维 Runbook 对账用例可继续补。
