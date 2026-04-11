@@ -79,6 +79,7 @@ WHERE user_id = :user_id;
 |------|------|------|
 | GET | `/api/v1/admin/reconciliation/ledger` | 全库 `api_usage_logs` 与 usage 流水合计对比 |
 | GET | `/api/v1/admin/reconciliation/ledger/drift?page=&page_size=` | 按用户列出差值（可能较慢） |
+| GET | `/api/v1/admin/reconciliation/ledger/drift/export` | 差异用户 CSV（UTF-8 BOM，最多约 5 万行） |
 | POST | `/api/v1/admin/reconciliation/ledger/check` | 与 GET ledger 相同计算并写审计日志，供定时任务触发 |
 | GET | `/api/v1/admin/reconciliation/gmv?start_date=&end_date=` | 订单 GMV（CNY，`paid`/`completed`），日期可选 |
 

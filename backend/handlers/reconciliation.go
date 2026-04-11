@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"encoding/csv"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -81,6 +83,45 @@ func AdminGetLedgerDrift(c *gin.Context) {
 		"page_size":  pageSize,
 		"checked_at": time.Now().UTC().Format(time.RFC3339),
 	})
+}
+
+// AdminExportLedgerDriftCSV streams up to 50k drift rows as UTF-8 CSV (for Excel / ops).
+func AdminExportLedgerDriftCSV(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	rows, err := services.ListUsageDriftUsersForExport(db)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"RECONCILE_EXPORT_FAILED", "Failed to export drift users", http.StatusInternalServerError, err))
+		return
+	}
+	fn := fmt.Sprintf("ledger_drift_%s.csv", time.Now().UTC().Format("20060102_150405"))
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, fn))
+	if _, err := c.Writer.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		return
+	}
+	w := csv.NewWriter(c.Writer)
+	if err := w.Write([]string{"user_id", "log_sum", "tx_sum", "delta"}); err != nil {
+		return
+	}
+	for _, r := range rows {
+		if err := w.Write([]string{
+			strconv.Itoa(r.UserID),
+			strconv.FormatFloat(r.LogSum, 'f', -1, 64),
+			strconv.FormatFloat(r.TxSum, 'f', -1, 64),
+			strconv.FormatFloat(r.Delta, 'f', -1, 64),
+		}); err != nil {
+			return
+		}
+	}
+	w.Flush()
 }
 
 // AdminPostLedgerCheck runs the same global check as GET and writes an audit log line (for cron jobs).
