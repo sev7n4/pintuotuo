@@ -37,7 +37,7 @@ GLM Coding Plan 档位参考价（若本地有副本）：`docs/glm_coding_plan_
 | 现状 | 目标 |
 |------|------|
 | ~~`compute_points` 曾入账 `compute_point_accounts`~~（已改为 `tokens`，046 合并历史） | 统一入账到**单一账本** |
-| `token_pack` SKU 校验要求 `compute_points`，但履约只加 `token_amount` | 取消无效必填或纳入唯一公式，避免配置与履约脱节 |
+| ~~`token_pack` SKU 曾必填 `compute_points`~~（已改为可选/展示；履约只认 `token_amount`） | 配置与履约一致 |
 | `api_proxy` 扣 `tokens.balance`；未消费算力点账户 | 扣费路径只认**收敛后的主账本**；换算用**版本化单价** |
 | 定价多为实时读库 / 缓存 | 扣费解析优先：**订单或权益 → `pricing_version_id` → 单价** |
 
