@@ -49,7 +49,8 @@ GLM Coding Plan 档位参考价（若本地有副本）：`docs/glm_coding_plan_
 - 履约：`services/fulfillment_service.go`（`fulfillTokenPack`、`fulfillComputePoints`）
 - 定价：`services/pricing_service.go`
 - 结算：`services/settlement_service.go`（商户侧，与用户余额隔离）
-- 价目版本表：`migrations/045_pricing_versions.sql`（`pricing_versions`、`pricing_version_spu_rates`；`orders.pricing_version_id` 可空，供后续下单绑定）
+- 价目版本表：`migrations/045_pricing_versions.sql`（`pricing_versions`、`pricing_version_spu_rates`；`orders.pricing_version_id` 可空）
+- 下单绑定：`handlers/order_and_group.go` 在创建订单时写入 **baseline** 价目版本（`services.BaselinePricingVersionID`）；库中无 baseline 时保持 `NULL`（兼容未跑迁移的环境）
 
 ---
 

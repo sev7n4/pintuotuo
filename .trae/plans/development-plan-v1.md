@@ -380,6 +380,7 @@ Phase 4 (用户体验) - 独立实现
 |--------|----------|------|----------|
 | IE-1 | 评审：`pricing_versions`（或等价）表结构与订单/权益外键 | 无 | `migrations/`、设计文档 |
 | IE-2 | 订单履约：快照字段 1:1 入账单一账本（收敛 `compute_points` SKU 与 `token_pack`） | IE-1 草案 | `services/fulfillment_service.go` |
+| IE-2a | 新建订单绑定 `pricing_version_id`（当前为 **baseline**） | IE-1 已合入 | `handlers/order_and_group.go`、`services/pricing_version.go` |
 | IE-3 | 数据迁移：历史 `compute_point_accounts` → 主账本策略与对账 | IE-2 | `migrations/`、一次性脚本 |
 | IE-4 | `api_proxy`：解析调用 → 权益/订单 → `pricing_version` → 扣减内部单位 | IE-1、IE-2 | `handlers/api_proxy.go`、`services/pricing_service.go` |
 | IE-5 | 清理：`token_pack` 上无效必填 `compute_points` 或纳入唯一公式 | IE-2 | `handlers/sku.go`、管理端表单 |
@@ -392,3 +393,9 @@ Phase 4 (用户体验) - 独立实现
 - [ ] IE-3 迁移方案与回滚路径书面确认
 
 未勾选前，仍可启动 Phase 1.4 中「定价从 DB 读取、缓存」等子任务；**全量上线「单一账本 + 版本扣费」**建议以上条件满足后再合入生产。
+
+### A.4 进展速记
+
+- **IE-1**：已合入 `main`（迁移 045）。
+- **IE-2a**：下单写入 `pricing_version_id`（无 baseline 行时保持 `NULL`，兼容未迁移库）。
+- **IE-2** 剩余：履约侧单一账本与 `compute_points` / `token_pack` 收敛（见 `fulfillment_service`）。
