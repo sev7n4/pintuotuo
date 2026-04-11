@@ -78,6 +78,10 @@ migrate: ## Run database migrations
 	@echo "$(BLUE)Running migrations...$(NC)"
 	cd backend && go run cmd/migrate/main.go
 
+reconcile-check: ## Full-database usage ledger check (api_usage_logs vs token_transactions); needs DATABASE_URL
+	@echo "$(BLUE)Running usage reconciliation...$(NC)"
+	cd backend && go run ./cmd/reconcile
+
 migrate-create: ## Create new migration file (usage: make migrate-create name=migration_name)
 	@if [ -z "$(name)" ]; then echo "Usage: make migrate-create name=migration_name"; exit 1; fi
 	@echo "Creating migration: $(name)"

@@ -1,0 +1,160 @@
+package handlers
+
+import (
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/config"
+	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/logger"
+	"github.com/pintuotuo/backend/middleware"
+	"github.com/pintuotuo/backend/services"
+)
+
+// AdminGetLedgerReconciliation returns full-database usage log vs token_transactions usage sums.
+func AdminGetLedgerReconciliation(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	logSum, txSum, err := services.GlobalUsageLedgerMatch(db)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"RECONCILE_FAILED", "Failed to compute ledger reconciliation", http.StatusInternalServerError, err))
+		return
+	}
+	delta := logSum - txSum
+	c.JSON(http.StatusOK, gin.H{
+		"usage_log_total": logSum,
+		"usage_tx_total":  txSum,
+		"delta":           delta,
+		"matched":         services.UsageReconcileOK(logSum, txSum),
+		"checked_at":      time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// AdminGetLedgerDrift lists users where per-user usage sums diverge (may be slow on large datasets).
+func AdminGetLedgerDrift(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 500 {
+		pageSize = 500
+	}
+	offset := (page - 1) * pageSize
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	total, err := services.CountUsageDriftUsers(db)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"RECONCILE_FAILED", "Failed to count drift users", http.StatusInternalServerError, err))
+		return
+	}
+	rows, err := services.ListUsageDriftUsers(db, pageSize, offset)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"RECONCILE_FAILED", "Failed to list drift users", http.StatusInternalServerError, err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"data":       rows,
+		"total":      total,
+		"page":       page,
+		"page_size":  pageSize,
+		"checked_at": time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// AdminPostLedgerCheck runs the same global check as GET and writes an audit log line (for cron jobs).
+func AdminPostLedgerCheck(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	logSum, txSum, err := services.GlobalUsageLedgerMatch(db)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"RECONCILE_FAILED", "Failed to compute ledger reconciliation", http.StatusInternalServerError, err))
+		return
+	}
+	ok := services.UsageReconcileOK(logSum, txSum)
+	logger.LogInfo(c.Request.Context(), "reconciliation", "ledger usage check", map[string]interface{}{
+		"usage_log_total": logSum,
+		"usage_tx_total":  txSum,
+		"delta":           logSum - txSum,
+		"matched":         ok,
+	})
+	delta := logSum - txSum
+	c.JSON(http.StatusOK, gin.H{
+		"usage_log_total": logSum,
+		"usage_tx_total":  txSum,
+		"delta":           delta,
+		"matched":         ok,
+		"checked_at":      time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// AdminGetGMVReport returns CNY GMV from orders (paid/completed), separate from internal Token usage.
+func AdminGetGMVReport(c *gin.Context) {
+	if !requireAdminRole(c) {
+		return
+	}
+	startStr := c.Query("start_date")
+	endStr := c.Query("end_date")
+
+	var startPtr, endPtr *time.Time
+	if startStr != "" {
+		t, err := time.ParseInLocation("2006-01-02", startStr, time.Local)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError("INVALID_DATE", "Invalid start_date", http.StatusBadRequest, err))
+			return
+		}
+		startOf := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
+		startPtr = &startOf
+	}
+	if endStr != "" {
+		t, err := time.ParseInLocation("2006-01-02", endStr, time.Local)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError("INVALID_DATE", "Invalid end_date", http.StatusBadRequest, err))
+			return
+		}
+		endOfDay := time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 999999999, time.Local)
+		endPtr = &endOfDay
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	summary, err := services.GetGMVReportSummary(db, startPtr, endPtr)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"GMV_REPORT_FAILED", "Failed to load GMV report", http.StatusInternalServerError, err))
+		return
+	}
+	c.JSON(http.StatusOK, summary)
+}

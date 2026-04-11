@@ -398,6 +398,15 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 		adminUserBillings.GET("/export", handlers.AdminExportUserBillings)
 	}
 
+	adminReconciliation := router.Group("/admin/reconciliation")
+	adminReconciliation.Use(middleware.AuthMiddleware())
+	{
+		adminReconciliation.GET("/ledger", handlers.AdminGetLedgerReconciliation)
+		adminReconciliation.GET("/ledger/drift", handlers.AdminGetLedgerDrift)
+		adminReconciliation.POST("/ledger/check", handlers.AdminPostLedgerCheck)
+		adminReconciliation.GET("/gmv", handlers.AdminGetGMVReport)
+	}
+
 	merchantBillings := router.Group("/merchant/billings")
 	merchantBillings.Use(middleware.AuthMiddleware())
 	{
