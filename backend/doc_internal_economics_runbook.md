@@ -68,3 +68,24 @@ WHERE user_id = :user_id;
 ## 6. 代码辅助
 
 后端提供 `services.ReconcileUserUsage` / `services.UsageReconcileOK`（见 `services/usage_reconcile.go`），可在集成环境或小流量抽样调用，与 **第 2 节** SQL 等价。
+
+---
+
+## 7. 管理端 API 与 CLI 任务
+
+**HTTP（需管理员 JWT）**
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/admin/reconciliation/ledger` | 全库 `api_usage_logs` 与 usage 流水合计对比 |
+| GET | `/api/v1/admin/reconciliation/ledger/drift?page=&page_size=` | 按用户列出差值（可能较慢） |
+| POST | `/api/v1/admin/reconciliation/ledger/check` | 与 GET ledger 相同计算并写审计日志，供定时任务触发 |
+| GET | `/api/v1/admin/reconciliation/gmv?start_date=&end_date=` | 订单 GMV（CNY，`paid`/`completed`），日期可选 |
+
+**CLI（cron / 部署后巡检）**
+
+```bash
+cd backend && DATABASE_URL="postgresql://..." go run ./cmd/reconcile
+```
+
+退出码：`0` 表示全库用量两侧合计一致；`1` 表示不一致或连接失败。可与 `Makefile` 中 `reconcile-check` 目标配合使用。

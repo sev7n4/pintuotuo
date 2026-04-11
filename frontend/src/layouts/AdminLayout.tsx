@@ -18,6 +18,7 @@ import {
   WalletOutlined,
   DollarOutlined,
   BranchesOutlined,
+  AccountBookOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -89,6 +90,11 @@ const menuItems = [
     key: '/admin/user-billings',
     icon: <DollarOutlined />,
     label: '用户账单',
+  },
+  {
+    key: '/admin/reconciliation',
+    icon: <AccountBookOutlined />,
+    label: '对账与GMV',
   },
   {
     key: '/admin/settings',
