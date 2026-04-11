@@ -31,6 +31,21 @@ export interface GMVReport {
   end_date?: string;
 }
 
+export interface GMVTrendPoint {
+  period: string;
+  order_count: number;
+  gmv_cny: number;
+}
+
+export interface GMVTrendsResponse {
+  currency: string;
+  granularity: string;
+  start_date: string;
+  end_date: string;
+  trends: GMVTrendPoint[];
+  checked_at: string;
+}
+
 export const reconciliationService = {
   getLedger: () => api.get<LedgerReconciliation>('/admin/reconciliation/ledger'),
 
@@ -44,4 +59,10 @@ export const reconciliationService = {
 
   getGMV: (params?: { start_date?: string; end_date?: string }) =>
     api.get<GMVReport>('/admin/reconciliation/gmv', { params }),
+
+  getGMVTrends: (params: {
+    granularity: 'day' | 'week' | 'month';
+    start_date?: string;
+    end_date?: string;
+  }) => api.get<GMVTrendsResponse>('/admin/reconciliation/gmv/trends', { params }),
 };

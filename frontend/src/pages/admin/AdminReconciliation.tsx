@@ -29,6 +29,7 @@ import {
   type GMVReport,
 } from '@/services/reconciliation';
 import { formatLedgerUnits } from '@/utils/ledgerDisplay';
+import GMVTrendChart from '@/components/GMVTrendChart';
 
 const { RangePicker } = DatePicker;
 const { Paragraph, Text } = Typography;
@@ -43,7 +44,10 @@ const AdminReconciliation = () => {
   const [driftLoading, setDriftLoading] = useState(false);
   const [gmv, setGmv] = useState<GMVReport | null>(null);
   const [gmvLoading, setGmvLoading] = useState(false);
-  const [gmvRange, setGmvRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+  const [gmvRange, setGmvRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>([
+    dayjs().subtract(89, 'day'),
+    dayjs(),
+  ]);
 
   const fetchGMV = useCallback(async (range: [dayjs.Dayjs, dayjs.Dayjs] | null) => {
     setGmvLoading(true);
@@ -130,8 +134,8 @@ const AdminReconciliation = () => {
   }, [loadDrift]);
 
   useEffect(() => {
-    void fetchGMV(null);
-  }, [fetchGMV]);
+    void fetchGMV(gmvRange);
+  }, [fetchGMV, gmvRange]);
 
   const driftColumns: ColumnsType<UsageDriftRow> = [
     { title: '用户 ID', dataIndex: 'user_id', width: 100 },
@@ -158,8 +162,8 @@ const AdminReconciliation = () => {
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Paragraph type="secondary">
         全库汇总：<Text code>api_usage_logs.cost</Text> 之和应与{' '}
-        <Text code>token_transactions</Text>（type=usage）扣减绝对值之和一致，单位为内部 Token，与「我的
-        Token」扣费同口径。
+        <Text code>token_transactions</Text>（type=usage）扣减绝对值之和一致，单位为内部
+        Token，与「我的 Token」扣费同口径。
       </Paragraph>
       <Row gutter={16}>
         <Col xs={24} sm={8}>
@@ -189,7 +193,13 @@ const AdminReconciliation = () => {
               valueStyle={{
                 color: ledger?.matched === false ? '#cf1322' : undefined,
               }}
-              prefix={ledger?.matched === false ? <Tag color="error">不一致</Tag> : <Tag color="success">一致</Tag>}
+              prefix={
+                ledger?.matched === false ? (
+                  <Tag color="error">不一致</Tag>
+                ) : (
+                  <Tag color="success">一致</Tag>
+                )
+              }
             />
           </Card>
         </Col>
@@ -198,7 +208,12 @@ const AdminReconciliation = () => {
         <Button icon={<ReloadOutlined />} onClick={() => void loadLedger()} loading={ledgerLoading}>
           刷新汇总
         </Button>
-        <Button type="primary" icon={<PlayCircleOutlined />} onClick={() => void runJob()} loading={ledgerLoading}>
+        <Button
+          type="primary"
+          icon={<PlayCircleOutlined />}
+          onClick={() => void runJob()}
+          loading={ledgerLoading}
+        >
           执行对账任务
         </Button>
         <Button icon={<DownloadOutlined />} onClick={() => void exportDrift()}>
@@ -230,8 +245,9 @@ const AdminReconciliation = () => {
   const gmvTab = (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Paragraph type="secondary">
-        以下为订单维度 <Text code>orders.total_price</Text> 汇总（状态 paid/completed），单位人民币（CNY），与内部
-        Token 用量报表相互独立。
+        以下为订单维度 <Text code>orders.total_price</Text> 汇总（状态
+        paid/completed），单位人民币（CNY），与内部 Token
+        用量报表相互独立。未选日期区间时汇总为全量；曲线未选区间时默认近 90 日（与后端一致）。
       </Paragraph>
       <Space wrap>
         <RangePicker
@@ -239,7 +255,11 @@ const AdminReconciliation = () => {
           onChange={(d) => setGmvRange(d as [dayjs.Dayjs, dayjs.Dayjs] | null)}
           allowClear
         />
-        <Button icon={<ReloadOutlined />} onClick={() => void fetchGMV(gmvRange)} loading={gmvLoading}>
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={() => void fetchGMV(gmvRange)}
+          loading={gmvLoading}
+        >
           查询
         </Button>
       </Space>
@@ -261,6 +281,7 @@ const AdminReconciliation = () => {
           </Card>
         </Col>
       </Row>
+      <GMVTrendChart dateRange={gmvRange} />
     </Space>
   );
 

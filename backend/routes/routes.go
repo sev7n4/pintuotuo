@@ -405,6 +405,7 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 		adminReconciliation.GET("/ledger/drift/export", handlers.AdminExportLedgerDriftCSV)
 		adminReconciliation.GET("/ledger/drift", handlers.AdminGetLedgerDrift)
 		adminReconciliation.POST("/ledger/check", handlers.AdminPostLedgerCheck)
+		adminReconciliation.GET("/gmv/trends", handlers.AdminGetGMVTrends)
 		adminReconciliation.GET("/gmv", handlers.AdminGetGMVReport)
 	}
 
