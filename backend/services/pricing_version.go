@@ -20,3 +20,42 @@ func BaselinePricingVersionID(q interface {
 	}
 	return id
 }
+
+// LatestUserPricingVersionID returns the pricing_version_id from the user's most recent fulfilled paid order (IE-4).
+func LatestUserPricingVersionID(db *sql.DB, userID int) sql.NullInt64 {
+	var id sql.NullInt64
+	err := db.QueryRow(`
+		SELECT pricing_version_id FROM orders
+		WHERE user_id = $1 AND status = 'paid' AND fulfilled_at IS NOT NULL
+		  AND pricing_version_id IS NOT NULL
+		ORDER BY fulfilled_at DESC
+		LIMIT 1
+	`, userID).Scan(&id)
+	if err != nil {
+		return sql.NullInt64{}
+	}
+	return id
+}
+
+// CostFromPer1KRates applies 元/1K tokens to usage (same formula as PricingService.CalculateCost).
+func CostFromPer1KRates(inputPrice, outputPrice float64, inputTokens, outputTokens int) float64 {
+	return float64(inputTokens)*inputPrice/1000 + float64(outputTokens)*outputPrice/1000
+}
+
+// CalculateCostFromPricingVersion loads snapshot rates for provider/model from pricing_version_spu_rates + spus.
+func CalculateCostFromPricingVersion(db *sql.DB, versionID int, provider, model string, inputTokens, outputTokens int) (float64, bool) {
+	var inRate, outRate float64
+	err := db.QueryRow(`
+		SELECT r.provider_input_rate, r.provider_output_rate
+		FROM pricing_version_spu_rates r
+		INNER JOIN spus p ON p.id = r.spu_id
+		WHERE r.pricing_version_id = $1
+		  AND p.model_provider = $2 AND p.model_name = $3
+		  AND p.status = 'active'
+		LIMIT 1
+	`, versionID, provider, model).Scan(&inRate, &outRate)
+	if err != nil {
+		return 0, false
+	}
+	return CostFromPer1KRates(inRate, outRate, inputTokens, outputTokens), true
+}

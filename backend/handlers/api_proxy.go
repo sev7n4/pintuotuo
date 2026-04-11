@@ -342,7 +342,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	if apiResp.Usage.TotalTokens > 0 {
 		inputTokens = apiResp.Usage.PromptTokens
 		outputTokens = apiResp.Usage.CompletionTokens
-		cost = calculateTokenCost(req.Provider, req.Model, inputTokens, outputTokens)
+		cost = calculateTokenCost(db, userIDInt, req.Provider, req.Model, inputTokens, outputTokens)
 	}
 
 	if cost > 0 {
@@ -417,16 +417,38 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	c.Data(resp.StatusCode, "application/json", body)
 }
 
-func calculateTokenCost(provider, model string, inputTokens, outputTokens int) float64 {
+func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTokens, outputTokens int) float64 {
+	vid := services.LatestUserPricingVersionID(db, userID)
+	if vid.Valid {
+		if cost, ok := services.CalculateCostFromPricingVersion(db, int(vid.Int64), provider, model, inputTokens, outputTokens); ok {
+			logger.LogDebug(context.Background(), "api_proxy", "Token cost from pricing_version snapshot", map[string]interface{}{
+				"pricing_version_id": vid.Int64,
+				"pricing_source":     "pricing_version_spu_rates",
+				"provider":           provider,
+				"model":              model,
+				"input_tokens":       inputTokens,
+				"output_tokens":      outputTokens,
+				"cost":               cost,
+			})
+			return cost
+		}
+		logger.LogDebug(context.Background(), "api_proxy", "pricing_version snapshot miss, fallback live SPU", map[string]interface{}{
+			"pricing_version_id": vid.Int64,
+			"provider":           provider,
+			"model":              model,
+		})
+	}
+
 	pricingService := services.GetPricingService()
 	cost := pricingService.CalculateCost(provider, model, inputTokens, outputTokens)
 
-	logger.LogDebug(context.Background(), "api_proxy", "Token cost calculated", map[string]interface{}{
-		"provider":      provider,
-		"model":         model,
-		"input_tokens":  inputTokens,
-		"output_tokens": outputTokens,
-		"cost":          cost,
+	logger.LogDebug(context.Background(), "api_proxy", "Token cost calculated (live SPU)", map[string]interface{}{
+		"provider":       provider,
+		"model":          model,
+		"input_tokens":   inputTokens,
+		"output_tokens":  outputTokens,
+		"cost":           cost,
+		"pricing_source": "live_spu",
 	})
 
 	return cost
