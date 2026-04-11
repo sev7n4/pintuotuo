@@ -76,7 +76,7 @@ const Consumption: React.FC = () => {
   const fetchConsumptionData = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
       const params = new URLSearchParams({
         start_date: dateRange[0].format('YYYY-MM-DD'),
         end_date: dateRange[1].format('YYYY-MM-DD'),
