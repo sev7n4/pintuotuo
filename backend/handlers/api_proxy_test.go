@@ -59,6 +59,44 @@ func TestCalculateTokenCost(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+// IE-6：扣费路径与价目快照一致——有履约订单绑定的 pricing_version 且 SPU 命中时使用快照单价。
+func TestCalculateTokenCost_UsesPricingVersionWhenSnapshotHits(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT pricing_version_id FROM orders`).
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{"pricing_version_id"}).AddRow(9))
+	mock.ExpectQuery(`SELECT r.provider_input_rate, r.provider_output_rate`).
+		WithArgs(9, "openai", "gpt-4o-mini-snapshot").
+		WillReturnRows(sqlmock.NewRows([]string{"provider_input_rate", "provider_output_rate"}).
+			AddRow(0.02, 0.06))
+
+	cost := calculateTokenCost(db, 1, "openai", "gpt-4o-mini-snapshot", 1000, 500)
+	want := services.CostFromPer1KRates(0.02, 0.06, 1000, 500)
+	assert.InDelta(t, want, cost, 1e-9)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// 有价目版本但快照无该 provider/model 时回退 live SPU 定价，与「无版本」路径结果一致。
+func TestCalculateTokenCost_PricingVersionMissFallsBackToLiveSPU(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT pricing_version_id FROM orders`).
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{"pricing_version_id"}).AddRow(99))
+	mock.ExpectQuery(`SELECT r.provider_input_rate, r.provider_output_rate`).
+		WithArgs(99, "openai", "gpt-4-turbo-preview").
+		WillReturnError(sql.ErrNoRows)
+
+	cost := calculateTokenCost(db, 1, "openai", "gpt-4-turbo-preview", 1000, 1000)
+	assert.InDelta(t, 0.04, cost, 0.0001)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestGetAPIProviders(t *testing.T) {
 	// 创建一个测试gin上下文
 	w := httptest.NewRecorder()
