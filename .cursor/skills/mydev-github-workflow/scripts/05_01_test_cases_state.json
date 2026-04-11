@@ -1,42 +1,16 @@
 {
-  "currentIssue": {
-    "id": "ISSUE-GMVTREND-001",
-    "type": "feature",
-    "module": "reconciliation/admin_gmv",
-    "branch": "feature/gmv-trend-curves",
-    "title": "GMV 日/周/月趋势 API 与前端曲线"
-  },
+  "currentIssue": null,
   "testCases": {
-    "unit": [
-      {
-        "id": "UT-RECON-GMVTREND-GetGMVTrends",
-        "name": "GetGMVTrends day 聚合（sqlmock）",
-        "status": "passed",
-        "file": "backend/services/reconciliation_gmv_trends_test.go"
-      },
-      {
-        "id": "UT-MAKE-TEST-FULL",
-        "name": "make test（根目录全量）",
-        "status": "passed",
-        "file": "Makefile"
-      }
-    ],
+    "unit": [],
     "integration": [],
-    "e2e": [
-      {
-        "id": "E2E-CI-PR-PIPELINE",
-        "name": "PR 触发 CI/CD → Integration → E2E",
-        "status": "passed",
-        "file": ".github/workflows"
-      }
-    ]
+    "e2e": []
   },
   "statistics": {
-    "total": 3,
-    "passed": 3,
+    "total": 0,
+    "passed": 0,
     "failed": 0,
     "pending": 0
   },
-  "lastUpdated": "2026-04-11T16:35:00Z",
-  "workflowNote": "PR #241 CI 全绿；待合并（Squash）或需人工审批"
+  "lastUpdated": "2026-04-12T01:00:00Z",
+  "workflowNote": "Step 14 归档：ISSUE-GMVTREND-001 / PR #241 已 Squash 合入 main（48b09b6）；CI/CD·Integration·E2E 与 deploy-tencent 均为 success。本地可删 feature/gmv-trend-curves（若仍存在）。"
 }
