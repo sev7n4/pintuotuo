@@ -295,6 +295,7 @@ cd frontend && npm run build -- --analyze
 
 ## 资源
 
+- [backend/doc_internal_token_economics.md](backend/doc_internal_token_economics.md) - 内部经济（余额 / 扣费 / 价目）；任务清单见 [.trae/plans/development-plan-v1.md](.trae/plans/development-plan-v1.md) **附录 A**
 - [CLAUDE.md](../CLAUDE.md) - 项目开发指南
 - [Gin框架文档](https://gin-gonic.com/)
 - [React文档](https://react.dev/)
@@ -332,5 +333,5 @@ git push origin feature/your-feature
 
 ---
 
-**最后更新**：2026-03-14
+**最后更新**：2026-04-10
 **状态**：开发中 🚀
