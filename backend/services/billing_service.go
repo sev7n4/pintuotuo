@@ -35,6 +35,7 @@ type BillingRecordDetail struct {
 }
 
 type BillingStats struct {
+	// TotalCost is sum(api_usage_logs.cost): same internal Token ledger units as tokens.balance deductions (not CNY GMV).
 	TotalCost         float64                  `json:"total_cost"`
 	TotalRequests     int                      `json:"total_requests"`
 	TotalTokens       int64                    `json:"total_tokens"`

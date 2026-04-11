@@ -18,7 +18,6 @@ import {
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import {
-  DollarOutlined,
   ApiOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
@@ -26,6 +25,7 @@ import {
   ReloadOutlined,
   DownloadOutlined,
 } from '@ant-design/icons';
+import { formatLedgerUnits, ledgerUnitColumnTitle } from '@/utils/ledgerDisplay';
 import styles from './AdminSettlements.module.css';
 
 const getAuthToken = () => {
@@ -309,11 +309,11 @@ const AdminBillings = () => {
       render: (num: number) => num.toLocaleString(),
     },
     {
-      title: '成本',
+      title: ledgerUnitColumnTitle,
       dataIndex: 'cost',
       key: 'cost',
-      width: 100,
-      render: (cost: number) => `¥${cost.toFixed(6)}`,
+      width: 120,
+      render: (cost: number) => formatLedgerUnits(cost),
     },
     {
       title: '延迟(ms)',
@@ -362,11 +362,10 @@ const AdminBillings = () => {
         <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
-              title="总消费"
+              title="总扣减（Token）"
               value={stats?.total_cost || 0}
-              precision={2}
-              prefix={<DollarOutlined />}
-              suffix="元"
+              precision={4}
+              suffix="Token"
               valueStyle={{ fontSize: '20px' }}
             />
           </Card>
@@ -539,7 +538,9 @@ const AdminBillings = () => {
             <Descriptions.Item label="总Tokens">
               {selectedBilling.total_tokens.toLocaleString()}
             </Descriptions.Item>
-            <Descriptions.Item label="成本">¥{selectedBilling.cost.toFixed(6)}</Descriptions.Item>
+            <Descriptions.Item label="扣减（Token）">
+              {formatLedgerUnits(selectedBilling.cost)}
+            </Descriptions.Item>
             <Descriptions.Item label="延迟">
               {selectedBilling.request_time.toFixed(2)} ms
             </Descriptions.Item>

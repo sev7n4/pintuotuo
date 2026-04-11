@@ -1,6 +1,6 @@
 # 用户余额与扣费口径（内部说明）
 
-**最后更新**：2026-04-10
+**最后更新**：2026-04-11
 
 GLM Coding Plan 档位参考价（若本地有副本）：`docs/glm_coding_plan_internal_economics.csv`（仓库 `docs/` 已 gitignore，与平台内部账本单位无直接等价关系）。
 
@@ -52,6 +52,18 @@ GLM Coding Plan 档位参考价（若本地有副本）：`docs/glm_coding_plan_
 - 价目版本表：`migrations/045_pricing_versions.sql`（`pricing_versions`、`pricing_version_spu_rates`；`orders.pricing_version_id` 可空）
 - 下单绑定：`handlers/order_and_group.go` 在创建订单时写入 **baseline** 价目版本（`services.BaselinePricingVersionID`）；库中无 baseline 时保持 `NULL`（兼容未跑迁移的环境）
 - **IE-2 零售单一账本**：`fulfillComputePoints` 入账 `tokens` + `token_transactions`；`migrations/046_merge_compute_points_to_tokens.sql` 合并历史 `compute_point_accounts`；算力点余额/流水 API（`GetComputePointBalance` / `GetComputePointTransactions`）与 Token 同源。
+
+### 报表与 JSON 字段单位（勿与人民币 GMV 混淆）
+
+| 字段 / 场景 | 单位语义 |
+|-------------|----------|
+| `api_usage_logs.cost` | 与用户 **`tokens.balance` 扣减**同口径的**内部可消费单位**（由价目表「元/1K tokens」等换算；前端展示名 **Token**） |
+| `consumption` / `billing` 统计里的 `total_cost`、`BillingTrend` 的 `total_cost` | 同上，**不是**订单人民币实收 |
+| `merchant_api_keys.quota_used` / `quota_limit` | 与上述扣减同一量纲（累计消耗与上限） |
+
+人民币收入、商户结算成本等在 **订单 / 支付 / `settlement`** 域处理；**不要**把 `api_usage_logs.cost` 直接当作对用户收取的人民币金额。
+
+运维对账 SQL 与排障见：**[`doc_internal_economics_runbook.md`](./doc_internal_economics_runbook.md)**。
 
 ---
 
