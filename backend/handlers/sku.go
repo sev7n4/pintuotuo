@@ -1185,32 +1185,31 @@ func GetComputePointBalance(c *gin.Context) {
 	}
 
 	db := config.GetDB()
-	var account models.ComputePointAccount
+	// Single retail ledger: same balances as GET /tokens/balance (046 merged legacy compute_point_accounts).
+	var balance, totalEarned, totalUsed float64
 	err := db.QueryRow(
-		"SELECT id, user_id, balance, total_earned, total_used, COALESCE(total_expired, 0), created_at, updated_at FROM compute_point_accounts WHERE user_id = $1",
+		`SELECT COALESCE(balance, 0), COALESCE(total_earned, 0), COALESCE(total_used, 0) FROM tokens WHERE user_id = $1`,
 		userIDInt,
-	).Scan(&account.ID, &account.UserID, &account.Balance, &account.TotalEarned, &account.TotalUsed, &account.TotalExpired, &account.CreatedAt, &account.UpdatedAt)
-
+	).Scan(&balance, &totalEarned, &totalUsed)
 	if err == sql.ErrNoRows {
-		_, err = db.Exec("INSERT INTO compute_point_accounts (user_id, balance) VALUES ($1, 0)", userIDInt)
-		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-			return
-		}
-		account = models.ComputePointAccount{
-			UserID:  userIDInt,
-			Balance: 0,
-		}
-	} else if err != nil {
+		c.JSON(http.StatusOK, gin.H{"data": models.ComputePointBalanceResponse{
+			Balance:      0,
+			TotalEarned:  0,
+			TotalUsed:    0,
+			TotalExpired: 0,
+		}})
+		return
+	}
+	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": models.ComputePointBalanceResponse{
-		Balance:      account.Balance,
-		TotalEarned:  account.TotalEarned,
-		TotalUsed:    account.TotalUsed,
-		TotalExpired: account.TotalExpired,
+		Balance:      balance,
+		TotalEarned:  totalEarned,
+		TotalUsed:    totalUsed,
+		TotalExpired: 0,
 	}})
 }
 
@@ -1244,8 +1243,8 @@ func GetComputePointTransactions(c *gin.Context) {
 	db := config.GetDB()
 
 	rows, err := db.Query(
-		`SELECT id, user_id, type, amount, balance_after, order_id, sku_id, description, created_at 
-		 FROM compute_point_transactions WHERE user_id = $1 
+		`SELECT id, user_id, type, amount, order_id, COALESCE(reason, ''), created_at 
+		 FROM token_transactions WHERE user_id = $1 
 		 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
 		userIDInt, perPageNum, offset,
 	)
@@ -1258,32 +1257,27 @@ func GetComputePointTransactions(c *gin.Context) {
 	var transactions []models.ComputePointTransaction
 	for rows.Next() {
 		var t models.ComputePointTransaction
-		var orderID, skuID sql.NullInt64
-		var description sql.NullString
+		var orderID sql.NullInt64
+		var reason string
 
-		err := rows.Scan(&t.ID, &t.UserID, &t.Type, &t.Amount, &t.BalanceAfter, &orderID, &skuID, &description, &t.CreatedAt)
+		err := rows.Scan(&t.ID, &t.UserID, &t.Type, &t.Amount, &orderID, &reason, &t.CreatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 
+		t.BalanceAfter = 0
 		if orderID.Valid {
 			oid := int(orderID.Int64)
 			t.OrderID = &oid
 		}
-		if skuID.Valid {
-			sid := int(skuID.Int64)
-			t.SKUID = &sid
-		}
-		if description.Valid {
-			t.Description = description.String
-		}
+		t.Description = reason
 
 		transactions = append(transactions, t)
 	}
 
 	var total int
-	db.QueryRow("SELECT COUNT(*) FROM compute_point_transactions WHERE user_id = $1", userIDInt).Scan(&total)
+	db.QueryRow("SELECT COUNT(*) FROM token_transactions WHERE user_id = $1", userIDInt).Scan(&total)
 
 	c.JSON(http.StatusOK, gin.H{
 		"total":    total,

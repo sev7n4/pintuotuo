@@ -392,3 +392,9 @@ Phase 4 (用户体验) - 独立实现
 - [ ] IE-3 迁移方案与回滚路径书面确认
 
 未勾选前，仍可启动 Phase 1.4 中「定价从 DB 读取、缓存」等子任务；**全量上线「单一账本 + 版本扣费」**建议以上条件满足后再合入生产。
+
+### A.4 进展速记
+
+- **IE-1**：已合入（045）。
+- **IE-2 / IE-3**：履约与算力点 API 已用 `tokens`；046 一次性合并历史 `compute_point_accounts`（IE-3 与迁移合并交付）。
+- **IE-4**：`api_proxy` 仍按当前 `PricingService` 扣 `tokens`；按订单 `pricing_version_id` 扣费待做。

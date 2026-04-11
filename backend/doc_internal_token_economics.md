@@ -36,7 +36,7 @@ GLM Coding Plan 档位参考价（若本地有副本）：`docs/glm_coding_plan_
 
 | 现状 | 目标 |
 |------|------|
-| `sku_type=compute_points` 入账 `compute_point_accounts`；`token_pack` 入账 `tokens` | 统一入账到**单一账本** |
+| ~~`compute_points` 曾入账 `compute_point_accounts`~~（已改为 `tokens`，046 合并历史） | 统一入账到**单一账本** |
 | `token_pack` SKU 校验要求 `compute_points`，但履约只加 `token_amount` | 取消无效必填或纳入唯一公式，避免配置与履约脱节 |
 | `api_proxy` 扣 `tokens.balance`；未消费算力点账户 | 扣费路径只认**收敛后的主账本**；换算用**版本化单价** |
 | 定价多为实时读库 / 缓存 | 扣费解析优先：**订单或权益 → `pricing_version_id` → 单价** |
@@ -50,6 +50,7 @@ GLM Coding Plan 档位参考价（若本地有副本）：`docs/glm_coding_plan_
 - 定价：`services/pricing_service.go`
 - 结算：`services/settlement_service.go`（商户侧，与用户余额隔离）
 - 价目版本表：`migrations/045_pricing_versions.sql`（`pricing_versions`、`pricing_version_spu_rates`；`orders.pricing_version_id` 可空，供后续下单绑定）
+- **IE-2 零售单一账本**：`fulfillComputePoints` 入账 `tokens` + `token_transactions`；`migrations/046_merge_compute_points_to_tokens.sql` 合并历史 `compute_point_accounts`；算力点余额/流水 API（`GetComputePointBalance` / `GetComputePointTransactions`）与 Token 同源。
 
 ---
 

@@ -408,6 +408,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 		ctx := context.Background()
 		cache.Delete(ctx, cache.TokenBalanceKey(userIDInt))
+		cache.Delete(ctx, cache.ComputePointBalanceKey(userIDInt))
 	}
 
 	decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
