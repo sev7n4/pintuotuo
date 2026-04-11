@@ -21,37 +21,42 @@ import (
 )
 
 func TestCalculateTokenCost(t *testing.T) {
-	// 测试OpenAI GPT-4 Turbo（元/1K 口径）
-	cost := calculateTokenCost("openai", "gpt-4-turbo-preview", 1000, 1000)
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	// 无最近绑定价目版本的订单 → 走 live SPU（与历史期望一致）
+	for range make([]struct{}, 8) {
+		mock.ExpectQuery(`SELECT pricing_version_id FROM orders`).
+			WithArgs(1).
+			WillReturnError(sql.ErrNoRows)
+	}
+
+	cost := calculateTokenCost(db, 1, "openai", "gpt-4-turbo-preview", 1000, 1000)
 	assert.InDelta(t, 0.04, cost, 0.0001)
 
-	// 测试OpenAI GPT-4（元/1K 口径）
-	cost = calculateTokenCost("openai", "gpt-4", 1000, 1000)
+	cost = calculateTokenCost(db, 1, "openai", "gpt-4", 1000, 1000)
 	assert.InDelta(t, 0.09, cost, 0.0001)
 
-	// 测试OpenAI GPT-3.5 Turbo（元/1K 口径）
-	cost = calculateTokenCost("openai", "gpt-3.5-turbo", 1000, 1000)
+	cost = calculateTokenCost(db, 1, "openai", "gpt-3.5-turbo", 1000, 1000)
 	assert.InDelta(t, 0.002, cost, 0.0001)
 
-	// 测试Anthropic Claude 3 Opus（元/1K 口径）
-	cost = calculateTokenCost("anthropic", "claude-3-opus-20240229", 1000, 1000)
+	cost = calculateTokenCost(db, 1, "anthropic", "claude-3-opus-20240229", 1000, 1000)
 	assert.InDelta(t, 0.09, cost, 0.0001)
 
-	// 测试Anthropic Claude 3 Sonnet（元/1K 口径）
-	cost = calculateTokenCost("anthropic", "claude-3-sonnet-20240229", 1000, 1000)
+	cost = calculateTokenCost(db, 1, "anthropic", "claude-3-sonnet-20240229", 1000, 1000)
 	assert.InDelta(t, 0.018, cost, 0.0001)
 
-	// 测试Anthropic Claude 3 Haiku（元/1K 口径）
-	cost = calculateTokenCost("anthropic", "claude-3-haiku-20240307", 1000, 1000)
+	cost = calculateTokenCost(db, 1, "anthropic", "claude-3-haiku-20240307", 1000, 1000)
 	assert.InDelta(t, 0.0015, cost, 0.0001)
 
-	// 测试Google AI Gemini Pro（元/1K 口径）
-	cost = calculateTokenCost("google", "gemini-pro", 1000, 1000)
+	cost = calculateTokenCost(db, 1, "google", "gemini-pro", 1000, 1000)
 	assert.InDelta(t, 0.002, cost, 0.0001)
 
-	// 测试默认提供商（元/1K 口径）
-	cost = calculateTokenCost("unknown", "unknown-model", 1000, 1000)
+	cost = calculateTokenCost(db, 1, "unknown", "unknown-model", 1000, 1000)
 	assert.InDelta(t, 0.003, cost, 0.0001)
+
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestGetAPIProviders(t *testing.T) {

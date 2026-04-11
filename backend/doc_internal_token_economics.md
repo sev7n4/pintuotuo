@@ -45,7 +45,7 @@ GLM Coding Plan 档位参考价（若本地有副本）：`docs/glm_coding_plan_
 
 ## 三、相关代码（落点）
 
-- 扣费：`handlers/api_proxy.go`（`calculateTokenCost`、余额扣减）
+- 扣费：`handlers/api_proxy.go`（`calculateTokenCost`：优先 **最近履约订单** 的 `pricing_version_id` → `pricing_version_spu_rates`；无绑定或快照无该模型时回退 **live `spus`**；再扣 `tokens`）
 - 履约：`services/fulfillment_service.go`（`fulfillTokenPack`、`fulfillComputePoints`）
 - 定价：`services/pricing_service.go`
 - 结算：`services/settlement_service.go`（商户侧，与用户余额隔离）
