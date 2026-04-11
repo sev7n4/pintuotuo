@@ -582,13 +582,16 @@ type traceTopCandidate struct {
 }
 
 func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string) smartRoutingPick {
+	if strings.TrimSpace(req.Provider) == "" {
+		return smartRoutingPick{}
+	}
 	router := services.GetSmartRouter()
-	choice, err := router.SelectProvider(context.Background(), req.Model, services.RoutingStrategy(strategyCode))
+	choice, err := router.SelectProvider(context.Background(), req.Model, req.Provider, services.RoutingStrategy(strategyCode))
 	if err != nil || choice == nil {
 		return smartRoutingPick{}
 	}
 
-	candidates, cErr := router.GetCandidates(context.Background(), req.Model)
+	candidates, cErr := router.GetCandidates(context.Background(), req.Model, req.Provider)
 	if cErr == nil {
 		router.CalculateScores(candidates, services.RoutingStrategy(strategyCode))
 	}

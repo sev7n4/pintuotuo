@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -112,4 +113,19 @@ func OpenAIChatCompletions(c *gin.Context) {
 	startTime := time.Now()
 	requestID := uuid.New().String()
 	proxyAPIRequestCore(c, userIDInt, requestID, startTime, req, c.Request.URL.Path)
+}
+
+// OpenAIListModels exposes GET /v1/models for OpenAI SDK discovery (same base URL as chat/completions).
+func OpenAIListModels(c *gin.Context) {
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	resp, listErr := services.ListOpenAIModelsFromCatalog(context.Background(), db)
+	if listErr != nil {
+		respondOpenAIError(c, http.StatusInternalServerError, "Failed to list models")
+		return
+	}
+	c.JSON(http.StatusOK, resp)
 }

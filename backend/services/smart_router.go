@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,8 +59,8 @@ func GetSmartRouter() *SmartRouter {
 	return router
 }
 
-func (r *SmartRouter) SelectProvider(ctx context.Context, model string, strategy RoutingStrategy) (*RoutingCandidate, error) {
-	candidates, err := r.GetCandidates(ctx, model)
+func (r *SmartRouter) SelectProvider(ctx context.Context, model string, provider string, strategy RoutingStrategy) (*RoutingCandidate, error) {
+	candidates, err := r.GetCandidates(ctx, model, provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get candidates: %w", err)
 	}
@@ -87,7 +88,11 @@ func (r *SmartRouter) SelectProvider(ctx context.Context, model string, strategy
 	return &verifiedCandidates[0], nil
 }
 
-func (r *SmartRouter) GetCandidates(ctx context.Context, model string) ([]RoutingCandidate, error) {
+// GetCandidates returns active verified keys that can serve the given model trace.
+// When providerFilter is non-empty, only keys for that upstream provider are considered.
+// This must align with the resolved request provider (e.g. from model routing); otherwise
+// SmartRouter could inject an api_key_id for a different vendor and the proxy returns 403.
+func (r *SmartRouter) GetCandidates(ctx context.Context, model string, providerFilter string) ([]RoutingCandidate, error) {
 	if r.db == nil {
 		r.db = config.GetDB()
 	}
@@ -95,7 +100,8 @@ func (r *SmartRouter) GetCandidates(ctx context.Context, model string) ([]Routin
 		return nil, fmt.Errorf("database not available")
 	}
 
-	rows, err := r.db.QueryContext(ctx, `
+	providerFilter = strings.TrimSpace(providerFilter)
+	query := `
 		SELECT 
 			mak.id, 
 			mak.provider, 
@@ -127,10 +133,21 @@ func (r *SmartRouter) GetCandidates(ctx context.Context, model string) ([]Routin
 		WHERE mak.status = 'active'
 		AND mak.health_status IN ('healthy', 'degraded')
 		AND mak.verified_at IS NOT NULL
+	`
+	querySuffix := `
 		GROUP BY mak.id, mak.provider, mak.health_status, mak.verified_at, 
 		         mak.cost_input_rate, mak.cost_output_rate
 		ORDER BY mak.last_health_check_at DESC
-	`)
+	`
+	var rows *sql.Rows
+	var err error
+	if providerFilter != "" {
+		query += ` AND mak.provider = $1` + querySuffix
+		rows, err = r.db.QueryContext(ctx, query, providerFilter)
+	} else {
+		query += querySuffix
+		rows, err = r.db.QueryContext(ctx, query)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to query candidates: %w", err)
 	}

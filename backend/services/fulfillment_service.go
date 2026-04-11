@@ -30,6 +30,39 @@ type skuFulfillmentRow struct {
 	TrialDurationDays  sql.NullInt64
 }
 
+type orderFulfillmentSnapshot struct {
+	SKUType       sql.NullString
+	TokenAmount   sql.NullInt64
+	ComputePoints sql.NullFloat64
+}
+
+// EffectiveSKUTypeForFulfillment prefers the order snapshot (checkout-time) over live SKU rows.
+func EffectiveSKUTypeForFulfillment(orderType sql.NullString, skuType string) string {
+	if orderType.Valid {
+		s := strings.TrimSpace(orderType.String)
+		if s != "" {
+			return s
+		}
+	}
+	return skuType
+}
+
+// EffectiveTokenAmountForFulfillment prefers orders.token_amount when set so fulfillment matches what was sold.
+func EffectiveTokenAmountForFulfillment(orderTA, skuTA sql.NullInt64) sql.NullInt64 {
+	if orderTA.Valid && orderTA.Int64 > 0 {
+		return orderTA
+	}
+	return skuTA
+}
+
+// EffectiveComputePointsForFulfillment prefers orders.compute_points when set.
+func EffectiveComputePointsForFulfillment(orderCP, skuCP sql.NullFloat64) sql.NullFloat64 {
+	if orderCP.Valid && orderCP.Float64 > 0 {
+		return orderCP
+	}
+	return skuCP
+}
+
 // FulfillOrder delivers digital goods for a paid order. Idempotent via orders.fulfilled_at.
 func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 	var userID int
@@ -37,12 +70,15 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 	var qty int
 	var status string
 	var fulfilledAt sql.NullTime
+	var snap orderFulfillmentSnapshot
 
 	err := tx.QueryRow(`
-		SELECT user_id, sku_id, quantity, status, fulfilled_at
+		SELECT user_id, sku_id, quantity, status, fulfilled_at,
+		       sku_type, token_amount, compute_points
 		FROM orders WHERE id = $1 FOR UPDATE`,
 		orderID,
-	).Scan(&userID, &skuID, &qty, &status, &fulfilledAt)
+	).Scan(&userID, &skuID, &qty, &status, &fulfilledAt,
+		&snap.SKUType, &snap.TokenAmount, &snap.ComputePoints)
 	if err != nil {
 		return fmt.Errorf("load order %d: %w", orderID, err)
 	}
@@ -77,14 +113,18 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 		return fmt.Errorf("load sku %d: %w", skuID.Int64, err)
 	}
 
-	st := strings.ToLower(strings.TrimSpace(skuRow.SKUType))
+	effectiveType := EffectiveSKUTypeForFulfillment(snap.SKUType, skuRow.SKUType)
+	tokenAmt := EffectiveTokenAmountForFulfillment(snap.TokenAmount, skuRow.TokenAmount)
+	computeAmt := EffectiveComputePointsForFulfillment(snap.ComputePoints, skuRow.ComputePoints)
+
+	st := strings.ToLower(strings.TrimSpace(effectiveType))
 	switch st {
 	case skuTypeTokenPack:
-		if err = s.fulfillTokenPack(tx, userID, int(skuID.Int64), orderID, qty, skuRow.TokenAmount); err != nil {
+		if err = s.fulfillTokenPack(tx, userID, int(skuID.Int64), orderID, qty, tokenAmt); err != nil {
 			return err
 		}
 	case skuTypeComputePoints:
-		if err = s.fulfillComputePoints(tx, userID, int(skuID.Int64), orderID, qty, skuRow.ComputePoints); err != nil {
+		if err = s.fulfillComputePoints(tx, userID, int(skuID.Int64), orderID, qty, computeAmt); err != nil {
 			return err
 		}
 	case skuTypeSubscription:
@@ -96,17 +136,17 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 			return err
 		}
 	case skuTypeConcurrent:
-		if skuRow.TokenAmount.Valid && skuRow.TokenAmount.Int64 > 0 {
-			if err = s.fulfillTokenPack(tx, userID, int(skuID.Int64), orderID, qty, skuRow.TokenAmount); err != nil {
+		if tokenAmt.Valid && tokenAmt.Int64 > 0 {
+			if err = s.fulfillTokenPack(tx, userID, int(skuID.Int64), orderID, qty, tokenAmt); err != nil {
 				return err
 			}
-		} else if skuRow.ComputePoints.Valid && skuRow.ComputePoints.Float64 > 0 {
-			if err = s.fulfillComputePoints(tx, userID, int(skuID.Int64), orderID, qty, skuRow.ComputePoints); err != nil {
+		} else if computeAmt.Valid && computeAmt.Float64 > 0 {
+			if err = s.fulfillComputePoints(tx, userID, int(skuID.Int64), orderID, qty, computeAmt); err != nil {
 				return err
 			}
 		}
 	default:
-		return fmt.Errorf("unknown sku_type %q", skuRow.SKUType)
+		return fmt.Errorf("unknown sku_type %q", effectiveType)
 	}
 
 	_, err = tx.Exec(`UPDATE orders SET fulfilled_at = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, time.Now(), orderID)

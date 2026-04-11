@@ -337,3 +337,11 @@ func TestSelectAPIKeyForRequest_MerchantWithAPIKeyIDBoundedByMerchant(t *testing
 	require.ErrorIs(t, err, sql.ErrNoRows)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestTrySelectAPIKeyWithSmartRouter_EmptyProviderSkipsInjection(t *testing.T) {
+	pick := trySelectAPIKeyWithSmartRouter(APIProxyRequest{
+		Provider: "",
+		Model:    "gpt-4",
+	}, "balanced")
+	assert.Nil(t, pick.APIKeyID)
+}
