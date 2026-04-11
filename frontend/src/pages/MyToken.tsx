@@ -521,7 +521,7 @@ const MyToken = () => {
               loading={usageGuideLoading}
               style={{ marginBottom: 16 }}
             >
-              {usageGuide && usageGuide.items.length > 0 ? (
+              {usageGuide && (usageGuide.items?.length ?? 0) > 0 ? (
                 <>
                   <Paragraph type="secondary" style={{ marginBottom: 8 }}>
                     {usageGuide.disclaimer}

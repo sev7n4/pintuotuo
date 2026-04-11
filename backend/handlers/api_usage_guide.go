@@ -52,7 +52,7 @@ func GetAPIUsageGuide(c *gin.Context) {
 		Model string
 	}
 	seen := make(map[rowKey]struct{})
-	var items []APIUsageGuideItem
+	items := make([]APIUsageGuideItem, 0)
 
 	appendRows := func(rows *sql.Rows, source string) error {
 		defer rows.Close()
