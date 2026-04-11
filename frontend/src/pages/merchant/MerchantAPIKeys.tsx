@@ -407,7 +407,7 @@ const MerchantAPIKeys = () => {
           <div className={styles.quotaCell}>
             <Progress percent={percent} size="small" />
             <span className={styles.quotaText}>
-              ¥{usage.quota_used.toFixed(2)} / ¥{usage.quota_limit.toFixed(2)}
+              {usage.quota_used.toFixed(2)} / {usage.quota_limit.toFixed(2)} Token
             </span>
           </div>
         );

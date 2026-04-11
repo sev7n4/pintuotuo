@@ -156,6 +156,10 @@ curl http://localhost:8080/health
 }
 ```
 
+### 内部经济对账（Token 用量）
+
+零售与 `api_proxy` 按量扣费相关的抽样对账、排障步骤见：[`backend/doc_internal_economics_runbook.md`](backend/doc_internal_economics_runbook.md)。
+
 ---
 
 ## 备份和恢复

@@ -16,7 +16,6 @@ import {
   Descriptions,
 } from 'antd';
 import {
-  DollarOutlined,
   ApiOutlined,
   ClockCircleOutlined,
   EyeOutlined,
@@ -28,6 +27,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { billingService } from '@/services/billing';
 import type { BillingRecord, BillingStats } from '@/types';
+import { formatLedgerUnits, ledgerUnitColumnTitle } from '@/utils/ledgerDisplay';
 
 const { RangePicker } = DatePicker;
 
@@ -237,11 +237,11 @@ const AdminUserBillings: React.FC = () => {
       render: (num: number) => num?.toLocaleString() || '-',
     },
     {
-      title: '成本',
+      title: ledgerUnitColumnTitle,
       dataIndex: 'cost',
       key: 'cost',
-      width: 100,
-      render: (cost: number) => `¥${(cost || 0).toFixed(6)}`,
+      width: 120,
+      render: (cost: number) => formatLedgerUnits(cost ?? 0),
     },
     {
       title: '延迟(ms)',
@@ -290,11 +290,10 @@ const AdminUserBillings: React.FC = () => {
         <Col xs={24} sm={12} md={12} lg={6} xl={4}>
           <Card>
             <Statistic
-              title="总消费"
+              title="总扣减（Token）"
               value={stats?.total_cost || 0}
-              precision={2}
-              prefix={<DollarOutlined />}
-              suffix="元"
+              precision={4}
+              suffix="Token"
               valueStyle={{ fontSize: '20px' }}
             />
           </Card>
@@ -442,8 +441,8 @@ const AdminUserBillings: React.FC = () => {
             <Descriptions.Item label="总Tokens">
               {selectedBilling.total_tokens?.toLocaleString()}
             </Descriptions.Item>
-            <Descriptions.Item label="成本">
-              ¥{(selectedBilling.cost || 0).toFixed(6)}
+            <Descriptions.Item label="扣减（Token）">
+              {formatLedgerUnits(selectedBilling.cost ?? 0)}
             </Descriptions.Item>
             <Descriptions.Item label="延迟">
               {(selectedBilling.request_time || 0).toFixed(2)} ms

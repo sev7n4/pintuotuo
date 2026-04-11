@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Select, DatePicker, Spin, Empty, Table } from 'antd';
 import dayjs from 'dayjs';
 import { billingService, type BillingTrend } from '@/services/billing';
+import { formatLedgerUnits } from '@/utils/ledgerDisplay';
 
 const { RangePicker } = DatePicker;
 
@@ -46,10 +47,10 @@ const BillingTrendChart: React.FC<BillingTrendChartProps> = ({ merchantId, userI
       key: 'date',
     },
     {
-      title: '消费(USD)',
+      title: '扣减（Token）',
       dataIndex: 'total_cost',
       key: 'total_cost',
-      render: (v: number) => `$${v.toFixed(4)}`,
+      render: (v: number) => formatLedgerUnits(v),
     },
     {
       title: 'Tokens',

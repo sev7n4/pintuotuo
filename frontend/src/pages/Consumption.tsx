@@ -20,6 +20,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { EyeOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import styles from './Consumption.module.css';
+import { formatLedgerUnits, ledgerUnitColumnTitle } from '@/utils/ledgerDisplay';
 
 const { useBreakpoint } = Grid;
 const { RangePicker } = DatePicker;
@@ -121,7 +122,7 @@ const Consumption: React.FC = () => {
         'Model',
         '输入Tokens',
         '输出Tokens',
-        '费用(元)',
+        '扣减(Token)',
         '延迟(ms)',
         '状态码',
         '时间',
@@ -219,12 +220,14 @@ const Consumption: React.FC = () => {
           ]
         : []),
       {
-        title: '费用',
+        title: ledgerUnitColumnTitle,
         dataIndex: 'cost',
         key: 'cost',
-        width: 90,
+        width: 110,
         align: 'right',
-        render: (cost: number) => <span style={{ color: '#f5222d' }}>¥{cost.toFixed(6)}</span>,
+        render: (cost: number) => (
+          <span style={{ color: '#f5222d' }}>{formatLedgerUnits(cost)}</span>
+        ),
       },
       ...(screens.sm
         ? [
@@ -304,10 +307,10 @@ const Consumption: React.FC = () => {
           </Col>
           <Col xs={12} sm={12} md={6}>
             <Statistic
-              title="总费用"
+              title="合计扣减（Token）"
               value={stats?.total_cost || 0}
               precision={4}
-              prefix="¥"
+              suffix="Token"
               valueStyle={{ color: '#f5222d', fontSize: isMobile ? 18 : 24 }}
             />
           </Col>
@@ -333,7 +336,7 @@ const Consumption: React.FC = () => {
                       <Tag color={getProviderColor(p.provider)}>{p.provider.toUpperCase()}</Tag>
                     }
                     value={p.count}
-                    suffix={`次 / ¥${p.cost.toFixed(6)}`}
+                    suffix={`次 / ${formatLedgerUnits(p.cost)} Token`}
                     valueStyle={{ fontSize: isMobile ? 14 : 16 }}
                   />
                 </Card>
@@ -429,9 +432,9 @@ const Consumption: React.FC = () => {
             <Descriptions.Item label="输出Tokens">
               {selectedRecord.output_tokens.toLocaleString()}
             </Descriptions.Item>
-            <Descriptions.Item label="费用">
+            <Descriptions.Item label="扣减（Token）">
               <span style={{ color: '#f5222d', fontWeight: 'bold' }}>
-                ¥{selectedRecord.cost.toFixed(6)}
+                {formatLedgerUnits(selectedRecord.cost)}
               </span>
             </Descriptions.Item>
             <Descriptions.Item label="延迟">{selectedRecord.latency_ms} ms</Descriptions.Item>
