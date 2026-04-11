@@ -820,9 +820,7 @@ func validateSKUCreateRequest(req *models.SKUCreateRequest) *apperrors.AppError 
 		if req.TokenAmount <= 0 {
 			return apperrors.NewAppError("TOKEN_AMOUNT_REQUIRED", "Token包须填写大于 0 的 Token 数量", http.StatusBadRequest, nil)
 		}
-		if req.ComputePoints <= 0 {
-			return apperrors.NewAppError("COMPUTE_POINTS_REQUIRED", "Token包须填写大于 0 的算力点", http.StatusBadRequest, nil)
-		}
+		// compute_points 可选：履约仅使用 token_amount；算力点字段仅作展示/兼容，可为 0 或不填
 	case "subscription":
 		p := strings.TrimSpace(req.SubscriptionPeriod)
 		if p == "" {

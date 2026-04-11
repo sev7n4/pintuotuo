@@ -12,6 +12,9 @@ func TestValidateSKUCreateRequest_TokenPack(t *testing.T) {
 	ok := &models.SKUCreateRequest{SKUType: "token_pack", TokenAmount: 100, ComputePoints: 1}
 	assert.Nil(t, validateSKUCreateRequest(ok))
 
+	okOptionalCP := &models.SKUCreateRequest{SKUType: "token_pack", TokenAmount: 100, ComputePoints: 0}
+	assert.Nil(t, validateSKUCreateRequest(okOptionalCP))
+
 	bad := &models.SKUCreateRequest{SKUType: "token_pack", TokenAmount: 0, ComputePoints: 1}
 	e := validateSKUCreateRequest(bad)
 	assert.NotNil(t, e)

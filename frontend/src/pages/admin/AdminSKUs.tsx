@@ -670,13 +670,13 @@ const AdminSKUs = () => {
                 <Col span={8}>
                   <Form.Item
                     name="compute_points"
-                    label="算力点数量"
-                    rules={[{ required: true, message: '请输入算力点数量' }]}
+                    label="算力点数量（可选）"
+                    extra="仅展示/兼容；Token 包履约以 Token 数量为准，可不填"
                   >
                     <InputNumber
-                      min={1}
+                      min={0}
                       style={{ width: '100%' }}
-                      placeholder="100"
+                      placeholder="可选"
                       formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     />
                   </Form.Item>
