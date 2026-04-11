@@ -19,6 +19,7 @@ import {
   ReloadOutlined,
   PlayCircleOutlined,
   LineChartOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -89,6 +90,22 @@ const AdminReconciliation = () => {
       setDriftLoading(false);
     }
   }, []);
+
+  const exportDrift = async () => {
+    try {
+      const res = await reconciliationService.exportDriftCSV();
+      const blob = res.data;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ledger_drift_${dayjs().format('YYYYMMDD_HHmmss')}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      message.success('已导出（最多 5 万行）');
+    } catch {
+      message.error('导出失败');
+    }
+  };
 
   const runJob = async () => {
     setLedgerLoading(true);
@@ -183,6 +200,9 @@ const AdminReconciliation = () => {
         </Button>
         <Button type="primary" icon={<PlayCircleOutlined />} onClick={() => void runJob()} loading={ledgerLoading}>
           执行对账任务
+        </Button>
+        <Button icon={<DownloadOutlined />} onClick={() => void exportDrift()}>
+          导出差异用户 CSV
         </Button>
         <Text type="secondary">{ledger?.checked_at ? `上次检查：${ledger.checked_at}` : ''}</Text>
       </Space>

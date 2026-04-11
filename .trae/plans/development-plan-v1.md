@@ -384,7 +384,7 @@ Phase 4 (用户体验) - 独立实现
 | IE-3 | 数据迁移：历史 `compute_point_accounts` → 主账本策略与对账 | IE-2 | `migrations/`、一次性脚本 |
 | IE-4 | `api_proxy`：解析调用 → 权益/订单 → `pricing_version` → 扣减内部单位 | IE-1、IE-2 | `handlers/api_proxy.go`、`services/pricing_service.go` |
 | IE-5 | ~~清理：`token_pack` 上无效必填 `compute_points`~~（已处理：后端校验 + 管理端表单） | IE-2 | `handlers/sku.go`、`AdminSKUs.tsx` |
-| IE-6 | 验收：入账/扣费/报表单位一致性测试与对账用例 | IE-2–IE-4 | 集成测试、运维 Runbook |
+| IE-6 | ~~验收：入账/扣费/报表单位一致性测试与对账用例~~（已交付：单测、报表 Token 口径、Runbook、全库对账 API/CLI、管理端对账+GMV、差异导出） | IE-2–IE-4 | `reconciliation_*`、`AdminReconciliation` |
 
 ### A.3 启动条件检查
 
@@ -401,4 +401,4 @@ Phase 4 (用户体验) - 独立实现
 - **IE-2 / IE-3**：履约与算力点 API 已用 `tokens`；046 一次性合并历史 `compute_point_accounts`（IE-3 与迁移合并交付）。
 - **IE-4**：`api_proxy` 已按 **最近履约订单** `pricing_version_id` 解析 `pricing_version_spu_rates`；无版本或快照缺模型时回退 `PricingService`（live SPU）。
 - **IE-5**：`token_pack` 创建校验与管理端表单中 **`compute_points` 已非必填**；履约仍以 `token_amount` 为准。
-- **IE-6（部分）**：扣费价目单测 + 报表 Token 口径 + Runbook；**全库对账**：`GET/POST /admin/reconciliation/ledger*`、`cmd/reconcile`、`make reconcile-check`；**管理端** `/admin/reconciliation`（用量对账 + 人民币 GMV）；入账与更细财务报表可继续迭代。
+- **IE-6**：扣费价目单测、报表 Token 口径、Runbook、**全库对账**（HTTP + `cmd/reconcile` + `make reconcile-check`）、管理端 **对账 + 人民币 GMV**、差异用户 **CSV 导出**。更细财务科目/多币种可再开需求。

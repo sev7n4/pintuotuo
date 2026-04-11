@@ -37,6 +37,9 @@ export const reconciliationService = {
   getDrift: (params: { page?: number; page_size?: number }) =>
     api.get<DriftListResponse>('/admin/reconciliation/ledger/drift', { params }),
 
+  exportDriftCSV: () =>
+    api.get<Blob>('/admin/reconciliation/ledger/drift/export', { responseType: 'blob' }),
+
   postLedgerCheck: () => api.post<LedgerReconciliation>('/admin/reconciliation/ledger/check'),
 
   getGMV: (params?: { start_date?: string; end_date?: string }) =>

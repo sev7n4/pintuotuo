@@ -23,17 +23,9 @@ type UsageDriftRow struct {
 	Delta  float64 `json:"delta"`
 }
 
-// ListUsageDriftUsers returns users where SUM(api_usage_logs.cost) != SUM(-amount for usage), paginated by largest |delta|.
-func ListUsageDriftUsers(db *sql.DB, limit, offset int) ([]UsageDriftRow, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-	if limit > 500 {
-		limit = 500
-	}
-	if offset < 0 {
-		offset = 0
-	}
+const exportDriftMaxRows = 50000
+
+func queryUsageDriftPage(db *sql.DB, limit, offset int) ([]UsageDriftRow, error) {
 	rows, err := db.Query(`
 		WITH log AS (
 			SELECT user_id, SUM(cost) AS c FROM api_usage_logs GROUP BY user_id
@@ -74,6 +66,25 @@ func ListUsageDriftUsers(db *sql.DB, limit, offset int) ([]UsageDriftRow, error)
 		out = []UsageDriftRow{}
 	}
 	return out, rows.Err()
+}
+
+// ListUsageDriftUsers returns users where SUM(api_usage_logs.cost) != SUM(-amount for usage), paginated by largest |delta|.
+func ListUsageDriftUsers(db *sql.DB, limit, offset int) ([]UsageDriftRow, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return queryUsageDriftPage(db, limit, offset)
+}
+
+// ListUsageDriftUsersForExport returns up to exportDriftMaxRows drift rows for CSV download (admin only).
+func ListUsageDriftUsersForExport(db *sql.DB) ([]UsageDriftRow, error) {
+	return queryUsageDriftPage(db, exportDriftMaxRows, 0)
 }
 
 // CountUsageDriftUsers returns how many users have a non-zero drift beyond epsilon.
