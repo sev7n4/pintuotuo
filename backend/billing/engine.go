@@ -22,10 +22,17 @@ type PricingTier struct {
 	EffectiveAt string  `json:"effective_at"`
 }
 
+type PreDeductConfig struct {
+	Multiplier    int
+	MaxMultiplier int
+}
+
 type BillingEngine struct {
-	pricingCache map[string]PricingTier
-	cacheMutex   sync.RWMutex
-	db           *sql.DB
+	pricingCache  map[string]PricingTier
+	cacheMutex    sync.RWMutex
+	db            *sql.DB
+	configCache   map[string]*PreDeductConfig
+	configMutex   sync.RWMutex
 }
 
 var (
@@ -38,6 +45,7 @@ func GetBillingEngine() *BillingEngine {
 		engine = &BillingEngine{
 			pricingCache: make(map[string]PricingTier),
 			db:           config.GetDB(),
+			configCache:  make(map[string]*PreDeductConfig),
 		}
 		engine.loadPricing()
 	})
@@ -391,4 +399,367 @@ func (e *BillingEngine) GetUsageStats(userID int, startDate, endDate time.Time) 
 			"end":   endDate.Format("2006-01-02"),
 		},
 	}, nil
+}
+
+func (e *BillingEngine) CalculateTokenUsage(inputTokens, outputTokens int) int64 {
+	return int64(inputTokens) + int64(outputTokens)
+}
+
+func (e *BillingEngine) EstimateTokenUsage(inputTokens int, config *PreDeductConfig) int64 {
+	if config == nil {
+		config = &PreDeductConfig{Multiplier: 2, MaxMultiplier: 10}
+	}
+
+	multiplier := config.Multiplier
+	if multiplier <= 0 {
+		multiplier = 2
+	}
+
+	estimate := int64(inputTokens * multiplier)
+
+	maxMultiplier := config.MaxMultiplier
+	if maxMultiplier <= 0 {
+		maxMultiplier = 10
+	}
+	maxEstimate := int64(inputTokens * maxMultiplier)
+
+	if estimate > maxEstimate && maxEstimate > 0 {
+		estimate = maxEstimate
+	}
+
+	return estimate
+}
+
+func (e *BillingEngine) GetPreDeductConfig(skuID, spuID int, providerCode string) *PreDeductConfig {
+	cacheKey := fmt.Sprintf("pre_deduct_config:%d:%d:%s", skuID, spuID, providerCode)
+
+	e.configMutex.RLock()
+	if cached, ok := e.configCache[cacheKey]; ok {
+		e.configMutex.RUnlock()
+		return cached
+	}
+	e.configMutex.RUnlock()
+
+	config := &PreDeductConfig{
+		Multiplier:    2,
+		MaxMultiplier: 10,
+	}
+
+	providerConfig := e.getProviderPreDeductConfig(providerCode)
+	if providerConfig != nil {
+		config = providerConfig
+	}
+
+	spuConfig := e.getSPUPreDeductConfig(spuID)
+	if spuConfig != nil {
+		config = spuConfig
+	}
+
+	skuConfig := e.getSKUPreDeductConfig(skuID)
+	if skuConfig != nil {
+		config = skuConfig
+	}
+
+	e.configMutex.Lock()
+	e.configCache[cacheKey] = config
+	e.configMutex.Unlock()
+
+	return config
+}
+
+func (e *BillingEngine) getProviderPreDeductConfig(providerCode string) *PreDeductConfig {
+	if e.db == nil {
+		e.db = config.GetDB()
+	}
+	if e.db == nil || providerCode == "" {
+		return nil
+	}
+
+	var segmentConfig []byte
+	err := e.db.QueryRow(
+		"SELECT segment_config FROM model_providers WHERE code = $1 AND status = 'active'",
+		providerCode,
+	).Scan(&segmentConfig)
+	if err != nil {
+		return nil
+	}
+
+	if len(segmentConfig) == 0 {
+		return nil
+	}
+
+	var cfg struct {
+		PreDeductMultiplier    int `json:"pre_deduct_multiplier"`
+		PreDeductMaxMultiplier int `json:"pre_deduct_max_multiplier"`
+	}
+	if err := json.Unmarshal(segmentConfig, &cfg); err != nil {
+		return nil
+	}
+
+	if cfg.PreDeductMultiplier > 0 {
+		return &PreDeductConfig{
+			Multiplier:    cfg.PreDeductMultiplier,
+			MaxMultiplier: cfg.PreDeductMaxMultiplier,
+		}
+	}
+
+	return nil
+}
+
+func (e *BillingEngine) getSPUPreDeductConfig(spuID int) *PreDeductConfig {
+	if e.db == nil {
+		e.db = config.GetDB()
+	}
+	if e.db == nil || spuID <= 0 {
+		return nil
+	}
+
+	var multiplier, maxMultiplier sql.NullInt64
+	err := e.db.QueryRow(
+		"SELECT pre_deduct_multiplier, pre_deduct_max_multiplier FROM spus WHERE id = $1 AND pre_deduct_multiplier IS NOT NULL",
+		spuID,
+	).Scan(&multiplier, &maxMultiplier)
+	if err != nil {
+		return nil
+	}
+
+	if multiplier.Valid && multiplier.Int64 > 0 {
+		maxVal := 10
+		if maxMultiplier.Valid && maxMultiplier.Int64 > 0 {
+			maxVal = int(maxMultiplier.Int64)
+		}
+		return &PreDeductConfig{
+			Multiplier:    int(multiplier.Int64),
+			MaxMultiplier: maxVal,
+		}
+	}
+
+	return nil
+}
+
+func (e *BillingEngine) getSKUPreDeductConfig(skuID int) *PreDeductConfig {
+	if e.db == nil {
+		e.db = config.GetDB()
+	}
+	if e.db == nil || skuID <= 0 {
+		return nil
+	}
+
+	var multiplier, maxMultiplier sql.NullInt64
+	err := e.db.QueryRow(
+		"SELECT pre_deduct_multiplier, pre_deduct_max_multiplier FROM skus WHERE id = $1 AND pre_deduct_multiplier IS NOT NULL",
+		skuID,
+	).Scan(&multiplier, &maxMultiplier)
+	if err != nil {
+		return nil
+	}
+
+	if multiplier.Valid && multiplier.Int64 > 0 {
+		maxVal := 10
+		if maxMultiplier.Valid && maxMultiplier.Int64 > 0 {
+			maxVal = int(maxMultiplier.Int64)
+		}
+		return &PreDeductConfig{
+			Multiplier:    int(multiplier.Int64),
+			MaxMultiplier: maxVal,
+		}
+	}
+
+	return nil
+}
+
+func (e *BillingEngine) InvalidateConfigCache(skuID, spuID int, providerCode string) {
+	cacheKey := fmt.Sprintf("pre_deduct_config:%d:%d:%s", skuID, spuID, providerCode)
+	e.configMutex.Lock()
+	delete(e.configCache, cacheKey)
+	e.configMutex.Unlock()
+}
+
+func (e *BillingEngine) PreDeductBalance(userID int, amount int64, reason string, requestID string) error {
+	if e.db == nil {
+		e.db = config.GetDB()
+	}
+	if e.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	tx, err := e.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	var currentBalance float64
+	err = tx.QueryRow("SELECT balance FROM tokens WHERE user_id = $1 FOR UPDATE", userID).Scan(&currentBalance)
+	if err != nil {
+		return fmt.Errorf("failed to get current balance: %w", err)
+	}
+
+	if currentBalance < float64(amount) {
+		return fmt.Errorf("insufficient balance: current=%.0f, required=%d", currentBalance, amount)
+	}
+
+	_, err = tx.Exec(
+		"UPDATE tokens SET balance = balance - $1, updated_at = $2 WHERE user_id = $3",
+		amount, time.Now(), userID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to pre-deduct balance: %w", err)
+	}
+
+	_, err = tx.Exec(
+		"INSERT INTO pre_deductions (user_id, request_id, pre_deduct_amount, status) VALUES ($1, $2, $3, 'pending')",
+		userID, requestID, amount,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to record pre-deduction: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	ctx := context.Background()
+	cache.Delete(ctx, cache.TokenBalanceKey(userID))
+
+	return nil
+}
+
+func (e *BillingEngine) SettlePreDeduct(userID int, requestID string, actualUsage int64) error {
+	if e.db == nil {
+		e.db = config.GetDB()
+	}
+	if e.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	tx, err := e.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	var preDeductAmount int64
+	var status string
+	err = tx.QueryRow(
+		"SELECT pre_deduct_amount, status FROM pre_deductions WHERE user_id = $1 AND request_id = $2 FOR UPDATE",
+		userID, requestID,
+	).Scan(&preDeductAmount, &status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		return fmt.Errorf("failed to get pre-deduction record: %w", err)
+	}
+
+	if status != "pending" {
+		return nil
+	}
+
+	diff := preDeductAmount - actualUsage
+
+	if diff > 0 {
+		_, err = tx.Exec(
+			"UPDATE tokens SET balance = balance + $1, updated_at = $2 WHERE user_id = $3",
+			diff, time.Now(), userID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to refund balance: %w", err)
+		}
+	} else if diff < 0 {
+		extraNeeded := -diff
+		_, err = tx.Exec(
+			"UPDATE tokens SET balance = balance - $1, total_used = total_used + $1, updated_at = $2 WHERE user_id = $3",
+			extraNeeded, time.Now(), userID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to deduct extra balance: %w", err)
+		}
+	}
+
+	_, err = tx.Exec(
+		"UPDATE pre_deductions SET actual_amount = $1, status = 'settled', settled_at = $2 WHERE user_id = $3 AND request_id = $4",
+		actualUsage, time.Now(), userID, requestID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update pre-deduction status: %w", err)
+	}
+
+	_, err = tx.Exec(
+		"INSERT INTO token_transactions (user_id, type, amount, reason, request_id) VALUES ($1, 'usage', $2, $3, $4)",
+		userID, -actualUsage, "API usage settled", requestID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to record transaction: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	ctx := context.Background()
+	cache.Delete(ctx, cache.TokenBalanceKey(userID))
+
+	return nil
+}
+
+func (e *BillingEngine) CancelPreDeduct(userID int, requestID string) error {
+	if e.db == nil {
+		e.db = config.GetDB()
+	}
+	if e.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	tx, err := e.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	var preDeductAmount int64
+	var status string
+	err = tx.QueryRow(
+		"SELECT pre_deduct_amount, status FROM pre_deductions WHERE user_id = $1 AND request_id = $2 FOR UPDATE",
+		userID, requestID,
+	).Scan(&preDeductAmount, &status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		return fmt.Errorf("failed to get pre-deduction record: %w", err)
+	}
+
+	if status != "pending" {
+		return nil
+	}
+
+	_, err = tx.Exec(
+		"UPDATE tokens SET balance = balance + $1, updated_at = $2 WHERE user_id = $3",
+		preDeductAmount, time.Now(), userID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to refund balance: %w", err)
+	}
+
+	_, err = tx.Exec(
+		"UPDATE pre_deductions SET status = 'cancelled', settled_at = $1 WHERE user_id = $2 AND request_id = $3",
+		time.Now(), userID, requestID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update pre-deduction status: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	ctx := context.Background()
+	cache.Delete(ctx, cache.TokenBalanceKey(userID))
+
+	return nil
+}
+
+func (e *BillingEngine) CalculateCostForSettlement(provider, model string, inputTokens, outputTokens int) float64 {
+	return e.CalculateCost(provider, model, inputTokens, outputTokens)
 }

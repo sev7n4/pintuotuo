@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
@@ -76,6 +77,14 @@ type APIProxyRequest struct {
 type ChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+func estimateInputTokens(messages []ChatMessage) int {
+	totalChars := 0
+	for _, msg := range messages {
+		totalChars += len(msg.Role) + len(msg.Content)
+	}
+	return totalChars / 4
 }
 
 type APIProxyResponse struct {
@@ -152,8 +161,44 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
+	inputTokensEstimate := estimateInputTokens(req.Messages)
+	billingEngine := billing.GetBillingEngine()
+	preDeductConfig := billingEngine.GetPreDeductConfig(0, 0, req.Provider)
+	estimatedUsage := billingEngine.EstimateTokenUsage(inputTokensEstimate, preDeductConfig)
+
+	if tokenBalance < float64(estimatedUsage) {
+		logger.LogWarn(c.Request.Context(), "api_proxy", "Insufficient balance for pre-deduction", map[string]interface{}{
+			"user_id":          userIDInt,
+			"balance":          tokenBalance,
+			"estimated_usage":  estimatedUsage,
+			"input_estimate":   inputTokensEstimate,
+			"multiplier":       preDeductConfig.Multiplier,
+			"request_id":       requestID,
+		})
+		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
+		return
+	}
+
+	preDeductErr := billingEngine.PreDeductBalance(userIDInt, estimatedUsage, "API call pre-deduct", requestID)
+	if preDeductErr != nil {
+		logger.LogError(c.Request.Context(), "api_proxy", "Pre-deduction failed", preDeductErr, map[string]interface{}{
+			"user_id":         userIDInt,
+			"estimated_usage": estimatedUsage,
+			"request_id":      requestID,
+		})
+		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
+		return
+	}
+
+	logger.LogInfo(c.Request.Context(), "api_proxy", "Pre-deduction successful", map[string]interface{}{
+		"user_id":         userIDInt,
+		"estimated_usage": estimatedUsage,
+		"request_id":      requestID,
+	})
+
 	merchantID, merchantErr := resolveMerchantIDByUser(db, userIDInt)
 	if merchantErr != nil {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
@@ -175,6 +220,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	var apiKey models.MerchantAPIKey
 	err = selectAPIKeyForRequest(db, userIDInt, merchantID, req, &apiKey)
 	if err != nil {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		if errors.Is(err, sql.ErrNoRows) {
 			logger.LogWarn(c.Request.Context(), "api_proxy", "API key authorization miss", map[string]interface{}{
 				"request_id":        requestID,
@@ -206,6 +252,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	decryptedKey, err := utils.Decrypt(apiKey.APIKeyEncrypted)
 	if err != nil {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"DECRYPTION_FAILED",
 			"Failed to decrypt API key",
@@ -217,6 +264,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	providerCfg, err := getProviderRuntimeConfig(db, req.Provider)
 	if err == sql.ErrNoRows {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"UNSUPPORTED_PROVIDER",
 			fmt.Sprintf("Provider %s is not supported", req.Provider),
@@ -226,12 +274,14 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 	if err != nil {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 
 	baseURL := strings.TrimRight(providerCfg.APIBaseURL, "/")
 	if baseURL == "" {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"UNSUPPORTED_PROVIDER",
 			fmt.Sprintf("Provider %s is missing api_base_url", req.Provider),
@@ -263,6 +313,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"REQUEST_BUILD_FAILED",
 			"Failed to build request body",
@@ -274,6 +325,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	httpReq, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBody))
 	if err != nil {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"REQUEST_CREATE_FAILED",
 			"Failed to create request",
@@ -301,6 +353,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	retryPolicy := buildRetryPolicy(strategySnapshot)
 	resp, err := executeProviderRequestWithRetry(client, httpReq, retryPolicy)
 	if err != nil {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		services.GetSmartRouter().RecordRequestResult(apiKey.ID, false)
 		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -318,6 +371,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"RESPONSE_READ_FAILED",
@@ -330,6 +384,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	var apiResp APIProxyResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		c.Data(resp.StatusCode, "application/json", body)
 		return
 	}
@@ -337,45 +392,41 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	latency := int(time.Since(startTime).Milliseconds())
 
 	var inputTokens, outputTokens int
+	var tokenUsage int64
 	var cost float64
 
 	if apiResp.Usage.TotalTokens > 0 {
 		inputTokens = apiResp.Usage.PromptTokens
 		outputTokens = apiResp.Usage.CompletionTokens
+		tokenUsage = billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
 		cost = calculateTokenCost(db, userIDInt, req.Provider, req.Model, inputTokens, outputTokens)
+	}
+
+	if tokenUsage > 0 {
+		settleErr := billingEngine.SettlePreDeduct(userIDInt, requestID, tokenUsage)
+		if settleErr != nil {
+			logger.LogError(context.Background(), "api_proxy", "Settle pre-deduct failed", settleErr, map[string]interface{}{
+				"user_id":      userIDInt,
+				"token_usage":  tokenUsage,
+				"request_id":   requestID,
+			})
+		}
+	} else {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
 	}
 
 	if cost > 0 {
 		tx, err := db.Begin()
 		if err == nil {
-			res, updateErr := tx.Exec(
-				"UPDATE tokens SET balance = balance - $1, total_used = total_used + $1 WHERE user_id = $2 AND balance >= $1",
-				cost, userIDInt,
+			_, updateErr := tx.Exec(
+				"UPDATE merchant_api_keys SET quota_used = quota_used + $1, last_used_at = $2 WHERE id = $3",
+				cost, time.Now(), apiKey.ID,
 			)
 			err = updateErr
 			if err == nil {
-				var rowsAffected int64
-				rowsAffected, err = res.RowsAffected()
-				if err == nil && rowsAffected == 0 {
-					err = apperrors.ErrInsufficientBalance
-				}
-			}
-			if err == nil {
 				_, err = tx.Exec(
-					"INSERT INTO token_transactions (user_id, type, amount, reason, request_id) VALUES ($1, $2, $3, $4, $5)",
-					userIDInt, "usage", -cost, fmt.Sprintf("API call: %s/%s", req.Provider, req.Model), requestID,
-				)
-			}
-			if err == nil {
-				_, err = tx.Exec(
-					"UPDATE merchant_api_keys SET quota_used = quota_used + $1, last_used_at = $2 WHERE id = $3",
-					cost, time.Now(), apiKey.ID,
-				)
-			}
-			if err == nil {
-				_, err = tx.Exec(
-					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
-					userIDInt, apiKey.ID, requestID, req.Provider, req.Model, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost,
+					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, token_usage) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+					userIDInt, apiKey.ID, requestID, req.Provider, req.Model, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost, tokenUsage,
 				)
 			}
 
@@ -386,6 +437,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 					"provider":   req.Provider,
 					"model":      req.Model,
 					"cost":       cost,
+					"token_usage": tokenUsage,
 					"request_id": requestID,
 				})
 			} else {
@@ -396,6 +448,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 					"model":         req.Model,
 					"input_tokens":  inputTokens,
 					"output_tokens": outputTokens,
+					"token_usage":   tokenUsage,
 					"cost":          cost,
 					"latency_ms":    latency,
 					"status_code":   resp.StatusCode,
