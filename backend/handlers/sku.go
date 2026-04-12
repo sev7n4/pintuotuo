@@ -17,6 +17,7 @@ import (
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/logger"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
@@ -1598,7 +1599,7 @@ func PatchModelProvider(c *gin.Context) {
 		return
 	}
 	if err != nil {
-		logger.Error("Failed to update model provider: %v", err)
+		logger.LogError(c.Request.Context(), "model_provider", "Failed to update model provider", err, nil)
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
