@@ -141,13 +141,13 @@ const MerchantBills = () => {
   };
 
   const generateBillCSV = (bill: MonthlyBill): string => {
-    let csv = '日期,订单数,销售额,退款,净销售额\n';
+    let csv = '日期,订单数,销售额(¥),退款(¥),净销售额(¥)\n';
     bill.details.forEach((d) => {
-      csv += `${d.date},${d.orders},${d.sales.toFixed(2)},${d.refund.toFixed(2)},${d.net_sales.toFixed(2)}\n`;
+      csv += `${d.date},${d.orders},${d.sales.toFixed(6)},${d.refund.toFixed(6)},${d.net_sales.toFixed(6)}\n`;
     });
-    csv += `\n合计,,${bill.total_sales.toFixed(2)},,${bill.total_sales.toFixed(2)}\n`;
-    csv += `平台费用(5%),,,${bill.platform_fee.toFixed(2)}\n`;
-    csv += `结算金额,,,${bill.settlement_amount.toFixed(2)}\n`;
+    csv += `\n合计,,${bill.total_sales.toFixed(6)},,${bill.total_sales.toFixed(6)}\n`;
+    csv += `平台费用(5%),,,${bill.platform_fee.toFixed(6)}\n`;
+    csv += `结算金额,,,${bill.settlement_amount.toFixed(6)}\n`;
     return csv;
   };
 
@@ -183,22 +183,22 @@ const MerchantBills = () => {
       render: (v: number) => `${v} 笔`,
     },
     {
-      title: '销售总额',
+      title: '销售总额(¥)',
       dataIndex: 'total_sales',
       key: 'total_sales',
-      render: (v: number) => `¥${v.toFixed(2)}`,
+      render: (v: number) => `¥${v.toFixed(6)}`,
     },
     {
       title: '平台费用',
       dataIndex: 'platform_fee',
       key: 'platform_fee',
-      render: (v: number) => <span style={{ color: '#ff4d4f' }}>-¥{v.toFixed(2)}</span>,
+      render: (v: number) => <span style={{ color: '#ff4d4f' }}>-¥{v.toFixed(6)}</span>,
     },
     {
       title: '结算金额',
       dataIndex: 'settlement_amount',
       key: 'settlement_amount',
-      render: (v: number) => <span className={styles.amount}>¥{v.toFixed(2)}</span>,
+      render: (v: number) => <span className={styles.amount}>¥{v.toFixed(6)}</span>,
     },
     {
       title: '状态',
@@ -250,22 +250,22 @@ const MerchantBills = () => {
       render: (v: number) => `${v} 笔`,
     },
     {
-      title: '销售额',
+      title: '销售额(¥)',
       dataIndex: 'sales',
       key: 'sales',
-      render: (v: number) => `¥${v.toFixed(2)}`,
+      render: (v: number) => `¥${v.toFixed(6)}`,
     },
     {
       title: '退款',
       dataIndex: 'refund',
       key: 'refund',
-      render: (v: number) => (v > 0 ? `-¥${v.toFixed(2)}` : '-'),
+      render: (v: number) => (v > 0 ? `-¥${v.toFixed(6)}` : '-'),
     },
     {
-      title: '净销售额',
+      title: '净销售额(¥)',
       dataIndex: 'net_sales',
       key: 'net_sales',
-      render: (v: number) => `¥${v.toFixed(2)}`,
+      render: (v: number) => `¥${v.toFixed(6)}`,
     },
   ];
 
@@ -354,14 +354,14 @@ const MerchantBills = () => {
                   {statusMap[selectedBill.status]?.text}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="销售总额">
-                ¥{selectedBill.total_sales.toFixed(2)}
+              <Descriptions.Item label="销售总额(¥)">
+                ¥{selectedBill.total_sales.toFixed(6)}
               </Descriptions.Item>
               <Descriptions.Item label="平台费用(5%)">
-                <span style={{ color: '#ff4d4f' }}>-¥{selectedBill.platform_fee.toFixed(2)}</span>
+                <span style={{ color: '#ff4d4f' }}>-¥{selectedBill.platform_fee.toFixed(6)}</span>
               </Descriptions.Item>
               <Descriptions.Item label="结算金额" span={2}>
-                <span className={styles.amount}>¥{selectedBill.settlement_amount.toFixed(2)}</span>
+                <span className={styles.amount}>¥{selectedBill.settlement_amount.toFixed(6)}</span>
               </Descriptions.Item>
             </Descriptions>
 

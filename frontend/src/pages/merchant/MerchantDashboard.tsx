@@ -45,11 +45,11 @@ const MerchantDashboard = () => {
       width: 80,
     },
     {
-      title: '金额',
+      title: '金额(¥)',
       dataIndex: 'total_price',
       key: 'total_price',
       width: 100,
-      render: (price: number) => `¥${price.toFixed(2)}`,
+      render: (price: number) => `¥${price.toFixed(6)}`,
     },
     {
       title: '状态',
