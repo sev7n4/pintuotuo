@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, message, Radio, Space } from 'antd';
-import { UserOutlined, ShopOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, message, Tabs, Alert } from 'antd';
+import { ShopOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@stores/authStore';
 
@@ -10,7 +10,7 @@ export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const { register, isLoading, error, user, isAuthenticated } = useAuthStore();
   const [form] = Form.useForm();
-  const [selectedRole, setSelectedRole] = useState<UserRole>('user');
+  const [accountTab, setAccountTab] = useState<'buyer' | 'merchant'>('buyer');
 
   const onFinish = async (values: {
     email: string;
@@ -23,7 +23,7 @@ export const RegisterPage: React.FC = () => {
       return;
     }
 
-    const role = selectedRole || 'user';
+    const role: UserRole = accountTab === 'merchant' ? 'merchant' : 'user';
 
     try {
       await register(values.email, values.name, values.password, role);
@@ -46,40 +46,32 @@ export const RegisterPage: React.FC = () => {
   return (
     <div className="auth-page">
       <Card className="auth-card" title="拼脱脱 - 注册" style={{ maxWidth: 400 }}>
+        <Tabs
+          activeKey={accountTab}
+          onChange={(k) => setAccountTab(k as 'buyer' | 'merchant')}
+          items={[
+            { key: 'buyer', label: '买家注册' },
+            {
+              key: 'merchant',
+              label: (
+                <span>
+                  <ShopOutlined /> 商户入驻
+                </span>
+              ),
+            },
+          ]}
+          style={{ marginBottom: 16 }}
+        />
+        {accountTab === 'merchant' && (
+          <Alert
+            type="info"
+            showIcon
+            message="商户入驻"
+            description="用于上架 SKU、管理订单与结算。若仅购买 Token，请使用「买家注册」。"
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <Form form={form} layout="vertical" onFinish={onFinish} autoComplete="off">
-          <Form.Item label="选择角色" name="role">
-            <Radio.Group
-              style={{ width: '100%' }}
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-            >
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Radio.Button
-                  value="user"
-                  style={{ width: '100%', height: 60, display: 'flex', alignItems: 'center' }}
-                >
-                  <UserOutlined style={{ marginRight: 8 }} />
-                  <span>
-                    <strong>普通用户</strong>
-                    <br />
-                    <small>购买 Token、参与拼团</small>
-                  </span>
-                </Radio.Button>
-                <Radio.Button
-                  value="merchant"
-                  style={{ width: '100%', height: 60, display: 'flex', alignItems: 'center' }}
-                >
-                  <ShopOutlined style={{ marginRight: 8 }} />
-                  <span>
-                    <strong>商家</strong>
-                    <br />
-                    <small>上架商品、管理订单</small>
-                  </span>
-                </Radio.Button>
-              </Space>
-            </Radio.Group>
-          </Form.Item>
-
           <Form.Item
             label="邮箱"
             name="email"

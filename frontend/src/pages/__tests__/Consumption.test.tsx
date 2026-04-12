@@ -1,4 +1,4 @@
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Consumption from '../Consumption';
 
@@ -29,7 +29,7 @@ jest.mock('antd', () => {
 });
 
 describe('Consumption', () => {
-  it('renders consumption page with title', async () => {
+  it('renders consumption page with view mode toggle', async () => {
     await act(async () => {
       render(
         <MemoryRouter>
@@ -37,7 +37,8 @@ describe('Consumption', () => {
         </MemoryRouter>
       );
     });
-    expect(screen.getByText('消费明细')).toBeInTheDocument();
+    expect(screen.getByText('简要看板')).toBeInTheDocument();
+    expect(screen.getByText('每次调用明细')).toBeInTheDocument();
   });
 
   it('shows statistics cards', async () => {
@@ -66,7 +67,7 @@ describe('Consumption', () => {
     expect(refreshButton).toBeInTheDocument();
   });
 
-  it('displays export button', async () => {
+  it('displays export button in detail view', async () => {
     await act(async () => {
       render(
         <MemoryRouter>
@@ -74,8 +75,13 @@ describe('Consumption', () => {
         </MemoryRouter>
       );
     });
-    const exportButtons = screen.getAllByRole('button');
-    const exportButton = exportButtons.find((btn) => btn.textContent?.includes('导出'));
-    expect(exportButton).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByText('每次调用明细'));
+    });
+    await waitFor(() => {
+      const exportButtons = screen.getAllByRole('button');
+      const exportButton = exportButtons.find((btn) => btn.textContent?.includes('导出'));
+      expect(exportButton).toBeInTheDocument();
+    });
   });
 });

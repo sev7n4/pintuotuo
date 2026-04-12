@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, message } from 'antd';
 import {
@@ -6,11 +6,22 @@ import {
   LogoutOutlined,
   HomeOutlined,
   CustomerServiceOutlined,
+  AppstoreOutlined,
+  ShoppingCartOutlined,
+  UnorderedListOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import './Layout.css';
 
 const { Header, Content, Footer } = AntLayout;
+
+function getMainNavSelectedKey(pathname: string): string[] {
+  if (pathname === '/') return ['home'];
+  if (pathname.startsWith('/catalog')) return ['catalog'];
+  if (pathname === '/cart' || pathname === '/checkout') return ['cart'];
+  if (pathname.startsWith('/orders') || pathname.startsWith('/payment')) return ['orders'];
+  return [];
+}
 
 export default function Layout() {
   const location = useLocation();
@@ -23,13 +34,35 @@ export default function Layout() {
     }
   }, [isAuthenticated, user, fetchUser]);
 
-  const tabItems = [
-    {
-      key: 'home',
-      label: <Link to="/">首页</Link>,
-      icon: <HomeOutlined />,
-    },
-  ];
+  const tabItems = useMemo(
+    () => [
+      {
+        key: 'home',
+        label: <Link to="/">首页</Link>,
+        icon: <HomeOutlined />,
+      },
+      {
+        key: 'catalog',
+        label: <Link to="/catalog">卖场</Link>,
+        icon: <AppstoreOutlined />,
+      },
+      {
+        key: 'cart',
+        label: <Link to="/cart">购物车</Link>,
+        icon: <ShoppingCartOutlined />,
+      },
+      ...(isAuthenticated
+        ? [
+            {
+              key: 'orders',
+              label: <Link to="/orders">我的订单</Link>,
+              icon: <UnorderedListOutlined />,
+            },
+          ]
+        : []),
+    ],
+    [isAuthenticated]
+  );
 
   const userMenuItems = [
     { key: 'my', label: '我的主页', icon: <UserOutlined /> },
@@ -62,7 +95,7 @@ export default function Layout() {
         </Link>
         <Menu
           mode="horizontal"
-          selectedKeys={location.pathname === '/' ? ['home'] : []}
+          selectedKeys={getMainNavSelectedKey(location.pathname)}
           items={tabItems}
           className="layout-menu"
         />

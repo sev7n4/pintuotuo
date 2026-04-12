@@ -26,7 +26,7 @@ describe('RegisterPage Component', () => {
     jest.clearAllMocks();
   });
 
-  test('renders RegisterPage with form and role selection', () => {
+  test('renders RegisterPage with form and buyer/merchant tabs', () => {
     // 模拟 store 状态
     mockUseAuthStore.mockReturnValue({
       user: null,
@@ -50,9 +50,8 @@ describe('RegisterPage Component', () => {
 
     // 检查页面元素
     expect(screen.getByText('拼脱脱 - 注册')).toBeInTheDocument();
-    expect(screen.getByText('选择角色')).toBeInTheDocument();
-    expect(screen.getByText('普通用户')).toBeInTheDocument();
-    expect(screen.getByText('商家')).toBeInTheDocument();
+    expect(screen.getByText('买家注册')).toBeInTheDocument();
+    expect(screen.getByText('商户入驻')).toBeInTheDocument();
     expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
     expect(screen.getByLabelText('名字')).toBeInTheDocument();
     expect(screen.getByLabelText('密码')).toBeInTheDocument();
@@ -140,9 +139,7 @@ describe('RegisterPage Component', () => {
       </MemoryRouter>
     );
 
-    // 选择商家角色
-    const merchantRole = screen.getByText('商家');
-    fireEvent.click(merchantRole);
+    fireEvent.click(screen.getByRole('tab', { name: /商户入驻/i }));
 
     // 填写表单
     const emailInput = screen.getByPlaceholderText('example@email.com');
@@ -332,8 +329,7 @@ describe('RegisterPage Component', () => {
     expect(screen.getByText('拼脱脱 - 注册')).toBeInTheDocument();
   });
 
-  test('toggles between user and merchant roles', () => {
-    // 模拟 store 状态
+  test('switches to merchant tab and shows onboarding hint', () => {
     mockUseAuthStore.mockReturnValue({
       user: null,
       token: null,
@@ -354,15 +350,10 @@ describe('RegisterPage Component', () => {
       </MemoryRouter>
     );
 
-    // 检查初始角色
-    const userRole = screen.getByText('普通用户');
-    expect(userRole).toBeInTheDocument();
-
-    // 切换到商家角色
-    const merchantRole = screen.getByText('商家');
-    fireEvent.click(merchantRole);
-
-    // 验证角色切换
-    expect(merchantRole).toBeInTheDocument();
+    expect(screen.getByText('买家注册')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /商户入驻/i }));
+    expect(
+      screen.getByText(/若仅购买 Token，请使用「买家注册」/)
+    ).toBeInTheDocument();
   });
 });

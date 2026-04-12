@@ -172,12 +172,7 @@ describe('Page Navigation Integration Tests', () => {
       const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码');
       const registerButton = screen.getByText('创建账户');
 
-      const userRadio = screen.getByText('普通用户').closest('label')?.querySelector('input');
-
       await act(async () => {
-        if (userRadio) {
-          fireEvent.click(userRadio);
-        }
         fireEvent.change(emailInput, { target: { value: 'cuser@example.com' } });
         fireEvent.change(nameInput, { target: { value: 'C端用户' } });
         fireEvent.change(passwordInput, { target: { value: 'password123' } });
@@ -239,12 +234,8 @@ describe('Page Navigation Integration Tests', () => {
       const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码');
       const registerButton = screen.getByText('创建账户');
 
-      const merchantRadio = screen.getByText('商家').closest('label')?.querySelector('input');
-
       await act(async () => {
-        if (merchantRadio) {
-          fireEvent.click(merchantRadio);
-        }
+        fireEvent.click(screen.getByRole('tab', { name: /商户入驻/i }));
         fireEvent.change(emailInput, { target: { value: 'merchant@example.com' } });
         fireEvent.change(nameInput, { target: { value: 'B端商家' } });
         fireEvent.change(passwordInput, { target: { value: 'password123' } });
@@ -262,7 +253,7 @@ describe('Page Navigation Integration Tests', () => {
       });
     });
 
-    test('should show role selection UI correctly', async () => {
+    test('should show buyer and merchant registration tabs', async () => {
       mockUseAuthStore.mockReturnValue({
         user: null,
         token: null,
@@ -286,10 +277,8 @@ describe('Page Navigation Integration Tests', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByText('普通用户')).toBeInTheDocument();
-      expect(screen.getByText('商家')).toBeInTheDocument();
-      expect(screen.getByText('购买 Token、参与拼团')).toBeInTheDocument();
-      expect(screen.getByText('上架商品、管理订单')).toBeInTheDocument();
+      expect(screen.getByText('买家注册')).toBeInTheDocument();
+      expect(screen.getByText('商户入驻')).toBeInTheDocument();
     });
   });
 
