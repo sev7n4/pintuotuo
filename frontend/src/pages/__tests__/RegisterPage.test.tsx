@@ -352,8 +352,6 @@ describe('RegisterPage Component', () => {
 
     expect(screen.getByText('买家注册')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: /商户入驻/i }));
-    expect(
-      screen.getByText(/若仅购买 Token，请使用「买家注册」/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/若仅购买 Token，请使用「买家注册」/)).toBeInTheDocument();
   });
 });

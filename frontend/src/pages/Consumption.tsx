@@ -293,7 +293,15 @@ const Consumption: React.FC = () => {
 
   return (
     <div className={styles.container} style={{ padding: isMobile ? 12 : 24 }}>
-      <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          alignItems: 'center',
+        }}
+      >
         <Segmented
           value={viewMode}
           onChange={(v) => setViewMode(v as 'simple' | 'detail')}
