@@ -71,7 +71,7 @@ func GetConsumptionRecords(c *gin.Context) {
 	db.QueryRow(countQuery, args...).Scan(&total)
 
 	offset := (page - 1) * pageSize
-	dataQuery := "SELECT id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, created_at " + baseQuery + " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(argIndex) + " OFFSET $" + strconv.Itoa(argIndex+1)
+	dataQuery := "SELECT id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, COALESCE(token_usage, input_tokens + output_tokens) as token_usage, created_at " + baseQuery + " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(argIndex) + " OFFSET $" + strconv.Itoa(argIndex+1)
 	args = append(args, pageSize, offset)
 
 	rows, err := db.Query(dataQuery, args...)
@@ -84,11 +84,12 @@ func GetConsumptionRecords(c *gin.Context) {
 	records := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var id, statusCode, latencyMs, inputTokens, outputTokens int
+		var tokenUsage int64
 		var requestID, provider, model, method, path string
 		var cost float64
 		var createdAt time.Time
 
-		err := rows.Scan(&id, &requestID, &provider, &model, &method, &path, &statusCode, &latencyMs, &inputTokens, &outputTokens, &cost, &createdAt)
+		err := rows.Scan(&id, &requestID, &provider, &model, &method, &path, &statusCode, &latencyMs, &inputTokens, &outputTokens, &cost, &tokenUsage, &createdAt)
 		if err != nil {
 			continue
 		}
@@ -104,6 +105,7 @@ func GetConsumptionRecords(c *gin.Context) {
 			"latency_ms":    latencyMs,
 			"input_tokens":  inputTokens,
 			"output_tokens": outputTokens,
+			"token_usage":   tokenUsage,
 			"cost":          cost,
 			"created_at":    createdAt,
 		})
@@ -161,12 +163,13 @@ func GetConsumptionStats(c *gin.Context) {
 	var stats struct {
 		TotalRequests int     `json:"total_requests"`
 		TotalTokens   int64   `json:"total_tokens"`
+		TokenUsage    int64   `json:"token_usage"`
 		TotalCost     float64 `json:"total_cost"`
 		AvgLatencyMs  int     `json:"avg_latency_ms"`
 	}
 
-	statsQuery := "SELECT COUNT(*), COALESCE(SUM(input_tokens + output_tokens), 0), COALESCE(SUM(cost), 0), COALESCE(AVG(latency_ms), 0) " + baseQuery
-	db.QueryRow(statsQuery, args...).Scan(&stats.TotalRequests, &stats.TotalTokens, &stats.TotalCost, &stats.AvgLatencyMs)
+	statsQuery := "SELECT COUNT(*), COALESCE(SUM(input_tokens + output_tokens), 0), COALESCE(SUM(token_usage), SUM(input_tokens + output_tokens)), COALESCE(SUM(cost), 0), COALESCE(AVG(latency_ms), 0) " + baseQuery
+	db.QueryRow(statsQuery, args...).Scan(&stats.TotalRequests, &stats.TotalTokens, &stats.TokenUsage, &stats.TotalCost, &stats.AvgLatencyMs)
 
 	providerQuery := "SELECT provider, COUNT(*) as count, SUM(cost) as cost " + baseQuery + " GROUP BY provider ORDER BY cost DESC"
 	rows, err := db.Query(providerQuery, args...)

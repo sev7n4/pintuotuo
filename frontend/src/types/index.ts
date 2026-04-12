@@ -314,6 +314,8 @@ export interface MerchantSettlement {
   period_start: string;
   period_end: string;
   total_sales: number;
+  total_sales_cny: number;
+  total_tokens: number;
   platform_fee: number;
   settlement_amount: number;
   status: 'pending' | 'processing' | 'completed';
@@ -371,6 +373,7 @@ export interface BillingRecord {
   model: string;
   input_tokens: number;
   output_tokens: number;
+  token_usage: number;
   cost: number;
   request_id: string;
   status_code: number;

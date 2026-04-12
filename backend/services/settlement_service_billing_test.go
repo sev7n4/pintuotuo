@@ -127,10 +127,10 @@ func TestGetBillingRecords(t *testing.T) {
 
 	rows := sqlmock.NewRows([]string{
 		"id", "user_id", "merchant_id", "provider", "model",
-		"input_tokens", "output_tokens", "cost", "request_id",
+		"input_tokens", "output_tokens", "token_usage", "cost", "request_id",
 		"status_code", "latency_ms", "created_at",
 	}).
-		AddRow(1, 10, 1, "openai", "gpt-4", 1000, 500, 0.05, "req-123", 200, 150, time.Now())
+		AddRow(1, 10, 1, "openai", "gpt-4", 1000, 500, 1500, 0.05, "req-123", 200, 150, time.Now())
 
 	mock.ExpectQuery(`SELECT aul\.id, aul\.user_id`).
 		WithArgs(startDate, endDate, 20, 0).

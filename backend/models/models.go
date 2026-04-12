@@ -211,6 +211,8 @@ type MerchantSettlement struct {
 	PeriodStart         time.Time  `json:"period_start"`
 	PeriodEnd           time.Time  `json:"period_end"`
 	TotalSales          float64    `json:"total_sales"`
+	TotalSalesCNY       float64    `json:"total_sales_cny"`
+	TotalTokens         int64      `json:"total_tokens"`
 	PlatformFee         float64    `json:"platform_fee"`
 	SettlementAmount    float64    `json:"settlement_amount"`
 	Status              string     `json:"status"` // pending, processing, completed

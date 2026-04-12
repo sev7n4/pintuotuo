@@ -25,6 +25,8 @@ type SettlementService struct {
 type SettlementData struct {
 	MerchantID       int
 	TotalSales       float64
+	TotalSalesCNY    float64
+	TotalTokens      int64
 	TotalOrders      int
 	PlatformFee      float64
 	SettlementAmount float64
@@ -92,7 +94,7 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 		SELECT 
 			mak.merchant_id,
 			COUNT(aul.id) as total_requests,
-			SUM(aul.input_tokens + aul.output_tokens) as total_tokens,
+			COALESCE(SUM(aul.token_usage), SUM(aul.input_tokens + aul.output_tokens)) as total_tokens,
 			SUM(aul.cost) as total_cost
 		FROM api_usage_logs aul
 		JOIN merchant_api_keys mak ON mak.id = aul.key_id
@@ -129,7 +131,12 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 			continue
 		}
 
-		settlement, err := s.createSettlementWithItems(data.MerchantID, periodStart, periodEnd, data.TotalSales, platformFeeRate)
+		if totalTokens.Valid {
+			data.TotalTokens = totalTokens.Int64
+		}
+		data.TotalSalesCNY = data.TotalSales
+
+		settlement, err := s.createSettlementWithItems(data.MerchantID, periodStart, periodEnd, data.TotalSales, data.TotalSalesCNY, data.TotalTokens, platformFeeRate)
 		if err != nil {
 			logger.LogError(ctx, "settlement_service", "Failed to create settlement", err, map[string]interface{}{
 				"merchant_id": data.MerchantID,
@@ -143,9 +150,10 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 			"settlement_id":     settlement.ID,
 			"merchant_id":       data.MerchantID,
 			"total_sales":       data.TotalSales,
+			"total_sales_cny":   data.TotalSalesCNY,
+			"total_tokens":      data.TotalTokens,
 			"settlement_amount": settlement.SettlementAmount,
 			"total_requests":    data.TotalOrders,
-			"total_tokens":      totalTokens,
 		})
 	}
 
@@ -180,7 +188,7 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 	query := `
 		SELECT 
 			COUNT(aul.id) as total_requests,
-			SUM(aul.input_tokens + aul.output_tokens) as total_tokens,
+			COALESCE(SUM(aul.token_usage), SUM(aul.input_tokens + aul.output_tokens)) as total_tokens,
 			SUM(aul.cost) as total_cost
 		FROM api_usage_logs aul
 		JOIN merchant_api_keys mak ON mak.id = aul.key_id
@@ -216,7 +224,7 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 	}
 
 	platformFeeRate := 0.05
-	settlement, err := s.createSettlementWithItems(merchantID, periodStart, periodEnd, actualTotalCost, platformFeeRate)
+	settlement, err := s.createSettlementWithItems(merchantID, periodStart, periodEnd, actualTotalCost, actualTotalCost, actualTotalTokens, platformFeeRate)
 	if err != nil {
 		return nil, err
 	}
@@ -225,15 +233,16 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 		"settlement_id":     settlement.ID,
 		"merchant_id":       merchantID,
 		"total_sales":       actualTotalCost,
+		"total_sales_cny":   actualTotalCost,
+		"total_tokens":      actualTotalTokens,
 		"settlement_amount": settlement.SettlementAmount,
 		"total_requests":    totalRequests,
-		"total_tokens":      actualTotalTokens,
 	})
 
 	return settlement, nil
 }
 
-func (s *SettlementService) createSettlementWithItems(merchantID int, periodStart, periodEnd time.Time, totalSales float64, platformFeeRate float64) (*models.MerchantSettlement, error) {
+func (s *SettlementService) createSettlementWithItems(merchantID int, periodStart, periodEnd time.Time, totalSales float64, totalSalesCNY float64, totalTokens int64, platformFeeRate float64) (*models.MerchantSettlement, error) {
 	ctx := context.Background()
 
 	tx, err := s.db.Begin()
@@ -262,10 +271,10 @@ func (s *SettlementService) createSettlementWithItems(merchantID int, periodStar
 	var settlementID int
 	err = tx.QueryRow(
 		`INSERT INTO merchant_settlements 
-		 (merchant_id, period_start, period_end, total_sales, platform_fee, settlement_amount, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 (merchant_id, period_start, period_end, total_sales, total_sales_cny, total_tokens, platform_fee, settlement_amount, status)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 RETURNING id`,
-		merchantID, periodStart, periodEnd, totalSales, platformFee, settlementAmount, "pending",
+		merchantID, periodStart, periodEnd, totalSales, totalSalesCNY, totalTokens, platformFee, settlementAmount, "pending",
 	).Scan(&settlementID)
 
 	if err != nil {
@@ -298,14 +307,18 @@ func (s *SettlementService) createSettlementWithItems(merchantID int, periodStar
 		PeriodStart:      periodStart,
 		PeriodEnd:        periodEnd,
 		TotalSales:       totalSales,
+		TotalSalesCNY:    totalSalesCNY,
+		TotalTokens:      totalTokens,
 		PlatformFee:      platformFee,
 		SettlementAmount: settlementAmount,
 		Status:           "pending",
 	}
 
 	logger.LogInfo(ctx, "settlement_service", "Settlement with items created", map[string]interface{}{
-		"settlement_id": settlementID,
-		"merchant_id":   merchantID,
+		"settlement_id":   settlementID,
+		"merchant_id":     merchantID,
+		"total_sales_cny": totalSalesCNY,
+		"total_tokens":    totalTokens,
 	})
 
 	return settlement, nil
@@ -319,6 +332,7 @@ type BillingRecord struct {
 	Model        string    `json:"model"`
 	InputTokens  int       `json:"input_tokens"`
 	OutputTokens int       `json:"output_tokens"`
+	TokenUsage   int64     `json:"token_usage"`
 	Cost         float64   `json:"cost"`
 	RequestID    string    `json:"request_id"`
 	StatusCode   int       `json:"status_code"`
@@ -340,6 +354,7 @@ func (s *SettlementService) GetBillingRecords(merchantID int, startDate, endDate
 			aul.model,
 			aul.input_tokens,
 			aul.output_tokens,
+			COALESCE(aul.token_usage, aul.input_tokens + aul.output_tokens) as token_usage,
 			aul.cost,
 			aul.request_id,
 			aul.status_code,
@@ -374,7 +389,7 @@ func (s *SettlementService) GetBillingRecords(merchantID int, startDate, endDate
 		var r BillingRecord
 		err := rows.Scan(
 			&r.ID, &r.UserID, &r.MerchantID, &r.Provider, &r.Model,
-			&r.InputTokens, &r.OutputTokens, &r.Cost, &r.RequestID,
+			&r.InputTokens, &r.OutputTokens, &r.TokenUsage, &r.Cost, &r.RequestID,
 			&r.StatusCode, &r.LatencyMs, &r.CreatedAt,
 		)
 		if err != nil {
