@@ -309,7 +309,6 @@ const Consumption: React.FC = () => {
             <Statistic
               title="合计扣减（Token）"
               value={stats?.total_cost || 0}
-              precision={4}
               suffix="Token"
               valueStyle={{ color: '#f5222d', fontSize: isMobile ? 18 : 24 }}
             />

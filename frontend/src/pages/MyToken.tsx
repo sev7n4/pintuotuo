@@ -382,7 +382,6 @@ const MyToken = () => {
             <Statistic
               title="当前余额"
               value={balance?.balance || 0}
-              precision={2}
               prefix={<WalletOutlined />}
               suffix="Token"
               valueStyle={{ color: '#1890ff' }}
@@ -394,7 +393,6 @@ const MyToken = () => {
             <Statistic
               title="累计使用"
               value={balance?.total_used || 0}
-              precision={2}
               prefix={<HistoryOutlined />}
               suffix="Token"
               valueStyle={{ color: '#faad14' }}
@@ -406,7 +404,6 @@ const MyToken = () => {
             <Statistic
               title="累计获得"
               value={balance?.total_earned || 0}
-              precision={2}
               prefix={<WalletOutlined />}
               suffix="Token"
               valueStyle={{ color: '#52c41a' }}
@@ -521,6 +518,13 @@ const MyToken = () => {
               loading={usageGuideLoading}
               style={{ marginBottom: 16 }}
             >
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message="Token 计费说明"
+                description="调用 API 时，系统将直接扣除模型 Token 数量（input_tokens + output_tokens），无需按费率换算。请确保账户余额充足。"
+              />
               {usageGuide && (usageGuide.items?.length ?? 0) > 0 ? (
                 <>
                   <Paragraph type="secondary" style={{ marginBottom: 8 }}>
