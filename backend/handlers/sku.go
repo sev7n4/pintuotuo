@@ -1583,7 +1583,7 @@ func PatchModelProvider(c *gin.Context) {
 			billing_type = COALESCE($4, billing_type),
 			status = COALESCE($5, status),
 			sort_order = COALESCE($6, sort_order),
-			compat_prefixes = CASE WHEN $7::boolean THEN COALESCE($8, '{}') ELSE compat_prefixes END,
+			compat_prefixes = CASE WHEN $7::boolean THEN COALESCE($8, '{}'::text[]) ELSE compat_prefixes END,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = $9
 		RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), compat_prefixes, status, sort_order, created_at, updated_at`,
