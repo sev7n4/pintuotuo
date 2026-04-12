@@ -168,12 +168,12 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	if tokenBalance < float64(estimatedUsage) {
 		logger.LogWarn(c.Request.Context(), "api_proxy", "Insufficient balance for pre-deduction", map[string]interface{}{
-			"user_id":          userIDInt,
-			"balance":          tokenBalance,
-			"estimated_usage":  estimatedUsage,
-			"input_estimate":   inputTokensEstimate,
-			"multiplier":       preDeductConfig.Multiplier,
-			"request_id":       requestID,
+			"user_id":         userIDInt,
+			"balance":         tokenBalance,
+			"estimated_usage": estimatedUsage,
+			"input_estimate":  inputTokensEstimate,
+			"multiplier":      preDeductConfig.Multiplier,
+			"request_id":      requestID,
 		})
 		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
 		return
@@ -406,9 +406,9 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		settleErr := billingEngine.SettlePreDeduct(userIDInt, requestID, tokenUsage)
 		if settleErr != nil {
 			logger.LogError(context.Background(), "api_proxy", "Settle pre-deduct failed", settleErr, map[string]interface{}{
-				"user_id":      userIDInt,
-				"token_usage":  tokenUsage,
-				"request_id":   requestID,
+				"user_id":     userIDInt,
+				"token_usage": tokenUsage,
+				"request_id":  requestID,
 			})
 		}
 	} else {
@@ -433,12 +433,12 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			if err != nil {
 				tx.Rollback()
 				logger.LogError(context.Background(), "api_proxy", "Transaction rollback", err, map[string]interface{}{
-					"user_id":    userIDInt,
-					"provider":   req.Provider,
-					"model":      req.Model,
-					"cost":       cost,
+					"user_id":     userIDInt,
+					"provider":    req.Provider,
+					"model":       req.Model,
+					"cost":        cost,
 					"token_usage": tokenUsage,
-					"request_id": requestID,
+					"request_id":  requestID,
 				})
 			} else {
 				tx.Commit()

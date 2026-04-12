@@ -28,11 +28,11 @@ type PreDeductConfig struct {
 }
 
 type BillingEngine struct {
-	pricingCache  map[string]PricingTier
-	cacheMutex    sync.RWMutex
-	db            *sql.DB
-	configCache   map[string]*PreDeductConfig
-	configMutex   sync.RWMutex
+	pricingCache map[string]PricingTier
+	cacheMutex   sync.RWMutex
+	db           *sql.DB
+	configCache  map[string]*PreDeductConfig
+	configMutex  sync.RWMutex
 }
 
 var (
