@@ -23,13 +23,14 @@ type SettlementService struct {
 }
 
 type SettlementData struct {
-	MerchantID       int
-	TotalSales       float64
-	TotalSalesCNY    float64
-	TotalTokens      int64
-	TotalOrders      int
-	PlatformFee      float64
-	SettlementAmount float64
+	MerchantID          int
+	TotalSales          float64
+	TotalSalesCNY       float64
+	TotalTokens         int64
+	TotalProcurementCNY float64
+	TotalOrders         int
+	PlatformFee         float64
+	SettlementAmount    float64
 }
 
 type DisputeData struct {
@@ -95,7 +96,8 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 			mak.merchant_id,
 			COUNT(aul.id) as total_requests,
 			COALESCE(SUM(aul.token_usage), SUM(aul.input_tokens + aul.output_tokens)) as total_tokens,
-			SUM(aul.cost) as total_cost
+			SUM(aul.cost) as total_cost,
+			COALESCE(SUM(aul.procurement_cost_cny), 0) as total_procurement_cny
 		FROM api_usage_logs aul
 		JOIN merchant_api_keys mak ON mak.id = aul.key_id
 		JOIN merchants m ON m.id = mak.merchant_id
@@ -125,7 +127,7 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 	for rows.Next() {
 		var data SettlementData
 		var totalTokens sql.NullInt64
-		err := rows.Scan(&data.MerchantID, &data.TotalOrders, &totalTokens, &data.TotalSales)
+		err := rows.Scan(&data.MerchantID, &data.TotalOrders, &totalTokens, &data.TotalSales, &data.TotalProcurementCNY)
 		if err != nil {
 			logger.LogError(ctx, "settlement_service", "Failed to scan merchant data", err, nil)
 			continue
@@ -136,7 +138,7 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 		}
 		data.TotalSalesCNY = data.TotalSales
 
-		settlement, err := s.createSettlementWithItems(data.MerchantID, periodStart, periodEnd, data.TotalSales, data.TotalSalesCNY, data.TotalTokens, platformFeeRate)
+		settlement, err := s.createSettlementWithItems(data.MerchantID, periodStart, periodEnd, data.TotalSales, data.TotalSalesCNY, data.TotalTokens, data.TotalProcurementCNY, platformFeeRate)
 		if err != nil {
 			logger.LogError(ctx, "settlement_service", "Failed to create settlement", err, map[string]interface{}{
 				"merchant_id": data.MerchantID,
@@ -189,7 +191,8 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 		SELECT 
 			COUNT(aul.id) as total_requests,
 			COALESCE(SUM(aul.token_usage), SUM(aul.input_tokens + aul.output_tokens)) as total_tokens,
-			SUM(aul.cost) as total_cost
+			SUM(aul.cost) as total_cost,
+			COALESCE(SUM(aul.procurement_cost_cny), 0) as total_procurement_cny
 		FROM api_usage_logs aul
 		JOIN merchant_api_keys mak ON mak.id = aul.key_id
 		WHERE mak.merchant_id = $1
@@ -201,7 +204,8 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 	var totalRequests int
 	var totalTokens sql.NullInt64
 	var totalCost sql.NullFloat64
-	err := s.db.QueryRow(query, merchantID, periodStart, periodEnd).Scan(&totalRequests, &totalTokens, &totalCost)
+	var totalProcurement float64
+	err := s.db.QueryRow(query, merchantID, periodStart, periodEnd).Scan(&totalRequests, &totalTokens, &totalCost, &totalProcurement)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("no billing data found for merchant %d in the specified period", merchantID)
@@ -224,7 +228,7 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 	}
 
 	platformFeeRate := 0.05
-	settlement, err := s.createSettlementWithItems(merchantID, periodStart, periodEnd, actualTotalCost, actualTotalCost, actualTotalTokens, platformFeeRate)
+	settlement, err := s.createSettlementWithItems(merchantID, periodStart, periodEnd, actualTotalCost, actualTotalCost, actualTotalTokens, totalProcurement, platformFeeRate)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +246,7 @@ func (s *SettlementService) GenerateSettlementForMerchant(merchantID int, period
 	return settlement, nil
 }
 
-func (s *SettlementService) createSettlementWithItems(merchantID int, periodStart, periodEnd time.Time, totalSales float64, totalSalesCNY float64, totalTokens int64, platformFeeRate float64) (*models.MerchantSettlement, error) {
+func (s *SettlementService) createSettlementWithItems(merchantID int, periodStart, periodEnd time.Time, totalSales float64, totalSalesCNY float64, totalTokens int64, totalProcurementCNY float64, platformFeeRate float64) (*models.MerchantSettlement, error) {
 	ctx := context.Background()
 
 	tx, err := s.db.Begin()
@@ -271,10 +275,10 @@ func (s *SettlementService) createSettlementWithItems(merchantID int, periodStar
 	var settlementID int
 	err = tx.QueryRow(
 		`INSERT INTO merchant_settlements 
-		 (merchant_id, period_start, period_end, total_sales, total_sales_cny, total_tokens, platform_fee, settlement_amount, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 (merchant_id, period_start, period_end, total_sales, total_sales_cny, total_tokens, total_procurement_cny, platform_fee, settlement_amount, status)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		 RETURNING id`,
-		merchantID, periodStart, periodEnd, totalSales, totalSalesCNY, totalTokens, platformFee, settlementAmount, "pending",
+		merchantID, periodStart, periodEnd, totalSales, totalSalesCNY, totalTokens, totalProcurementCNY, platformFee, settlementAmount, "pending",
 	).Scan(&settlementID)
 
 	if err != nil {
@@ -301,17 +305,23 @@ func (s *SettlementService) createSettlementWithItems(merchantID int, periodStar
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	var procPtr *float64
+	if totalProcurementCNY != 0 {
+		p := totalProcurementCNY
+		procPtr = &p
+	}
 	settlement := &models.MerchantSettlement{
-		ID:               settlementID,
-		MerchantID:       merchantID,
-		PeriodStart:      periodStart,
-		PeriodEnd:        periodEnd,
-		TotalSales:       totalSales,
-		TotalSalesCNY:    totalSalesCNY,
-		TotalTokens:      totalTokens,
-		PlatformFee:      platformFee,
-		SettlementAmount: settlementAmount,
-		Status:           "pending",
+		ID:                  settlementID,
+		MerchantID:          merchantID,
+		PeriodStart:         periodStart,
+		PeriodEnd:           periodEnd,
+		TotalSales:          totalSales,
+		TotalSalesCNY:       totalSalesCNY,
+		TotalTokens:         totalTokens,
+		TotalProcurementCNY: procPtr,
+		PlatformFee:         platformFee,
+		SettlementAmount:    settlementAmount,
+		Status:              "pending",
 	}
 
 	logger.LogInfo(ctx, "settlement_service", "Settlement with items created", map[string]interface{}{

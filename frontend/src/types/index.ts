@@ -316,6 +316,8 @@ export interface MerchantSettlement {
   total_sales: number;
   total_sales_cny: number;
   total_tokens: number;
+  /** 周期内采购成本合计（人民币元），来自 api_usage_logs.procurement_cost_cny */
+  total_procurement_cny?: number;
   platform_fee: number;
   settlement_amount: number;
   status: 'pending' | 'processing' | 'completed';

@@ -15,8 +15,8 @@ func TestSettlementService_BoundaryConditions(t *testing.T) {
 		defer db.Close()
 
 		mock.ExpectQuery("SELECT COUNT").
-			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost"}).
-				AddRow(0, nil, nil))
+			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+				AddRow(0, nil, nil, 0))
 
 		service := &SettlementService{db: db}
 		periodStart := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
@@ -75,8 +75,8 @@ func TestSettlementService_BoundaryConditions(t *testing.T) {
 		defer db.Close()
 
 		mock.ExpectQuery("SELECT COUNT").
-			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost"}).
-				AddRow(100, 10000, 50.0))
+			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+				AddRow(100, 10000, 50.0, 0))
 
 		mock.ExpectBegin()
 		mock.ExpectQuery("SELECT id FROM merchant_settlements").
@@ -113,8 +113,8 @@ func TestSettlementService_BoundaryConditions(t *testing.T) {
 		defer db.Close()
 
 		mock.ExpectQuery("SELECT COUNT").
-			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost"}).
-				AddRow(1000000, 1000000000, 999999999.99))
+			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+				AddRow(1000000, 1000000000, 999999999.99, 0))
 
 		mock.ExpectBegin()
 		mock.ExpectQuery("SELECT id FROM merchant_settlements").
@@ -141,8 +141,8 @@ func TestSettlementService_BoundaryConditions(t *testing.T) {
 		defer db.Close()
 
 		mock.ExpectQuery("SELECT COUNT").
-			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost"}).
-				AddRow(1, 1, 0.0001))
+			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+				AddRow(1, 1, 0.0001, 0))
 
 		mock.ExpectBegin()
 		mock.ExpectQuery("SELECT id FROM merchant_settlements").

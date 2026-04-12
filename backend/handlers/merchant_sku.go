@@ -4,10 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
@@ -17,6 +20,27 @@ import (
 
 const merchantSKUStatusInactive = "inactive"
 const defaultMerchantProfitMargin = 20.0
+
+func merchantSKUKeyConflictAppErr(cause error) *apperrors.AppError {
+	return apperrors.NewAppError(
+		"MERCHANT_SKU_KEY_CONFLICT",
+		"该 API Key 已绑定另一在售 SKU，请更换 Key 或先下架已占用该 Key 的商品",
+		http.StatusConflict,
+		cause,
+	)
+}
+
+// hasOtherActiveMerchantSKUForAPIKey 在「将存在一条 active 且绑定该 Key 的 merchant_sku」为真时返回 true。excludeMerchantSKUID=0 表示不排除（用于新建）。
+func hasOtherActiveMerchantSKUForAPIKey(db *sql.DB, apiKeyID int, excludeMerchantSKUID int) (bool, error) {
+	var exists bool
+	err := db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM merchant_skus
+			WHERE api_key_id = $1 AND status = 'active'
+			  AND ($2 = 0 OR id <> $2)
+		)`, apiKeyID, excludeMerchantSKUID).Scan(&exists)
+	return exists, err
+}
 
 func resolveSKUDefaultCostBySKUID(db *sql.DB, skuID int) (float64, float64, error) {
 	var inputRate, outputRate float64
@@ -140,7 +164,7 @@ func ListMerchantSKUs(c *gin.Context) {
 		return
 	}
 
-	status := c.DefaultQuery("status", "active")
+	status := c.DefaultQuery("status", merchantStatusActive)
 
 	ctx := context.Background()
 	cacheKey := cache.MerchantSKUsKey(merchantID, status)
@@ -411,6 +435,18 @@ func CreateMerchantSKU(c *gin.Context) {
 			middleware.RespondWithError(c, appErr)
 			return
 		}
+		if req.APIKeyID != nil && *req.APIKeyID > 0 {
+			var dup bool
+			dup, err = hasOtherActiveMerchantSKUForAPIKey(db, *req.APIKeyID, existingID)
+			if err != nil {
+				middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+				return
+			}
+			if dup {
+				middleware.RespondWithError(c, merchantSKUKeyConflictAppErr(nil))
+				return
+			}
+		}
 		var reactivated models.MerchantSKUDetail
 		err = db.QueryRow(
 			`UPDATE merchant_skus SET status = $1, api_key_id = $2, cost_input_rate = $3, cost_output_rate = $4,
@@ -421,6 +457,11 @@ func CreateMerchantSKU(c *gin.Context) {
 		).Scan(&reactivated.ID, &reactivated.MerchantID, &reactivated.SKUID, &reactivated.APIKeyID, &reactivated.Status,
 			&reactivated.SalesCount, &reactivated.TotalSalesAmount, &reactivated.CreatedAt, &reactivated.UpdatedAt)
 		if err != nil {
+			var pqErr *pq.Error
+			if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+				middleware.RespondWithError(c, merchantSKUKeyConflictAppErr(err))
+				return
+			}
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
@@ -462,6 +503,16 @@ func CreateMerchantSKU(c *gin.Context) {
 			))
 			return
 		}
+		var dup bool
+		dup, err = hasOtherActiveMerchantSKUForAPIKey(db, *req.APIKeyID, 0)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		if dup {
+			middleware.RespondWithError(c, merchantSKUKeyConflictAppErr(nil))
+			return
+		}
 	}
 
 	spuInputRate, spuOutputRate, err := resolveSKUDefaultCostBySKUID(db, req.SKUID)
@@ -478,12 +529,17 @@ func CreateMerchantSKU(c *gin.Context) {
 	var merchantSKU models.MerchantSKUDetail
 	err = db.QueryRow(
 		`INSERT INTO merchant_skus (merchant_id, sku_id, api_key_id, status, cost_input_rate, cost_output_rate, profit_margin, custom_pricing_enabled) 
-		 VALUES ($1, $2, $3, 'active', $4, $5, $6, $7) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
 		 RETURNING id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
-		merchantID, req.SKUID, req.APIKeyID, costInputRate, costOutputRate, profitMargin, customPricing,
+		merchantID, req.SKUID, req.APIKeyID, merchantStatusActive, costInputRate, costOutputRate, profitMargin, customPricing,
 	).Scan(&merchantSKU.ID, &merchantSKU.MerchantID, &merchantSKU.SKUID, &merchantSKU.APIKeyID, &merchantSKU.Status, &merchantSKU.SalesCount, &merchantSKU.TotalSalesAmount, &merchantSKU.CreatedAt, &merchantSKU.UpdatedAt)
 
 	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			middleware.RespondWithError(c, merchantSKUKeyConflictAppErr(err))
+			return
+		}
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MERCHANT_SKU_CREATE_FAILED",
 			"创建商户SKU失败",
@@ -585,11 +641,14 @@ func UpdateMerchantSKU(c *gin.Context) {
 
 	var currentInput, currentOutput, currentProfit float64
 	var currentCustom bool
+	var curKey sql.NullInt64
+	var curStatus string
 	err = db.QueryRow(
-		`SELECT COALESCE(cost_input_rate, 0), COALESCE(cost_output_rate, 0), COALESCE(profit_margin, 20), COALESCE(custom_pricing_enabled, false)
+		`SELECT COALESCE(cost_input_rate, 0), COALESCE(cost_output_rate, 0), COALESCE(profit_margin, 20), COALESCE(custom_pricing_enabled, false),
+			api_key_id, status
 		 FROM merchant_skus WHERE id = $1 AND merchant_id = $2`,
 		id, merchantID,
-	).Scan(&currentInput, &currentOutput, &currentProfit, &currentCustom)
+	).Scan(&currentInput, &currentOutput, &currentProfit, &currentCustom, &curKey, &curStatus)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MERCHANT_SKU_NOT_FOUND",
@@ -598,6 +657,30 @@ func UpdateMerchantSKU(c *gin.Context) {
 			err,
 		))
 		return
+	}
+	effKey := curKey
+	if req.APIKeyID != nil {
+		if *req.APIKeyID <= 0 {
+			effKey = sql.NullInt64{}
+		} else {
+			effKey = sql.NullInt64{Int64: int64(*req.APIKeyID), Valid: true}
+		}
+	}
+	effStatus := curStatus
+	if strings.TrimSpace(req.Status) != "" {
+		effStatus = strings.TrimSpace(req.Status)
+	}
+	if effKey.Valid && effKey.Int64 > 0 && effStatus == merchantStatusActive {
+		var dup bool
+		dup, err = hasOtherActiveMerchantSKUForAPIKey(db, int(effKey.Int64), id)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		if dup {
+			middleware.RespondWithError(c, merchantSKUKeyConflictAppErr(nil))
+			return
+		}
 	}
 	newInput, newOutput, newProfit, newCustom, appErr := normalizeMerchantSKUCostUpdate(req, currentInput, currentOutput, currentProfit, currentCustom)
 	if appErr != nil {
@@ -624,6 +707,11 @@ func UpdateMerchantSKU(c *gin.Context) {
 		))
 		return
 	} else if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			middleware.RespondWithError(c, merchantSKUKeyConflictAppErr(err))
+			return
+		}
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}

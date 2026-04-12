@@ -416,6 +416,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	}
 
 	if cost > 0 {
+		logMerchantSKUID, logProcurementCNY := resolveMerchantSKUProcurementForLog(db, req, apiKey.ID, merchantID, inputTokens, outputTokens)
 		tx, err := db.Begin()
 		if err == nil {
 			_, updateErr := tx.Exec(
@@ -425,8 +426,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			err = updateErr
 			if err == nil {
 				_, err = tx.Exec(
-					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, token_usage) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
-					userIDInt, apiKey.ID, requestID, req.Provider, req.Model, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost, tokenUsage,
+					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, token_usage, merchant_sku_id, procurement_cost_cny) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+					userIDInt, apiKey.ID, requestID, req.Provider, req.Model, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost, tokenUsage, nullInt64Arg(logMerchantSKUID), nullFloat64Arg(logProcurementCNY),
 				)
 			}
 
@@ -616,6 +617,54 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 		),
 		apiKey,
 	)
+}
+
+// resolveMerchantSKUProcurementForLog 按 merchant_skus 成本单价计算采购成本；无绑定在售 SKU 时返回空。
+func resolveMerchantSKUProcurementForLog(db *sql.DB, req APIProxyRequest, apiKeyID int, merchantID int, inputTokens, outputTokens int) (sql.NullInt64, sql.NullFloat64) {
+	var msID int
+	var inRate, outRate float64
+	var err error
+	if req.MerchantSKUID != nil && *req.MerchantSKUID > 0 && merchantID > 0 {
+		err = db.QueryRow(
+			`SELECT ms.id, ms.cost_input_rate, ms.cost_output_rate
+			 FROM merchant_skus ms
+			 WHERE ms.id = $1 AND ms.api_key_id = $2 AND ms.merchant_id = $3 AND ms.status = 'active'`,
+			*req.MerchantSKUID, apiKeyID, merchantID,
+		).Scan(&msID, &inRate, &outRate)
+	} else {
+		err = db.QueryRow(
+			`SELECT ms.id, ms.cost_input_rate, ms.cost_output_rate
+			 FROM merchant_skus ms
+			 WHERE ms.api_key_id = $1 AND ms.status = 'active'
+			 LIMIT 1`,
+			apiKeyID,
+		).Scan(&msID, &inRate, &outRate)
+	}
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return sql.NullInt64{}, sql.NullFloat64{}
+		}
+		logger.LogWarn(context.Background(), "api_proxy", "resolve procurement merchant_sku failed", map[string]interface{}{
+			"error": err.Error(), "api_key_id": apiKeyID, "merchant_id": merchantID,
+		})
+		return sql.NullInt64{}, sql.NullFloat64{}
+	}
+	proc := services.ProcurementCostCNY(inRate, outRate, inputTokens, outputTokens)
+	return sql.NullInt64{Int64: int64(msID), Valid: true}, sql.NullFloat64{Float64: proc, Valid: true}
+}
+
+func nullInt64Arg(n sql.NullInt64) interface{} {
+	if n.Valid {
+		return n.Int64
+	}
+	return nil
+}
+
+func nullFloat64Arg(n sql.NullFloat64) interface{} {
+	if n.Valid {
+		return n.Float64
+	}
+	return nil
 }
 
 func resolveMerchantIDByUser(db *sql.DB, userID int) (int, error) {

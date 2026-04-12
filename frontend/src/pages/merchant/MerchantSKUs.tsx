@@ -178,6 +178,11 @@ const MerchantSKUs = () => {
             window.location.href = '/merchant/settings';
           },
         });
+      } else if (axiosError.response?.data?.code === 'MERCHANT_SKU_KEY_CONFLICT') {
+        message.error(
+          axiosError.response?.data?.message ||
+            '该 API Key 已绑定其他在售商品，请更换 Key 或先下架占用该 Key 的商品'
+        );
       } else {
         message.error(axiosError.response?.data?.message || '上架失败');
       }
@@ -192,8 +197,16 @@ const MerchantSKUs = () => {
       await merchantSkuService.updateMerchantSKU(id, { status: newStatus });
       message.success(newStatus === 'active' ? 'SKU已上架' : 'SKU已下架');
       fetchMerchantSKUs();
-    } catch {
-      message.error('操作失败');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string; code?: string } } };
+      if (axiosError.response?.data?.code === 'MERCHANT_SKU_KEY_CONFLICT') {
+        message.error(
+          axiosError.response?.data?.message ||
+            '该 API Key 已绑定其他在售商品，请更换 Key 或先下架占用该 Key 的商品'
+        );
+      } else {
+        message.error('操作失败');
+      }
     }
   };
 
@@ -212,8 +225,16 @@ const MerchantSKUs = () => {
       await merchantSkuService.updateMerchantSKU(id, { api_key_id: apiKeyId });
       message.success('API Key已更新');
       fetchMerchantSKUs();
-    } catch {
-      message.error('更新失败');
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string; code?: string } } };
+      if (axiosError.response?.data?.code === 'MERCHANT_SKU_KEY_CONFLICT') {
+        message.error(
+          axiosError.response?.data?.message ||
+            '该 API Key 已绑定其他在售商品，请更换 Key 或先下架占用该 Key 的商品'
+        );
+      } else {
+        message.error('更新失败');
+      }
     }
   };
 
