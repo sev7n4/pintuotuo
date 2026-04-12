@@ -164,7 +164,7 @@ func ListMerchantSKUs(c *gin.Context) {
 		return
 	}
 
-	status := c.DefaultQuery("status", "active")
+	status := c.DefaultQuery("status", merchantStatusActive)
 
 	ctx := context.Background()
 	cacheKey := cache.MerchantSKUsKey(merchantID, status)
@@ -529,9 +529,9 @@ func CreateMerchantSKU(c *gin.Context) {
 	var merchantSKU models.MerchantSKUDetail
 	err = db.QueryRow(
 		`INSERT INTO merchant_skus (merchant_id, sku_id, api_key_id, status, cost_input_rate, cost_output_rate, profit_margin, custom_pricing_enabled) 
-		 VALUES ($1, $2, $3, 'active', $4, $5, $6, $7) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
 		 RETURNING id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
-		merchantID, req.SKUID, req.APIKeyID, costInputRate, costOutputRate, profitMargin, customPricing,
+		merchantID, req.SKUID, req.APIKeyID, merchantStatusActive, costInputRate, costOutputRate, profitMargin, customPricing,
 	).Scan(&merchantSKU.ID, &merchantSKU.MerchantID, &merchantSKU.SKUID, &merchantSKU.APIKeyID, &merchantSKU.Status, &merchantSKU.SalesCount, &merchantSKU.TotalSalesAmount, &merchantSKU.CreatedAt, &merchantSKU.UpdatedAt)
 
 	if err != nil {
@@ -670,7 +670,7 @@ func UpdateMerchantSKU(c *gin.Context) {
 	if strings.TrimSpace(req.Status) != "" {
 		effStatus = strings.TrimSpace(req.Status)
 	}
-	if effKey.Valid && effKey.Int64 > 0 && effStatus == "active" {
+	if effKey.Valid && effKey.Int64 > 0 && effStatus == merchantStatusActive {
 		var dup bool
 		dup, err = hasOtherActiveMerchantSKUForAPIKey(db, int(effKey.Int64), id)
 		if err != nil {
