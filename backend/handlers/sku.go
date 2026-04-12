@@ -1550,7 +1550,7 @@ func PatchModelProvider(c *gin.Context) {
 	}
 
 	compatSet := false
-	var compatArg interface{}
+	compatArg := pq.Array([]string{})
 	if req.CompatPrefixes != nil {
 		normalized, nErr := services.NormalizeCompatPrefixes(*req.CompatPrefixes)
 		if nErr != nil {
