@@ -1598,6 +1598,7 @@ func PatchModelProvider(c *gin.Context) {
 		return
 	}
 	if err != nil {
+		logger.Error("Failed to update model provider: %v", err)
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
