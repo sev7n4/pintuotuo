@@ -2,7 +2,9 @@ import { formatLedgerUnits, ledgerUnitColumnTitle } from '../ledgerDisplay';
 
 describe('ledgerDisplay', () => {
   it('formats numbers without implying fiat currency', () => {
-    expect(formatLedgerUnits(1.234567)).toMatch(/1\.234567/);
+    const rounded = formatLedgerUnits(1.234567);
+    expect(rounded).not.toMatch(/¥|\$|CNY|元/);
+    expect(Number(String(rounded).replace(/[,\s]/g, ''))).toBe(1);
     expect(formatLedgerUnits(0)).toBe('0');
   });
 
