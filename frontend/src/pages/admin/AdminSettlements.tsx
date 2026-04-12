@@ -309,9 +309,11 @@ const AdminSettlements = () => {
     },
     {
       title: '销售总额(¥)',
-      dataIndex: 'total_sales_cny',
       key: 'total_sales_cny',
-      render: (amount: number) => `¥${amount.toFixed(6)}`,
+      render: (_: unknown, record: MerchantSettlement) => {
+        const v = record.total_sales_cny ?? record.total_sales ?? 0;
+        return `¥${Number(v).toFixed(6)}`;
+      },
     },
     {
       title: 'Token使用量',
