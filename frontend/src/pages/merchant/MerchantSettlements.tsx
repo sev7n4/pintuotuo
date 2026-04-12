@@ -194,22 +194,28 @@ const MerchantSettlements = () => {
       ),
     },
     {
-      title: '销售总额',
-      dataIndex: 'total_sales',
-      key: 'total_sales',
-      render: (amount: number) => `¥${amount.toFixed(2)}`,
+      title: '销售总额(¥)',
+      dataIndex: 'total_sales_cny',
+      key: 'total_sales_cny',
+      render: (amount: number) => `¥${amount.toFixed(6)}`,
+    },
+    {
+      title: 'Token使用量',
+      dataIndex: 'total_tokens',
+      key: 'total_tokens',
+      render: (tokens: number) => tokens?.toLocaleString() || '0',
     },
     {
       title: '平台费用',
       dataIndex: 'platform_fee',
       key: 'platform_fee',
-      render: (fee: number) => `¥${fee.toFixed(2)}`,
+      render: (fee: number) => `¥${fee.toFixed(6)}`,
     },
     {
       title: '结算金额',
       dataIndex: 'settlement_amount',
       key: 'settlement_amount',
-      render: (amount: number) => <span className={styles.amount}>¥{amount.toFixed(2)}</span>,
+      render: (amount: number) => <span className={styles.amount}>¥{amount.toFixed(6)}</span>,
     },
     {
       title: '状态',
@@ -392,15 +398,18 @@ const MerchantSettlements = () => {
                 {new Date(selectedSettlement.period_start).toLocaleDateString('zh-CN')} -{' '}
                 {new Date(selectedSettlement.period_end).toLocaleDateString('zh-CN')}
               </Descriptions.Item>
-              <Descriptions.Item label="销售总额">
-                ¥{selectedSettlement.total_sales.toFixed(2)}
+              <Descriptions.Item label="销售总额(¥)">
+                ¥{selectedSettlement.total_sales_cny?.toFixed(6) || selectedSettlement.total_sales?.toFixed(6) || '0.000000'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Token使用量">
+                {selectedSettlement.total_tokens?.toLocaleString() || '0'}
               </Descriptions.Item>
               <Descriptions.Item label="平台费用（5%）">
-                ¥{selectedSettlement.platform_fee.toFixed(2)}
+                ¥{selectedSettlement.platform_fee.toFixed(6)}
               </Descriptions.Item>
               <Descriptions.Item label="结算金额" span={2}>
                 <span className={styles.amount}>
-                  ¥{selectedSettlement.settlement_amount.toFixed(2)}
+                  ¥{selectedSettlement.settlement_amount.toFixed(6)}
                 </span>
               </Descriptions.Item>
               <Descriptions.Item label="商户确认">
