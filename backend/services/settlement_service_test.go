@@ -23,8 +23,8 @@ func TestSettlementService_GenerateMonthlySettlements(t *testing.T) {
 
 		mock.ExpectQuery(`SELECT mak\.merchant_id, COUNT`).
 			WithArgs(periodStart, periodEnd).
-			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost"}).
-				AddRow(merchantID, 100, 50000, 10000.00))
+			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+				AddRow(merchantID, 100, 50000, 10000.00, 0))
 
 		mock.ExpectBegin()
 
@@ -58,8 +58,8 @@ func TestSettlementService_GenerateMonthlySettlements(t *testing.T) {
 
 		mock.ExpectQuery(`SELECT mak\.merchant_id, COUNT`).
 			WithArgs(periodStart, periodEnd).
-			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost"}).
-				AddRow(merchantID, 100, 50000, 10000.00))
+			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+				AddRow(merchantID, 100, 50000, 10000.00, 0))
 
 		mock.ExpectBegin()
 
@@ -90,7 +90,7 @@ func TestSettlementService_GenerateMonthlySettlements_EmptyData(t *testing.T) {
 
 		mock.ExpectQuery(`SELECT mak\.merchant_id, COUNT`).
 			WithArgs(periodStart, periodEnd).
-			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost"}))
+			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost", "total_procurement_cny"}))
 
 		settlements, err := service.GenerateMonthlySettlements(periodStart, periodEnd)
 		assert.NoError(t, err)
@@ -114,8 +114,8 @@ func TestSettlementService_GenerateSettlementForMerchant_EmptyData(t *testing.T)
 
 		mock.ExpectQuery(`SELECT COUNT\(aul\.id\)`).
 			WithArgs(merchantID, periodStart, periodEnd).
-			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost"}).
-				AddRow(0, nil, nil))
+			WillReturnRows(sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+				AddRow(0, nil, nil, 0))
 
 		settlement, err := service.GenerateSettlementForMerchant(merchantID, periodStart, periodEnd)
 		assert.Error(t, err)

@@ -602,7 +602,7 @@ func GetMerchantSettlements(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		`SELECT id, merchant_id, period_start, period_end, total_sales, platform_fee, settlement_amount, status, settled_at, created_at, updated_at 
+		`SELECT id, merchant_id, period_start, period_end, total_sales, platform_fee, settlement_amount, status, settled_at, created_at, updated_at, total_procurement_cny
 		 FROM merchant_settlements WHERE merchant_id = $1 ORDER BY period_end DESC LIMIT 12`,
 		merchantID,
 	)
@@ -617,14 +617,19 @@ func GetMerchantSettlements(c *gin.Context) {
 	for rows.Next() {
 		var s models.MerchantSettlement
 		var settledAt sql.NullTime
+		var proc sql.NullFloat64
 		err := rows.Scan(&s.ID, &s.MerchantID, &s.PeriodStart, &s.PeriodEnd, &s.TotalSales, &s.PlatformFee,
-			&s.SettlementAmount, &s.Status, &settledAt, &s.CreatedAt, &s.UpdatedAt)
+			&s.SettlementAmount, &s.Status, &settledAt, &s.CreatedAt, &s.UpdatedAt, &proc)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 		if settledAt.Valid {
 			s.SettledAt = &settledAt.Time
+		}
+		if proc.Valid {
+			v := proc.Float64
+			s.TotalProcurementCNY = &v
 		}
 		settlements = append(settlements, s)
 	}

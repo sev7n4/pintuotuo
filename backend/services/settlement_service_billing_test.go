@@ -21,8 +21,8 @@ func TestGenerateMonthlySettlements_BillingBased(t *testing.T) {
 	periodStart := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 	periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
 
-	rows := sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost"}).
-		AddRow(1, 100, 50000, 100.50)
+	rows := sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+		AddRow(1, 100, 50000, 100.50, 12.34)
 
 	mock.ExpectQuery(`SELECT mak\.merchant_id, COUNT\(aul\.id\)`).
 		WithArgs(periodStart, periodEnd).
@@ -77,8 +77,8 @@ func TestGenerateSettlementForMerchant(t *testing.T) {
 	periodEnd := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
 	merchantID := 1
 
-	rows := sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost"}).
-		AddRow(100, 50000, 100.50)
+	rows := sqlmock.NewRows([]string{"total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+		AddRow(100, 50000, 100.50, 12.34)
 
 	mock.ExpectQuery(`SELECT COUNT\(aul\.id\)`).
 		WithArgs(merchantID, periodStart, periodEnd).

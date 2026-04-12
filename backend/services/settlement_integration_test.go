@@ -212,8 +212,8 @@ func TestSettlementService_GenerateMonthlySettlements_TransactionProtection(t *t
 
 		mock.ExpectQuery(`SELECT mak\.merchant_id, COUNT`).
 			WithArgs(periodStart, periodEnd).
-			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost"}).
-				AddRow(merchantID, 100, 50000, 10000.00))
+			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+				AddRow(merchantID, 100, 50000, 10000.00, 0))
 
 		mock.ExpectBegin()
 
@@ -243,8 +243,8 @@ func TestSettlementService_GenerateMonthlySettlements_TransactionProtection(t *t
 
 		mock.ExpectQuery(`SELECT mak\.merchant_id, COUNT`).
 			WithArgs(periodStart, periodEnd).
-			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost"}).
-				AddRow(merchantID, 100, 50000, 10000.00))
+			WillReturnRows(sqlmock.NewRows([]string{"merchant_id", "total_requests", "total_tokens", "total_cost", "total_procurement_cny"}).
+				AddRow(merchantID, 100, 50000, 10000.00, 0))
 
 		mock.ExpectBegin()
 
