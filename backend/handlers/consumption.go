@@ -77,7 +77,8 @@ func GetConsumptionRecords(c *gin.Context) {
 	db.QueryRow(countQuery, args...).Scan(&total)
 
 	offset := (page - 1) * pageSize
-	dataQuery := "SELECT id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, COALESCE(token_usage, input_tokens + output_tokens) as token_usage, created_at " + baseQuery + " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(argIndex) + " OFFSET $" + strconv.Itoa(argIndex+1)
+	// C 端不返回 cost（内部/商户记账）；用户可见扣减口径为 输入+输出 tokens
+	dataQuery := "SELECT id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, created_at " + baseQuery + " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(argIndex) + " OFFSET $" + strconv.Itoa(argIndex+1)
 	args = append(args, pageSize, offset)
 
 	rows, err := db.Query(dataQuery, args...)
@@ -90,12 +91,10 @@ func GetConsumptionRecords(c *gin.Context) {
 	records := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var id, statusCode, latencyMs, inputTokens, outputTokens int
-		var tokenUsage int64
 		var requestID, provider, model, method, path string
-		var cost float64
 		var createdAt time.Time
 
-		err := rows.Scan(&id, &requestID, &provider, &model, &method, &path, &statusCode, &latencyMs, &inputTokens, &outputTokens, &cost, &tokenUsage, &createdAt)
+		err := rows.Scan(&id, &requestID, &provider, &model, &method, &path, &statusCode, &latencyMs, &inputTokens, &outputTokens, &createdAt)
 		if err != nil {
 			continue
 		}
@@ -111,8 +110,6 @@ func GetConsumptionRecords(c *gin.Context) {
 			"latency_ms":    latencyMs,
 			"input_tokens":  inputTokens,
 			"output_tokens": outputTokens,
-			"token_usage":   tokenUsage,
-			"cost":          cost,
 			"created_at":    createdAt,
 		})
 	}
@@ -174,17 +171,15 @@ func GetConsumptionStats(c *gin.Context) {
 	}
 
 	var stats struct {
-		TotalRequests int     `json:"total_requests"`
-		TotalTokens   int64   `json:"total_tokens"`
-		TotalCost     float64 `json:"total_cost"`
-		AvgLatencyMs  int     `json:"avg_latency_ms"`
+		TotalRequests       int   `json:"total_requests"`
+		TotalTokenDeduction int64 `json:"total_token_deduction"` // SUM(input+output)，与用户可见「扣减」一致
+		AvgLatencyMs        int   `json:"avg_latency_ms"`
 	}
 
-	// 总 Tokens：优先 token_usage，否则 input+output（与列表行一致）
-	statsQuery := "SELECT COUNT(*), COALESCE(SUM(COALESCE(token_usage, (input_tokens + output_tokens)::bigint)), 0), COALESCE(SUM(cost), 0), COALESCE(AVG(latency_ms), 0) " + baseQuery
-	db.QueryRow(statsQuery, args...).Scan(&stats.TotalRequests, &stats.TotalTokens, &stats.TotalCost, &stats.AvgLatencyMs)
+	statsQuery := "SELECT COUNT(*), COALESCE(SUM((input_tokens::bigint + output_tokens::bigint)), 0), COALESCE(AVG(latency_ms), 0) " + baseQuery
+	db.QueryRow(statsQuery, args...).Scan(&stats.TotalRequests, &stats.TotalTokenDeduction, &stats.AvgLatencyMs)
 
-	providerQuery := "SELECT provider, COUNT(*) as count, SUM(cost) as cost " + baseQuery + " GROUP BY provider ORDER BY cost DESC"
+	providerQuery := "SELECT provider, COUNT(*) as count, COALESCE(SUM((input_tokens::bigint + output_tokens::bigint)), 0) as tokens " + baseQuery + " GROUP BY provider ORDER BY tokens DESC"
 	rows, err := db.Query(providerQuery, args...)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -196,14 +191,14 @@ func GetConsumptionStats(c *gin.Context) {
 	for rows.Next() {
 		var p string
 		var count int
-		var cost float64
-		if err := rows.Scan(&p, &count, &cost); err != nil {
+		var tokens int64
+		if err := rows.Scan(&p, &count, &tokens); err != nil {
 			continue
 		}
 		byProvider = append(byProvider, map[string]interface{}{
 			"provider": p,
 			"count":    count,
-			"cost":     cost,
+			"tokens":   tokens,
 		})
 	}
 
@@ -220,9 +215,45 @@ func GetConsumptionStats(c *gin.Context) {
 		}
 	}
 
+	// C 端「模型对比」气泡图：按 provider + model 聚合，与用户可见扣减口径一致（输入+输出）
+	modelComparison := make([]map[string]interface{}, 0)
+	mcQuery := "SELECT provider, TRIM(COALESCE(model,'')) AS model, COUNT(*)::bigint, " +
+		"COALESCE(SUM((input_tokens::bigint + output_tokens::bigint)), 0), " +
+		"COALESCE(AVG((input_tokens::bigint + output_tokens::bigint))::float8, 0), " +
+		"COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms), 0)::float8, " +
+		"COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms), 0)::float8, " +
+		"COALESCE(SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END)::float8 / NULLIF(COUNT(*), 0), 0) " +
+		baseQuery + " GROUP BY provider, TRIM(COALESCE(model,'')) " +
+		"HAVING TRIM(COALESCE(model,'')) <> '' " +
+		"ORDER BY SUM((input_tokens::bigint + output_tokens::bigint)) DESC NULLS LAST LIMIT 60"
+	mcRows, errMC := db.Query(mcQuery, args...)
+	if errMC == nil && mcRows != nil {
+		defer mcRows.Close()
+		for mcRows.Next() {
+			var prov, m string
+			var reqCount int64
+			var totalDed int64
+			var avgDed, p50, p95, succ float64
+			if err := mcRows.Scan(&prov, &m, &reqCount, &totalDed, &avgDed, &p50, &p95, &succ); err != nil {
+				continue
+			}
+			modelComparison = append(modelComparison, map[string]interface{}{
+				"provider":              prov,
+				"model":                 m,
+				"request_count":         reqCount,
+				"total_token_deduction": totalDed,
+				"avg_token_deduction":   avgDed,
+				"latency_p50_ms":        p50,
+				"latency_p95_ms":        p95,
+				"success_rate":          succ,
+			})
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"stats":          stats,
-		"by_provider":    byProvider,
-		"models_in_range": distinctModels,
+		"stats":            stats,
+		"by_provider":      byProvider,
+		"models_in_range":  distinctModels,
+		"model_comparison": modelComparison,
 	})
 }
