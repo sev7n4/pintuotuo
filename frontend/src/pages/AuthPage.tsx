@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   Form,
   Input,
@@ -46,6 +46,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
   const [accountTab, setAccountTab] = useState<'buyer' | 'merchant'>('buyer');
   const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
   const oauthRedirectHandled = useRef(false);
+
+  /** URL 仍带 oauth=1&token= 时，避免「已登录自动跳转首页」与 OAuth 处理竞态，导致未清 query 就离开 /login */
+  const oauthCallbackPending = useMemo(() => {
+    const p = new URLSearchParams(location.search);
+    return p.get('oauth') === '1' && Boolean(p.get('token'));
+  }, [location.search]);
 
   const loadCapabilities = useCallback(() => {
     fetch('/api/v1/users/auth/capabilities')
@@ -127,6 +133,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
+    if (oauthCallbackPending) return;
     if (user.role === 'admin') {
       navigate('/admin', { replace: true });
     } else if (user.role === 'merchant') {
@@ -134,7 +141,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
     } else {
       navigate('/', { replace: true });
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, oauthCallbackPending]);
 
   const cardTitle =
     authTab === 'login' ? '拼脱脱 - 登录' : '拼脱脱 - 注册';
