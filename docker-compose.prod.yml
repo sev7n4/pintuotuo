@@ -7,6 +7,9 @@ services:
       dockerfile: Dockerfile
     container_name: pintuotuo-backend
     restart: unless-stopped
+    # 便于容器访问宿主机上的 HTTP(S) 代理（如 Clash），配合 HTTPS_PROXY= http://host.docker.internal:7890
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     environment:
@@ -45,6 +48,10 @@ services:
       - WECHAT_OPEN_APP_SECRET=${WECHAT_OPEN_APP_SECRET:-}
       - WECHAT_OAUTH_REDIRECT_URI=${WECHAT_OAUTH_REDIRECT_URI:-}
       - AUTH_ACCOUNT_LINKING=${AUTH_ACCOUNT_LINKING:-}
+      # 出口代理：大陆访问 github.com/login/oauth/access_token 常需代理（勿把 DB/redis 走代理）
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+      - NO_PROXY=${NO_PROXY:-localhost,127.0.0.1,postgres,redis,backend,frontend,pintuotuo-postgres,pintuotuo-redis}
     depends_on:
       postgres:
         condition: service_healthy
