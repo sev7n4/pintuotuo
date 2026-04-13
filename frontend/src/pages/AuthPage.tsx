@@ -32,6 +32,13 @@ type AuthCapabilities = {
   account_linking: boolean;
 };
 
+const defaultAuthCapabilities: AuthCapabilities = {
+  sms: false,
+  wechat_oauth: false,
+  github_oauth: false,
+  account_linking: false,
+};
+
 /**
  * 登录与注册合一页：注册成功后由 authStore 写入 token，即「注册即登录」。
  * /login、/register 仍保留，便于书签与 E2E。
@@ -51,9 +58,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
     fetch('/api/v1/users/auth/capabilities')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data && typeof data.sms === 'boolean') setCapabilities(data);
+        if (data && typeof data.sms === 'boolean') {
+          setCapabilities(data);
+        } else {
+          setCapabilities(defaultAuthCapabilities);
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        setCapabilities(defaultAuthCapabilities);
+      });
   }, []);
 
   useEffect(() => {
@@ -269,14 +282,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
           </>
         )}
 
-        {capabilities?.sms && <AuthPhoneSection />}
+        <AuthPhoneSection
+          smsEnabled={capabilities?.sms === true}
+          capabilitiesLoaded={capabilities !== null}
+        />
 
         <Divider plain>
           <Typography.Text type="secondary">更多方式（需服务端配置）</Typography.Text>
         </Divider>
         <Space direction="vertical" style={{ width: '100%' }} size="small">
           <Typography.Paragraph type="secondary" style={{ marginBottom: 8, fontSize: 12 }}>
-            微信扫码、GitHub 与账号绑定能力由后端开关控制，配置完成后自动启用。手机号验证码见上方（SMS 开启时显示）。
+            微信扫码、GitHub 与账号绑定由后端开关控制。手机号验证码见上方「手机号」区域（未开启时会说明如何配置）。
           </Typography.Paragraph>
           <Space wrap>
             <Button
