@@ -15,6 +15,8 @@ import {
   Spin,
   message,
   Grid,
+  Segmented,
+  Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { EyeOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
@@ -53,7 +55,10 @@ interface ProviderStats {
   cost: number;
 }
 
+const { Paragraph } = Typography;
+
 const Consumption: React.FC = () => {
+  const [viewMode, setViewMode] = useState<'simple' | 'detail'>('simple');
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<ConsumptionRecord[]>([]);
   const [stats, setStats] = useState<ConsumptionStats | null>(null);
@@ -288,6 +293,56 @@ const Consumption: React.FC = () => {
 
   return (
     <div className={styles.container} style={{ padding: isMobile ? 12 : 24 }}>
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          alignItems: 'center',
+        }}
+      >
+        <Segmented
+          value={viewMode}
+          onChange={(v) => setViewMode(v as 'simple' | 'detail')}
+          options={[
+            { label: '简要看板', value: 'simple' },
+            { label: '每次调用明细', value: 'detail' },
+          ]}
+        />
+        <Paragraph type="secondary" style={{ margin: 0, flex: '1 1 200px' }}>
+          简要看板仅展示汇总；明细含模型、延迟等，适合排障与对账。
+        </Paragraph>
+      </div>
+      <Card size="small" style={{ marginBottom: 16 }} title="筛选">
+        <Space size="small" wrap>
+          <RangePicker
+            value={dateRange}
+            onChange={(dates) => dates && setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs])}
+            allowClear={false}
+            size={isMobile ? 'small' : 'middle'}
+          />
+          <Select
+            value={provider}
+            onChange={setProvider}
+            style={{ width: isMobile ? 100 : 120 }}
+            size={isMobile ? 'small' : 'middle'}
+            options={[
+              { value: 'all', label: '全部' },
+              { value: 'openai', label: 'OpenAI' },
+              { value: 'anthropic', label: 'Anthropic' },
+              { value: 'google', label: 'Google' },
+            ]}
+          />
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={fetchConsumptionData}
+            size={isMobile ? 'small' : 'middle'}
+          >
+            刷新
+          </Button>
+        </Space>
+      </Card>
       <Card className={styles.statsCard}>
         <Row gutter={[16, 16]}>
           <Col xs={12} sm={12} md={6}>
@@ -345,36 +400,11 @@ const Consumption: React.FC = () => {
         </Card>
       )}
 
-      <Card
-        className={styles.tableCard}
-        title="消费明细"
-        extra={
-          <Space size="small" wrap>
-            <RangePicker
-              value={dateRange}
-              onChange={(dates) => dates && setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs])}
-              allowClear={false}
-              size={isMobile ? 'small' : 'middle'}
-            />
-            <Select
-              value={provider}
-              onChange={setProvider}
-              style={{ width: isMobile ? 100 : 120 }}
-              size={isMobile ? 'small' : 'middle'}
-              options={[
-                { value: 'all', label: '全部' },
-                { value: 'openai', label: 'OpenAI' },
-                { value: 'anthropic', label: 'Anthropic' },
-                { value: 'google', label: 'Google' },
-              ]}
-            />
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={fetchConsumptionData}
-              size={isMobile ? 'small' : 'middle'}
-            >
-              {!isMobile && '刷新'}
-            </Button>
+      {viewMode === 'detail' && (
+        <Card
+          className={styles.tableCard}
+          title="消费明细"
+          extra={
             <Button
               icon={<DownloadOutlined />}
               onClick={exportData}
@@ -382,26 +412,26 @@ const Consumption: React.FC = () => {
             >
               {!isMobile && '导出'}
             </Button>
-          </Space>
-        }
-      >
-        <Spin spinning={loading}>
-          <Table
-            columns={columns}
-            dataSource={records}
-            rowKey="id"
-            scroll={{ x: 600 }}
-            size={isMobile ? 'small' : 'middle'}
-            pagination={{
-              pageSize: 20,
-              size: isMobile ? 'small' : 'default',
-              showSizeChanger: !isMobile,
-              showQuickJumper: !isMobile,
-              showTotal: isMobile ? undefined : (total) => `共 ${total} 条记录`,
-            }}
-          />
-        </Spin>
-      </Card>
+          }
+        >
+          <Spin spinning={loading}>
+            <Table
+              columns={columns}
+              dataSource={records}
+              rowKey="id"
+              scroll={{ x: 600 }}
+              size={isMobile ? 'small' : 'middle'}
+              pagination={{
+                pageSize: 20,
+                size: isMobile ? 'small' : 'default',
+                showSizeChanger: !isMobile,
+                showQuickJumper: !isMobile,
+                showTotal: isMobile ? undefined : (total) => `共 ${total} 条记录`,
+              }}
+            />
+          </Spin>
+        </Card>
+      )}
 
       <Modal
         title="请求详情"

@@ -60,11 +60,10 @@ describe('Layout Component', () => {
       </MemoryRouter>
     );
 
-    // 主导航仅保留首页
     expect(screen.getByText('首页')).toBeInTheDocument();
-    expect(screen.queryByText('分类')).not.toBeInTheDocument();
-    expect(screen.queryByText('订单')).not.toBeInTheDocument();
-    expect(screen.queryByText('购物车')).not.toBeInTheDocument();
+    expect(screen.getByText('卖场')).toBeInTheDocument();
+    expect(screen.getByText('购物车')).toBeInTheDocument();
+    expect(screen.queryByText('我的订单')).not.toBeInTheDocument();
 
     // 检查登录/注册链接
     expect(screen.getByText('登录')).toBeInTheDocument();
@@ -102,9 +101,9 @@ describe('Layout Component', () => {
       </MemoryRouter>
     );
 
-    // 检查用户信息显示
     expect(screen.getByText('Test User')).toBeInTheDocument();
     expect(screen.getByTestId('user-dropdown')).toBeInTheDocument();
+    expect(screen.getByText('我的订单')).toBeInTheDocument();
   });
 
   test('renders user dropdown when authenticated', () => {

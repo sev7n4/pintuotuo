@@ -113,11 +113,10 @@ test.describe('Registration', () => {
     await registerPage.goto();
   });
 
-  test('should have role selection on register page', async ({ page }) => {
+  test('should have buyer and merchant registration tabs', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    const userText = page.getByText('用户', { exact: true });
-    const merchantText = page.getByText('商家', { exact: true });
-    await expect(userText.or(merchantText)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('tab', { name: /买家注册/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('tab', { name: /商户入驻/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('should register new user and redirect to home', async ({ page }) => {

@@ -24,7 +24,7 @@ type PaymentMethod = 'alipay' | 'wechat';
 const CheckoutPage: React.FC = () => {
   const navigate = useNavigate();
   const { items, clear } = useCartStore();
-  const { createOrder, isLoading } = useOrderStore();
+  const { createOrder, isLoading, fetchOrders } = useOrderStore();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('alipay');
   const [selectedItems, setSelectedItems] = useState<string[]>(items.map((item) => item.id));
 
@@ -63,14 +63,25 @@ const CheckoutPage: React.FC = () => {
 
       clear();
 
-      const firstOrderId = orderIds.find((id) => id !== null);
-      if (firstOrderId) {
-        message.success('订单创建成功，正在跳转到支付页面');
-        navigate(`/payment/${firstOrderId}`);
-      } else {
+      const validIds = orderIds.filter((id): id is number => id !== null && id !== undefined);
+      await fetchOrders();
+
+      if (validIds.length === 0) {
         message.success('订单创建成功');
         navigate('/orders');
+        return;
       }
+
+      if (validIds.length === 1) {
+        message.success('订单创建成功，正在跳转到支付页面');
+        navigate(`/payment/${validIds[0]}`);
+        return;
+      }
+
+      message.success(
+        `已创建 ${validIds.length} 笔订单（每类商品一笔）。请先在列表中完成第一笔支付，其余在「我的订单」中继续支付。`
+      );
+      navigate('/orders');
     } catch (error) {
       message.error('创建订单失败，请重试');
     }

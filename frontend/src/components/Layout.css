@@ -21,7 +21,10 @@
 
 .layout-menu {
   flex: 1;
+  min-width: 0;
   border-bottom: none;
+  overflow-x: auto;
+  flex-wrap: nowrap;
 }
 
 .layout-user {
@@ -42,6 +45,8 @@
 @media (max-width: 768px) {
   .layout-header {
     padding: 0 12px;
+    flex-wrap: wrap;
+    row-gap: 8px;
   }
 
   .layout-logo {
@@ -50,7 +55,13 @@
   }
 
   .layout-menu {
-    display: none;
+    order: 3;
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+
+  .layout-user {
+    margin-left: auto;
   }
 
   .layout-content {

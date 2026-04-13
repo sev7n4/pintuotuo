@@ -35,7 +35,7 @@ export class RegisterPage {
 
   async register(email: string, name: string, password: string, role: 'user' | 'merchant' = 'user') {
     if (role === 'merchant') {
-      await this.page.getByText('商家', { exact: true }).click();
+      await this.page.getByRole('tab', { name: /商户入驻/i }).click();
     }
     await this.page.getByPlaceholder('example@email.com').fill(email);
     await this.page.getByPlaceholder('输入你的名字').fill(name);
