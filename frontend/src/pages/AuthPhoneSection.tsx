@@ -1,5 +1,17 @@
 import { useState } from 'react';
-import { Form, Input, Button, Card, Tabs, message, Space, Typography, Grid } from 'antd';
+import {
+  Form,
+  Input,
+  Button,
+  Card,
+  Tabs,
+  message,
+  Space,
+  Typography,
+  Grid,
+  Spin,
+  Alert,
+} from 'antd';
 import { MobileOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AuthPhoneSection.module.css';
@@ -46,10 +58,18 @@ function SmsCodeField({
   );
 }
 
+export type AuthPhoneSectionProps = {
+  /** 与 GET /users/auth/capabilities 的 sms 一致 */
+  smsEnabled: boolean;
+  /** 已完成 capabilities 请求（含失败时的降级） */
+  capabilitiesLoaded: boolean;
+};
+
 /**
  * 手机号验证码登录 / 注册（需后端 MOCK_SMS 或 SMS_PROVIDER）
+ * 未开启时仍展示说明，避免用户误以为「没有手机登录入口」。
  */
-export function AuthPhoneSection() {
+export function AuthPhoneSection({ smsEnabled, capabilitiesLoaded }: AuthPhoneSectionProps) {
   const { sendSmsCode, loginWithSms, registerWithSms, isLoading } = useAuthStore();
   const [loginForm] = Form.useForm();
   const [regForm] = Form.useForm();
@@ -59,6 +79,7 @@ export function AuthPhoneSection() {
   const stackCodeRow = screens.md === false;
 
   const handleSend = async (phone: string) => {
+    if (!smsEnabled) return;
     if (!/^1[3-9]\d{9}$/.test(phone)) {
       message.warning('请先填写有效手机号');
       return;
@@ -76,6 +97,42 @@ export function AuthPhoneSection() {
       setSending(false);
     }
   };
+
+  if (!capabilitiesLoaded) {
+    return (
+      <Card size="small" title={<><MobileOutlined /> 手机号</>} style={{ marginTop: 16 }}>
+        <div style={{ textAlign: 'center', padding: '16px 0' }}>
+          <Spin tip="加载登录方式…" />
+        </div>
+      </Card>
+    );
+  }
+
+  if (!smsEnabled) {
+    return (
+      <Card size="small" title={<><MobileOutlined /> 手机号</>} style={{ marginTop: 16 }}>
+        <Alert
+          type="info"
+          showIcon
+          message="暂未开启手机号验证码"
+          description={
+            <Typography.Paragraph style={{ marginBottom: 0, fontSize: 13 }}>
+              服务端需在环境变量中开启短信能力后重启后端，本区域才会出现「验证码登录 / 手机号注册」：
+              <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                <li>
+                  开发/联调：设置 <Typography.Text code>MOCK_SMS=true</Typography.Text>，验证码多为{' '}
+                  <Typography.Text code>123456</Typography.Text>
+                </li>
+                <li>
+                  生产：配置真实短信网关对应的 <Typography.Text code>SMS_PROVIDER</Typography.Text> 等变量
+                </li>
+              </ul>
+            </Typography.Paragraph>
+          }
+        />
+      </Card>
+    );
+  }
 
   return (
     <Card size="small" title={<><MobileOutlined /> 手机号</>} style={{ marginTop: 16 }}>
