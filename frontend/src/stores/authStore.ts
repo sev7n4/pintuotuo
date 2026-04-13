@@ -8,7 +8,7 @@ interface LoginResponse {
   token: string;
 }
 
-interface AuthState {
+export interface AuthState {
   user: User | null;
   token: string | null;
   isLoading: boolean;
