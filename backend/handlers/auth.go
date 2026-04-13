@@ -90,9 +90,9 @@ func RegisterUser(c *gin.Context) {
 	// Hash password
 	passwordHash := hashPassword(req.Password)
 
-	// Determine role (default to "user" if not specified or invalid)
-	role := "user"
-	if req.Role == "merchant" || req.Role == "admin" {
+	// Determine role (default to user if not specified or invalid)
+	role := roleUser
+	if req.Role == roleMerchant || req.Role == roleAdmin {
 		role = req.Role
 	}
 
