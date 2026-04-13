@@ -1302,7 +1302,7 @@ func GetUserSubscriptions(c *gin.Context) {
 	db := config.GetDB()
 	rows, err := db.Query(
 		`SELECT us.id, us.user_id, us.sku_id, us.start_date, us.end_date, us.used_tokens, us.used_compute_points, 
-		 us.status, us.auto_renew, us.created_at, us.updated_at,
+		 us.status, us.auto_renew, us.pricing_version_id, us.entitlement_anchor_at, us.created_at, us.updated_at,
 		 s.sku_code, sp.name as spu_name, s.retail_price
 		 FROM user_subscriptions us 
 		 JOIN skus s ON us.sku_id = s.id 
@@ -1320,11 +1320,21 @@ func GetUserSubscriptions(c *gin.Context) {
 	var subscriptions []models.UserSubscriptionWithSKU
 	for rows.Next() {
 		var s models.UserSubscriptionWithSKU
+		var pvID sql.NullInt64
+		var anchorAt sql.NullTime
 		err := rows.Scan(&s.ID, &s.UserID, &s.SKUID, &s.StartDate, &s.EndDate, &s.UsedTokens, &s.UsedComputePoints,
-			&s.Status, &s.AutoRenew, &s.CreatedAt, &s.UpdatedAt, &s.SKUCode, &s.SPUName, &s.RetailPrice)
+			&s.Status, &s.AutoRenew, &pvID, &anchorAt, &s.CreatedAt, &s.UpdatedAt, &s.SKUCode, &s.SPUName, &s.RetailPrice)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
+		}
+		if pvID.Valid {
+			v := int(pvID.Int64)
+			s.PricingVersionID = &v
+		}
+		if anchorAt.Valid {
+			t := anchorAt.Time
+			s.EntitlementAnchorAt = &t
 		}
 		subscriptions = append(subscriptions, s)
 	}

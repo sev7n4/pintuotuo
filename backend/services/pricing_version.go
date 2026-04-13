@@ -43,6 +43,7 @@ func CostFromPer1KRates(inputPrice, outputPrice float64, inputTokens, outputToke
 }
 
 // CalculateCostFromPricingVersion loads snapshot rates for provider/model from pricing_version_spu_rates + spus.
+// Model matches provider_model_id (preferred) or model_name, aligned with api-usage-guide and entitlement resolution.
 func CalculateCostFromPricingVersion(db *sql.DB, versionID int, provider, model string, inputTokens, outputTokens int) (float64, bool) {
 	var inRate, outRate float64
 	err := db.QueryRow(`
@@ -50,7 +51,11 @@ func CalculateCostFromPricingVersion(db *sql.DB, versionID int, provider, model 
 		FROM pricing_version_spu_rates r
 		INNER JOIN spus p ON p.id = r.spu_id
 		WHERE r.pricing_version_id = $1
-		  AND p.model_provider = $2 AND p.model_name = $3
+		  AND lower(trim(p.model_provider)) = lower(trim($2::text))
+		  AND (
+		    lower(trim(coalesce(nullif(trim(p.provider_model_id), ''), p.model_name))) = lower(trim($3::text))
+		    OR lower(trim(p.model_name)) = lower(trim($3::text))
+		  )
 		  AND p.status = 'active'
 		LIMIT 1
 	`, versionID, provider, model).Scan(&inRate, &outRate)

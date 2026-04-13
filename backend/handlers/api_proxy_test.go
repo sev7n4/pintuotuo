@@ -32,30 +32,56 @@ func TestCalculateTokenCost(t *testing.T) {
 			WillReturnError(sql.ErrNoRows)
 	}
 
-	cost := calculateTokenCost(db, 1, "openai", "gpt-4-turbo-preview", 1000, 1000)
+	cost, err := calculateTokenCost(db, 1, "openai", "gpt-4-turbo-preview", 1000, 1000, nil)
+	require.NoError(t, err)
 	assert.InDelta(t, 0.04, cost, 0.0001)
 
-	cost = calculateTokenCost(db, 1, "openai", "gpt-4", 1000, 1000)
+	cost, err = calculateTokenCost(db, 1, "openai", "gpt-4", 1000, 1000, nil)
+	require.NoError(t, err)
 	assert.InDelta(t, 0.09, cost, 0.0001)
 
-	cost = calculateTokenCost(db, 1, "openai", "gpt-3.5-turbo", 1000, 1000)
+	cost, err = calculateTokenCost(db, 1, "openai", "gpt-3.5-turbo", 1000, 1000, nil)
+	require.NoError(t, err)
 	assert.InDelta(t, 0.002, cost, 0.0001)
 
-	cost = calculateTokenCost(db, 1, "anthropic", "claude-3-opus-20240229", 1000, 1000)
+	cost, err = calculateTokenCost(db, 1, "anthropic", "claude-3-opus-20240229", 1000, 1000, nil)
+	require.NoError(t, err)
 	assert.InDelta(t, 0.09, cost, 0.0001)
 
-	cost = calculateTokenCost(db, 1, "anthropic", "claude-3-sonnet-20240229", 1000, 1000)
+	cost, err = calculateTokenCost(db, 1, "anthropic", "claude-3-sonnet-20240229", 1000, 1000, nil)
+	require.NoError(t, err)
 	assert.InDelta(t, 0.018, cost, 0.0001)
 
-	cost = calculateTokenCost(db, 1, "anthropic", "claude-3-haiku-20240307", 1000, 1000)
+	cost, err = calculateTokenCost(db, 1, "anthropic", "claude-3-haiku-20240307", 1000, 1000, nil)
+	require.NoError(t, err)
 	assert.InDelta(t, 0.0015, cost, 0.0001)
 
-	cost = calculateTokenCost(db, 1, "google", "gemini-pro", 1000, 1000)
+	cost, err = calculateTokenCost(db, 1, "google", "gemini-pro", 1000, 1000, nil)
+	require.NoError(t, err)
 	assert.InDelta(t, 0.002, cost, 0.0001)
 
-	cost = calculateTokenCost(db, 1, "unknown", "unknown-model", 1000, 1000)
+	cost, err = calculateTokenCost(db, 1, "unknown", "unknown-model", 1000, 1000, nil)
+	require.NoError(t, err)
 	assert.InDelta(t, 0.003, cost, 0.0001)
 
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCalculateTokenCost_StrictEntitlementVersion(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	v := 7
+	mock.ExpectQuery(`SELECT r.provider_input_rate, r.provider_output_rate`).
+		WithArgs(7, "openai", "gpt-4o").
+		WillReturnRows(sqlmock.NewRows([]string{"provider_input_rate", "provider_output_rate"}).
+			AddRow(0.01, 0.02))
+
+	cost, cerr := calculateTokenCost(db, 1, "openai", "gpt-4o", 1000, 500, &v)
+	require.NoError(t, cerr)
+	want := services.CostFromPer1KRates(0.01, 0.02, 1000, 500)
+	assert.InDelta(t, want, cost, 1e-9)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -73,7 +99,8 @@ func TestCalculateTokenCost_UsesPricingVersionWhenSnapshotHits(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"provider_input_rate", "provider_output_rate"}).
 			AddRow(0.02, 0.06))
 
-	cost := calculateTokenCost(db, 1, "openai", "gpt-4o-mini-snapshot", 1000, 500)
+	cost, err := calculateTokenCost(db, 1, "openai", "gpt-4o-mini-snapshot", 1000, 500, nil)
+	require.NoError(t, err)
 	want := services.CostFromPer1KRates(0.02, 0.06, 1000, 500)
 	assert.InDelta(t, want, cost, 1e-9)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -92,7 +119,8 @@ func TestCalculateTokenCost_PricingVersionMissFallsBackToLiveSPU(t *testing.T) {
 		WithArgs(99, "openai", "gpt-4-turbo-preview").
 		WillReturnError(sql.ErrNoRows)
 
-	cost := calculateTokenCost(db, 1, "openai", "gpt-4-turbo-preview", 1000, 1000)
+	cost, err := calculateTokenCost(db, 1, "openai", "gpt-4-turbo-preview", 1000, 1000, nil)
+	require.NoError(t, err)
 	assert.InDelta(t, 0.04, cost, 0.0001)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
