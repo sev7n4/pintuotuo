@@ -5,6 +5,8 @@ export interface LedgerReconciliation {
   usage_tx_total: number;
   delta: number;
   matched: boolean;
+  /** 与 usage_* 字段一致：platform Token（非 CNY cost） */
+  unit?: 'tokens';
   checked_at: string;
 }
 

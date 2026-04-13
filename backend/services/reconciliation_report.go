@@ -6,11 +6,12 @@ import (
 	"time"
 )
 
-// GlobalUsageLedgerMatch compares total api_usage_logs.cost with total usage deductions in token_transactions (full database).
+// GlobalUsageLedgerMatch compares total billable tokens from api_usage_logs with total usage deductions
+// in token_transactions (type=usage), both in platform Token units — same口径 as user balance / 消费明细.
 func GlobalUsageLedgerMatch(db *sql.DB) (usageLogTotal, usageTxTotal float64, err error) {
 	err = db.QueryRow(`
 		SELECT
-			COALESCE((SELECT SUM(cost) FROM api_usage_logs), 0),
+			COALESCE((SELECT SUM(` + SQLBillableTokensPerLogRow + `) FROM api_usage_logs), 0),
 			COALESCE((SELECT SUM(-amount) FROM token_transactions WHERE type = 'usage'), 0)
 	`).Scan(&usageLogTotal, &usageTxTotal)
 	return
@@ -29,7 +30,7 @@ const exportDriftMaxRows = 50000
 func queryUsageDriftPage(db *sql.DB, limit, offset int) ([]UsageDriftRow, error) {
 	rows, err := db.Query(`
 		WITH log AS (
-			SELECT user_id, SUM(cost) AS c FROM api_usage_logs GROUP BY user_id
+			SELECT user_id, SUM(`+SQLBillableTokensPerLogRow+`) AS c FROM api_usage_logs GROUP BY user_id
 		),
 		tx AS (
 			SELECT user_id, SUM(-amount) AS c FROM token_transactions WHERE type = 'usage' GROUP BY user_id
@@ -69,7 +70,7 @@ func queryUsageDriftPage(db *sql.DB, limit, offset int) ([]UsageDriftRow, error)
 	return out, rows.Err()
 }
 
-// ListUsageDriftUsers returns users where SUM(api_usage_logs.cost) != SUM(-amount for usage), paginated by largest |delta|.
+// ListUsageDriftUsers returns users where per-user SUM(billable tokens in api_usage_logs) != SUM(-amount for usage).
 func ListUsageDriftUsers(db *sql.DB, limit, offset int) ([]UsageDriftRow, error) {
 	if limit <= 0 {
 		limit = 50
@@ -93,7 +94,7 @@ func CountUsageDriftUsers(db *sql.DB) (int, error) {
 	var n int
 	err := db.QueryRow(`
 		WITH log AS (
-			SELECT user_id, SUM(cost) AS c FROM api_usage_logs GROUP BY user_id
+			SELECT user_id, SUM(`+SQLBillableTokensPerLogRow+`) AS c FROM api_usage_logs GROUP BY user_id
 		),
 		tx AS (
 			SELECT user_id, SUM(-amount) AS c FROM token_transactions WHERE type = 'usage' GROUP BY user_id

@@ -1,4 +1,5 @@
-// Command reconcile runs full-database usage ledger checks (api_usage_logs vs token_transactions usage).
+// Command reconcile runs full-database usage ledger checks (billable tokens in api_usage_logs vs
+// token_transactions usage deductions, same Token 口径 as /admin/reconciliation/ledger).
 // Intended for cron: exit 0 when matched, 1 when drift exceeds epsilon or on error.
 //
 // Usage: DATABASE_URL=... go run ./cmd/reconcile (from backend module root)
@@ -37,6 +38,7 @@ func main() {
 		"usage_tx_total":  txSum,
 		"delta":           delta,
 		"matched":         ok,
+		"unit":            "tokens",
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
