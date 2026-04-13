@@ -45,10 +45,12 @@ Content-Type: application/json
 
 {
   "email": "user@example.com",
-  "name": "User Name",
-  "password": "password123"
+  "password": "password123",
+  "role": "user"
 }
 ```
+
+`name` 可选；省略时使用邮箱 `@` 前的本地部分作为展示名。`role` 可选，默认 `user`，商户注册为 `merchant`。
 
 **响应** (201):
 ```json

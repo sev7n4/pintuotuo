@@ -4,7 +4,7 @@ import ReferralPage from '../pages/ReferralPage';
 import LoginPage from '../pages/LoginPage';
 import CartPage from '../pages/CartPage';
 import RegisterPage from '../pages/RegisterPage';
-import { useAuthStore } from '@/stores/authStore';
+import { useAuthStore, type AuthState } from '@/stores/authStore';
 import { useReferralStore } from '@/stores/referralStore';
 import { useCartStore } from '@/stores/cartStore';
 
@@ -63,13 +63,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: false,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -119,17 +124,22 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated,
+      rememberMe: false,
       login: async (email: string, password: string) => {
         const result = await mockLogin(email, password);
         isAuthenticated = true;
         return result;
       },
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: mockFetchUser,
       setUser: jest.fn(),
       clearError: jest.fn(),
-    };
+      setRememberMe: jest.fn(),
+    } as AuthState;
 
     mockUseAuthStore.mockImplementation(() => mockStore);
 
@@ -149,6 +159,9 @@ describe('Integration Tests', () => {
       rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: mockFetchUser,
       setUser: jest.fn(),
@@ -218,13 +231,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: false,
+      rememberMe: false,
       login: jest.fn(),
       register: mockRegister,
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -256,14 +274,12 @@ describe('Integration Tests', () => {
     );
 
     // 输入注册信息
-    const nameInput = screen.getByPlaceholderText('输入你的名字') as HTMLInputElement;
     const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
     const passwordInput = screen.getByPlaceholderText('设置密码') as HTMLInputElement;
     const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码') as HTMLInputElement;
     const registerButton = screen.getByText('创建账户');
 
     await act(async () => {
-      fireEvent.change(nameInput, { target: { value: 'Test User' } });
       fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } });
       fireEvent.change(passwordInput, { target: { value: 'password123' } });
       fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
@@ -272,12 +288,7 @@ describe('Integration Tests', () => {
 
     // 检查是否调用了注册函数
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledWith(
-        'newuser@example.com',
-        'Test User',
-        'password123',
-        'user'
-      );
+      expect(mockRegister).toHaveBeenCalledWith('newuser@example.com', 'password123', 'user');
     });
   });
 
@@ -289,13 +300,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
@@ -373,13 +389,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
@@ -432,13 +453,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     const mockFetchReferralCode = jest.fn().mockResolvedValue('TESTCODE');
     const mockFetchStats = jest.fn().mockResolvedValue({
@@ -501,13 +527,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
@@ -558,13 +589,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'SHARE123',
@@ -622,13 +658,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
@@ -691,13 +732,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
@@ -749,13 +795,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: mockLogout,
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
@@ -817,13 +868,18 @@ describe('Integration Tests', () => {
       isLoading: true,
       error: null,
       isAuthenticated: false,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -864,13 +920,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: false,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     render(
       <MemoryRouter initialEntries={['/login']}>
@@ -907,19 +968,27 @@ describe('Integration Tests', () => {
       return { token: 'new-token' };
     });
 
-    mockUseAuthStore.mockImplementation(() => ({
-      user: authState.user,
-      token: authState.token,
-      isLoading: false,
-      error: null,
-      isAuthenticated: authState.isAuthenticated,
-      login: mockLogin,
-      register: jest.fn(),
-      logout: jest.fn(),
-      fetchUser: jest.fn(),
-      setUser: jest.fn(),
-      clearError: jest.fn(),
-    }));
+    mockUseAuthStore.mockImplementation(
+      () =>
+        ({
+          user: authState.user,
+          token: authState.token,
+          isLoading: false,
+          error: null,
+          isAuthenticated: authState.isAuthenticated,
+          rememberMe: false,
+          login: mockLogin,
+          register: jest.fn(),
+          loginWithSms: jest.fn(),
+          registerWithSms: jest.fn(),
+          sendSmsCode: jest.fn(),
+          logout: jest.fn(),
+          fetchUser: jest.fn(),
+          setUser: jest.fn(),
+          clearError: jest.fn(),
+          setRememberMe: jest.fn(),
+        }) as AuthState
+    );
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TESTCODE',
@@ -977,13 +1046,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -1024,13 +1098,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'DISCOUNT10',
@@ -1109,13 +1188,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'FIRSTCODE',
@@ -1175,19 +1259,27 @@ describe('Integration Tests', () => {
       throw new Error('Session expired');
     });
 
-    mockUseAuthStore.mockImplementation(() => ({
-      user: authState.user,
-      token: authState.token,
-      isLoading: false,
-      error: 'Session expired',
-      isAuthenticated: authState.isAuthenticated,
-      login: jest.fn(),
-      register: jest.fn(),
-      logout: jest.fn(),
-      fetchUser: mockFetchUser,
-      setUser: jest.fn(),
-      clearError: jest.fn(),
-    }));
+    mockUseAuthStore.mockImplementation(
+      () =>
+        ({
+          user: authState.user,
+          token: authState.token,
+          isLoading: false,
+          error: 'Session expired',
+          isAuthenticated: authState.isAuthenticated,
+          rememberMe: false,
+          login: jest.fn(),
+          register: jest.fn(),
+          loginWithSms: jest.fn(),
+          registerWithSms: jest.fn(),
+          sendSmsCode: jest.fn(),
+          logout: jest.fn(),
+          fetchUser: mockFetchUser,
+          setUser: jest.fn(),
+          clearError: jest.fn(),
+          setRememberMe: jest.fn(),
+        }) as AuthState
+    );
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -1229,13 +1321,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     const mockClearCart = jest.fn();
 
@@ -1286,13 +1383,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'MERCHANT1',
@@ -1340,13 +1442,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TIMEOUT1',
@@ -1395,13 +1502,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'CONCURRENT',
@@ -1455,13 +1567,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: false,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseCartStore.mockReturnValue({
       items: [],
@@ -1498,13 +1615,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'TOKEN123',
@@ -1551,13 +1673,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseCartStore.mockReturnValue({
       items: [
@@ -1605,13 +1732,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'VALIDCODE',
@@ -1671,13 +1803,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'SYNC123',
@@ -1737,13 +1874,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: 'Critical error',
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: null,
@@ -1784,13 +1926,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'ADMIN001',
@@ -1839,13 +1986,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseCartStore.mockReturnValue({
       items: [
@@ -1893,13 +2045,18 @@ describe('Integration Tests', () => {
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
-    });
+      setRememberMe: jest.fn(),
+    } as unknown as AuthState);
 
     mockUseReferralStore.mockReturnValue({
       referralCode: 'LINKTEST',

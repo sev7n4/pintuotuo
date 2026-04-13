@@ -8,7 +8,7 @@ interface LoginResponse {
   token: string;
 }
 
-interface AuthState {
+export interface AuthState {
   user: User | null;
   token: string | null;
   isLoading: boolean;
@@ -17,7 +17,10 @@ interface AuthState {
   rememberMe: boolean;
 
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  register: (email: string, name: string, password: string, role?: string) => Promise<void>;
+  register: (email: string, password: string, role?: string) => Promise<void>;
+  loginWithSms: (phone: string, code: string) => Promise<void>;
+  registerWithSms: (phone: string, code: string, password: string, role?: string) => Promise<void>;
+  sendSmsCode: (phone: string) => Promise<{ message?: string; debug_code?: string } | undefined>;
   logout: () => Promise<void>;
   fetchUser: () => Promise<void>;
   setUser: (user: User) => void;
@@ -61,10 +64,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  register: async (email, name, password, role = 'user') => {
+  register: async (email, password, role = 'user') => {
     set({ isLoading: true, error: null });
     try {
-      const response = await authService.register({ email, name, password, role });
+      const response = await authService.register({ email, password, role });
       const apiResponse = response.data as APIResponse<LoginResponse>;
       const data = apiResponse.data;
       if (data) {
@@ -78,6 +81,49 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ error: message, isLoading: false });
       throw error;
     }
+  },
+
+  loginWithSms: async (phone, code) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await authService.loginWithSms(phone, code);
+      const apiResponse = response.data as APIResponse<LoginResponse>;
+      const data = apiResponse.data;
+      if (data) {
+        const { user, token } = data;
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('remember_me', 'true');
+        set({ user, token, isAuthenticated: true, isLoading: false, rememberMe: true });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '登录失败';
+      set({ error: message, isLoading: false });
+      throw error;
+    }
+  },
+
+  registerWithSms: async (phone, code, password, role = 'user') => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await authService.registerWithSms({ phone, code, password, role });
+      const apiResponse = response.data as APIResponse<LoginResponse>;
+      const data = apiResponse.data;
+      if (data) {
+        const { user, token } = data;
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('remember_me', 'true');
+        set({ user, token, isAuthenticated: true, isLoading: false, rememberMe: true });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '注册失败';
+      set({ error: message, isLoading: false });
+      throw error;
+    }
+  },
+
+  sendSmsCode: async (phone) => {
+    const res = await authService.sendSmsCode(phone, 'auth');
+    return res.data;
   },
 
   logout: async () => {

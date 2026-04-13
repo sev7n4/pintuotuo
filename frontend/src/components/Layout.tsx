@@ -1,6 +1,17 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Layout as AntLayout, Menu, Dropdown, Avatar, Space, message } from 'antd';
+import {
+  Layout as AntLayout,
+  Menu,
+  Dropdown,
+  Avatar,
+  Space,
+  message,
+  Drawer,
+  Button,
+  Grid,
+} from 'antd';
+import type { MenuProps } from 'antd';
 import {
   UserOutlined,
   LogoutOutlined,
@@ -9,11 +20,13 @@ import {
   AppstoreOutlined,
   ShoppingCartOutlined,
   UnorderedListOutlined,
+  MenuOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import './Layout.css';
 
 const { Header, Content, Footer } = AntLayout;
+const { useBreakpoint } = Grid;
 
 function getMainNavSelectedKey(pathname: string): string[] {
   if (pathname === '/') return ['home'];
@@ -27,6 +40,9 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isAuthenticated, fetchUser } = useAuthStore();
+  const screens = useBreakpoint();
+  const isMobileNav = !screens.md;
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && !user) {
@@ -71,6 +87,49 @@ export default function Layout() {
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
   ];
 
+  const navPaths: Record<string, string> = {
+    home: '/',
+    catalog: '/catalog',
+    cart: '/cart',
+    orders: '/orders',
+  };
+
+  const drawerMenuItems: MenuProps['items'] = useMemo(
+    () => [
+      {
+        key: 'home',
+        label: '首页',
+        icon: <HomeOutlined />,
+      },
+      {
+        key: 'catalog',
+        label: '卖场',
+        icon: <AppstoreOutlined />,
+      },
+      {
+        key: 'cart',
+        label: '购物车',
+        icon: <ShoppingCartOutlined />,
+      },
+      ...(isAuthenticated
+        ? [
+            {
+              key: 'orders',
+              label: '我的订单',
+              icon: <UnorderedListOutlined />,
+            },
+          ]
+        : []),
+    ],
+    [isAuthenticated]
+  );
+
+  const onDrawerMenuClick: MenuProps['onClick'] = ({ key }) => {
+    const p = navPaths[String(key)];
+    if (p) navigate(p);
+    setDrawerOpen(false);
+  };
+
   const handleUserMenuClick = async ({ key }: { key: string }) => {
     switch (key) {
       case 'logout':
@@ -90,15 +149,44 @@ export default function Layout() {
   return (
     <AntLayout style={{ minHeight: '100vh' }}>
       <Header className="layout-header">
-        <Link to="/" className="layout-logo">
-          拼脱脱
-        </Link>
-        <Menu
-          mode="horizontal"
-          selectedKeys={getMainNavSelectedKey(location.pathname)}
-          items={tabItems}
-          className="layout-menu"
-        />
+        <div className="layout-header-cluster">
+          <Link to="/" className="layout-logo">
+            拼脱脱
+          </Link>
+          {isMobileNav ? (
+            <>
+              <Button
+                type="text"
+                icon={<MenuOutlined />}
+                className="layout-nav-trigger"
+                aria-label="打开导航菜单"
+                onClick={() => setDrawerOpen(true)}
+              />
+              <Drawer
+                title="导航"
+                placement="left"
+                onClose={() => setDrawerOpen(false)}
+                open={drawerOpen}
+                width={280}
+                className="layout-drawer"
+              >
+                <Menu
+                  mode="inline"
+                  selectedKeys={getMainNavSelectedKey(location.pathname)}
+                  items={drawerMenuItems}
+                  onClick={onDrawerMenuClick}
+                />
+              </Drawer>
+            </>
+          ) : (
+            <Menu
+              mode="horizontal"
+              selectedKeys={getMainNavSelectedKey(location.pathname)}
+              items={tabItems}
+              className="layout-menu"
+            />
+          )}
+        </div>
         <div className="layout-user">
           {isAuthenticated && user ? (
             <Dropdown

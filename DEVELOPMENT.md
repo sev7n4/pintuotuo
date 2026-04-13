@@ -10,6 +10,9 @@
 - Docker & Docker Compose
 - Make（可选，但推荐）
 
+**Go 模块缓存（若在 Cursor/沙箱中 `go test` 报大量「no such file or directory」）：**  
+项目根目录的 `make test` / `make test-backend` 已通过 `scripts/ensure-go-modcache.sh` 将 `GOMODCACHE` 指到稳定目录（默认 `$HOME/go/pkg/mod`）。若仍异常，可执行 `go clean -modcache` 后重试，或在 shell 中手动 `export GOMODCACHE="$HOME/go/pkg/mod"`。
+
 ### 2. 初始化项目
 
 ```bash

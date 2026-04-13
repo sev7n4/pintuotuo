@@ -36,6 +36,13 @@ func RegisterHealthRoutes(router *gin.RouterGroup) {
 func RegisterUserRoutes(router *gin.RouterGroup) {
 	users := router.Group("/users")
 	{
+		users.GET("/auth/capabilities", handlers.GetAuthCapabilities)
+		users.POST("/sms/send", handlers.SendSMSCode)
+		users.POST("/sms/register", handlers.RegisterWithSMS)
+		users.POST("/sms/login", handlers.LoginWithSMS)
+		users.GET("/oauth/wechat/start", handlers.WechatOAuthStart)
+		users.GET("/oauth/github/start", handlers.GithubOAuthStart)
+
 		users.POST("/register", handlers.RegisterUser)
 		users.POST("/login", handlers.LoginUser)
 		users.POST("/logout", handlers.LogoutUser)
@@ -48,6 +55,7 @@ func RegisterUserRoutes(router *gin.RouterGroup) {
 		auth.Use(middleware.AuthMiddleware())
 		{
 			auth.GET("/me", handlers.GetCurrentUser)
+			auth.GET("/me/identities", handlers.GetUserIdentities)
 			auth.PUT("/me", handlers.UpdateCurrentUser)
 		}
 

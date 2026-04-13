@@ -45,8 +45,10 @@ for i in {1..30}; do
     sleep 1
 done
 
-# Install backend dependencies
+# Install backend dependencies（与 Makefile 一致：修正沙箱下异常的 GOMODCACHE）
 echo -e "${BLUE}Installing backend dependencies...${NC}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+export GOMODCACHE="$("$SCRIPT_DIR/ensure-go-modcache.sh")"
 cd backend
 go mod download
 echo -e "${GREEN}✓ Backend dependencies installed${NC}"

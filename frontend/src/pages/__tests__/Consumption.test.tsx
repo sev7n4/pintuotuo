@@ -1,3 +1,4 @@
+import React from 'react';
 import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Consumption from '../Consumption';
@@ -28,6 +29,18 @@ jest.mock('antd', () => {
   };
 });
 
+jest.mock('recharts', () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Area: () => null,
+  Bar: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  CartesianGrid: () => null,
+  Tooltip: () => null,
+}));
+
 describe('Consumption', () => {
   it('renders consumption page with view mode toggle', async () => {
     await act(async () => {
@@ -38,7 +51,8 @@ describe('Consumption', () => {
       );
     });
     expect(screen.getByText('简要看板')).toBeInTheDocument();
-    expect(screen.getByText('每次调用明细')).toBeInTheDocument();
+    expect(screen.getByText('明细列表')).toBeInTheDocument();
+    expect(screen.getByText('图表视图')).toBeInTheDocument();
   });
 
   it('shows statistics cards', async () => {
@@ -76,7 +90,7 @@ describe('Consumption', () => {
       );
     });
     await act(async () => {
-      fireEvent.click(screen.getByText('每次调用明细'));
+      fireEvent.click(screen.getByText('明细列表'));
     });
     await waitFor(() => {
       const exportButtons = screen.getAllByRole('button');

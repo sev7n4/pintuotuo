@@ -40,13 +40,11 @@ describe('AuthService', () => {
 
       const result = await authService.register({
         email: 'test@example.com',
-        name: 'Test User',
         password: 'password123',
       });
 
       expect(mockedApi.post).toHaveBeenCalledWith('/users/register', {
         email: 'test@example.com',
-        name: 'Test User',
         password: 'password123',
       });
       expect(result.data.data?.token).toBe('test-token');

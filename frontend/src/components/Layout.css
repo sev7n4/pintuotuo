@@ -1,9 +1,19 @@
 .layout-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   padding: 0 24px;
+}
+
+.layout-header-cluster {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
 }
 
 .layout-logo {
@@ -42,26 +52,34 @@
   text-align: center;
 }
 
+.layout-nav-trigger {
+  font-size: 18px;
+  padding: 4px 8px;
+}
+
 @media (max-width: 768px) {
   .layout-header {
     padding: 0 12px;
-    flex-wrap: wrap;
-    row-gap: 8px;
+    flex-wrap: nowrap;
   }
 
   .layout-logo {
     font-size: 16px;
-    margin-right: 12px;
+    margin-right: 0;
+    flex-shrink: 0;
   }
 
   .layout-menu {
-    order: 3;
-    flex-basis: 100%;
-    max-width: 100%;
+    display: none;
   }
 
   .layout-user {
-    margin-left: auto;
+    margin-left: 0;
+    flex-shrink: 0;
+  }
+
+  .layout-user .user-name {
+    display: none;
   }
 
   .layout-content {

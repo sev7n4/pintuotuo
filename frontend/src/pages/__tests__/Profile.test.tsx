@@ -2,9 +2,17 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Profile from '../Profile';
 import { useAuthStore } from '@/stores/authStore';
+import { userService } from '@/services/user';
 
 // 模拟 useAuthStore
 jest.mock('@/stores/authStore');
+
+jest.mock('@/services/user', () => ({
+  userService: {
+    getMyIdentities: jest.fn().mockResolvedValue({ data: { code: 0, data: [] } }),
+    updateCurrentUser: jest.fn(),
+  },
+}));
 
 // 模拟 CSS 模块
 jest.mock('../Profile.module.css', () => ({}));
@@ -19,10 +27,12 @@ jest.mock('antd', () => ({
 }));
 
 const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>;
+const mockGetMyIdentities = userService.getMyIdentities as jest.Mock;
 
 describe('Profile Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetMyIdentities.mockResolvedValue({ data: { code: 0, data: [] } });
   });
 
   test('renders Profile page with user info', () => {
@@ -34,17 +44,24 @@ describe('Profile Component', () => {
         name: '测试用户',
         phone: '13800138000',
         role: 'user',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       },
       token: 'test-token',
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: true,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
+      setRememberMe: jest.fn(),
     });
 
     render(
@@ -70,17 +87,24 @@ describe('Profile Component', () => {
         name: '测试用户',
         phone: '13800138000',
         role: 'user',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       },
       token: 'test-token',
       isLoading: false,
       error: null,
       isAuthenticated: true,
+      rememberMe: true,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: mockLogout,
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
+      setRememberMe: jest.fn(),
     });
 
     render(
@@ -101,12 +125,17 @@ describe('Profile Component', () => {
       isLoading: false,
       error: null,
       isAuthenticated: false,
+      rememberMe: false,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
+      setRememberMe: jest.fn(),
     });
 
     render(
@@ -127,12 +156,17 @@ describe('Profile Component', () => {
       isLoading: true,
       error: null,
       isAuthenticated: true,
+      rememberMe: true,
       login: jest.fn(),
       register: jest.fn(),
+      loginWithSms: jest.fn(),
+      registerWithSms: jest.fn(),
+      sendSmsCode: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
       clearError: jest.fn(),
+      setRememberMe: jest.fn(),
     });
 
     render(

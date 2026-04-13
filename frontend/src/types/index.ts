@@ -3,9 +3,18 @@ export interface User {
   id: number;
   email: string;
   name: string;
+  /** 绑定手机号（若有） */
+  phone?: string;
   role: 'user' | 'merchant' | 'admin';
   created_at: string;
   updated_at: string;
+}
+
+/** GET /users/me/identities */
+export interface UserIdentity {
+  provider: string;
+  external_id: string;
+  display_name?: string;
 }
 
 // Product related types

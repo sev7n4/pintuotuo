@@ -1,5 +1,9 @@
 .PHONY: help setup dev-backend dev-frontend dev test build clean docker-up docker-down migrate
 
+# Go 模块缓存：部分 IDE/沙箱会把 GOMODCACHE 指到不完整路径，导致 go test 报「源文件不存在」。
+# 统一通过 scripts/ensure-go-modcache.sh 回退到 $HOME/go/pkg/mod（可被环境变量预先覆盖）。
+export GOMODCACHE := $(shell "$(CURDIR)/scripts/ensure-go-modcache.sh")
+
 # Colors
 BLUE=\033[0;34m
 GREEN=\033[0;32m
