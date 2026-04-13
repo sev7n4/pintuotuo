@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,9 +29,25 @@ func init() {
 // RegisterRequest represents user registration data
 type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
-	Name     string `json:"name" binding:"required,min=2"`
+	Name     string `json:"name"`
 	Password string `json:"password" binding:"required,min=6"`
 	Role     string `json:"role"`
+}
+
+// registrationDisplayName 在未提供「名字」或长度过短时，使用邮箱 @ 前本地部分作为展示名。
+func registrationDisplayName(email, nameHint string) string {
+	s := strings.TrimSpace(nameHint)
+	if len(s) >= 2 {
+		return s
+	}
+	at := strings.Index(email, "@")
+	if at > 0 {
+		local := strings.TrimSpace(email[:at])
+		if local != "" {
+			return local
+		}
+	}
+	return email
 }
 
 // LoginRequest represents user login data
@@ -78,11 +96,13 @@ func RegisterUser(c *gin.Context) {
 		role = req.Role
 	}
 
+	displayName := registrationDisplayName(req.Email, req.Name)
+
 	// Create user
 	var user models.User
 	err = db.QueryRow(
 		"INSERT INTO users (email, name, password_hash, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, created_at, updated_at",
-		req.Email, req.Name, passwordHash, role, "active",
+		req.Email, displayName, passwordHash, role, "active",
 	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
@@ -114,7 +134,7 @@ func RegisterUser(c *gin.Context) {
 	if role == "merchant" {
 		_, err = db.Exec(
 			"INSERT INTO merchants (user_id, company_name, status) VALUES ($1, $2, $3)",
-			user.ID, req.Name, "pending",
+			user.ID, displayName, "pending",
 		)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.NewAppError(
@@ -225,14 +245,19 @@ func GetCurrentUser(c *gin.Context) {
 	db := config.GetDB()
 
 	var user models.User
+	var phone sql.NullString
 	err := db.QueryRow(
-		"SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1",
+		"SELECT id, email, name, role, phone, created_at, updated_at FROM users WHERE id = $1",
 		userIDInt,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &phone, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrUserNotFound)
 		return
+	}
+	if phone.Valid && phone.String != "" {
+		p := phone.String
+		user.Phone = &p
 	}
 
 	// Cache the result

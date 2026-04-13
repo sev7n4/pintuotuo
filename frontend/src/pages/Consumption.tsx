@@ -21,6 +21,17 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { EyeOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  BarChart,
+  Bar,
+} from 'recharts';
 import styles from './Consumption.module.css';
 import { formatLedgerUnits, ledgerUnitColumnTitle } from '@/utils/ledgerDisplay';
 
@@ -55,10 +66,14 @@ interface ProviderStats {
   cost: number;
 }
 
-const { Paragraph } = Typography;
+const { Paragraph, Text } = Typography;
+
+type MainView = 'dashboard' | 'records' | 'charts';
 
 const Consumption: React.FC = () => {
-  const [viewMode, setViewMode] = useState<'simple' | 'detail'>('simple');
+  /** 默认「明细列表」，避免用户误以为消费清单消失 */
+  const [mainView, setMainView] = useState<MainView>('records');
+  const [recordsLayout, setRecordsLayout] = useState<'table' | 'cards'>('table');
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<ConsumptionRecord[]>([]);
   const [stats, setStats] = useState<ConsumptionStats | null>(null);
@@ -291,6 +306,22 @@ const Consumption: React.FC = () => {
     [screens, isMobile]
   );
 
+  const dailySeries = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of records) {
+      const d = dayjs(r.created_at).format('YYYY-MM-DD');
+      m.set(d, (m.get(d) || 0) + r.cost);
+    }
+    return [...m.entries()]
+      .map(([date, cost]) => ({ date, cost: Number(cost.toFixed(6)) }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [records]);
+
+  const providerBarData = useMemo(
+    () => providerStats.map((p) => ({ name: p.provider, cost: p.cost, count: p.count })),
+    [providerStats]
+  );
+
   return (
     <div className={styles.container} style={{ padding: isMobile ? 12 : 24 }}>
       <div
@@ -303,17 +334,30 @@ const Consumption: React.FC = () => {
         }}
       >
         <Segmented
-          value={viewMode}
-          onChange={(v) => setViewMode(v as 'simple' | 'detail')}
+          value={mainView}
+          onChange={(v) => setMainView(v as MainView)}
           options={[
-            { label: '简要看板', value: 'simple' },
-            { label: '每次调用明细', value: 'detail' },
+            { label: '简要看板', value: 'dashboard' },
+            { label: '明细列表', value: 'records' },
+            { label: '图表视图', value: 'charts' },
           ]}
         />
         <Paragraph type="secondary" style={{ margin: 0, flex: '1 1 200px' }}>
-          简要看板仅展示汇总；明细含模型、延迟等，适合排障与对账。
+          明细列表含完整调用记录；图表视图按日汇总扣减与按 Provider 对比。简要看板仅汇总数字。
         </Paragraph>
       </div>
+      {mainView === 'records' && (
+        <div style={{ marginBottom: 12 }}>
+          <Segmented
+            value={recordsLayout}
+            onChange={(v) => setRecordsLayout(v as 'table' | 'cards')}
+            options={[
+              { label: '表格', value: 'table' },
+              { label: '卡片', value: 'cards' },
+            ]}
+          />
+        </div>
+      )}
       <Card size="small" style={{ marginBottom: 16 }} title="筛选">
         <Space size="small" wrap>
           <RangePicker
@@ -379,7 +423,7 @@ const Consumption: React.FC = () => {
         </Row>
       </Card>
 
-      {providerStats.length > 0 && (
+      {mainView !== 'charts' && providerStats.length > 0 && (
         <Card className={styles.providerCard} title="按Provider统计">
           <Row gutter={[16, 16]}>
             {providerStats.map((p) => (
@@ -400,7 +444,56 @@ const Consumption: React.FC = () => {
         </Card>
       )}
 
-      {viewMode === 'detail' && (
+      {mainView === 'charts' && (
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={24} lg={14}>
+            <Card title="扣减趋势（按日）">
+              {dailySeries.length === 0 ? (
+                <Paragraph type="secondary">当前筛选条件下暂无数据</Paragraph>
+              ) : (
+                <div style={{ width: '100%', height: 280 }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={dailySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <RechartsTooltip />
+                      <Area
+                        type="monotone"
+                        dataKey="cost"
+                        name="扣减(Token)"
+                        stroke="#1677ff"
+                        fill="#1677ff33"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} lg={10}>
+            <Card title="按 Provider 扣减">
+              {providerBarData.length === 0 ? (
+                <Paragraph type="secondary">暂无 Provider 汇总</Paragraph>
+              ) : (
+                <div style={{ width: '100%', height: 280 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={providerBarData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <RechartsTooltip />
+                      <Bar dataKey="cost" name="扣减(Token)" fill="#722ed1" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+      {mainView === 'records' && (
         <Card
           className={styles.tableCard}
           title="消费明细"
@@ -415,20 +508,50 @@ const Consumption: React.FC = () => {
           }
         >
           <Spin spinning={loading}>
-            <Table
-              columns={columns}
-              dataSource={records}
-              rowKey="id"
-              scroll={{ x: 600 }}
-              size={isMobile ? 'small' : 'middle'}
-              pagination={{
-                pageSize: 20,
-                size: isMobile ? 'small' : 'default',
-                showSizeChanger: !isMobile,
-                showQuickJumper: !isMobile,
-                showTotal: isMobile ? undefined : (total) => `共 ${total} 条记录`,
-              }}
-            />
+            {recordsLayout === 'table' ? (
+              <Table
+                columns={columns}
+                dataSource={records}
+                rowKey="id"
+                scroll={{ x: 600 }}
+                size={isMobile ? 'small' : 'middle'}
+                pagination={{
+                  pageSize: 20,
+                  size: isMobile ? 'small' : 'default',
+                  showSizeChanger: !isMobile,
+                  showQuickJumper: !isMobile,
+                  showTotal: isMobile ? undefined : (total) => `共 ${total} 条记录`,
+                }}
+              />
+            ) : (
+              <Row gutter={[12, 12]}>
+                {records.map((r) => (
+                  <Col xs={24} sm={12} lg={8} key={r.id}>
+                    <Card
+                      size="small"
+                      title={
+                        <Tag color={getProviderColor(r.provider)}>{r.provider.toUpperCase()}</Tag>
+                      }
+                      extra={
+                        <Button type="link" size="small" onClick={() => showDetail(r)}>
+                          详情
+                        </Button>
+                      }
+                    >
+                      <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                        <span style={{ fontSize: 12, color: '#666' }}>{r.model}</span>
+                        <span>
+                          扣减：<Text type="danger">{formatLedgerUnits(r.cost)}</Text>
+                        </span>
+                        <span style={{ fontSize: 12 }}>
+                          {dayjs(r.created_at).format('MM-DD HH:mm')} · {r.status_code}
+                        </span>
+                      </Space>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            )}
           </Spin>
         </Card>
       )}

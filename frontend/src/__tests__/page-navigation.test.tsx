@@ -167,26 +167,19 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       const emailInput = screen.getByPlaceholderText('example@email.com');
-      const nameInput = screen.getByPlaceholderText('输入你的名字');
       const passwordInput = screen.getByPlaceholderText('设置密码');
       const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码');
       const registerButton = screen.getByText('创建账户');
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'cuser@example.com' } });
-        fireEvent.change(nameInput, { target: { value: 'C端用户' } });
         fireEvent.change(passwordInput, { target: { value: 'password123' } });
         fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
         fireEvent.click(registerButton);
       });
 
       await waitFor(() => {
-        expect(mockRegister).toHaveBeenCalledWith(
-          'cuser@example.com',
-          'C端用户',
-          'password123',
-          'user'
-        );
+        expect(mockRegister).toHaveBeenCalledWith('cuser@example.com', 'password123', 'user');
       });
     });
 
@@ -229,7 +222,6 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       const emailInput = screen.getByPlaceholderText('example@email.com');
-      const nameInput = screen.getByPlaceholderText('输入你的名字');
       const passwordInput = screen.getByPlaceholderText('设置密码');
       const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码');
       const registerButton = screen.getByText('创建账户');
@@ -237,7 +229,6 @@ describe('Page Navigation Integration Tests', () => {
       await act(async () => {
         fireEvent.click(screen.getByRole('tab', { name: /商户入驻/i }));
         fireEvent.change(emailInput, { target: { value: 'merchant@example.com' } });
-        fireEvent.change(nameInput, { target: { value: 'B端商家' } });
         fireEvent.change(passwordInput, { target: { value: 'password123' } });
         fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
         fireEvent.click(registerButton);
@@ -246,7 +237,6 @@ describe('Page Navigation Integration Tests', () => {
       await waitFor(() => {
         expect(mockRegister).toHaveBeenCalledWith(
           'merchant@example.com',
-          'B端商家',
           'password123',
           'merchant'
         );

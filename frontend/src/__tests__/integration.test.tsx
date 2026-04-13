@@ -256,14 +256,12 @@ describe('Integration Tests', () => {
     );
 
     // 输入注册信息
-    const nameInput = screen.getByPlaceholderText('输入你的名字') as HTMLInputElement;
     const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
     const passwordInput = screen.getByPlaceholderText('设置密码') as HTMLInputElement;
     const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码') as HTMLInputElement;
     const registerButton = screen.getByText('创建账户');
 
     await act(async () => {
-      fireEvent.change(nameInput, { target: { value: 'Test User' } });
       fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } });
       fireEvent.change(passwordInput, { target: { value: 'password123' } });
       fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
@@ -272,12 +270,7 @@ describe('Integration Tests', () => {
 
     // 检查是否调用了注册函数
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledWith(
-        'newuser@example.com',
-        'Test User',
-        'password123',
-        'user'
-      );
+      expect(mockRegister).toHaveBeenCalledWith('newuser@example.com', 'password123', 'user');
     });
   });
 

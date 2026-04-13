@@ -174,7 +174,7 @@ describe('AuthStore', () => {
       mockedAuthService.register.mockResolvedValueOnce(mockResponse as any);
 
       const store = useAuthStore.getState();
-      await store.register('new@example.com', 'New User', 'password');
+      await store.register('new@example.com', 'password');
 
       const newState = useAuthStore.getState();
       expect(newState.user?.email).toBe('new@example.com');
@@ -204,7 +204,7 @@ describe('AuthStore', () => {
       mockedAuthService.register.mockResolvedValueOnce(mockResponse as any);
 
       const store = useAuthStore.getState();
-      await store.register('merchant@example.com', 'Merchant User', 'password', 'merchant');
+      await store.register('merchant@example.com', 'password', 'merchant');
 
       const newState = useAuthStore.getState();
       expect(newState.user?.email).toBe('merchant@example.com');
@@ -217,7 +217,7 @@ describe('AuthStore', () => {
       mockedAuthService.register.mockRejectedValueOnce(new Error(errorMessage));
 
       const store = useAuthStore.getState();
-      await expect(store.register('existing@example.com', 'User', 'password')).rejects.toThrow(
+      await expect(store.register('existing@example.com', 'password')).rejects.toThrow(
         errorMessage
       );
 

@@ -33,12 +33,11 @@ export class RegisterPage {
     await this.page.waitForSelector('.auth-card');
   }
 
-  async register(email: string, name: string, password: string, role: 'user' | 'merchant' = 'user') {
+  async register(email: string, password: string, role: 'user' | 'merchant' = 'user') {
     if (role === 'merchant') {
       await this.page.getByRole('tab', { name: /商户入驻/i }).click();
     }
     await this.page.getByPlaceholder('example@email.com').fill(email);
-    await this.page.getByPlaceholder('输入你的名字').fill(name);
     await this.page.getByPlaceholder('设置密码').fill(password);
     await this.page.getByPlaceholder('再次输入密码').fill(password);
     await this.page.locator('button[type="submit"]').click();

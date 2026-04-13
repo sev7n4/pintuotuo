@@ -4,13 +4,20 @@ import Layout from '../Layout';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 
-// 模拟 message
-jest.mock('antd', () => ({
-  ...jest.requireActual('antd'),
-  message: {
-    success: jest.fn(),
-  },
-}));
+// 模拟 message；桌面端断点，避免测到 Drawer 移动导航
+jest.mock('antd', () => {
+  const antd = jest.requireActual('antd');
+  return {
+    ...antd,
+    message: {
+      success: jest.fn(),
+    },
+    Grid: {
+      ...antd.Grid,
+      useBreakpoint: () => ({ xs: false, sm: false, md: true, lg: true }),
+    },
+  };
+});
 
 // 模拟 CSS 文件
 jest.mock('../Layout.css', () => ({}));

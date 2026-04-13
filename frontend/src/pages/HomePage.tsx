@@ -213,10 +213,6 @@ const HomePage = () => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.heroHintCompact}>
-        <Text type="secondary">数字商品卖场 · Token / 订阅 / 并发套餐</Text>
-      </div>
-
       <div className={styles.searchSection}>
         <Space.Compact style={{ width: '100%', maxWidth: 720 }}>
           <Search

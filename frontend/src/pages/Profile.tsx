@@ -15,6 +15,9 @@ import {
   Row,
   Col,
   Statistic,
+  List,
+  Spin,
+  Empty,
 } from 'antd';
 import {
   UserOutlined,
@@ -26,6 +29,7 @@ import {
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import { userService } from '@/services/user';
+import type { UserIdentity } from '@/types';
 import styles from './Profile.module.css';
 
 const Profile = () => {
@@ -35,6 +39,31 @@ const Profile = () => {
   const [form] = Form.useForm();
   const [passwordForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [identities, setIdentities] = useState<UserIdentity[]>([]);
+  const [identitiesLoading, setIdentitiesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setIdentities([]);
+      return;
+    }
+    let cancelled = false;
+    setIdentitiesLoading(true);
+    userService
+      .getMyIdentities()
+      .then((res) => {
+        if (!cancelled && res.data?.data) setIdentities(res.data.data);
+      })
+      .catch(() => {
+        if (!cancelled) setIdentities([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIdentitiesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -186,6 +215,9 @@ const Profile = () => {
                     <Descriptions column={{ xs: 1, sm: 2 }} bordered>
                       <Descriptions.Item label="用户名">{user?.name}</Descriptions.Item>
                       <Descriptions.Item label="邮箱">{user?.email}</Descriptions.Item>
+                      <Descriptions.Item label="手机号">
+                        {user?.phone?.trim() ? user.phone : '未绑定'}
+                      </Descriptions.Item>
                       <Descriptions.Item label="角色">
                         <span>{user && getRoleTag(user.role)}</span>
                       </Descriptions.Item>
@@ -214,6 +246,40 @@ const Profile = () => {
                     </Button>
                   </div>
                 </div>
+              </Tabs.TabPane>
+
+              <Tabs.TabPane tab="账号绑定" key="identities">
+                <Spin spinning={identitiesLoading}>
+                  {identities.length === 0 && !identitiesLoading ? (
+                    <Empty
+                      description="暂无第三方账号绑定（微信 / GitHub 等需在服务端配置 OAuth 并完成授权）"
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    />
+                  ) : (
+                    <List
+                      size="small"
+                      bordered
+                      dataSource={identities}
+                      renderItem={(item) => (
+                        <List.Item>
+                          <List.Item.Meta
+                            title={
+                              <Space>
+                                <Tag>{item.provider}</Tag>
+                                {item.display_name && (
+                                  <span style={{ color: 'rgba(0,0,0,0.65)' }}>
+                                    {item.display_name}
+                                  </span>
+                                )}
+                              </Space>
+                            }
+                            description={<span style={{ fontSize: 12 }}>ID: {item.external_id}</span>}
+                          />
+                        </List.Item>
+                      )}
+                    />
+                  )}
+                </Spin>
               </Tabs.TabPane>
             </Tabs>
           </Card>

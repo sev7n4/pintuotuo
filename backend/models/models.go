@@ -7,6 +7,7 @@ type User struct {
 	ID             int       `json:"id"`
 	Email          string    `json:"email"`
 	Name           string    `json:"name"`
+	Phone          *string   `json:"phone,omitempty"`
 	Password       string    `json:"-"`
 	Role           string    `json:"role"` // user, merchant, admin
 	ReferralCode   string    `json:"referral_code,omitempty"`

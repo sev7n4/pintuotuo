@@ -121,7 +121,7 @@ test.describe('Registration', () => {
 
   test('should register new user and redirect to home', async ({ page }) => {
     const uniqueEmail = `test${Date.now()}@example.com`;
-    await registerPage.register(uniqueEmail, 'testuser', 'Test123456!');
+    await registerPage.register(uniqueEmail, 'Test123456!');
 
     await page.waitForURL(/.*\//, { timeout: 15000 });
     await expect(page).toHaveURL(/.*\//);
@@ -129,14 +129,14 @@ test.describe('Registration', () => {
 
   test('should register as merchant and redirect to merchant dashboard', async ({ page }) => {
     const uniqueEmail = `merchant${Date.now()}@example.com`;
-    await registerPage.register(uniqueEmail, 'merchant_user', 'Test123456!', 'merchant');
+    await registerPage.register(uniqueEmail, 'Test123456!', 'merchant');
     
     await page.waitForURL(/.*merchant/, { timeout: 15000 });
     await expect(page).toHaveURL(/.*merchant/);
   });
 
   test('should show error for duplicate email', async ({ page }) => {
-    await registerPage.register('demo@example.com', 'testuser', 'Test123456!');
+    await registerPage.register('demo@example.com', 'Test123456!');
     await page.waitForTimeout(2000);
     const errorMessage = page.locator('.ant-message');
     await expect(errorMessage.first()).toBeVisible({ timeout: 10000 });
@@ -146,7 +146,6 @@ test.describe('Registration', () => {
     const uniqueEmail = `test${Date.now()}@example.com`;
     
     await page.getByPlaceholder('example@email.com').fill(uniqueEmail);
-    await page.getByPlaceholder('输入你的名字').fill('testuser');
     await page.getByPlaceholder('设置密码').fill('Test123456!');
     await page.getByPlaceholder('再次输入密码').fill('DifferentPassword!');
     await page.locator('button[type="submit"]').click();

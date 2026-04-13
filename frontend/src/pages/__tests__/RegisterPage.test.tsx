@@ -53,7 +53,6 @@ describe('RegisterPage Component', () => {
     expect(screen.getByText('买家注册')).toBeInTheDocument();
     expect(screen.getByText('商户入驻')).toBeInTheDocument();
     expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
-    expect(screen.getByLabelText('名字')).toBeInTheDocument();
     expect(screen.getByLabelText('密码')).toBeInTheDocument();
     expect(screen.getByLabelText('确认密码')).toBeInTheDocument();
     expect(screen.getByText('创建账户')).toBeInTheDocument();
@@ -86,13 +85,11 @@ describe('RegisterPage Component', () => {
 
     // 填写表单
     const emailInput = screen.getByPlaceholderText('example@email.com');
-    const nameInput = screen.getByPlaceholderText('输入你的名字');
     const passwordInput = screen.getByPlaceholderText('设置密码');
     const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码');
     const submitButton = screen.getByText('创建账户');
 
     fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-    fireEvent.change(nameInput, { target: { value: 'Test User' } });
     fireEvent.change(passwordInput, { target: { value: 'password123' } });
     fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
 
@@ -103,16 +100,11 @@ describe('RegisterPage Component', () => {
 
     // 验证注册函数被调用
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledWith(
-        'test@example.com',
-        'Test User',
-        'password123',
-        'user'
-      );
+      expect(mockRegister).toHaveBeenCalledWith('test@example.com', 'password123', 'user');
     });
 
-    // 验证成功消息
-    expect(mockMessage.success).toHaveBeenCalledWith('注册成功');
+    // 验证成功消息（与 AuthPage 一致）
+    expect(mockMessage.success).toHaveBeenCalledWith('注册成功，已自动登录');
   });
 
   test('submits form successfully as merchant', async () => {
@@ -143,13 +135,11 @@ describe('RegisterPage Component', () => {
 
     // 填写表单
     const emailInput = screen.getByPlaceholderText('example@email.com');
-    const nameInput = screen.getByPlaceholderText('输入你的名字');
     const passwordInput = screen.getByPlaceholderText('设置密码');
     const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码');
     const submitButton = screen.getByText('创建账户');
 
     fireEvent.change(emailInput, { target: { value: 'merchant@example.com' } });
-    fireEvent.change(nameInput, { target: { value: 'Merchant User' } });
     fireEvent.change(passwordInput, { target: { value: 'password123' } });
     fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
 
@@ -162,14 +152,12 @@ describe('RegisterPage Component', () => {
     await waitFor(() => {
       expect(mockRegister).toHaveBeenCalledWith(
         'merchant@example.com',
-        'Merchant User',
         'password123',
         'merchant'
       );
     });
 
-    // 验证成功消息
-    expect(mockMessage.success).toHaveBeenCalledWith('注册成功');
+    expect(mockMessage.success).toHaveBeenCalledWith('注册成功，已自动登录');
   });
 
   test('handles password mismatch error', async () => {
@@ -196,13 +184,11 @@ describe('RegisterPage Component', () => {
 
     // 填写表单，密码不一致
     const emailInput = screen.getByPlaceholderText('example@email.com');
-    const nameInput = screen.getByPlaceholderText('输入你的名字');
     const passwordInput = screen.getByPlaceholderText('设置密码');
     const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码');
     const submitButton = screen.getByText('创建账户');
 
     fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-    fireEvent.change(nameInput, { target: { value: 'Test User' } });
     fireEvent.change(passwordInput, { target: { value: 'password123' } });
     fireEvent.change(confirmPasswordInput, { target: { value: 'differentpassword' } });
 
@@ -242,13 +228,11 @@ describe('RegisterPage Component', () => {
 
     // 填写表单
     const emailInput = screen.getByPlaceholderText('example@email.com');
-    const nameInput = screen.getByPlaceholderText('输入你的名字');
     const passwordInput = screen.getByPlaceholderText('设置密码');
     const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码');
     const submitButton = screen.getByText('创建账户');
 
     fireEvent.change(emailInput, { target: { value: 'existing@example.com' } });
-    fireEvent.change(nameInput, { target: { value: 'Test User' } });
     fireEvent.change(passwordInput, { target: { value: 'password123' } });
     fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
 
@@ -259,12 +243,7 @@ describe('RegisterPage Component', () => {
 
     // 验证注册函数被调用
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledWith(
-        'existing@example.com',
-        'Test User',
-        'password123',
-        'user'
-      );
+      expect(mockRegister).toHaveBeenCalledWith('existing@example.com', 'password123', 'user');
     });
 
     // 验证错误消息
@@ -325,8 +304,8 @@ describe('RegisterPage Component', () => {
     const loginButton = screen.getByText('立即登录');
     fireEvent.click(loginButton);
 
-    // 验证导航到登录页面
-    expect(screen.getByText('拼脱脱 - 注册')).toBeInTheDocument();
+    // 验证导航到登录页面（navigate('/login')）
+    expect(screen.getByText('拼脱脱 - 登录')).toBeInTheDocument();
   });
 
   test('switches to merchant tab and shows onboarding hint', () => {
