@@ -44,7 +44,9 @@ func redirectOAuthError(c *gin.Context, msg string) {
 }
 
 func oauthHTTPClient() *http.Client {
-	return &http.Client{Timeout: 15 * time.Second}
+	// 国内机房常出现 api.github.com 可达但 github.com（换 token 唯一入口）超时；
+	// http.Client 默认 Transport 会读 HTTPS_PROXY，部署时在 .env 配置出口代理即可。
+	return &http.Client{Timeout: 45 * time.Second}
 }
 
 func randomOAuthPassword() string {
