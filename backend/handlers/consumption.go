@@ -28,6 +28,7 @@ func GetConsumptionRecords(c *gin.Context) {
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 	provider := c.Query("provider")
+	modelFilter := c.Query("model")
 	pageStr := c.DefaultQuery("page", "1")
 	pageSizeStr := c.DefaultQuery("page_size", "20")
 
@@ -63,6 +64,11 @@ func GetConsumptionRecords(c *gin.Context) {
 	if provider != "" && provider != allProviders {
 		baseQuery += " AND provider = $" + strconv.Itoa(argIndex)
 		args = append(args, provider)
+		argIndex++
+	}
+	if modelFilter != "" {
+		baseQuery += " AND model = $" + strconv.Itoa(argIndex)
+		args = append(args, modelFilter)
 		argIndex++
 	}
 
@@ -134,6 +140,7 @@ func GetConsumptionStats(c *gin.Context) {
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 	provider := c.Query("provider")
+	modelFilter := c.Query("model")
 
 	db := config.GetDB()
 	if db == nil {
@@ -158,18 +165,24 @@ func GetConsumptionStats(c *gin.Context) {
 	if provider != "" && provider != allProviders {
 		baseQuery += " AND provider = $" + strconv.Itoa(argIndex)
 		args = append(args, provider)
+		argIndex++
+	}
+	if modelFilter != "" {
+		baseQuery += " AND model = $" + strconv.Itoa(argIndex)
+		args = append(args, modelFilter)
+		argIndex++
 	}
 
 	var stats struct {
 		TotalRequests int     `json:"total_requests"`
 		TotalTokens   int64   `json:"total_tokens"`
-		TokenUsage    int64   `json:"token_usage"`
 		TotalCost     float64 `json:"total_cost"`
 		AvgLatencyMs  int     `json:"avg_latency_ms"`
 	}
 
-	statsQuery := "SELECT COUNT(*), COALESCE(SUM(input_tokens + output_tokens), 0), COALESCE(SUM(token_usage), SUM(input_tokens + output_tokens)), COALESCE(SUM(cost), 0), COALESCE(AVG(latency_ms), 0) " + baseQuery
-	db.QueryRow(statsQuery, args...).Scan(&stats.TotalRequests, &stats.TotalTokens, &stats.TokenUsage, &stats.TotalCost, &stats.AvgLatencyMs)
+	// 总 Tokens：优先 token_usage，否则 input+output（与列表行一致）
+	statsQuery := "SELECT COUNT(*), COALESCE(SUM(COALESCE(token_usage, (input_tokens + output_tokens)::bigint)), 0), COALESCE(SUM(cost), 0), COALESCE(AVG(latency_ms), 0) " + baseQuery
+	db.QueryRow(statsQuery, args...).Scan(&stats.TotalRequests, &stats.TotalTokens, &stats.TotalCost, &stats.AvgLatencyMs)
 
 	providerQuery := "SELECT provider, COUNT(*) as count, SUM(cost) as cost " + baseQuery + " GROUP BY provider ORDER BY cost DESC"
 	rows, err := db.Query(providerQuery, args...)
@@ -194,8 +207,22 @@ func GetConsumptionStats(c *gin.Context) {
 		})
 	}
 
+	distinctModels := make([]string, 0)
+	dModelQ := "SELECT DISTINCT TRIM(model) AS m " + baseQuery + " AND TRIM(COALESCE(model,'')) <> '' ORDER BY m LIMIT 200"
+	dmRows, errDM := db.Query(dModelQ, args...)
+	if errDM == nil {
+		defer dmRows.Close()
+		for dmRows.Next() {
+			var m string
+			if err := dmRows.Scan(&m); err == nil && m != "" {
+				distinctModels = append(distinctModels, m)
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"stats":       stats,
-		"by_provider": byProvider,
+		"stats":          stats,
+		"by_provider":    byProvider,
+		"models_in_range": distinctModels,
 	})
 }

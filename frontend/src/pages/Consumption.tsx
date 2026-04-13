@@ -33,7 +33,7 @@ import {
   Bar,
 } from 'recharts';
 import styles from './Consumption.module.css';
-import { formatLedgerUnits, ledgerUnitColumnTitle } from '@/utils/ledgerDisplay';
+import { formatLedgerUnits, ledgerUnitColumnTitle, ledgerUnitShort } from '@/utils/ledgerDisplay';
 
 const { useBreakpoint } = Grid;
 const { RangePicker } = DatePicker;
@@ -68,16 +68,16 @@ interface ProviderStats {
 
 const { Paragraph, Text } = Typography;
 
-type MainView = 'dashboard' | 'records' | 'charts';
+type MainView = 'records' | 'charts';
 
 const Consumption: React.FC = () => {
-  /** 默认「明细列表」，避免用户误以为消费清单消失 */
   const [mainView, setMainView] = useState<MainView>('records');
   const [recordsLayout, setRecordsLayout] = useState<'table' | 'cards'>('table');
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<ConsumptionRecord[]>([]);
   const [stats, setStats] = useState<ConsumptionStats | null>(null);
   const [providerStats, setProviderStats] = useState<ProviderStats[]>([]);
+  const [modelOptions, setModelOptions] = useState<{ value: string; label: string }[]>([]);
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<ConsumptionRecord | null>(null);
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
@@ -85,13 +85,14 @@ const Consumption: React.FC = () => {
     dayjs(),
   ]);
   const [provider, setProvider] = useState<string>('all');
+  const [model, setModel] = useState<string>('');
   const screens = useBreakpoint();
 
   const isMobile = screens.xs || (screens.sm && !screens.md);
 
   useEffect(() => {
     fetchConsumptionData();
-  }, [dateRange, provider]);
+  }, [dateRange, provider, model]);
 
   const fetchConsumptionData = async () => {
     setLoading(true);
@@ -100,8 +101,11 @@ const Consumption: React.FC = () => {
       const params = new URLSearchParams({
         start_date: dateRange[0].format('YYYY-MM-DD'),
         end_date: dateRange[1].format('YYYY-MM-DD'),
-        provider: provider,
+        provider,
       });
+      if (model.trim()) {
+        params.set('model', model.trim());
+      }
 
       const [recordsRes, statsRes] = await Promise.all([
         fetch(`/api/v1/consumption/records?${params}`, {
@@ -121,6 +125,8 @@ const Consumption: React.FC = () => {
         const data = await statsRes.json();
         setStats(data.stats || null);
         setProviderStats(data.by_provider || []);
+        const models = (data.models_in_range as string[] | undefined) || [];
+        setModelOptions(models.map((m) => ({ value: m, label: m })));
       }
     } catch {
       message.error('获取消费数据失败');
@@ -322,6 +328,41 @@ const Consumption: React.FC = () => {
     [providerStats]
   );
 
+  const providerSelectOptions = useMemo(() => {
+    const base = [{ value: 'all', label: '全部 Provider' }];
+    const seen = new Set<string>();
+    const fromStats: { value: string; label: string }[] = [];
+    for (const p of providerStats) {
+      if (p.provider && !seen.has(p.provider)) {
+        seen.add(p.provider);
+        fromStats.push({ value: p.provider, label: p.provider.toUpperCase() });
+      }
+    }
+    if (fromStats.length > 0) {
+      return [...base, ...fromStats];
+    }
+    return [
+      ...base,
+      { value: 'openai', label: 'OpenAI' },
+      { value: 'anthropic', label: 'Anthropic' },
+      { value: 'google', label: 'Google' },
+      { value: 'azure', label: 'Azure' },
+    ];
+  }, [providerStats]);
+
+  const rangeMinutes = useMemo(() => {
+    const end = dateRange[1];
+    const start = dateRange[0];
+    if (!end?.diff || !start) {
+      return 1;
+    }
+    const m = end.diff(start, 'minute', true);
+    return Math.max(m, 1 / 60);
+  }, [dateRange]);
+
+  const rpm = stats ? stats.total_requests / rangeMinutes : 0;
+  const tpm = stats ? stats.total_tokens / rangeMinutes : 0;
+
   return (
     <div className={styles.container} style={{ padding: isMobile ? 12 : 24 }}>
       <div
@@ -337,13 +378,12 @@ const Consumption: React.FC = () => {
           value={mainView}
           onChange={(v) => setMainView(v as MainView)}
           options={[
-            { label: '简要看板', value: 'dashboard' },
             { label: '明细列表', value: 'records' },
             { label: '图表视图', value: 'charts' },
           ]}
         />
         <Paragraph type="secondary" style={{ margin: 0, flex: '1 1 200px' }}>
-          明细列表含完整调用记录；图表视图按日汇总扣减与按 Provider 对比。简要看板仅汇总数字。
+          上方筛选项对列表与统计、图表共用；明细列表可切换表格/卡片，图表按日汇总扣减与按 Provider 对比。
         </Paragraph>
       </div>
       {mainView === 'records' && (
@@ -369,14 +409,23 @@ const Consumption: React.FC = () => {
           <Select
             value={provider}
             onChange={setProvider}
-            style={{ width: isMobile ? 100 : 120 }}
+            style={{ width: isMobile ? 120 : 140 }}
             size={isMobile ? 'small' : 'middle'}
-            options={[
-              { value: 'all', label: '全部' },
-              { value: 'openai', label: 'OpenAI' },
-              { value: 'anthropic', label: 'Anthropic' },
-              { value: 'google', label: 'Google' },
-            ]}
+            options={providerSelectOptions}
+            showSearch
+            optionFilterProp="label"
+            placeholder="Provider"
+          />
+          <Select
+            value={model || undefined}
+            onChange={(v) => setModel(v ?? '')}
+            allowClear
+            showSearch
+            placeholder="模型"
+            style={{ width: isMobile ? 140 : 200 }}
+            size={isMobile ? 'small' : 'middle'}
+            options={modelOptions}
+            notFoundContent={modelOptions.length ? undefined : '先选日期并刷新'}
           />
           <Button
             icon={<ReloadOutlined />}
@@ -389,7 +438,7 @@ const Consumption: React.FC = () => {
       </Card>
       <Card className={styles.statsCard}>
         <Row gutter={[16, 16]}>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6} lg={4}>
             <Statistic
               title="总请求数"
               value={stats?.total_requests || 0}
@@ -397,22 +446,22 @@ const Consumption: React.FC = () => {
               valueStyle={{ fontSize: isMobile ? 18 : 24 }}
             />
           </Col>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6} lg={4}>
             <Statistic
-              title="总Tokens"
+              title="总 Tokens"
               value={stats?.total_tokens || 0}
               valueStyle={{ fontSize: isMobile ? 18 : 24 }}
             />
           </Col>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6} lg={4}>
             <Statistic
-              title="合计扣减（Token）"
+              title="合计扣减"
               value={stats?.total_cost || 0}
-              suffix="Token"
+              suffix={ledgerUnitShort}
               valueStyle={{ color: '#f5222d', fontSize: isMobile ? 18 : 24 }}
             />
           </Col>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6} lg={4}>
             <Statistic
               title="平均延迟"
               value={stats?.avg_latency_ms || 0}
@@ -420,7 +469,29 @@ const Consumption: React.FC = () => {
               valueStyle={{ fontSize: isMobile ? 18 : 24 }}
             />
           </Col>
+          <Col xs={12} sm={12} md={6} lg={4}>
+            <Statistic
+              title="RPM（均）"
+              value={rpm}
+              precision={2}
+              suffix="/min"
+              valueStyle={{ fontSize: isMobile ? 16 : 20 }}
+            />
+          </Col>
+          <Col xs={12} sm={12} md={6} lg={4}>
+            <Statistic
+              title="TPM（均）"
+              value={tpm}
+              precision={0}
+              suffix="/min"
+              valueStyle={{ fontSize: isMobile ? 16 : 20 }}
+            />
+          </Col>
         </Row>
+        <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: 12 }}>
+          总请求数/总 Tokens/合计扣减/平均延迟来自后端对 api_usage_logs 的聚合；RPM、TPM
+          为当前日期范围内总请求数、总 Tokens 除以区间分钟数（均值，非峰值）。
+        </Paragraph>
       </Card>
 
       {mainView !== 'charts' && providerStats.length > 0 && (
@@ -529,11 +600,21 @@ const Consumption: React.FC = () => {
                   <Col xs={24} sm={12} lg={8} key={r.id}>
                     <Card
                       size="small"
+                      hoverable
+                      onClick={() => showDetail(r)}
+                      styles={{ body: { cursor: 'pointer' } }}
                       title={
                         <Tag color={getProviderColor(r.provider)}>{r.provider.toUpperCase()}</Tag>
                       }
                       extra={
-                        <Button type="link" size="small" onClick={() => showDetail(r)}>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            showDetail(r);
+                          }}
+                        >
                           详情
                         </Button>
                       }

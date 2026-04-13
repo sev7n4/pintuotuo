@@ -50,7 +50,6 @@ describe('Consumption', () => {
         </MemoryRouter>
       );
     });
-    expect(screen.getByText('简要看板')).toBeInTheDocument();
     expect(screen.getByText('明细列表')).toBeInTheDocument();
     expect(screen.getByText('图表视图')).toBeInTheDocument();
   });
