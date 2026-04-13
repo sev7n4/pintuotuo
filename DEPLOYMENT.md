@@ -108,6 +108,38 @@ kubectl create secret generic pintuotuo-secrets \
 | `REDIS_URL` | 全部 | Redis 连接 | redis://localhost:6379 |
 | `KAFKA_BROKERS` | 全部 | Kafka 代理 | localhost:9092 |
 
+### 腾讯云 Docker Compose：邮箱魔法链接（Mock，不发信）
+
+适用于 `docker-compose.prod.yml` 部署：在服务器项目目录（如 `/opt/pintuotuo`）的 **`.env`** 中增加或修改为：
+
+```bash
+AUTH_MAGIC_LINK=true
+EMAIL_MAGIC_MOCK=true
+```
+
+**重要：**
+
+- Mock 模式下**不要**同时配齐 `SMTP_HOST`、`SMTP_PORT`、`SMTP_FROM`（及发信账号），否则后端会优先走真实发信，接口响应里**不会出现** `debug_link`。
+- 验证链接必须是你**在浏览器里能打开的公网地址**。二选一配置：
+  - **推荐**：`PUBLIC_API_BASE_URL=https://你的域名`（与对外 API 一致，无尾斜杠）。
+  - 或只设 `FRONTEND_URL=https://你的站点`，并保证 Nginx 将 `https://你的站点/api/v1` 反代到后端（与线上一致）。
+
+写入 `.env` 后重建后端容器使环境变量生效：
+
+```bash
+cd /opt/pintuotuo   # 以实际路径为准
+docker-compose -f docker-compose.prod.yml up -d --force-recreate backend
+```
+
+**如何自测（Mock）**
+
+1. **能力开关**：`curl -sS 'https://你的域名/api/v1/users/auth/capabilities'`，应见 `"email_magic": true`。
+2. **请求发链**：`POST /api/v1/users/email/magic/send`，JSON `{"email":"你的邮箱@example.com"}`，应 **HTTP 200** 且 JSON 含 **`debug_link`**（同时服务端日志会有 `[EMAIL_MAGIC_MOCK]`）。
+3. **完成登录**：用浏览器打开 `debug_link` 中的完整 URL（一次性，约 15 分钟内），应重定向到前端并带上 token，完成登录。
+4. **前端**：登录页「发送邮箱魔法链接」可点；开发环境下前端可能对 `debug_link` 再弹一条 `message.info`，生产环境请以接口或日志为准。
+
+切换到真实邮件时：关闭 `EMAIL_MAGIC_MOCK`（或设为 `false`），配置完整 `SMTP_*`，并去掉与 Mock 冲突的依赖。
+
 ---
 
 ## 监控和日志
