@@ -131,7 +131,7 @@ func RegisterUser(c *gin.Context) {
 	}
 
 	// If user is a merchant, create merchant record with pending status (requires admin approval)
-	if role == "merchant" {
+	if role == roleMerchant {
 		_, err = db.Exec(
 			"INSERT INTO merchants (user_id, company_name, status) VALUES ($1, $2, $3)",
 			user.ID, displayName, "pending",
