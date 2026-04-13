@@ -67,7 +67,7 @@ WHERE user_id = :user_id;
 
 ## 6. 代码辅助
 
-后端提供 `services.ReconcileUserUsage` / `services.UsageReconcileOK`（见 `services/usage_reconcile.go`），可在集成环境或小流量抽样调用，与 **第 2 节** SQL 等价。
+后端提供 `services.ReconcileUserUsage` / `services.UsageReconcileOK`（见 `services/usage_reconcile.go`），对比 **用量日志计费 Token 量**（`COALESCE(token_usage, input+output)`）与 **usage 流水扣减（Token）**；可在集成环境或小流量抽样调用，与 **第 2 节** SQL 等价（勿再与 `cost` 元混比）。
 
 ---
 
@@ -77,7 +77,7 @@ WHERE user_id = :user_id;
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/v1/admin/reconciliation/ledger` | 全库 `api_usage_logs` 与 usage 流水合计对比 |
+| GET | `/api/v1/admin/reconciliation/ledger` | 全库计费 Token（`api_usage_logs`）与 `token_transactions` usage 扣减对比，响应含 `unit: tokens` |
 | GET | `/api/v1/admin/reconciliation/ledger/drift?page=&page_size=` | 按用户列出差值（可能较慢） |
 | GET | `/api/v1/admin/reconciliation/ledger/drift/export` | 差异用户 CSV（UTF-8 BOM，最多约 5 万行） |
 | POST | `/api/v1/admin/reconciliation/ledger/check` | 与 GET ledger 相同计算并写审计日志，供定时任务触发 |

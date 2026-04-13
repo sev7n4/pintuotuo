@@ -161,9 +161,10 @@ const AdminReconciliation = () => {
   const ledgerTab = (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Paragraph type="secondary">
-        全库汇总：<Text code>api_usage_logs.cost</Text> 之和应与{' '}
-        <Text code>token_transactions</Text>（type=usage）扣减绝对值之和一致，单位为内部
-        Token，与「我的 Token」扣费同口径。
+        全库汇总：<Text code>api_usage_logs</Text> 中每行计费 Token 量（
+        <Text code>COALESCE(token_usage, input_tokens + output_tokens)</Text>
+        ）之和，应与 <Text code>token_transactions</Text> 中 <Text code>type=usage</Text>{' '}
+        扣减绝对值之和一致；单位为平台 Token，与「我的 Token」扣费同口径（非人民币 cost）。
       </Paragraph>
       <Row gutter={16}>
         <Col xs={24} sm={8}>

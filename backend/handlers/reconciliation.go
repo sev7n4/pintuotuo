@@ -15,7 +15,8 @@ import (
 	"github.com/pintuotuo/backend/services"
 )
 
-// AdminGetLedgerReconciliation returns full-database usage log vs token_transactions usage sums.
+// AdminGetLedgerReconciliation returns full-database billable-token totals from api_usage_logs
+// vs token_transactions usage deductions (both platform Token units).
 func AdminGetLedgerReconciliation(c *gin.Context) {
 	if !requireAdminRole(c) {
 		return
@@ -37,6 +38,7 @@ func AdminGetLedgerReconciliation(c *gin.Context) {
 		"usage_tx_total":  txSum,
 		"delta":           delta,
 		"matched":         services.UsageReconcileOK(logSum, txSum),
+		"unit":            "tokens",
 		"checked_at":      time.Now().UTC().Format(time.RFC3339),
 	})
 }
@@ -153,6 +155,7 @@ func AdminPostLedgerCheck(c *gin.Context) {
 		"usage_tx_total":  txSum,
 		"delta":           delta,
 		"matched":         ok,
+		"unit":            "tokens",
 		"checked_at":      time.Now().UTC().Format(time.RFC3339),
 	})
 }
