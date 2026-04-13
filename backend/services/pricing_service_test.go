@@ -122,12 +122,12 @@ func TestGetStrategyConfig(t *testing.T) {
 	router := GetSmartRouter()
 
 	tests := []struct {
-		name           string
-		strategyCode   string
-		wantFound      bool
-		wantPriceW     float64
-		wantLatencyW   float64
-		wantReliabW    float64
+		name         string
+		strategyCode string
+		wantFound    bool
+		wantPriceW   float64
+		wantLatencyW float64
+		wantReliabW  float64
 	}{
 		{
 			name:         "Price first strategy",
@@ -175,17 +175,17 @@ func TestGetStrategyConfig(t *testing.T) {
 
 func TestPricingHistoryStruct(t *testing.T) {
 	history := PricingHistory{
-		ID:            1,
-		EntityType:    "spu",
-		EntityID:      100,
-		OldInputPrice: 10.0,
+		ID:             1,
+		EntityType:     "spu",
+		EntityID:       100,
+		OldInputPrice:  10.0,
 		OldOutputPrice: 30.0,
-		NewInputPrice: 12.0,
+		NewInputPrice:  12.0,
 		NewOutputPrice: 35.0,
-		ChangeReason:  "Market adjustment",
-		ChangedBy:     1,
-		ChangedAt:     time.Now(),
-		EffectiveAt:   time.Now(),
+		ChangeReason:   "Market adjustment",
+		ChangedBy:      1,
+		ChangedAt:      time.Now(),
+		EffectiveAt:    time.Now(),
 	}
 
 	if history.EntityType != "spu" {
@@ -198,15 +198,15 @@ func TestPricingHistoryStruct(t *testing.T) {
 
 func TestPricingScheduleStruct(t *testing.T) {
 	schedule := PricingSchedule{
-		ID:            1,
-		EntityType:    "spu",
-		EntityID:      100,
-		NewInputPrice: 15.0,
+		ID:             1,
+		EntityType:     "spu",
+		EntityID:       100,
+		NewInputPrice:  15.0,
 		NewOutputPrice: 40.0,
-		ScheduledAt:   time.Now().Add(24 * time.Hour),
-		Status:        "pending",
-		ChangeReason:  "Scheduled price increase",
-		CreatedBy:     1,
+		ScheduledAt:    time.Now().Add(24 * time.Hour),
+		Status:         "pending",
+		ChangeReason:   "Scheduled price increase",
+		CreatedBy:      1,
 	}
 
 	if schedule.Status != "pending" {

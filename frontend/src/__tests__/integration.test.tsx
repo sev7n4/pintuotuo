@@ -5,6 +5,7 @@ import LoginPage from '../pages/LoginPage';
 import CartPage from '../pages/CartPage';
 import RegisterPage from '../pages/RegisterPage';
 import { useAuthStore, type AuthState } from '@/stores/authStore';
+import { AUTH_PRIMARY_LOGIN_KEY } from '@/lib/authLoginPreference';
 import { useReferralStore } from '@/stores/referralStore';
 import { useCartStore } from '@/stores/cartStore';
 
@@ -53,6 +54,17 @@ Object.defineProperty(navigator, 'clipboard', {
 describe('Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.removeItem(AUTH_PRIMARY_LOGIN_KEY);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        sms: false,
+        email_magic: false,
+        wechat_oauth: false,
+        github_oauth: false,
+        account_linking: false,
+      }),
+    });
   });
 
   test('should render referral page for unauthenticated users', async () => {
@@ -125,7 +137,7 @@ describe('Integration Tests', () => {
       error: null,
       isAuthenticated,
       rememberMe: false,
-      login: async (email: string, password: string) => {
+      login: async (email: string, password: string, _remember?: boolean) => {
         const result = await mockLogin(email, password);
         isAuthenticated = true;
         return result;
@@ -134,6 +146,7 @@ describe('Integration Tests', () => {
       loginWithSms: jest.fn(),
       registerWithSms: jest.fn(),
       sendSmsCode: jest.fn(),
+      sendEmailMagicLink: jest.fn(),
       logout: jest.fn(),
       fetchUser: mockFetchUser,
       setUser: jest.fn(),
@@ -207,7 +220,7 @@ describe('Integration Tests', () => {
     // 输入登录信息
     const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
     const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
-    const loginButton = screen.getByText('登 录');
+    const loginButton = screen.getByRole('button', { name: '密码登录' });
 
     await act(async () => {
       fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
@@ -220,11 +233,11 @@ describe('Integration Tests', () => {
     });
   });
 
-  test('should bind referral code during registration', async () => {
-    const mockRegister = jest.fn().mockResolvedValue({ token: 'test-token' });
+  test('should submit unified auth form on register route (referral query preserved for future bind)', async () => {
+    const mockLogin = jest.fn().mockResolvedValue({ token: 'test-token' });
     const mockBindReferralCode = jest.fn().mockResolvedValue(undefined);
 
-    // 初始未认证状态
+    // 初始未认证状态（注册路由与登录共用 AuthPage，密码入口走 login）
     mockUseAuthStore.mockReturnValue({
       user: null,
       token: null,
@@ -232,11 +245,12 @@ describe('Integration Tests', () => {
       error: null,
       isAuthenticated: false,
       rememberMe: false,
-      login: jest.fn(),
-      register: mockRegister,
+      login: mockLogin,
+      register: jest.fn(),
       loginWithSms: jest.fn(),
       registerWithSms: jest.fn(),
       sendSmsCode: jest.fn(),
+      sendEmailMagicLink: jest.fn(),
       logout: jest.fn(),
       fetchUser: jest.fn(),
       setUser: jest.fn(),
@@ -273,23 +287,21 @@ describe('Integration Tests', () => {
       </MemoryRouter>
     );
 
-    // 输入注册信息
+    // 输入邮箱密码（与登录页同一套表单；推荐码 query 保留供后续绑定逻辑使用）
     const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
-    const passwordInput = screen.getByPlaceholderText('设置密码') as HTMLInputElement;
-    const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码') as HTMLInputElement;
-    const registerButton = screen.getByText('创建账户');
+    const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
+    const submitButton = screen.getByRole('button', { name: '密码登录' });
 
     await act(async () => {
       fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } });
       fireEvent.change(passwordInput, { target: { value: 'password123' } });
-      fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
-      fireEvent.click(registerButton);
+      fireEvent.click(submitButton);
     });
 
-    // 检查是否调用了注册函数
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledWith('newuser@example.com', 'password123', 'user');
+      expect(mockLogin).toHaveBeenCalledWith('newuser@example.com', 'password123', true);
     });
+    expect(mockBindReferralCode).not.toHaveBeenCalled();
   });
 
   test('should integrate referral system with cart and orders', async () => {
@@ -942,7 +954,7 @@ describe('Integration Tests', () => {
       </MemoryRouter>
     );
 
-    const loginButton = screen.getByText('登 录');
+    const loginButton = screen.getByRole('button', { name: '密码登录' });
     expect(loginButton).toBeInTheDocument();
 
     const emailInput = screen.getByPlaceholderText('example@email.com');
@@ -982,6 +994,7 @@ describe('Integration Tests', () => {
           loginWithSms: jest.fn(),
           registerWithSms: jest.fn(),
           sendSmsCode: jest.fn(),
+          sendEmailMagicLink: jest.fn(),
           logout: jest.fn(),
           fetchUser: jest.fn(),
           setUser: jest.fn(),
@@ -1026,7 +1039,7 @@ describe('Integration Tests', () => {
 
     const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
     const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
-    const loginButton = screen.getByText('登 录');
+    const loginButton = screen.getByRole('button', { name: '密码登录' });
 
     await act(async () => {
       fireEvent.change(emailInput, { target: { value: 'test@example.com' } });

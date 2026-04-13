@@ -2,6 +2,7 @@ import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import LoginPage from '../LoginPage';
 import { useAuthStore } from '@/stores/authStore';
+import { AUTH_PRIMARY_LOGIN_KEY } from '@/lib/authLoginPreference';
 
 jest.mock('@/stores/authStore');
 
@@ -18,6 +19,17 @@ const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore
 describe('LoginPage Integration Tests - User Experience Flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.removeItem(AUTH_PRIMARY_LOGIN_KEY);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        sms: false,
+        email_magic: false,
+        wechat_oauth: false,
+        github_oauth: false,
+        account_linking: false,
+      }),
+    });
   });
 
   describe('TC-AUTH-001: 用户登录成功流程', () => {
@@ -71,7 +83,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
       const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
@@ -132,7 +144,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
       const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'merchant@example.com' } });
@@ -193,7 +205,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
       const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'admin@example.com' } });
@@ -230,7 +242,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       );
 
       const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'invalid-email' } });
@@ -264,7 +276,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       );
 
       const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'userexample.com' } });
@@ -300,7 +312,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       );
 
       const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
@@ -339,7 +351,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
       const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'wrong@example.com' } });
@@ -377,7 +389,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
       const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
@@ -414,10 +426,10 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByText('拼脱脱 - 登录')).toBeInTheDocument();
+      expect(screen.getByText('拼脱脱 - 登录 / 注册')).toBeInTheDocument();
       expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
-      expect(screen.getByLabelText('密码')).toBeInTheDocument();
-      expect(screen.getByText('登 录')).toBeInTheDocument();
+      expect(screen.getByLabelText('密码（仅曾用邮箱注册的账号）')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '密码登录' })).toBeInTheDocument();
       expect(screen.getByText('创建新账户')).toBeInTheDocument();
     });
 
@@ -506,8 +518,8 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         </MemoryRouter>
       );
 
-      const loginButton = screen.getByText('登 录');
-      expect(loginButton).toBeInTheDocument();
+      //加载中 Ant Design 按钮的可访问名可能变化，用文案更稳
+      expect(screen.getByText('密码登录')).toBeInTheDocument();
     });
   });
 
@@ -533,7 +545,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         </MemoryRouter>
       );
 
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.click(loginButton);
@@ -582,7 +594,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
       const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'wrong@example.com' } });
@@ -651,7 +663,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
       const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
@@ -730,7 +742,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       const emailInput = screen.getByPlaceholderText('example@email.com');
       const passwordInput = screen.getByPlaceholderText('输入密码');
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
@@ -778,7 +790,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       const emailInput = screen.getByPlaceholderText('example@email.com');
       const passwordInput = screen.getByPlaceholderText('输入密码');
       const checkbox = screen.getByLabelText('记住我');
-      const loginButton = screen.getByText('登 录');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
 
       await act(async () => {
         fireEvent.click(checkbox);
@@ -789,6 +801,91 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       await waitFor(() => {
         expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', false);
+      });
+    });
+  });
+
+  describe('TC-AUTH-011: 记住主登录入口', () => {
+    test('上次为手机登录时默认展示手机入口（未开短信时显示说明）', async () => {
+      localStorage.setItem(AUTH_PRIMARY_LOGIN_KEY, 'phone');
+
+      mockUseAuthStore.mockReturnValue({
+        user: null,
+        token: null,
+        isLoading: false,
+        error: null,
+        isAuthenticated: false,
+        rememberMe: false,
+        login: jest.fn(),
+        register: jest.fn(),
+        loginWithSms: jest.fn(),
+        registerWithSms: jest.fn(),
+        sendSmsCode: jest.fn(),
+        sendEmailMagicLink: jest.fn(),
+        logout: jest.fn(),
+        fetchUser: jest.fn(),
+        setUser: jest.fn(),
+        clearError: jest.fn(),
+        setRememberMe: jest.fn(),
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/login']}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('暂未开启手机号验证码')).toBeInTheDocument();
+      });
+    });
+
+    test('邮箱密码登录成功后写入偏好为 email', async () => {
+      const mockLogin = jest.fn().mockResolvedValue(undefined);
+
+      mockUseAuthStore.mockReturnValue({
+        user: null,
+        token: null,
+        isLoading: false,
+        error: null,
+        isAuthenticated: false,
+        rememberMe: false,
+        login: mockLogin,
+        register: jest.fn(),
+        loginWithSms: jest.fn(),
+        registerWithSms: jest.fn(),
+        sendSmsCode: jest.fn(),
+        sendEmailMagicLink: jest.fn(),
+        logout: jest.fn(),
+        fetchUser: jest.fn(),
+        setUser: jest.fn(),
+        clearError: jest.fn(),
+        setRememberMe: jest.fn(),
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/login']}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      const emailInput = screen.getByPlaceholderText('example@email.com');
+      const passwordInput = screen.getByPlaceholderText('输入密码');
+      const loginButton = screen.getByRole('button', { name: '密码登录' });
+
+      await act(async () => {
+        fireEvent.change(emailInput, { target: { value: 'a@b.com' } });
+        fireEvent.change(passwordInput, { target: { value: 'secret' } });
+        fireEvent.click(loginButton);
+      });
+
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalled();
+        expect(localStorage.getItem(AUTH_PRIMARY_LOGIN_KEY)).toBe('email');
       });
     });
   });

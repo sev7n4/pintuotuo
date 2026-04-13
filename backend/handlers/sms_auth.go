@@ -213,7 +213,55 @@ type smsLoginBody struct {
 	Code  string `json:"code" binding:"required"`
 }
 
+func findUserByPhone(db *sql.DB, phone string) (*models.User, error) {
+	var user models.User
+	var phoneCol sql.NullString
+	err := db.QueryRow(
+		`SELECT id, email, name, role, created_at, updated_at, phone FROM users WHERE phone = $1`,
+		phone,
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt, &phoneCol)
+	if err != nil {
+		return nil, err
+	}
+	if phoneCol.Valid && phoneCol.String != "" {
+		user.Phone = &phoneCol.String
+	}
+	return &user, nil
+}
+
+func createUserFromPhone(db *sql.DB, phone string) (*models.User, error) {
+	email := fmt.Sprintf("p%s@phone.pintuotuo.local", phone)
+	displayName := phone
+	pwd := hashPassword(randomOAuthPassword())
+
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var user models.User
+	err = tx.QueryRow(
+		`INSERT INTO users (email, name, password_hash, role, status, phone) VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, email, name, role, created_at, updated_at`,
+		email, displayName, pwd, roleUser, "active", phone,
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	user.Phone = &phone
+
+	if _, err := tx.Exec(`INSERT INTO tokens (user_id, balance) VALUES ($1, $2)`, user.ID, 0); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 // LoginWithSMS POST /users/sms/login — 验证码登录（无需密码）
+// 若手机号尚未注册，则自动创建 user 账号并登录（无感注册）。
 func LoginWithSMS(c *gin.Context) {
 	var req smsLoginBody
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -240,22 +288,22 @@ func LoginWithSMS(c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	var phoneCol sql.NullString
-	err := db.QueryRow(
-		`SELECT id, email, name, role, created_at, updated_at, phone FROM users WHERE phone = $1`,
-		phone,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.Role, &user.CreatedAt, &user.UpdatedAt, &phoneCol)
+	user, err := findUserByPhone(db, phone)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			middleware.RespondWithError(c, apperrors.ErrInvalidCredentials)
+		if !errors.Is(err, sql.ErrNoRows) {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-	if phoneCol.Valid && phoneCol.String != "" {
-		user.Phone = &phoneCol.String
+		user, err = createUserFromPhone(db, phone)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"USER_CREATION_FAILED",
+				"Failed to auto create user from phone",
+				http.StatusInternalServerError,
+				err,
+			))
+			return
+		}
 	}
 
 	token := generateToken(user.ID, user.Email, user.Role)

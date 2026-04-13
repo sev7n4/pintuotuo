@@ -18,8 +18,7 @@ interface RegisterRequest {
 }
 
 export const authService = {
-  register: (data: RegisterRequest) =>
-    api.post<APIResponse<LoginResponse>>('/users/register', data),
+  register: (data: RegisterRequest) => api.post<APIResponse<LoginResponse>>('/users/register', data),
 
   login: (data: LoginRequest) => api.post<APIResponse<LoginResponse>>('/users/login', data),
 
@@ -27,6 +26,9 @@ export const authService = {
 
   sendSmsCode: (phone: string, scene?: string) =>
     api.post<{ message?: string; debug_code?: string }>('/users/sms/send', { phone, scene }),
+
+  sendEmailMagicLink: (email: string) =>
+    api.post<{ message?: string; debug_link?: string }>('/users/email/magic/send', { email }),
 
   registerWithSms: (data: { phone: string; code: string; password: string; role?: string }) =>
     api.post<APIResponse<LoginResponse>>('/users/sms/register', data),

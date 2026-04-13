@@ -34,20 +34,20 @@ func TestBillingEngine_PreDeductBalance_Logic(t *testing.T) {
 	t.Run("should validate pre-deduct amount calculation", func(t *testing.T) {
 		inputTokens := 1000
 		config := &PreDeductConfig{Multiplier: 2, MaxMultiplier: 10}
-		
+
 		engine := GetBillingEngine()
 		estimated := engine.EstimateTokenUsage(inputTokens, config)
-		
+
 		assert.Equal(t, int64(2000), estimated)
 	})
 
 	t.Run("should respect max multiplier", func(t *testing.T) {
 		inputTokens := 1000
 		config := &PreDeductConfig{Multiplier: 15, MaxMultiplier: 5}
-		
+
 		engine := GetBillingEngine()
 		estimated := engine.EstimateTokenUsage(inputTokens, config)
-		
+
 		assert.Equal(t, int64(5000), estimated)
 	})
 }
@@ -56,7 +56,7 @@ func TestBillingEngine_SettlePreDeduct_Logic(t *testing.T) {
 	t.Run("should calculate refund correctly when actual < pre-deduct", func(t *testing.T) {
 		preDeductAmount := int64(1000)
 		actualUsage := int64(800)
-		
+
 		diff := preDeductAmount - actualUsage
 		assert.Equal(t, int64(200), diff)
 		assert.True(t, diff > 0)
@@ -65,11 +65,11 @@ func TestBillingEngine_SettlePreDeduct_Logic(t *testing.T) {
 	t.Run("should calculate additional charge when actual > pre-deduct", func(t *testing.T) {
 		preDeductAmount := int64(1000)
 		actualUsage := int64(1500)
-		
+
 		diff := preDeductAmount - actualUsage
 		assert.Equal(t, int64(-500), diff)
 		assert.True(t, diff < 0)
-		
+
 		extraNeeded := -diff
 		assert.Equal(t, int64(500), extraNeeded)
 	})
@@ -77,7 +77,7 @@ func TestBillingEngine_SettlePreDeduct_Logic(t *testing.T) {
 	t.Run("should handle exact match", func(t *testing.T) {
 		preDeductAmount := int64(1000)
 		actualUsage := int64(1000)
-		
+
 		diff := preDeductAmount - actualUsage
 		assert.Equal(t, int64(0), diff)
 	})
@@ -86,7 +86,7 @@ func TestBillingEngine_SettlePreDeduct_Logic(t *testing.T) {
 func TestBillingEngine_CancelPreDeduct_Logic(t *testing.T) {
 	t.Run("should refund full pre-deduct amount on cancel", func(t *testing.T) {
 		preDeductAmount := int64(1000)
-		
+
 		assert.Equal(t, int64(1000), preDeductAmount)
 	})
 }

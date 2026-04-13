@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Form,
   Input,
   Button,
   Card,
-  Tabs,
   message,
   Space,
   Typography,
@@ -63,16 +62,26 @@ export type AuthPhoneSectionProps = {
   smsEnabled: boolean;
   /** 已完成 capabilities 请求（含失败时的降级） */
   capabilitiesLoaded: boolean;
+  /**
+   * true：嵌入主登录卡片内，不再套一层 Card（与邮箱登录二选一展示时用）
+   */
+  embedded?: boolean;
+  /** 验证码登录成功回调（用于记住「手机登录」偏好） */
+  onSmsLoginSuccess?: () => void;
 };
 
 /**
- * 手机号验证码登录 / 注册（需后端 MOCK_SMS 或 SMS_PROVIDER）
+ * 手机号验证码登录（需后端 MOCK_SMS 或 SMS_PROVIDER）
  * 未开启时仍展示说明，避免用户误以为「没有手机登录入口」。
  */
-export function AuthPhoneSection({ smsEnabled, capabilitiesLoaded }: AuthPhoneSectionProps) {
-  const { sendSmsCode, loginWithSms, registerWithSms, isLoading } = useAuthStore();
+export function AuthPhoneSection({
+  smsEnabled,
+  capabilitiesLoaded,
+  embedded = false,
+  onSmsLoginSuccess,
+}: AuthPhoneSectionProps) {
+  const { sendSmsCode, loginWithSms, isLoading } = useAuthStore();
   const [loginForm] = Form.useForm();
-  const [regForm] = Form.useForm();
   const [sending, setSending] = useState(false);
   const screens = useBreakpoint();
   /** 与 Layout 一致：未达 md 断点时验证码行纵向排列，避免按钮挤压 */
@@ -98,140 +107,81 @@ export function AuthPhoneSection({ smsEnabled, capabilitiesLoaded }: AuthPhoneSe
     }
   };
 
-  if (!capabilitiesLoaded) {
-    return (
+  const wrap = (inner: React.ReactNode) =>
+    embedded ? (
+      <div>{inner}</div>
+    ) : (
       <Card size="small" title={<><MobileOutlined /> 手机号</>} style={{ marginTop: 16 }}>
-        <div style={{ textAlign: 'center', padding: '16px 0' }}>
-          <Spin tip="加载登录方式…" />
-        </div>
+        {inner}
       </Card>
+    );
+
+  if (!capabilitiesLoaded) {
+    return wrap(
+      <div style={{ textAlign: 'center', padding: '16px 0' }}>
+        <Spin tip="加载登录方式…" />
+      </div>
     );
   }
 
   if (!smsEnabled) {
-    return (
-      <Card size="small" title={<><MobileOutlined /> 手机号</>} style={{ marginTop: 16 }}>
-        <Alert
-          type="info"
-          showIcon
-          message="暂未开启手机号验证码"
-          description={
-            <Typography.Paragraph style={{ marginBottom: 0, fontSize: 13 }}>
-              服务端需在环境变量中开启短信能力后重启后端，本区域才会出现「验证码登录 / 手机号注册」：
-              <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-                <li>
-                  开发/联调：设置 <Typography.Text code>MOCK_SMS=true</Typography.Text>，验证码多为{' '}
-                  <Typography.Text code>123456</Typography.Text>
-                </li>
-                <li>
-                  生产：配置真实短信网关对应的 <Typography.Text code>SMS_PROVIDER</Typography.Text> 等变量
-                </li>
-              </ul>
-            </Typography.Paragraph>
-          }
-        />
-      </Card>
+    return wrap(
+      <Alert
+        type="info"
+        showIcon
+        message="暂未开启手机号验证码"
+        description={
+          <Typography.Paragraph style={{ marginBottom: 0, fontSize: 13 }}>
+            服务端需在环境变量中开启短信能力后重启后端，此处才会出现验证码登录表单：
+            <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+              <li>
+                开发/联调：设置 <Typography.Text code>MOCK_SMS=true</Typography.Text>，验证码多为{' '}
+                <Typography.Text code>123456</Typography.Text>
+              </li>
+              <li>
+                生产：配置真实短信网关对应的 <Typography.Text code>SMS_PROVIDER</Typography.Text> 等变量
+              </li>
+            </ul>
+          </Typography.Paragraph>
+        }
+      />
     );
   }
 
-  return (
-    <Card size="small" title={<><MobileOutlined /> 手机号</>} style={{ marginTop: 16 }}>
-      <Tabs
-        items={[
-          {
-            key: 'plogin',
-            label: '验证码登录',
-            children: (
-              <Form form={loginForm} layout="vertical" onFinish={onSmsLogin} size="small">
-                <Form.Item label="手机号" name="phone" rules={phoneRules}>
-                  <Input placeholder="11 位手机号" maxLength={11} />
-                </Form.Item>
-                <SmsCodeField
-                  stack={stackCodeRow}
-                  sending={sending}
-                  onSendCode={() => {
-                    const p = loginForm.getFieldValue('phone');
-                    void handleSend(p);
-                  }}
-                />
-                <Form.Item style={{ marginBottom: 0 }}>
-                  <Button type="primary" htmlType="submit" block loading={isLoading}>
-                    验证码登录
-                  </Button>
-                </Form.Item>
-              </Form>
-            ),
-          },
-          {
-            key: 'preg',
-            label: '手机号注册',
-            children: (
-              <Form form={regForm} layout="vertical" onFinish={onSmsRegister} size="small">
-                <Form.Item label="手机号" name="phone" rules={phoneRules}>
-                  <Input placeholder="11 位手机号" maxLength={11} />
-                </Form.Item>
-                <SmsCodeField
-                  stack={stackCodeRow}
-                  sending={sending}
-                  onSendCode={() => {
-                    const p = regForm.getFieldValue('phone');
-                    void handleSend(p);
-                  }}
-                />
-                <Form.Item
-                  label="密码"
-                  name="password"
-                  rules={[{ required: true, min: 6, message: '至少 6 位密码' }]}
-                >
-                  <Input.Password placeholder="设置密码" />
-                </Form.Item>
-                <Form.Item
-                  label="确认密码"
-                  name="confirmPassword"
-                  rules={[{ required: true, message: '请确认密码' }]}
-                >
-                  <Input.Password placeholder="再次输入" />
-                </Form.Item>
-                <Form.Item style={{ marginBottom: 0 }}>
-                  <Button type="primary" htmlType="submit" block loading={isLoading}>
-                    注册并登录
-                  </Button>
-                </Form.Item>
-              </Form>
-            ),
-          },
-        ]}
-      />
+  return wrap(
+    <>
+      <Form form={loginForm} layout="vertical" onFinish={onSmsLogin} size="small">
+        <Form.Item label="手机号" name="phone" rules={phoneRules}>
+          <Input placeholder="11 位手机号" maxLength={11} />
+        </Form.Item>
+        <SmsCodeField
+          stack={stackCodeRow}
+          sending={sending}
+          onSendCode={() => {
+            const p = loginForm.getFieldValue('phone');
+            void handleSend(p);
+          }}
+        />
+        <Form.Item style={{ marginBottom: 0 }}>
+          <Button type="primary" htmlType="submit" block loading={isLoading}>
+            验证并进入
+          </Button>
+        </Form.Item>
+      </Form>
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
-        开发环境可设置 <code>MOCK_SMS=true</code>，验证码固定为 <code>123456</code>。
+        首次手机号验证成功将自动创建账号并登录。开发环境可设置 <code>MOCK_SMS=true</code>，验证码固定为{' '}
+        <code>123456</code>。
       </Typography.Paragraph>
-    </Card>
+    </>
   );
 
   async function onSmsLogin(values: { phone: string; code: string }) {
     try {
       await loginWithSms(values.phone.trim(), values.code.trim());
+      onSmsLoginSuccess?.();
       message.success('登录成功');
     } catch (e) {
       message.error(e instanceof Error ? e.message : '登录失败');
-    }
-  }
-
-  async function onSmsRegister(values: {
-    phone: string;
-    code: string;
-    password: string;
-    confirmPassword: string;
-  }) {
-    if (values.password !== values.confirmPassword) {
-      message.error('两次密码不一致');
-      return;
-    }
-    try {
-      await registerWithSms(values.phone.trim(), values.code.trim(), values.password, 'user');
-      message.success('注册成功，已自动登录');
-    } catch (e) {
-      message.error(e instanceof Error ? e.message : '注册失败');
     }
   }
 }

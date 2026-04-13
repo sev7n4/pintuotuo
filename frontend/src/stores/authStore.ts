@@ -21,6 +21,7 @@ export interface AuthState {
   loginWithSms: (phone: string, code: string) => Promise<void>;
   registerWithSms: (phone: string, code: string, password: string, role?: string) => Promise<void>;
   sendSmsCode: (phone: string) => Promise<{ message?: string; debug_code?: string } | undefined>;
+  sendEmailMagicLink?: (email: string) => Promise<{ message?: string; debug_link?: string } | undefined>;
   logout: () => Promise<void>;
   fetchUser: () => Promise<void>;
   setUser: (user: User) => void;
@@ -123,6 +124,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   sendSmsCode: async (phone) => {
     const res = await authService.sendSmsCode(phone, 'auth');
+    return res.data;
+  },
+
+  sendEmailMagicLink: async (email) => {
+    const res = await authService.sendEmailMagicLink(email);
     return res.data;
   },
 

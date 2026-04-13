@@ -94,13 +94,13 @@ func TestAdminCreateRoutingStrategy_MissingRole(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	reqBody := map[string]interface{}{
-		"name":                  "Test Strategy",
-		"code":                  "test_strategy",
-		"price_weight":          0.33,
-		"latency_weight":        0.34,
-		"reliability_weight":    0.33,
-		"max_retry_count":       3,
-		"retry_backoff_base":    1000,
+		"name":                      "Test Strategy",
+		"code":                      "test_strategy",
+		"price_weight":              0.33,
+		"latency_weight":            0.34,
+		"reliability_weight":        0.33,
+		"max_retry_count":           3,
+		"retry_backoff_base":        1000,
 		"circuit_breaker_threshold": 5,
 		"circuit_breaker_timeout":   60,
 	}
@@ -118,11 +118,11 @@ func TestAdminCreateRoutingStrategy_NonAdminRole(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	reqBody := map[string]interface{}{
-		"name":                  "Test Strategy",
-		"code":                  "test_strategy",
-		"price_weight":          0.33,
-		"latency_weight":        0.34,
-		"reliability_weight":    0.33,
+		"name":               "Test Strategy",
+		"code":               "test_strategy",
+		"price_weight":       0.33,
+		"latency_weight":     0.34,
+		"reliability_weight": 0.33,
 	}
 	body, _ := json.Marshal(reqBody)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/admin/routing-strategies", bytes.NewBuffer(body))
