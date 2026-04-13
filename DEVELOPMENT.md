@@ -298,6 +298,8 @@ cd frontend && npm run build -- --analyze
 
 ## 资源
 
+- [docs/DEV_ENTITLEMENTS.md](docs/DEV_ENTITLEMENTS.md) - 权益白名单开关、表字段与本地造数
+- [docs/PRODUCT_ENTITLEMENTS.md](docs/PRODUCT_ENTITLEMENTS.md) - 产品侧：严格白名单语义与用户可见错误
 - [backend/doc_internal_token_economics.md](backend/doc_internal_token_economics.md) - 内部经济（余额 / 扣费 / 价目）；任务清单见 [.trae/plans/development-plan-v1.md](.trae/plans/development-plan-v1.md) **附录 A**
 - [CLAUDE.md](../CLAUDE.md) - 项目开发指南
 - [Gin框架文档](https://gin-gonic.com/)

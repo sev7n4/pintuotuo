@@ -149,6 +149,20 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	c.Header("X-Request-ID", requestID)
 	c.Header("X-Trace-ID", requestID)
 
+	var strictPricingVID *int
+	if services.EntitlementEnforcementStrict() {
+		vid, _, ok, entErr := services.ResolveChosenPricingVersion(db, userIDInt, req.Provider, req.Model)
+		if entErr != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		if !ok {
+			middleware.RespondWithError(c, apperrors.ErrEntitlementDenied)
+			return
+		}
+		strictPricingVID = &vid
+	}
+
 	var tokenBalance float64
 	err := db.QueryRow("SELECT balance FROM tokens WHERE user_id = $1", userIDInt).Scan(&tokenBalance)
 	if err != nil {
@@ -399,7 +413,16 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		inputTokens = apiResp.Usage.PromptTokens
 		outputTokens = apiResp.Usage.CompletionTokens
 		tokenUsage = billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
-		cost = calculateTokenCost(db, userIDInt, req.Provider, req.Model, inputTokens, outputTokens)
+		var cerr error
+		cost, cerr = calculateTokenCost(db, userIDInt, req.Provider, req.Model, inputTokens, outputTokens, strictPricingVID)
+		if cerr != nil {
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			logger.LogError(context.Background(), "api_proxy", "Token cost resolution failed", cerr, map[string]interface{}{
+				"user_id": userIDInt, "provider": req.Provider, "model": req.Model, "request_id": requestID,
+			})
+			middleware.RespondWithError(c, apperrors.ErrPricingSnapshotMiss)
+			return
+		}
 	}
 
 	if tokenUsage > 0 {
@@ -471,7 +494,24 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	c.Data(resp.StatusCode, "application/json", body)
 }
 
-func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTokens, outputTokens int) float64 {
+func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTokens, outputTokens int, strictPricingVID *int) (float64, error) {
+	if strictPricingVID != nil {
+		cost, ok := services.CalculateCostFromPricingVersion(db, *strictPricingVID, provider, model, inputTokens, outputTokens)
+		if !ok {
+			return 0, fmt.Errorf("strict pricing snapshot miss for version %d", *strictPricingVID)
+		}
+		logger.LogDebug(context.Background(), "api_proxy", "Token cost from entitlement pricing_version", map[string]interface{}{
+			"pricing_version_id": *strictPricingVID,
+			"pricing_source":     "entitlement_strict",
+			"provider":           provider,
+			"model":              model,
+			"input_tokens":       inputTokens,
+			"output_tokens":      outputTokens,
+			"cost":               cost,
+		})
+		return cost, nil
+	}
+
 	vid := services.LatestUserPricingVersionID(db, userID)
 	if vid.Valid {
 		if cost, ok := services.CalculateCostFromPricingVersion(db, int(vid.Int64), provider, model, inputTokens, outputTokens); ok {
@@ -484,7 +524,7 @@ func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTok
 				"output_tokens":      outputTokens,
 				"cost":               cost,
 			})
-			return cost
+			return cost, nil
 		}
 		logger.LogDebug(context.Background(), "api_proxy", "pricing_version snapshot miss, fallback live SPU", map[string]interface{}{
 			"pricing_version_id": vid.Int64,
@@ -505,7 +545,7 @@ func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTok
 		"pricing_source": "live_spu",
 	})
 
-	return cost
+	return cost, nil
 }
 
 func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeConfig, error) {

@@ -124,9 +124,14 @@ func renewSubscriptionWithToken(ctx context.Context, db *sql.DB, engine *billing
 		return false, true, nil
 	}
 
+	baseline := BaselinePricingVersionID(tx)
+	var pvArg interface{}
+	if baseline.Valid {
+		pvArg = baseline.Int64
+	}
 	_, err = tx.ExecContext(ctx, `
-		UPDATE user_subscriptions SET end_date = $1::date, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-		newEndStr, subscriptionID,
+		UPDATE user_subscriptions SET end_date = $1::date, pricing_version_id = $2, entitlement_anchor_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+		newEndStr, pvArg, subscriptionID,
 	)
 	if err != nil {
 		return false, false, err

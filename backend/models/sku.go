@@ -169,17 +169,19 @@ type ComputePointTransaction struct {
 }
 
 type UserSubscription struct {
-	ID                int       `json:"id"`
-	UserID            int       `json:"user_id"`
-	SKUID             int       `json:"sku_id"`
-	StartDate         time.Time `json:"start_date"`
-	EndDate           time.Time `json:"end_date"`
-	UsedTokens        int64     `json:"used_tokens"`
-	UsedComputePoints float64   `json:"used_compute_points"`
-	Status            string    `json:"status"`
-	AutoRenew         bool      `json:"auto_renew"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                  int        `json:"id"`
+	UserID              int        `json:"user_id"`
+	SKUID               int        `json:"sku_id"`
+	StartDate           time.Time  `json:"start_date"`
+	EndDate             time.Time  `json:"end_date"`
+	UsedTokens          int64      `json:"used_tokens"`
+	UsedComputePoints   float64    `json:"used_compute_points"`
+	Status              string     `json:"status"`
+	AutoRenew           bool       `json:"auto_renew"`
+	PricingVersionID    *int       `json:"pricing_version_id,omitempty"`
+	EntitlementAnchorAt *time.Time `json:"entitlement_anchor_at,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 type UserSubscriptionWithSKU struct {

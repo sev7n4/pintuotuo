@@ -210,6 +210,18 @@ var (
 		Status:  http.StatusNotFound,
 	}
 
+	ErrEntitlementDenied = &AppError{
+		Code:    "ENTITLEMENT_DENIED",
+		Message: "No active purchase or subscription entitles this provider/model; see GET /tokens/api-usage-guide",
+		Status:  http.StatusForbidden,
+	}
+
+	ErrPricingSnapshotMiss = &AppError{
+		Code:    "PRICING_SNAPSHOT_MISS",
+		Message: "Entitlement pricing snapshot has no rate row for this model; contact support",
+		Status:  http.StatusInternalServerError,
+	}
+
 	// API Key errors
 	ErrAPIKeyNotFound = &AppError{
 		Code:    "API_KEY_NOT_FOUND",

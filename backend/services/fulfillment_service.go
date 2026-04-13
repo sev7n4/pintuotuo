@@ -214,6 +214,19 @@ func (s *FulfillmentService) fulfillSubscription(tx *sql.Tx, userID, skuID, orde
 	return s.upsertSubscription(tx, userID, skuID, orderID, qty, period, validDays, false)
 }
 
+// subscriptionPVAndAnchor binds pricing snapshot from the paid order (baseline if unset).
+func subscriptionPVAndAnchor(tx *sql.Tx, orderID int) (sql.NullInt64, time.Time, error) {
+	var pv sql.NullInt64
+	err := tx.QueryRow(`SELECT pricing_version_id FROM orders WHERE id = $1`, orderID).Scan(&pv)
+	if err != nil {
+		return sql.NullInt64{}, time.Time{}, err
+	}
+	if !pv.Valid {
+		pv = BaselinePricingVersionID(tx)
+	}
+	return pv, time.Now().UTC(), nil
+}
+
 func (s *FulfillmentService) fulfillTrial(tx *sql.Tx, userID, skuID, orderID, qty int, skuRow skuFulfillmentRow) error {
 	days := 7
 	if skuRow.TrialDurationDays.Valid && skuRow.TrialDurationDays.Int64 > 0 {
@@ -221,7 +234,6 @@ func (s *FulfillmentService) fulfillTrial(tx *sql.Tx, userID, skuID, orderID, qt
 	} else if skuRow.ValidDays.Valid && skuRow.ValidDays.Int64 > 0 {
 		days = int(skuRow.ValidDays.Int64)
 	}
-	_ = orderID
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	end := today.AddDate(0, 0, days*qty)
 	var subID int
@@ -230,7 +242,11 @@ func (s *FulfillmentService) fulfillTrial(tx *sql.Tx, userID, skuID, orderID, qt
 		userID, skuID,
 	).Scan(&subID)
 	if err == sql.ErrNoRows {
-		return s.insertSubscription(tx, userID, skuID, today, end, false)
+		pv, anchor, perr := subscriptionPVAndAnchor(tx, orderID)
+		if perr != nil {
+			return perr
+		}
+		return s.insertSubscription(tx, userID, skuID, today, end, false, pv, anchor)
 	}
 	if err != nil {
 		return err
@@ -245,22 +261,36 @@ func (s *FulfillmentService) fulfillTrial(tx *sql.Tx, userID, skuID, orderID, qt
 		base = today
 	}
 	newEnd := base.AddDate(0, 0, days*qty)
-	_, err = tx.Exec(`UPDATE user_subscriptions SET end_date = $1::date, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, newEnd.Format("2006-01-02"), subID)
+	pv, anchor, perr := subscriptionPVAndAnchor(tx, orderID)
+	if perr != nil {
+		return perr
+	}
+	var pvArg interface{}
+	if pv.Valid {
+		pvArg = pv.Int64
+	}
+	_, err = tx.Exec(
+		`UPDATE user_subscriptions SET end_date = $1::date, pricing_version_id = $2, entitlement_anchor_at = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+		newEnd.Format("2006-01-02"), pvArg, anchor, subID,
+	)
 	return err
 }
 
 func (s *FulfillmentService) upsertSubscription(tx *sql.Tx, userID, skuID, orderID, qty int, period string, validDays int, autoRenew bool) error {
-	_ = orderID
+	pv, anchor, err := subscriptionPVAndAnchor(tx, orderID)
+	if err != nil {
+		return err
+	}
 	var subID int
 	var endDate time.Time
-	err := tx.QueryRow(
+	err = tx.QueryRow(
 		`SELECT id, end_date FROM user_subscriptions WHERE user_id = $1 AND sku_id = $2 AND status = 'active' FOR UPDATE`,
 		userID, skuID,
 	).Scan(&subID, &endDate)
 	if err == sql.ErrNoRows {
 		start := time.Now().UTC().Truncate(24 * time.Hour)
 		end := StackSubscriptionPeriods(start, period, validDays, qty)
-		return s.insertSubscription(tx, userID, skuID, start, end, autoRenew)
+		return s.insertSubscription(tx, userID, skuID, start, end, autoRenew, pv, anchor)
 	}
 	if err != nil {
 		return err
@@ -271,9 +301,13 @@ func (s *FulfillmentService) upsertSubscription(tx *sql.Tx, userID, skuID, order
 		base = today
 	}
 	newEnd := StackSubscriptionPeriods(base, period, validDays, qty)
+	var pvArg interface{}
+	if pv.Valid {
+		pvArg = pv.Int64
+	}
 	_, err = tx.Exec(
-		`UPDATE user_subscriptions SET end_date = $1::date, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-		newEnd.Format("2006-01-02"), subID,
+		`UPDATE user_subscriptions SET end_date = $1::date, pricing_version_id = $2, entitlement_anchor_at = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+		newEnd.Format("2006-01-02"), pvArg, anchor, subID,
 	)
 	return err
 }
@@ -287,11 +321,15 @@ func StackSubscriptionPeriods(base time.Time, period string, validDays int, qty 
 	return t
 }
 
-func (s *FulfillmentService) insertSubscription(tx *sql.Tx, userID, skuID int, start, end time.Time, autoRenew bool) error {
+func (s *FulfillmentService) insertSubscription(tx *sql.Tx, userID, skuID int, start, end time.Time, autoRenew bool, pv sql.NullInt64, anchor time.Time) error {
+	var pvArg interface{}
+	if pv.Valid {
+		pvArg = pv.Int64
+	}
 	_, err := tx.Exec(
-		`INSERT INTO user_subscriptions (user_id, sku_id, start_date, end_date, status, auto_renew)
-		 VALUES ($1, $2, $3::date, $4::date, 'active', $5)`,
-		userID, skuID, start.Format("2006-01-02"), end.Format("2006-01-02"), autoRenew,
+		`INSERT INTO user_subscriptions (user_id, sku_id, start_date, end_date, status, auto_renew, pricing_version_id, entitlement_anchor_at)
+		 VALUES ($1, $2, $3::date, $4::date, 'active', $5, $6, $7)`,
+		userID, skuID, start.Format("2006-01-02"), end.Format("2006-01-02"), autoRenew, pvArg, anchor,
 	)
 	return err
 }
