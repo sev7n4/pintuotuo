@@ -104,7 +104,8 @@ func GithubOAuthCallback(c *gin.Context) {
 		Error       string `json:"error"`
 		Description string `json:"error_description"`
 	}
-	if err := json.Unmarshal(respBody, &tr); err != nil || tr.AccessToken == "" {
+	err = json.Unmarshal(respBody, &tr)
+	if err != nil || tr.AccessToken == "" {
 		redirectOAuthError(c, "github_token_invalid")
 		return
 	}
@@ -134,7 +135,8 @@ func GithubOAuthCallback(c *gin.Context) {
 		Login string  `json:"login"`
 		Name  *string `json:"name"`
 	}
-	if err := json.Unmarshal(userBody, &gu); err != nil || gu.ID == 0 {
+	err = json.Unmarshal(userBody, &gu)
+	if err != nil || gu.ID == 0 {
 		redirectOAuthError(c, "github_user_parse")
 		return
 	}
@@ -178,13 +180,18 @@ func WechatOAuthCallback(c *gin.Context) {
 		return
 	}
 
-	u := fmt.Sprintf(
-		"https://api.weixin.qq.com/sns/oauth2/access_token?appid=%s&secret=%s&code=%s&grant_type=authorization_code",
-		url.QueryEscape(appID),
-		url.QueryEscape(secret),
-		url.QueryEscape(code),
-	)
-	resp, err := oauthHTTPClient().Get(u)
+	wxTokenURL := &url.URL{
+		Scheme: "https",
+		Host:   "api.weixin.qq.com",
+		Path:   "/sns/oauth2/access_token",
+	}
+	qTok := url.Values{}
+	qTok.Set("appid", appID)
+	qTok.Set("secret", secret)
+	qTok.Set("code", code)
+	qTok.Set("grant_type", "authorization_code")
+	wxTokenURL.RawQuery = qTok.Encode()
+	resp, err := oauthHTTPClient().Get(wxTokenURL.String())
 	if err != nil {
 		redirectOAuthError(c, "wechat_token_network")
 		return
@@ -206,7 +213,8 @@ func WechatOAuthCallback(c *gin.Context) {
 		ErrCode      int    `json:"errcode"`
 		ErrMsg       string `json:"errmsg"`
 	}
-	if err := json.Unmarshal(body, &wxTok); err != nil {
+	err = json.Unmarshal(body, &wxTok)
+	if err != nil {
 		redirectOAuthError(c, "wechat_token_parse")
 		return
 	}
@@ -221,12 +229,17 @@ func WechatOAuthCallback(c *gin.Context) {
 	}
 	syntheticEmail := fmt.Sprintf("wx-%s@oauth.pintuotuo.local", sanitizeEmailLocal(extID))
 
-	infoURL := fmt.Sprintf(
-		"https://api.weixin.qq.com/sns/userinfo?access_token=%s&openid=%s&lang=zh_CN",
-		url.QueryEscape(wxTok.AccessToken),
-		url.QueryEscape(wxTok.OpenID),
-	)
-	respI, err := oauthHTTPClient().Get(infoURL)
+	infoU := &url.URL{
+		Scheme: "https",
+		Host:   "api.weixin.qq.com",
+		Path:   "/sns/userinfo",
+	}
+	qInfo := url.Values{}
+	qInfo.Set("access_token", wxTok.AccessToken)
+	qInfo.Set("openid", wxTok.OpenID)
+	qInfo.Set("lang", "zh_CN")
+	infoU.RawQuery = qInfo.Encode()
+	respI, err := oauthHTTPClient().Get(infoU.String())
 	if err != nil {
 		redirectOAuthError(c, "wechat_userinfo_network")
 		return
@@ -245,7 +258,8 @@ func WechatOAuthCallback(c *gin.Context) {
 		ErrCode  int    `json:"errcode"`
 		ErrMsg   string `json:"errmsg"`
 	}
-	if err := json.Unmarshal(infoBody, &wxUser); err != nil {
+	err = json.Unmarshal(infoBody, &wxUser)
+	if err != nil {
 		redirectOAuthError(c, "wechat_userinfo_parse")
 		return
 	}
