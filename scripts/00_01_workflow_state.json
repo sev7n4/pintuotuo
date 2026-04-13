@@ -6,11 +6,11 @@
   "current_fix_cases": ["make-test", "make-test-backend", "frontend-npm-test"],
   "status": "ci_monitoring",
   "branch": "feature/entitlement-strict-pricing-snapshot",
-  "pr_number": null,
+  "pr_number": 270,
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "pending",
+    "cicd": "running",
     "integration": "pending",
     "e2e": "pending",
     "deploy": null
