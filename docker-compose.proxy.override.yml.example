@@ -1,0 +1,16 @@
+# 复制为 docker-compose.proxy.override.yml 后按需修改。
+# 用于大陆机房后端无法直连 https://github.com/login/oauth/access_token 时，经 HTTP(S) 代理出站。
+#
+# 启动示例：
+#   docker compose -f docker-compose.prod.yml -f docker-compose.proxy.override.yml up -d --force-recreate backend
+#
+# HTTPS_PROXY 请改为你的可用代理（宿主机 Clash 常见为 host.docker.internal:7890）。
+
+services:
+  backend:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - HTTPS_PROXY=${HTTPS_PROXY:-http://host.docker.internal:7890}
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - NO_PROXY=localhost,127.0.0.1,postgres,redis,backend,frontend,pintuotuo-postgres,pintuotuo-redis
