@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   message,
+  Modal,
   Checkbox,
   Alert,
   Divider,
@@ -161,9 +162,29 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
     setSendingMagic(true);
     try {
       const res = await sendEmailMagicLink(values.email.trim());
-      message.success('登录链接已发送，请检查邮箱');
       if (res?.debug_link) {
-        message.info(`[开发] 魔法链接：${res.debug_link}`);
+        // Mock：未发真实邮件；Message 内文字不可点击，用弹窗给出可跳转入口
+        message.success('当前为联调模式，未发送真实邮件');
+        Modal.info({
+          title: '完成登录',
+          width: 520,
+          okText: '立即验证并登录',
+          onOk: () => {
+            window.location.assign(res.debug_link!);
+          },
+          content: (
+            <div>
+              <Typography.Paragraph style={{ marginBottom: 8 }}>
+                真实环境会发到邮箱；Mock 模式下请点下方按钮，浏览器将打开验证链接并跳转回本站完成登录。
+              </Typography.Paragraph>
+              <Typography.Paragraph copyable={{ text: res.debug_link }} style={{ marginBottom: 0 }}>
+                {res.debug_link}
+              </Typography.Paragraph>
+            </div>
+          ),
+        });
+      } else {
+        message.success('登录链接已发送，请检查邮箱');
       }
     } catch (err) {
       message.error(err instanceof Error ? err.message : '发送失败，请稍后重试');
