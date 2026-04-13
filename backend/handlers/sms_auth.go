@@ -165,9 +165,9 @@ func RegisterWithSMS(c *gin.Context) {
 		return
 	}
 
-	role := "user"
-	if req.Role == "merchant" {
-		role = "merchant"
+	role := roleUser
+	if req.Role == roleMerchant {
+		role = roleMerchant
 	}
 	displayName := phone
 	hash := hashPassword(req.Password)
@@ -193,7 +193,7 @@ func RegisterWithSMS(c *gin.Context) {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	if role == "merchant" {
+	if role == roleMerchant {
 		_, _ = db.Exec(`INSERT INTO merchants (user_id, company_name, status) VALUES ($1, $2, $3)`, user.ID, displayName, "pending")
 	}
 
