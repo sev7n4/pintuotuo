@@ -41,7 +41,9 @@ func RegisterUserRoutes(router *gin.RouterGroup) {
 		users.POST("/sms/register", handlers.RegisterWithSMS)
 		users.POST("/sms/login", handlers.LoginWithSMS)
 		users.GET("/oauth/wechat/start", handlers.WechatOAuthStart)
+		users.GET("/oauth/wechat/callback", handlers.WechatOAuthCallback)
 		users.GET("/oauth/github/start", handlers.GithubOAuthStart)
+		users.GET("/oauth/github/callback", handlers.GithubOAuthCallback)
 
 		users.POST("/register", handlers.RegisterUser)
 		users.POST("/login", handlers.LoginUser)

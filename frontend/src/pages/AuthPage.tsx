@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Form,
   Input,
@@ -39,11 +39,13 @@ type AuthCapabilities = {
 export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, register, isLoading, error, user, isAuthenticated } = useAuthStore();
+  const { login, register, fetchUser, isLoading, error, user, isAuthenticated } =
+    useAuthStore();
   const [loginForm] = Form.useForm();
   const [registerForm] = Form.useForm();
   const [accountTab, setAccountTab] = useState<'buyer' | 'merchant'>('buyer');
   const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
+  const oauthRedirectHandled = useRef(false);
 
   const loadCapabilities = useCallback(() => {
     fetch('/api/v1/users/auth/capabilities')
@@ -57,6 +59,35 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
   useEffect(() => {
     loadCapabilities();
   }, [loadCapabilities]);
+
+  /** OAuth 回调：后端重定向到 /login?oauth=1&token=... 或 ?oauth_error=... */
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const oauthFlag = params.get('oauth');
+    const tok = params.get('token');
+    const oauthErr = params.get('oauth_error');
+
+    if (oauthErr) {
+      message.error(decodeURIComponent(oauthErr.replace(/\+/g, ' ')));
+      navigate({ pathname: location.pathname, search: '' }, { replace: true });
+      return;
+    }
+    if (oauthFlag === '1' && tok) {
+      if (oauthRedirectHandled.current) return;
+      oauthRedirectHandled.current = true;
+      localStorage.setItem('auth_token', tok);
+      void fetchUser()
+        .then(() => {
+          message.success('登录成功');
+          navigate({ pathname: location.pathname, search: '' }, { replace: true });
+        })
+        .catch(() => {
+          oauthRedirectHandled.current = false;
+          message.error('第三方登录失败，请重试');
+          navigate({ pathname: location.pathname, search: '' }, { replace: true });
+        });
+    }
+  }, [location.search, location.pathname, fetchUser, navigate]);
 
   const path = location.pathname;
   const authTab: 'login' | 'register' =
