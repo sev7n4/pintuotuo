@@ -31,9 +31,14 @@ import {
   Tooltip as RechartsTooltip,
   BarChart,
   Bar,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  Legend,
+  Cell,
 } from 'recharts';
 import styles from './Consumption.module.css';
-import { formatLedgerUnits, ledgerUnitColumnTitle } from '@/utils/ledgerDisplay';
+import { formatLedgerUnits } from '@/utils/ledgerDisplay';
 
 const { useBreakpoint } = Grid;
 const { RangePicker } = DatePicker;
@@ -49,35 +54,115 @@ interface ConsumptionRecord {
   latency_ms: number;
   input_tokens: number;
   output_tokens: number;
-  cost: number;
   created_at: string;
 }
 
 interface ConsumptionStats {
   total_requests: number;
-  total_tokens: number;
-  total_cost: number;
+  total_token_deduction: number;
   avg_latency_ms: number;
 }
 
 interface ProviderStats {
   provider: string;
   count: number;
-  cost: number;
+  tokens: number;
+}
+
+/** 与 GET /consumption/stats 中 model_comparison 一致 */
+interface ModelComparisonRow {
+  provider: string;
+  model: string;
+  request_count: number;
+  total_token_deduction: number;
+  avg_token_deduction: number;
+  latency_p50_ms: number;
+  latency_p95_ms: number;
+  success_rate: number;
+}
+
+type ModelComparePoint = ModelComparisonRow & {
+  rpm: number;
+  tpm: number;
+  low_sample: boolean;
+};
+
+const MIN_MODEL_SAMPLES = 5;
+
+function getProviderColorStatic(provider: string): string {
+  const colors: Record<string, string> = {
+    openai: 'green',
+    anthropic: 'purple',
+    google: 'blue',
+    azure: 'cyan',
+  };
+  return colors[provider.toLowerCase()] || 'default';
+}
+
+function providerChartFill(provider: string): string {
+  const key = (provider || '').toLowerCase();
+  const map: Record<string, string> = {
+    openai: '#52c41a',
+    anthropic: '#722ed1',
+    google: '#1677ff',
+    azure: '#13c2c2',
+  };
+  return map[key] || '#8c8c8c';
+}
+
+function ModelCompareTooltipView({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: ReadonlyArray<{ payload: ModelComparePoint }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  const srPct = Number.isFinite(p.success_rate) ? (p.success_rate * 100).toFixed(1) : '—';
+  return (
+    <div className={styles.modelCompareTooltip}>
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>
+        {p.model}
+        <Tag color={getProviderColorStatic(p.provider)} style={{ marginLeft: 8 }}>
+          {p.provider.toUpperCase()}
+        </Tag>
+      </div>
+      <div>延迟 p50：{Math.round(p.latency_p50_ms)} ms · p95：{Math.round(p.latency_p95_ms)} ms</div>
+      <div>单次平均扣减：{formatLedgerUnits(Math.round(p.avg_token_deduction))} Tokens</div>
+      <div>
+        请求数：{p.request_count.toLocaleString()} · 成功率：{srPct}%
+      </div>
+      <div>
+        RPM：{p.rpm.toFixed(2)} / min · TPM：{Math.round(p.tpm).toLocaleString()} / min
+      </div>
+      {p.low_sample ? (
+        <Paragraph type="warning" style={{ marginTop: 8, marginBottom: 0, fontSize: 11 }}>
+          样本较少（少于 {MIN_MODEL_SAMPLES} 次请求），对比仅供参考
+        </Paragraph>
+      ) : null}
+    </div>
+  );
+}
+
+/** C 端扣减口径：输入 tokens + 输出 tokens（与统计合计一致，不展示内部 cost） */
+function rowTokenDeduct(r: Pick<ConsumptionRecord, 'input_tokens' | 'output_tokens'>): number {
+  return (Number(r.input_tokens) || 0) + (Number(r.output_tokens) || 0);
 }
 
 const { Paragraph, Text } = Typography;
 
-type MainView = 'dashboard' | 'records' | 'charts';
+type MainView = 'records' | 'charts';
 
 const Consumption: React.FC = () => {
-  /** 默认「明细列表」，避免用户误以为消费清单消失 */
   const [mainView, setMainView] = useState<MainView>('records');
   const [recordsLayout, setRecordsLayout] = useState<'table' | 'cards'>('table');
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<ConsumptionRecord[]>([]);
   const [stats, setStats] = useState<ConsumptionStats | null>(null);
   const [providerStats, setProviderStats] = useState<ProviderStats[]>([]);
+  const [modelComparison, setModelComparison] = useState<ModelComparisonRow[]>([]);
+  const [modelOptions, setModelOptions] = useState<{ value: string; label: string }[]>([]);
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<ConsumptionRecord | null>(null);
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
@@ -85,13 +170,14 @@ const Consumption: React.FC = () => {
     dayjs(),
   ]);
   const [provider, setProvider] = useState<string>('all');
+  const [model, setModel] = useState<string>('');
   const screens = useBreakpoint();
 
   const isMobile = screens.xs || (screens.sm && !screens.md);
 
   useEffect(() => {
     fetchConsumptionData();
-  }, [dateRange, provider]);
+  }, [dateRange, provider, model]);
 
   const fetchConsumptionData = async () => {
     setLoading(true);
@@ -100,8 +186,11 @@ const Consumption: React.FC = () => {
       const params = new URLSearchParams({
         start_date: dateRange[0].format('YYYY-MM-DD'),
         end_date: dateRange[1].format('YYYY-MM-DD'),
-        provider: provider,
+        provider,
       });
+      if (model.trim()) {
+        params.set('model', model.trim());
+      }
 
       const [recordsRes, statsRes] = await Promise.all([
         fetch(`/api/v1/consumption/records?${params}`, {
@@ -121,6 +210,21 @@ const Consumption: React.FC = () => {
         const data = await statsRes.json();
         setStats(data.stats || null);
         setProviderStats(data.by_provider || []);
+        const models = (data.models_in_range as string[] | undefined) || [];
+        setModelOptions(models.map((m) => ({ value: m, label: m })));
+        const mc = (data.model_comparison as ModelComparisonRow[] | undefined) || [];
+        setModelComparison(
+          mc.map((row) => ({
+            provider: String(row.provider ?? ''),
+            model: String(row.model ?? ''),
+            request_count: Number(row.request_count) || 0,
+            total_token_deduction: Number(row.total_token_deduction) || 0,
+            avg_token_deduction: Number(row.avg_token_deduction) || 0,
+            latency_p50_ms: Number(row.latency_p50_ms) || 0,
+            latency_p95_ms: Number(row.latency_p95_ms) || 0,
+            success_rate: Number(row.success_rate) || 0,
+          }))
+        );
       }
     } catch {
       message.error('获取消费数据失败');
@@ -142,7 +246,7 @@ const Consumption: React.FC = () => {
         'Model',
         '输入Tokens',
         '输出Tokens',
-        '扣减(Token)',
+        '扣减(输入+输出Tokens)',
         '延迟(ms)',
         '状态码',
         '时间',
@@ -154,7 +258,7 @@ const Consumption: React.FC = () => {
           r.model,
           r.input_tokens,
           r.output_tokens,
-          r.cost.toFixed(6),
+          rowTokenDeduct(r),
           r.latency_ms,
           r.status_code,
           r.created_at,
@@ -240,13 +344,12 @@ const Consumption: React.FC = () => {
           ]
         : []),
       {
-        title: ledgerUnitColumnTitle,
-        dataIndex: 'cost',
-        key: 'cost',
-        width: 110,
+        title: '扣减（输入+输出）',
+        key: 'token_deduct',
+        width: 120,
         align: 'right',
-        render: (cost: number) => (
-          <span style={{ color: '#f5222d' }}>{formatLedgerUnits(cost)}</span>
+        render: (_: unknown, record: ConsumptionRecord) => (
+          <span style={{ color: '#f5222d' }}>{formatLedgerUnits(rowTokenDeduct(record))}</span>
         ),
       },
       ...(screens.sm
@@ -310,16 +413,70 @@ const Consumption: React.FC = () => {
     const m = new Map<string, number>();
     for (const r of records) {
       const d = dayjs(r.created_at).format('YYYY-MM-DD');
-      m.set(d, (m.get(d) || 0) + r.cost);
+      m.set(d, (m.get(d) || 0) + rowTokenDeduct(r));
     }
     return [...m.entries()]
-      .map(([date, cost]) => ({ date, cost: Number(cost.toFixed(6)) }))
+      .map(([date, tokens]) => ({ date, tokens: Math.round(tokens) }))
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [records]);
 
   const providerBarData = useMemo(
-    () => providerStats.map((p) => ({ name: p.provider, cost: p.cost, count: p.count })),
+    () => providerStats.map((p) => ({ name: p.provider, tokens: p.tokens, count: p.count })),
     [providerStats]
+  );
+
+  const providerSelectOptions = useMemo(() => {
+    const base = [{ value: 'all', label: '全部 Provider' }];
+    const seen = new Set<string>();
+    const fromStats: { value: string; label: string }[] = [];
+    for (const p of providerStats) {
+      if (p.provider && !seen.has(p.provider)) {
+        seen.add(p.provider);
+        fromStats.push({ value: p.provider, label: p.provider.toUpperCase() });
+      }
+    }
+    if (fromStats.length > 0) {
+      return [...base, ...fromStats];
+    }
+    return [
+      ...base,
+      { value: 'openai', label: 'OpenAI' },
+      { value: 'anthropic', label: 'Anthropic' },
+      { value: 'google', label: 'Google' },
+      { value: 'azure', label: 'Azure' },
+    ];
+  }, [providerStats]);
+
+  const rangeMinutes = useMemo(() => {
+    const end = dateRange[1];
+    const start = dateRange[0];
+    if (!end?.diff || !start) {
+      return 1;
+    }
+    const m = end.diff(start, 'minute', true);
+    return Math.max(m, 1 / 60);
+  }, [dateRange]);
+
+  const rpm = stats ? stats.total_requests / rangeMinutes : 0;
+  const tpm = stats ? stats.total_token_deduction / rangeMinutes : 0;
+
+  const modelComparePoints = useMemo((): ModelComparePoint[] => {
+    return modelComparison.map((row) => ({
+      ...row,
+      rpm: row.request_count / rangeMinutes,
+      tpm: row.total_token_deduction / rangeMinutes,
+      low_sample: row.request_count < MIN_MODEL_SAMPLES,
+    }));
+  }, [modelComparison, rangeMinutes]);
+
+  const compareProvidersOrdered = useMemo(() => {
+    const uniq = new Set(modelComparePoints.map((x) => x.provider).filter(Boolean));
+    return [...uniq].sort((a, b) => a.localeCompare(b));
+  }, [modelComparePoints]);
+
+  const maxCompareRequests = useMemo(
+    () => modelComparePoints.reduce((m, x) => Math.max(m, x.request_count), 0),
+    [modelComparePoints]
   );
 
   return (
@@ -337,13 +494,13 @@ const Consumption: React.FC = () => {
           value={mainView}
           onChange={(v) => setMainView(v as MainView)}
           options={[
-            { label: '简要看板', value: 'dashboard' },
             { label: '明细列表', value: 'records' },
             { label: '图表视图', value: 'charts' },
           ]}
         />
         <Paragraph type="secondary" style={{ margin: 0, flex: '1 1 200px' }}>
-          明细列表含完整调用记录；图表视图按日汇总扣减与按 Provider 对比。简要看板仅汇总数字。
+          上方筛选项对列表与统计、图表共用。图表视图中含按日扣减、按 Provider
+          汇总，以及「模型对比」气泡图（延迟与单次扣减、用量节奏），便于在相同筛选条件下评估不同厂家与模型。
         </Paragraph>
       </div>
       {mainView === 'records' && (
@@ -369,14 +526,23 @@ const Consumption: React.FC = () => {
           <Select
             value={provider}
             onChange={setProvider}
-            style={{ width: isMobile ? 100 : 120 }}
+            style={{ width: isMobile ? 120 : 140 }}
             size={isMobile ? 'small' : 'middle'}
-            options={[
-              { value: 'all', label: '全部' },
-              { value: 'openai', label: 'OpenAI' },
-              { value: 'anthropic', label: 'Anthropic' },
-              { value: 'google', label: 'Google' },
-            ]}
+            options={providerSelectOptions}
+            showSearch
+            optionFilterProp="label"
+            placeholder="Provider"
+          />
+          <Select
+            value={model || undefined}
+            onChange={(v) => setModel(v ?? '')}
+            allowClear
+            showSearch
+            placeholder="模型"
+            style={{ width: isMobile ? 140 : 200 }}
+            size={isMobile ? 'small' : 'middle'}
+            options={modelOptions}
+            notFoundContent={modelOptions.length ? undefined : '先选日期并刷新'}
           />
           <Button
             icon={<ReloadOutlined />}
@@ -389,7 +555,7 @@ const Consumption: React.FC = () => {
       </Card>
       <Card className={styles.statsCard}>
         <Row gutter={[16, 16]}>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6} lg={4}>
             <Statistic
               title="总请求数"
               value={stats?.total_requests || 0}
@@ -397,22 +563,15 @@ const Consumption: React.FC = () => {
               valueStyle={{ fontSize: isMobile ? 18 : 24 }}
             />
           </Col>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6} lg={4}>
             <Statistic
-              title="总Tokens"
-              value={stats?.total_tokens || 0}
-              valueStyle={{ fontSize: isMobile ? 18 : 24 }}
-            />
-          </Col>
-          <Col xs={12} sm={12} md={6}>
-            <Statistic
-              title="合计扣减（Token）"
-              value={stats?.total_cost || 0}
-              suffix="Token"
+              title="合计扣减（输入+输出）"
+              value={stats?.total_token_deduction || 0}
+              suffix="Tokens"
               valueStyle={{ color: '#f5222d', fontSize: isMobile ? 18 : 24 }}
             />
           </Col>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={6} lg={4}>
             <Statistic
               title="平均延迟"
               value={stats?.avg_latency_ms || 0}
@@ -420,7 +579,29 @@ const Consumption: React.FC = () => {
               valueStyle={{ fontSize: isMobile ? 18 : 24 }}
             />
           </Col>
+          <Col xs={12} sm={12} md={6} lg={4}>
+            <Statistic
+              title="RPM（均）"
+              value={rpm}
+              precision={2}
+              suffix="/min"
+              valueStyle={{ fontSize: isMobile ? 16 : 20 }}
+            />
+          </Col>
+          <Col xs={12} sm={12} md={6} lg={4}>
+            <Statistic
+              title="TPM（均）"
+              value={tpm}
+              precision={0}
+              suffix="/min"
+              valueStyle={{ fontSize: isMobile ? 16 : 20 }}
+            />
+          </Col>
         </Row>
+        <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: 12 }}>
+          合计扣减为当前筛选条件下，各次请求「输入 tokens + 输出 tokens」之和（与明细列表一致）；不展示内部计费
+          cost。RPM、TPM 为区间均值。
+        </Paragraph>
       </Card>
 
       {mainView !== 'charts' && providerStats.length > 0 && (
@@ -434,7 +615,7 @@ const Consumption: React.FC = () => {
                       <Tag color={getProviderColor(p.provider)}>{p.provider.toUpperCase()}</Tag>
                     }
                     value={p.count}
-                    suffix={`次 / ${formatLedgerUnits(p.cost)} Token`}
+                    suffix={`次 / 扣减 ${formatLedgerUnits(p.tokens)} Tokens`}
                     valueStyle={{ fontSize: isMobile ? 14 : 16 }}
                   />
                 </Card>
@@ -460,8 +641,8 @@ const Consumption: React.FC = () => {
                       <RechartsTooltip />
                       <Area
                         type="monotone"
-                        dataKey="cost"
-                        name="扣减(Token)"
+                        dataKey="tokens"
+                        name="扣减（输入+输出）"
                         stroke="#1677ff"
                         fill="#1677ff33"
                       />
@@ -483,10 +664,108 @@ const Consumption: React.FC = () => {
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <RechartsTooltip />
-                      <Bar dataKey="cost" name="扣减(Token)" fill="#722ed1" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="tokens" name="扣减（输入+输出）" fill="#722ed1" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+              )}
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+      {mainView === 'charts' && (
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={24}>
+            <Card
+              title="模型对比（选购参考）"
+              extra={
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  横轴越快越好 · 纵轴单次扣减越少越省 · 气泡越大用量越多
+                </Text>
+              }
+            >
+              {modelComparePoints.length === 0 ? (
+                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                  当前筛选条件下暂无带模型名的请求，无法绘制对比图。请调整日期或去掉过窄的模型筛选。
+                </Paragraph>
+              ) : (
+                <>
+                  <div style={{ width: '100%', height: isMobile ? 340 : 420 }}>
+                    <ResponsiveContainer>
+                      <ScatterChart margin={{ top: 12, right: 12, left: 8, bottom: 12 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          type="number"
+                          dataKey="latency_p50_ms"
+                          name="延迟 p50"
+                          unit=" ms"
+                          tick={{ fontSize: 11 }}
+                          domain={[0, 'auto']}
+                          label={{
+                            value: '延迟 p50（ms）· 越小越快',
+                            position: 'insideBottom',
+                            offset: -4,
+                            style: { fontSize: 11, fill: '#8c8c8c' },
+                          }}
+                        />
+                        <YAxis
+                          type="number"
+                          dataKey="avg_token_deduction"
+                          name="单次平均扣减"
+                          tick={{ fontSize: 11 }}
+                          domain={[0, 'auto']}
+                          width={56}
+                          label={{
+                            value: '单次平均扣减（Tokens）',
+                            angle: -90,
+                            position: 'insideLeft',
+                            style: { fontSize: 11, fill: '#8c8c8c' },
+                          }}
+                        />
+                        <ZAxis
+                          type="number"
+                          dataKey="request_count"
+                          range={[56, 320]}
+                          domain={[0, Math.max(maxCompareRequests, 1)]}
+                        />
+                        <RechartsTooltip
+                          cursor={{ strokeDasharray: '3 3' }}
+                          content={(props) => (
+                            <ModelCompareTooltipView
+                              active={props.active}
+                              payload={props.payload as ReadonlyArray<{ payload: ModelComparePoint }>}
+                            />
+                          )}
+                        />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        {compareProvidersOrdered.map((prov) => {
+                          const series = modelComparePoints.filter((d) => d.provider === prov);
+                          return (
+                            <Scatter
+                              key={prov}
+                              name={prov.toUpperCase()}
+                              data={series}
+                              fill={providerChartFill(prov)}
+                            >
+                              {series.map((entry) => (
+                                <Cell
+                                  key={`${entry.provider}:${entry.model}`}
+                                  fill={providerChartFill(prov)}
+                                  fillOpacity={entry.low_sample ? 0.42 : 0.9}
+                                />
+                              ))}
+                            </Scatter>
+                          );
+                        })}
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: 12 }}>
+                    每个气泡为「Provider + 模型」在当前筛选时间范围内的汇总；扣减为输入+输出 Tokens，与明细一致。成功率按
+                    2xx 请求占比。RPM、TPM 按该时间区间长度折算（与上方统计卡片同一口径），用于观察各模型的调用与消耗节奏。
+                  </Paragraph>
+                </>
               )}
             </Card>
           </Col>
@@ -529,11 +808,21 @@ const Consumption: React.FC = () => {
                   <Col xs={24} sm={12} lg={8} key={r.id}>
                     <Card
                       size="small"
+                      hoverable
+                      onClick={() => showDetail(r)}
+                      styles={{ body: { cursor: 'pointer' } }}
                       title={
                         <Tag color={getProviderColor(r.provider)}>{r.provider.toUpperCase()}</Tag>
                       }
                       extra={
-                        <Button type="link" size="small" onClick={() => showDetail(r)}>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            showDetail(r);
+                          }}
+                        >
                           详情
                         </Button>
                       }
@@ -541,7 +830,8 @@ const Consumption: React.FC = () => {
                       <Space direction="vertical" size={4} style={{ width: '100%' }}>
                         <span style={{ fontSize: 12, color: '#666' }}>{r.model}</span>
                         <span>
-                          扣减：<Text type="danger">{formatLedgerUnits(r.cost)}</Text>
+                          扣减（输入+输出）：
+                          <Text type="danger">{formatLedgerUnits(rowTokenDeduct(r))}</Text>
                         </span>
                         <span style={{ fontSize: 12 }}>
                           {dayjs(r.created_at).format('MM-DD HH:mm')} · {r.status_code}
@@ -584,9 +874,11 @@ const Consumption: React.FC = () => {
             <Descriptions.Item label="输出Tokens">
               {selectedRecord.output_tokens.toLocaleString()}
             </Descriptions.Item>
-            <Descriptions.Item label="扣减（Token）">
+            <Descriptions.Item label="扣减（输入+输出）" span={2}>
               <span style={{ color: '#f5222d', fontWeight: 'bold' }}>
-                {formatLedgerUnits(selectedRecord.cost)}
+                {formatLedgerUnits(rowTokenDeduct(selectedRecord))} Tokens（=
+                {selectedRecord.input_tokens.toLocaleString()} +{' '}
+                {selectedRecord.output_tokens.toLocaleString()}）
               </span>
             </Descriptions.Item>
             <Descriptions.Item label="延迟">{selectedRecord.latency_ms} ms</Descriptions.Item>

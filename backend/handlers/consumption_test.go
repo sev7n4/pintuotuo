@@ -62,27 +62,21 @@ func containsStr(s, substr string) bool {
 
 func TestConsumptionStats_Structure(t *testing.T) {
 	stats := struct {
-		TotalRequests int     `json:"total_requests"`
-		TotalTokens   int64   `json:"total_tokens"`
-		TotalCost     float64 `json:"total_cost"`
-		AvgLatencyMs  int     `json:"avg_latency_ms"`
+		TotalRequests       int   `json:"total_requests"`
+		TotalTokenDeduction int64 `json:"total_token_deduction"`
+		AvgLatencyMs        int   `json:"avg_latency_ms"`
 	}{
-		TotalRequests: 100,
-		TotalTokens:   50000,
-		TotalCost:     12.3456,
-		AvgLatencyMs:  1500,
+		TotalRequests:       100,
+		TotalTokenDeduction: 50000,
+		AvgLatencyMs:        1500,
 	}
 
 	if stats.TotalRequests != 100 {
 		t.Errorf("TotalRequests = %d, want 100", stats.TotalRequests)
 	}
 
-	if stats.TotalTokens != 50000 {
-		t.Errorf("TotalTokens = %d, want 50000", stats.TotalTokens)
-	}
-
-	if stats.TotalCost != 12.3456 {
-		t.Errorf("TotalCost = %v, want 12.3456", stats.TotalCost)
+	if stats.TotalTokenDeduction != 50000 {
+		t.Errorf("TotalTokenDeduction = %d, want 50000", stats.TotalTokenDeduction)
 	}
 }
 
@@ -127,13 +121,13 @@ func TestConsumptionRecords_ProviderFilter(t *testing.T) {
 
 func TestConsumptionStats_ByProvider(t *testing.T) {
 	byProvider := []map[string]interface{}{
-		{"provider": "openai", "count": 50, "cost": 10.5},
-		{"provider": "anthropic", "count": 30, "cost": 5.25},
-		{"provider": "google", "count": 20, "cost": 2.0},
+		{"provider": "openai", "count": 50, "tokens": int64(10000)},
+		{"provider": "anthropic", "count": 30, "tokens": int64(6000)},
+		{"provider": "google", "count": 20, "tokens": int64(4000)},
 	}
 
 	totalCount := 0
-	totalCost := 0.0
+	var totalTokens int64
 
 	for _, p := range byProvider {
 		count, ok := p["count"].(int)
@@ -142,18 +136,18 @@ func TestConsumptionStats_ByProvider(t *testing.T) {
 		}
 		totalCount += count
 
-		cost, ok := p["cost"].(float64)
+		tok, ok := p["tokens"].(int64)
 		if !ok {
-			t.Error("Cost should be a float64")
+			t.Error("Tokens should be an int64")
 		}
-		totalCost += cost
+		totalTokens += tok
 	}
 
 	if totalCount != 100 {
 		t.Errorf("Total count = %d, want 100", totalCount)
 	}
 
-	if totalCost != 17.75 {
-		t.Errorf("Total cost = %v, want 17.75", totalCost)
+	if totalTokens != 20000 {
+		t.Errorf("Total tokens = %d, want 20000", totalTokens)
 	}
 }
