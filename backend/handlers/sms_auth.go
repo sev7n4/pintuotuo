@@ -31,7 +31,7 @@ type otpRecord struct {
 var smsOTPStore sync.Map // key: normalized phone
 
 func smsAuthEnabled() bool {
-	return os.Getenv("SMS_PROVIDER") != "" || os.Getenv("MOCK_SMS") == "true"
+	return os.Getenv("SMS_PROVIDER") != "" || os.Getenv("MOCK_SMS") == envTrue
 }
 
 func normalizePhone(s string) string {
@@ -98,7 +98,7 @@ func SendSMSCode(c *gin.Context) {
 		return
 	}
 	var code string
-	if os.Getenv("MOCK_SMS") == "true" {
+	if os.Getenv("MOCK_SMS") == envTrue {
 		code = "123456"
 		log.Printf("[MOCK_SMS] OTP for %s is fixed 123456 (dev only)", phone)
 	} else {
@@ -107,7 +107,7 @@ func SendSMSCode(c *gin.Context) {
 	}
 	storeOTP(phone, code)
 	resp := gin.H{"message": "sent", "expires_in": 300}
-	if os.Getenv("MOCK_SMS") == "true" {
+	if os.Getenv("MOCK_SMS") == envTrue {
 		resp["debug_code"] = code
 	}
 	c.JSON(http.StatusOK, resp)
