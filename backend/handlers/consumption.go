@@ -167,7 +167,6 @@ func GetConsumptionStats(c *gin.Context) {
 	if modelFilter != "" {
 		baseQuery += " AND model = $" + strconv.Itoa(argIndex)
 		args = append(args, modelFilter)
-		argIndex++
 	}
 
 	var stats struct {
