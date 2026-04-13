@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 test.describe('Authentication', () => {
   test('should display login page', async ({ page }) => {
     await page.goto('/login');
-    await expect(page.getByText('拼脱脱 - 登录')).toBeVisible();
+    await expect(page.getByText('拼脱脱 - 登录 / 注册')).toBeVisible();
   });
 
   test('should show validation error for empty fields', async ({ page }) => {
@@ -26,11 +26,13 @@ test.describe('Authentication', () => {
   test('should navigate between login and register', async ({ page }) => {
     await page.goto('/login');
     await page.waitForLoadState('networkidle');
-    await page.getByText('创建新账户').click();
-    await expect(page.getByText('拼脱脱 - 注册')).toBeVisible();
-    
-    await page.getByText('立即登录').click();
-    await expect(page.getByText('拼脱脱 - 登录')).toBeVisible();
+    await page.getByRole('link', { name: '创建新账户' }).click();
+    await expect(page).toHaveURL(/register/);
+    await expect(page.getByText('账号体系已升级')).toBeVisible();
+
+    await page.getByRole('link', { name: '立即登录' }).click();
+    await expect(page).toHaveURL(/login/);
+    await expect(page.getByText('拼脱脱 - 登录 / 注册')).toBeVisible();
   });
 
   test('should show error for invalid email format', async ({ page }) => {
@@ -115,8 +117,8 @@ test.describe('Registration', () => {
 
   test('should have buyer and merchant registration tabs', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('tab', { name: /买家注册/i })).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('tab', { name: /商户入驻/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('个人用户')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('商户入驻')).toBeVisible({ timeout: 10000 });
   });
 
   test('should register new user and redirect to home', async ({ page }) => {
@@ -142,15 +144,14 @@ test.describe('Registration', () => {
     await expect(errorMessage.first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show error for password mismatch', async ({ page }) => {
+  test('should validate password min length on register', async ({ page }) => {
     const uniqueEmail = `test${Date.now()}@example.com`;
-    
+
     await page.getByPlaceholder('example@email.com').fill(uniqueEmail);
-    await page.getByPlaceholder('设置密码').fill('Test123456!');
-    await page.getByPlaceholder('再次输入密码').fill('DifferentPassword!');
-    await page.locator('button[type="submit"]').click();
-    
-    await expect(page.getByText('两次输入的密码不一致')).toBeVisible({ timeout: 10000 });
+    await page.getByPlaceholder(/设置密码/).fill('short');
+    await page.getByRole('button', { name: '注册并进入' }).click();
+
+    await expect(page.getByText('密码至少 6 位')).toBeVisible({ timeout: 10000 });
   });
 });
 

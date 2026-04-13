@@ -14,6 +14,7 @@ import { useProductStore } from '@/stores/productStore';
 import { useOrderStore } from '@/stores/orderStore';
 import { useCartStore } from '@/stores/cartStore';
 import { useMerchantStore } from '@/stores/merchantStore';
+import { AUTH_PRIMARY_LOGIN_KEY } from '@/lib/authLoginPreference';
 
 jest.mock('@/stores/authStore');
 jest.mock('@/stores/productStore');
@@ -126,8 +127,22 @@ describe('Page Navigation Integration Tests', () => {
   });
 
   describe('User Registration Navigation', () => {
-    test('should navigate to products page after C-end user registration', async () => {
-      const mockRegister = jest.fn().mockResolvedValue({ token: 'user-token' });
+    beforeEach(() => {
+      localStorage.removeItem(AUTH_PRIMARY_LOGIN_KEY);
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          sms: false,
+          email_magic: false,
+          wechat_oauth: false,
+          github_oauth: false,
+          account_linking: false,
+        }),
+      });
+    });
+
+    test('should submit email password on register route (unified auth)', async () => {
+      const mockRegister = jest.fn().mockResolvedValue(undefined);
 
       mockUseAuthStore.mockReturnValue({
         user: null,
@@ -135,12 +150,18 @@ describe('Page Navigation Integration Tests', () => {
         isLoading: false,
         error: null,
         isAuthenticated: false,
+        rememberMe: false,
         login: jest.fn(),
         register: mockRegister,
+        loginWithSms: jest.fn(),
+        registerWithSms: jest.fn(),
+        sendSmsCode: jest.fn(),
+        sendEmailMagicLink: jest.fn(),
         logout: jest.fn(),
         fetchUser: jest.fn(),
         setUser: jest.fn(),
         clearError: jest.fn(),
+        setRememberMe: jest.fn(),
       });
 
       mockUseProductStore.mockReturnValue({
@@ -167,15 +188,13 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       const emailInput = screen.getByPlaceholderText('example@email.com');
-      const passwordInput = screen.getByPlaceholderText('设置密码');
-      const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码');
-      const registerButton = screen.getByText('创建账户');
+      const passwordInput = screen.getByPlaceholderText(/设置密码/);
+      const submitButton = screen.getByRole('button', { name: '注册并进入' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'cuser@example.com' } });
         fireEvent.change(passwordInput, { target: { value: 'password123' } });
-        fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
-        fireEvent.click(registerButton);
+        fireEvent.click(submitButton);
       });
 
       await waitFor(() => {
@@ -183,79 +202,25 @@ describe('Page Navigation Integration Tests', () => {
       });
     });
 
-    test('should navigate to merchant dashboard after B-end user registration', async () => {
-      const mockRegister = jest.fn().mockResolvedValue({ token: 'merchant-token' });
-
+    test('should show unified auth Segmented and register notice', async () => {
       mockUseAuthStore.mockReturnValue({
         user: null,
         token: null,
         isLoading: false,
         error: null,
         isAuthenticated: false,
-        login: jest.fn(),
-        register: mockRegister,
-        logout: jest.fn(),
-        fetchUser: jest.fn(),
-        setUser: jest.fn(),
-        clearError: jest.fn(),
-      });
-
-      mockUseMerchantStore.mockReturnValue({
-        stats: { total_products: 0, active_products: 0, month_sales: 0, month_orders: 0 },
-        orders: [],
-        isLoading: false,
-        error: null,
-        fetchStats: jest.fn(),
-        fetchOrders: jest.fn(),
-        clearError: jest.fn(),
-      });
-
-      render(
-        <MemoryRouter initialEntries={['/register']}>
-          <Routes>
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/catalog" element={<ProductListPage />} />
-            <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
-            <Route path="/*" element={<Navigate to="/register" />} />
-          </Routes>
-        </MemoryRouter>
-      );
-
-      const emailInput = screen.getByPlaceholderText('example@email.com');
-      const passwordInput = screen.getByPlaceholderText('设置密码');
-      const confirmPasswordInput = screen.getByPlaceholderText('再次输入密码');
-      const registerButton = screen.getByText('创建账户');
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole('tab', { name: /商户入驻/i }));
-        fireEvent.change(emailInput, { target: { value: 'merchant@example.com' } });
-        fireEvent.change(passwordInput, { target: { value: 'password123' } });
-        fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
-        fireEvent.click(registerButton);
-      });
-
-      await waitFor(() => {
-        expect(mockRegister).toHaveBeenCalledWith(
-          'merchant@example.com',
-          'password123',
-          'merchant'
-        );
-      });
-    });
-
-    test('should show buyer and merchant registration tabs', async () => {
-      mockUseAuthStore.mockReturnValue({
-        user: null,
-        token: null,
-        isLoading: false,
-        error: null,
-        isAuthenticated: false,
+        rememberMe: false,
         login: jest.fn(),
         register: jest.fn(),
+        loginWithSms: jest.fn(),
+        registerWithSms: jest.fn(),
+        sendSmsCode: jest.fn(),
+        sendEmailMagicLink: jest.fn(),
         logout: jest.fn(),
         fetchUser: jest.fn(),
         setUser: jest.fn(),
         clearError: jest.fn(),
+        setRememberMe: jest.fn(),
       });
 
       render(
@@ -267,8 +232,12 @@ describe('Page Navigation Integration Tests', () => {
         </MemoryRouter>
       );
 
-      expect(screen.getByText('买家注册')).toBeInTheDocument();
-      expect(screen.getByText('商户入驻')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('拼脱脱 - 登录 / 注册')).toBeInTheDocument();
+      });
+      expect(screen.getByText('邮箱注册')).toBeInTheDocument();
+      expect(screen.getByText('手机注册')).toBeInTheDocument();
+      expect(screen.getByText('账号体系已升级')).toBeInTheDocument();
     });
   });
 
