@@ -11,7 +11,7 @@ import (
 func GlobalUsageLedgerMatch(db *sql.DB) (usageLogTotal, usageTxTotal float64, err error) {
 	err = db.QueryRow(`
 		SELECT
-			COALESCE((SELECT SUM(` + SQLBillableTokensPerLogRow + `) FROM api_usage_logs), 0),
+			COALESCE((SELECT SUM(`+SQLBillableTokensPerLogRow+`) FROM api_usage_logs), 0),
 			COALESCE((SELECT SUM(-amount) FROM token_transactions WHERE type = 'usage'), 0)
 	`).Scan(&usageLogTotal, &usageTxTotal)
 	return
