@@ -234,10 +234,10 @@ describe('Integration Tests', () => {
   });
 
   test('should submit unified auth form on register route (referral query preserved for future bind)', async () => {
-    const mockLogin = jest.fn().mockResolvedValue({ token: 'test-token' });
+    const mockRegister = jest.fn().mockResolvedValue({ token: 'test-token' });
     const mockBindReferralCode = jest.fn().mockResolvedValue(undefined);
 
-    // 初始未认证状态（注册路由与登录共用 AuthPage，密码入口走 login）
+    // 初始未认证状态；/register 走 register() 创建账号
     mockUseAuthStore.mockReturnValue({
       user: null,
       token: null,
@@ -245,8 +245,8 @@ describe('Integration Tests', () => {
       error: null,
       isAuthenticated: false,
       rememberMe: false,
-      login: mockLogin,
-      register: jest.fn(),
+      login: jest.fn(),
+      register: mockRegister,
       loginWithSms: jest.fn(),
       registerWithSms: jest.fn(),
       sendSmsCode: jest.fn(),
@@ -287,10 +287,10 @@ describe('Integration Tests', () => {
       </MemoryRouter>
     );
 
-    // 输入邮箱密码（与登录页同一套表单；推荐码 query 保留供后续绑定逻辑使用）
+    // 输入邮箱密码（注册页占位与按钮文案与登录页区分）
     const emailInput = screen.getByPlaceholderText('example@email.com') as HTMLInputElement;
-    const passwordInput = screen.getByPlaceholderText('输入密码') as HTMLInputElement;
-    const submitButton = screen.getByRole('button', { name: '密码登录' });
+    const passwordInput = screen.getByPlaceholderText(/设置密码/) as HTMLInputElement;
+    const submitButton = screen.getByRole('button', { name: '注册并进入' });
 
     await act(async () => {
       fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } });
@@ -299,7 +299,7 @@ describe('Integration Tests', () => {
     });
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('newuser@example.com', 'password123', true);
+      expect(mockRegister).toHaveBeenCalledWith('newuser@example.com', 'password123', 'user');
     });
     expect(mockBindReferralCode).not.toHaveBeenCalled();
   });

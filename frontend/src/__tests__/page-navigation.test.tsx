@@ -142,7 +142,7 @@ describe('Page Navigation Integration Tests', () => {
     });
 
     test('should submit email password on register route (unified auth)', async () => {
-      const mockLogin = jest.fn().mockResolvedValue(undefined);
+      const mockRegister = jest.fn().mockResolvedValue(undefined);
 
       mockUseAuthStore.mockReturnValue({
         user: null,
@@ -151,8 +151,8 @@ describe('Page Navigation Integration Tests', () => {
         error: null,
         isAuthenticated: false,
         rememberMe: false,
-        login: mockLogin,
-        register: jest.fn(),
+        login: jest.fn(),
+        register: mockRegister,
         loginWithSms: jest.fn(),
         registerWithSms: jest.fn(),
         sendSmsCode: jest.fn(),
@@ -188,8 +188,8 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       const emailInput = screen.getByPlaceholderText('example@email.com');
-      const passwordInput = screen.getByPlaceholderText('输入密码');
-      const submitButton = screen.getByRole('button', { name: '密码登录' });
+      const passwordInput = screen.getByPlaceholderText(/设置密码/);
+      const submitButton = screen.getByRole('button', { name: '注册并进入' });
 
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'cuser@example.com' } });
@@ -198,7 +198,7 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('cuser@example.com', 'password123', true);
+        expect(mockRegister).toHaveBeenCalledWith('cuser@example.com', 'password123', 'user');
       });
     });
 
@@ -235,8 +235,8 @@ describe('Page Navigation Integration Tests', () => {
       await waitFor(() => {
         expect(screen.getByText('拼脱脱 - 登录 / 注册')).toBeInTheDocument();
       });
-      expect(screen.getByText('邮箱登录')).toBeInTheDocument();
-      expect(screen.getByText('手机登录')).toBeInTheDocument();
+      expect(screen.getByText('邮箱注册')).toBeInTheDocument();
+      expect(screen.getByText('手机注册')).toBeInTheDocument();
       expect(screen.getByText('账号体系已升级')).toBeInTheDocument();
     });
   });

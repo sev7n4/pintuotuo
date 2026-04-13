@@ -7,6 +7,8 @@ export class LoginPage {
     await this.page.goto('/login');
     await this.page.waitForLoadState('networkidle');
     await this.page.waitForSelector('.auth-card');
+    // 避免 E2E 沿用 localStorage 中的「手机登录」偏好导致邮箱表单不可见
+    await this.page.getByText('邮箱登录').click();
   }
 
   async login(email: string, password: string) {
@@ -31,16 +33,18 @@ export class RegisterPage {
     await this.page.goto('/register');
     await this.page.waitForLoadState('networkidle');
     await this.page.waitForSelector('.auth-card');
+    await this.page.getByText('邮箱注册').click();
   }
 
   async register(email: string, password: string, role: 'user' | 'merchant' = 'user') {
     if (role === 'merchant') {
-      await this.page.getByRole('tab', { name: /商户入驻/i }).click();
+      await this.page.getByText('商户入驻').click();
+    } else {
+      await this.page.getByText('个人用户').click();
     }
     await this.page.getByPlaceholder('example@email.com').fill(email);
-    await this.page.getByPlaceholder('设置密码').fill(password);
-    await this.page.getByPlaceholder('再次输入密码').fill(password);
-    await this.page.locator('button[type="submit"]').click();
+    await this.page.getByPlaceholder(/设置密码/).fill(password);
+    await this.page.getByRole('button', { name: '注册并进入' }).click();
   }
 }
 

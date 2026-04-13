@@ -50,7 +50,7 @@ const defaultAuthCapabilities: AuthCapabilities = {
 export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, sendEmailMagicLink, fetchUser, isLoading, user, isAuthenticated } =
+  const { login, register, sendEmailMagicLink, fetchUser, isLoading, user, isAuthenticated } =
     useAuthStore();
   const [loginForm] = Form.useForm();
   const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
@@ -59,6 +59,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
   const [primaryLogin, setPrimaryLogin] = useState<'email' | 'phone'>(() =>
     readPrimaryLoginPreference()
   );
+  /** /register 邮箱注册时的账号类型（与旧版「买家 / 商户」Tab 对齐） */
+  const [registerRole, setRegisterRole] = useState<'user' | 'merchant'>('user');
   const oauthRedirectHandled = useRef(false);
 
   /** URL 仍带 oauth=1&token= 时，避免「已登录自动跳转首页」与 OAuth 处理竞态，导致未清 query 就离开 /login */
@@ -121,17 +123,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
     path === '/register' || (path === '/' && defaultMode === 'register') ? 'register' : 'login';
   const isRegisterRoute = authTab === 'register';
 
-  const onLoginFinish = async (values: {
+  const onEmailPasswordSubmit = async (values: {
     email: string;
     password: string;
     rememberMe?: boolean;
   }) => {
     try {
-      await login(values.email, values.password, values.rememberMe || false);
-      writePrimaryLoginPreference('email');
-      message.success('登录成功');
+      if (isRegisterRoute) {
+        await register(values.email, values.password, registerRole);
+        writePrimaryLoginPreference('email');
+        message.success('注册成功');
+      } else {
+        await login(values.email, values.password, values.rememberMe || false);
+        writePrimaryLoginPreference('email');
+        message.success('登录成功');
+      }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : '登录失败，请检查邮箱和密码';
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : isRegisterRoute
+            ? '注册失败，请检查邮箱与密码'
+            : '登录失败，请检查邮箱和密码';
       message.error(errorMsg);
     }
   };
@@ -191,18 +204,37 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
           value={primaryLogin}
           onChange={(v) => setPrimaryLogin(v as 'email' | 'phone')}
           options={[
-            { label: '邮箱登录', value: 'email' },
-            { label: '手机登录', value: 'phone' },
+            {
+              label: isRegisterRoute ? '邮箱注册' : '邮箱登录',
+              value: 'email',
+            },
+            {
+              label: isRegisterRoute ? '手机注册' : '手机登录',
+              value: 'phone',
+            },
           ]}
           style={{ marginBottom: 16 }}
         />
+
+        {isRegisterRoute && primaryLogin === 'email' && (
+          <Segmented
+            block
+            value={registerRole}
+            onChange={(v) => setRegisterRole(v as 'user' | 'merchant')}
+            options={[
+              { label: '个人用户', value: 'user' },
+              { label: '商户入驻', value: 'merchant' },
+            ]}
+            style={{ marginBottom: 16 }}
+          />
+        )}
 
         {primaryLogin === 'email' ? (
           <>
             <Form
               form={loginForm}
               layout="vertical"
-              onFinish={onLoginFinish}
+              onFinish={onEmailPasswordSubmit}
               autoComplete="off"
               initialValues={{ rememberMe: true }}
             >
@@ -217,30 +249,45 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
                 <Input placeholder="example@email.com" />
               </Form.Item>
               <Form.Item
-                label="密码（仅曾用邮箱注册的账号）"
+                label={
+                  isRegisterRoute ? '密码' : '密码（仅曾用邮箱注册的账号）'
+                }
                 name="password"
-                rules={[{ required: true, message: '请输入密码' }]}
+                rules={
+                  isRegisterRoute
+                    ? [
+                        { required: true, message: '请输入密码' },
+                        { min: 6, message: '密码至少 6 位' },
+                      ]
+                    : [{ required: true, message: '请输入密码' }]
+                }
               >
-                <Input.Password placeholder="输入密码" />
+                <Input.Password
+                  placeholder={isRegisterRoute ? '设置密码（至少 6 位）' : '输入密码'}
+                />
               </Form.Item>
-              <Form.Item name="rememberMe" valuePropName="checked">
-                <Checkbox>记住我</Checkbox>
-              </Form.Item>
+              {!isRegisterRoute && (
+                <Form.Item name="rememberMe" valuePropName="checked">
+                  <Checkbox>记住我</Checkbox>
+                </Form.Item>
+              )}
               <Form.Item style={{ marginBottom: 8 }}>
                 <Button type="primary" htmlType="submit" block loading={isLoading}>
-                  密码登录
+                  {isRegisterRoute ? '注册并进入' : '密码登录'}
                 </Button>
               </Form.Item>
-              <Form.Item style={{ marginBottom: 0 }}>
-                <Button
-                  block
-                  onClick={() => void loginForm.validateFields(['email']).then(onSendMagicLink)}
-                  loading={sendingMagic}
-                  disabled={!capabilities?.email_magic}
-                >
-                  发送邮箱魔法链接
-                </Button>
-              </Form.Item>
+              {!isRegisterRoute && (
+                <Form.Item style={{ marginBottom: 0 }}>
+                  <Button
+                    block
+                    onClick={() => void loginForm.validateFields(['email']).then(onSendMagicLink)}
+                    loading={sendingMagic}
+                    disabled={!capabilities?.email_magic}
+                  >
+                    发送邮箱魔法链接
+                  </Button>
+                </Form.Item>
+              )}
             </Form>
             <Typography.Paragraph
               type="secondary"
@@ -258,9 +305,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
           />
         )}
 
-        {!isRegisterRoute && (
+        {!isRegisterRoute ? (
           <Typography.Paragraph style={{ marginTop: 16, marginBottom: 0, textAlign: 'center' }}>
             <Link to="/register">创建新账户</Link>
+          </Typography.Paragraph>
+        ) : (
+          <Typography.Paragraph style={{ marginTop: 16, marginBottom: 0, textAlign: 'center' }}>
+            <Link to="/login">立即登录</Link>
           </Typography.Paragraph>
         )}
 

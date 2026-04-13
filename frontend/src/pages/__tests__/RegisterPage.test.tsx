@@ -34,7 +34,7 @@ describe('RegisterPage Component', () => {
     });
   });
 
-  test('renders RegisterPage as password + magic-link auth entry', () => {
+  test('renders RegisterPage as email register with role segmented', () => {
     mockUseAuthStore.mockReturnValue({
       user: null,
       token: null,
@@ -64,8 +64,11 @@ describe('RegisterPage Component', () => {
     expect(screen.getByText('拼脱脱 - 登录 / 注册')).toBeInTheDocument();
     expect(screen.getByText('账号体系已升级')).toBeInTheDocument();
     expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
-    expect(screen.getByLabelText('密码（仅曾用邮箱注册的账号）')).toBeInTheDocument();
-    expect(screen.getByText('发送邮箱魔法链接')).toBeInTheDocument();
+    expect(screen.getByLabelText('密码')).toBeInTheDocument();
+    expect(screen.getByText('个人用户')).toBeInTheDocument();
+    expect(screen.getByText('商户入驻')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '注册并进入' })).toBeInTheDocument();
+    expect(screen.queryByText('发送邮箱魔法链接')).not.toBeInTheDocument();
   });
 
   test('shows loading state during registration', () => {
@@ -96,8 +99,11 @@ describe('RegisterPage Component', () => {
       </MemoryRouter>
     );
 
-    const buttonElement = screen.getAllByRole('button')[0];
-    expect(buttonElement).toHaveClass('ant-btn-loading');
+    // 加载中按钮的可访问名可能变化，直接断言主提交按钮带 loading 样式
+    const loadingSubmit = document.querySelector(
+      '.auth-card form button.ant-btn-primary.ant-btn-loading'
+    );
+    expect(loadingSubmit).not.toBeNull();
   });
 
   test('navigates to login page when login button is clicked', () => {
@@ -129,5 +135,6 @@ describe('RegisterPage Component', () => {
     );
 
     expect(screen.getByText('拼脱脱 - 登录 / 注册')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '立即登录' })).toBeInTheDocument();
   });
 });

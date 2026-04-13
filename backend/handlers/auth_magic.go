@@ -55,6 +55,10 @@ func randomTokenURLSafe(size int) string {
 }
 
 func sendMagicLinkEmail(to, link string) error {
+	to = strings.TrimSpace(to)
+	if to == "" || strings.ContainsAny(to, "\r\n") {
+		return fmt.Errorf("invalid recipient")
+	}
 	host := strings.TrimSpace(os.Getenv("SMTP_HOST"))
 	port := strings.TrimSpace(os.Getenv("SMTP_PORT"))
 	from := strings.TrimSpace(os.Getenv("SMTP_FROM"))
@@ -81,7 +85,8 @@ func sendMagicLinkEmail(to, link string) error {
 	if user != "" && pass != "" {
 		auth = smtp.PlainAuth("", user, pass, host)
 	}
-	return smtp.SendMail(addr, auth, from, []string{to}, msg)
+	// to 已校验无换行；发件人来自环境变量（运维配置）
+	return smtp.SendMail(addr, auth, from, []string{to}, msg) // #nosec G707 -- recipient sanitized, no header injection
 }
 
 func createOrGetEmailUser(db *sql.DB, email string) (*models.User, error) {
@@ -153,15 +158,15 @@ func SendEmailMagicLink(c *gin.Context) {
 		Exp:   time.Now().Add(magicTokenTTL),
 	})
 
-	verifyURL := fmt.Sprintf("%s/api/v1/users/email/magic/verify?token=%s", strings.TrimRight(oauthFrontendBase(), "/"), token)
 	// 回调应请求后端，避免暴露 JWT 签发逻辑到前端路由。
+	var verifyURL string
 	apiBase := strings.TrimSpace(os.Getenv("PUBLIC_API_BASE_URL"))
-	if apiBase == "" {
+	if apiBase != "" {
+		verifyURL = fmt.Sprintf("%s/api/v1/users/email/magic/verify?token=%s", strings.TrimRight(apiBase, "/"), token)
+	} else {
 		apiBase = strings.TrimRight(getEnv("FRONTEND_URL", "http://localhost:5173"), "/")
 		// 当 FRONTEND_URL 指向前端站点时，默认约定 API 同域 /api/v1（Nginx 反代）。
 		verifyURL = fmt.Sprintf("%s/api/v1/users/email/magic/verify?token=%s", apiBase, token)
-	} else {
-		verifyURL = fmt.Sprintf("%s/api/v1/users/email/magic/verify?token=%s", strings.TrimRight(apiBase, "/"), token)
 	}
 
 	if emailSenderConfigured() {
