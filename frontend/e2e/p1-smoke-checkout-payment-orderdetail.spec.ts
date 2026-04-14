@@ -1,11 +1,13 @@
 import { test, expect, Page } from '@playwright/test';
 import { LoginPage } from './pages';
 
+const API_BASE_URL = process.env.E2E_API_BASE_URL || 'http://localhost:8080/api/v1';
+
 async function createPendingOrder(page: Page): Promise<number> {
   const token = await page.evaluate(() => localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'));
   expect(token).toBeTruthy();
 
-  const catalogResp = await page.request.get('/catalog', {
+  const catalogResp = await page.request.get(`${API_BASE_URL}/catalog`, {
     params: { page: 1, per_page: 1 },
   });
   expect(catalogResp.ok()).toBeTruthy();
@@ -14,7 +16,7 @@ async function createPendingOrder(page: Page): Promise<number> {
   const first = catalog?.data?.data?.[0];
   expect(first?.id).toBeTruthy();
 
-  const orderResp = await page.request.post('/orders', {
+  const orderResp = await page.request.post(`${API_BASE_URL}/orders`, {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
