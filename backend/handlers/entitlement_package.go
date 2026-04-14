@@ -185,7 +185,7 @@ func CreateAdminEntitlementPackage(c *gin.Context) {
 
 	status := req.Status
 	if status == "" {
-		status = "active"
+		status = productStatusActive
 	}
 
 	var packageID int
@@ -251,7 +251,7 @@ func UpdateAdminEntitlementPackage(c *gin.Context) {
 
 	status := req.Status
 	if status == "" {
-		status = "active"
+		status = productStatusActive
 	}
 	if _, err = tx.Exec(
 		`UPDATE entitlement_packages
