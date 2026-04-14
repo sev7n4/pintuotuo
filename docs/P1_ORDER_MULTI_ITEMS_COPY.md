@@ -46,3 +46,4 @@
 ## 发布通知模板（站内/群公告）
 
 `订单系统升级：支持一个订单包含多个商品条目。支付、查看更便捷，订单详情可查看每个条目金额。若对退款或明细有疑问，可联系在线客服。`
+EOF2cd /Users/4seven/cursorworkspace/pintuotuo && git add docs/P1_MONITORING_DASHBOARD_AND_TRACKING.md docs/P1_ORDER_MULTI_ITEMS_COPY.md && git status
