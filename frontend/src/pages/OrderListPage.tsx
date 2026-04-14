@@ -17,6 +17,7 @@ import {
   Card,
   Grid,
   List,
+  Alert,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { FundOutlined, ReloadOutlined, TeamOutlined, ShoppingOutlined } from '@ant-design/icons';
@@ -346,6 +347,12 @@ export const OrderListPage: React.FC = () => {
           onChange={setActiveTab}
           items={tabItems}
           size={isMobile ? 'small' : 'middle'}
+        />
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12, borderRadius: 10 }}
+          message="订单支持多明细展示：一个订单可包含多个 SKU 条目，详情中可查看每个条目的数量与金额。"
         />
 
         <Spin spinning={isLoading}>

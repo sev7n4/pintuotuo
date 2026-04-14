@@ -3,6 +3,8 @@ name: E2E Tests
 on:
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '30 2 * * *'
   workflow_dispatch:
     inputs:
       environment:
@@ -13,6 +15,14 @@ on:
         options:
           - staging
           - production
+      test_tier:
+        description: 'E2E test tier'
+        required: false
+        default: 'smoke'
+        type: choice
+        options:
+          - smoke
+          - full
 
 permissions:
   contents: read
@@ -126,7 +136,23 @@ jobs:
           npx serve -s dist -l 5173 &
           sleep 3
 
-      - name: Run E2E tests
+      - name: Run E2E tests (smoke tier)
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.test_tier == 'smoke') }}
+        working-directory: ./frontend
+        env:
+          CI: true
+        run: npm run test:e2e -- --project=chromium
+
+      - name: Run P1 smoke (desktop + mobile)
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.test_tier == 'smoke') }}
+        working-directory: ./frontend
+        env:
+          CI: true
+          E2E_BASE_URL: http://localhost:5173
+        run: npx playwright test e2e/p1-smoke-checkout-payment-orderdetail.spec.ts --project=chromium --project=mobile-chromium
+
+      - name: Run E2E tests (full tier)
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.test_tier == 'full') }}
         working-directory: ./frontend
         env:
           CI: true
@@ -158,6 +184,9 @@ jobs:
       - name: Check job status
         run: |
           echo "## E2E Tests Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tier: ${{ github.event_name == 'pull_request' && 'smoke' || (github.event_name == 'schedule' && 'full' || inputs.test_tier) }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
