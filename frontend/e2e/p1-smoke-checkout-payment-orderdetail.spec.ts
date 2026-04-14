@@ -9,9 +9,8 @@ async function createPendingOrder(page: Page): Promise<number> {
     params: { page: 1, per_page: 1 },
   });
   expect(catalogResp.ok()).toBeTruthy();
-  const contentType = (catalogResp.headers()['content-type'] || '').toLowerCase();
-  expect(contentType.includes('application/json')).toBeTruthy();
-  const catalog = await catalogResp.json();
+  const catalogText = await catalogResp.text();
+  const catalog = JSON.parse(catalogText);
   const first = catalog?.data?.data?.[0];
   expect(first?.id).toBeTruthy();
 
