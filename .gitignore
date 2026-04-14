@@ -152,6 +152,9 @@ app_private_key.pem
 app_public_key.pem
 *.pem
 
-# Cursor Agent skill: local workflow state (不纳入版本管理)
+# Agent / CI 工作流状态（非业务代码，仅本地，不纳入版本管理）
 .cursor/skills/mydev-github-workflow/scripts/00_01_workflow_state.json
 .cursor/skills/mydev-github-workflow/scripts/05_01_test_cases_state.json
+scripts/00_01_workflow_state.json
+scripts/05_01_test_cases_state.json
+scripts/workflow_state.json
