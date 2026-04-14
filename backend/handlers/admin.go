@@ -178,10 +178,17 @@ func GetAdminStats(c *gin.Context) {
 	}
 
 	var stats struct {
-		TotalUsers     int     `json:"total_users"`
-		TotalMerchants int     `json:"total_merchants"`
-		TotalOrders    int     `json:"total_orders"`
-		TotalRevenue   float64 `json:"total_revenue"`
+		TotalUsers          int     `json:"total_users"`
+		TotalMerchants      int     `json:"total_merchants"`
+		TotalOrders         int     `json:"total_orders"`
+		TotalRevenue        float64 `json:"total_revenue"`
+		PendingOrders       int     `json:"pending_orders"`
+		PaidOrders          int     `json:"paid_orders"`
+		CancelledOrders     int     `json:"cancelled_orders"`
+		MultiItemOrderRatio float64 `json:"multi_item_order_ratio"`
+		OrderConversionRate float64 `json:"order_conversion_rate"`
+		PaymentSuccessRate  float64 `json:"payment_success_rate"`
+		CancellationRate    float64 `json:"cancellation_rate"`
 	}
 
 	// Get total users
@@ -195,6 +202,37 @@ func GetAdminStats(c *gin.Context) {
 
 	// Get total revenue
 	db.QueryRow("SELECT COALESCE(SUM(total_price), 0) FROM orders WHERE status = 'completed'").Scan(&stats.TotalRevenue)
+
+	// Funnel counters for P1 operational monitoring
+	db.QueryRow("SELECT COUNT(*) FROM orders WHERE status = 'pending'").Scan(&stats.PendingOrders)
+	db.QueryRow("SELECT COUNT(*) FROM orders WHERE status IN ('paid', 'completed')").Scan(&stats.PaidOrders)
+	db.QueryRow("SELECT COUNT(*) FROM orders WHERE status = 'cancelled'").Scan(&stats.CancelledOrders)
+
+	if stats.TotalOrders > 0 {
+		stats.OrderConversionRate = float64(stats.PaidOrders) / float64(stats.TotalOrders)
+		stats.CancellationRate = float64(stats.CancelledOrders) / float64(stats.TotalOrders)
+	}
+
+	var totalPayments int
+	var successPayments int
+	db.QueryRow("SELECT COUNT(*) FROM payments").Scan(&totalPayments)
+	db.QueryRow("SELECT COUNT(*) FROM payments WHERE status = 'success'").Scan(&successPayments)
+	if totalPayments > 0 {
+		stats.PaymentSuccessRate = float64(successPayments) / float64(totalPayments)
+	}
+
+	var multiItemOrders int
+	db.QueryRow(
+		`SELECT COUNT(*) FROM (
+		   SELECT order_id
+		     FROM order_items
+		    GROUP BY order_id
+		   HAVING COUNT(*) > 1
+		) t`,
+	).Scan(&multiItemOrders)
+	if stats.TotalOrders > 0 {
+		stats.MultiItemOrderRatio = float64(multiItemOrders) / float64(stats.TotalOrders)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
