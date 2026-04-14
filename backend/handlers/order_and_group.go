@@ -157,12 +157,12 @@ func CreateOrder(c *gin.Context) {
 		lineTotal := unitPrice * float64(in.Quantity)
 
 		item := models.OrderItem{
-			SKUID:     skuID,
-			SPUID:     spuID,
-			Quantity:  in.Quantity,
-			UnitPrice: unitPrice,
+			SKUID:      skuID,
+			SPUID:      spuID,
+			Quantity:   in.Quantity,
+			UnitPrice:  unitPrice,
 			TotalPrice: lineTotal,
-			SKUType:   skuType,
+			SKUType:    skuType,
 		}
 		if tokenAmount.Valid {
 			t := tokenAmount.Int64

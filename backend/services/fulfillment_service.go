@@ -35,12 +35,6 @@ type skuFulfillmentRow struct {
 	TrialDurationDays  sql.NullInt64
 }
 
-type orderFulfillmentSnapshot struct {
-	SKUType       sql.NullString
-	TokenAmount   sql.NullInt64
-	ComputePoints sql.NullFloat64
-}
-
 // EffectiveSKUTypeForFulfillment prefers the order snapshot (checkout-time) over live SKU rows.
 func EffectiveSKUTypeForFulfillment(orderType sql.NullString, skuType string) string {
 	if orderType.Valid {
