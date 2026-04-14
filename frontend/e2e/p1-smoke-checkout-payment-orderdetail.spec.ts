@@ -5,15 +5,17 @@ async function createPendingOrder(page: Page): Promise<number> {
   const token = await page.evaluate(() => localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'));
   expect(token).toBeTruthy();
 
-  const catalogResp = await page.request.get('/api/v1/catalog', {
+  const catalogResp = await page.request.get('/catalog', {
     params: { page: 1, per_page: 1 },
   });
   expect(catalogResp.ok()).toBeTruthy();
+  const contentType = (catalogResp.headers()['content-type'] || '').toLowerCase();
+  expect(contentType.includes('application/json')).toBeTruthy();
   const catalog = await catalogResp.json();
   const first = catalog?.data?.data?.[0];
   expect(first?.id).toBeTruthy();
 
-  const orderResp = await page.request.post('/api/v1/orders', {
+  const orderResp = await page.request.post('/orders', {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',

@@ -184,7 +184,7 @@ func GetAdminStats(c *gin.Context) {
 		TotalRevenue        float64 `json:"total_revenue"`
 		PendingOrders       int     `json:"pending_orders"`
 		PaidOrders          int     `json:"paid_orders"`
-		CancelledOrders     int     `json:"cancelled_orders"`
+		CanceledOrders      int     `json:"canceled_orders"`
 		MultiItemOrderRatio float64 `json:"multi_item_order_ratio"`
 		OrderConversionRate float64 `json:"order_conversion_rate"`
 		PaymentSuccessRate  float64 `json:"payment_success_rate"`
@@ -206,11 +206,11 @@ func GetAdminStats(c *gin.Context) {
 	// Funnel counters for P1 operational monitoring
 	db.QueryRow("SELECT COUNT(*) FROM orders WHERE status = 'pending'").Scan(&stats.PendingOrders)
 	db.QueryRow("SELECT COUNT(*) FROM orders WHERE status IN ('paid', 'completed')").Scan(&stats.PaidOrders)
-	db.QueryRow("SELECT COUNT(*) FROM orders WHERE status = 'cancelled'").Scan(&stats.CancelledOrders)
+	db.QueryRow("SELECT COUNT(*) FROM orders WHERE status = 'cancelled'").Scan(&stats.CanceledOrders)
 
 	if stats.TotalOrders > 0 {
 		stats.OrderConversionRate = float64(stats.PaidOrders) / float64(stats.TotalOrders)
-		stats.CancellationRate = float64(stats.CancelledOrders) / float64(stats.TotalOrders)
+		stats.CancellationRate = float64(stats.CanceledOrders) / float64(stats.TotalOrders)
 	}
 
 	var totalPayments int

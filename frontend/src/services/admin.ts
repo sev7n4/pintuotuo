@@ -8,7 +8,7 @@ export interface AdminStats {
   total_revenue: number;
   pending_orders: number;
   paid_orders: number;
-  cancelled_orders: number;
+  canceled_orders: number;
   multi_item_order_ratio: number;
   order_conversion_rate: number;
   payment_success_rate: number;
