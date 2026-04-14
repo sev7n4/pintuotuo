@@ -73,8 +73,8 @@ const BillingTrendChart: React.FC<BillingTrendChartProps> = ({ merchantId, userI
   ];
 
   return (
-    <Card 
-      title="消费趋势" 
+    <Card
+      title="消费趋势"
       extra={
         <Row gutter={16}>
           <Col>

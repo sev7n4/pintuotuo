@@ -69,8 +69,7 @@ const CategoryPage = () => {
     navigate(`/catalog?tier=${encodeURIComponent(tierName)}`);
   };
 
-  const emptyAll =
-    !loading && filteredScenarios.length === 0 && filteredTiers.length === 0;
+  const emptyAll = !loading && filteredScenarios.length === 0 && filteredTiers.length === 0;
 
   return (
     <div className={`${styles.categoryPage} ${styles.pageMinimal}`}>
@@ -145,9 +144,7 @@ const CategoryPage = () => {
                         styles={{ body: { padding: 14 } }}
                       >
                         <div className={styles.categoryContent}>
-                          <div
-                            className={`${styles.categoryIcon} ${styles.categoryIconTier}`}
-                          >
+                          <div className={`${styles.categoryIcon} ${styles.categoryIconTier}`}>
                             <AppstoreOutlined />
                           </div>
                           <Text strong className={styles.categoryName}>

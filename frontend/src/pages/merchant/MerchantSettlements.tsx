@@ -399,7 +399,10 @@ const MerchantSettlements = () => {
                 {new Date(selectedSettlement.period_end).toLocaleDateString('zh-CN')}
               </Descriptions.Item>
               <Descriptions.Item label="销售总额(¥)">
-                ¥{selectedSettlement.total_sales_cny?.toFixed(6) || selectedSettlement.total_sales?.toFixed(6) || '0.000000'}
+                ¥
+                {selectedSettlement.total_sales_cny?.toFixed(6) ||
+                  selectedSettlement.total_sales?.toFixed(6) ||
+                  '0.000000'}
               </Descriptions.Item>
               <Descriptions.Item label="Token使用量">
                 {selectedSettlement.total_tokens?.toLocaleString() || '0'}

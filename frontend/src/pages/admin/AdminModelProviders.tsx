@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Button, Tag, Modal, Form, Input, Select, InputNumber, message, Space } from 'antd';
+import {
+  Card,
+  Table,
+  Button,
+  Tag,
+  Modal,
+  Form,
+  Input,
+  Select,
+  InputNumber,
+  message,
+  Space,
+} from 'antd';
 import { EditOutlined, PlusOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
 import type { ModelProvider } from '@/types/sku';
@@ -245,7 +257,11 @@ const AdminModelProviders = () => {
             label="OpenAI 兼容前缀（无前缀 model 名匹配）"
             tooltip="小写字母/数字/点/下划线/连字符；用于 /openai/v1 下仅写模型名时路由到本厂商。可多个，最长匹配优先。"
           >
-            <Select mode="tags" placeholder="输入后回车添加，如 deepseek、glm-" tokenSeparators={[',']} />
+            <Select
+              mode="tags"
+              placeholder="输入后回车添加，如 deepseek、glm-"
+              tokenSeparators={[',']}
+            />
           </Form.Item>
           <Form.Item name="billing_type" label="计费类型">
             <Input placeholder="可选，默认 flat" />

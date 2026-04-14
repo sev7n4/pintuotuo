@@ -51,7 +51,15 @@ interface RoutingStrategyConfig {
   updated_at: string;
 }
 
-const STRATEGY_PRESETS: Record<string, { weights: { price: number; latency: number; reliability: number }; retry: { count: number; backoff: number }; circuitBreaker: { threshold: number; timeout: number }; description: string }> = {
+const STRATEGY_PRESETS: Record<
+  string,
+  {
+    weights: { price: number; latency: number; reliability: number };
+    retry: { count: number; backoff: number };
+    circuitBreaker: { threshold: number; timeout: number };
+    description: string;
+  }
+> = {
   price_first: {
     weights: { price: 60, latency: 20, reliability: 20 },
     retry: { count: 3, backoff: 1000 },
@@ -222,7 +230,11 @@ const AdminRoutingStrategies: React.FC = () => {
       title={
         <Space>
           <span>{record.name}</span>
-          {record.is_default && <Tag color="blue" icon={<StarFilled />}>默认</Tag>}
+          {record.is_default && (
+            <Tag color="blue" icon={<StarFilled />}>
+              默认
+            </Tag>
+          )}
           <Tag color={record.status === 'active' ? 'green' : 'default'}>
             {record.status === 'active' ? '启用' : '禁用'}
           </Tag>
@@ -252,12 +264,7 @@ const AdminRoutingStrategies: React.FC = () => {
             okText="确定"
             cancelText="取消"
           >
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-            />
+            <Button type="link" size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
       }
@@ -281,11 +288,15 @@ const AdminRoutingStrategies: React.FC = () => {
         </Col>
         <Col span={12}>
           <div style={{ fontSize: 12, color: '#666' }}>重试配置</div>
-          <div style={{ fontSize: 12 }}>最大{record.max_retry_count}次 / 退避{record.retry_backoff_base}ms</div>
+          <div style={{ fontSize: 12 }}>
+            最大{record.max_retry_count}次 / 退避{record.retry_backoff_base}ms
+          </div>
         </Col>
         <Col span={12}>
           <div style={{ fontSize: 12, color: '#666' }}>熔断器</div>
-          <div style={{ fontSize: 12 }}>阈值{record.circuit_breaker_threshold}次 / 超时{record.circuit_breaker_timeout}s</div>
+          <div style={{ fontSize: 12 }}>
+            阈值{record.circuit_breaker_threshold}次 / 超时{record.circuit_breaker_timeout}s
+          </div>
         </Col>
       </Row>
     </Card>
@@ -306,7 +317,11 @@ const AdminRoutingStrategies: React.FC = () => {
       render: (name: string, record: RoutingStrategyConfig) => (
         <Space>
           {name}
-          {record.is_default && <Tag color="blue" icon={<StarFilled />}>默认</Tag>}
+          {record.is_default && (
+            <Tag color="blue" icon={<StarFilled />}>
+              默认
+            </Tag>
+          )}
         </Space>
       ),
     },
@@ -334,8 +349,12 @@ const AdminRoutingStrategies: React.FC = () => {
       responsive: ['xl'] as any,
       render: (_: any, record: RoutingStrategyConfig) => (
         <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 12 }}>重试: {record.max_retry_count}次/{record.retry_backoff_base}ms</span>
-          <span style={{ fontSize: 12 }}>熔断: {record.circuit_breaker_threshold}次/{record.circuit_breaker_timeout}s</span>
+          <span style={{ fontSize: 12 }}>
+            重试: {record.max_retry_count}次/{record.retry_backoff_base}ms
+          </span>
+          <span style={{ fontSize: 12 }}>
+            熔断: {record.circuit_breaker_threshold}次/{record.circuit_breaker_timeout}s
+          </span>
         </Space>
       ),
     },
@@ -354,7 +373,7 @@ const AdminRoutingStrategies: React.FC = () => {
       title: '操作',
       key: 'action',
       width: isMobile ? 80 : 200,
-      fixed: isMobile ? 'right' as const : undefined,
+      fixed: isMobile ? ('right' as const) : undefined,
       render: (_: any, record: RoutingStrategyConfig) => (
         <Space size={isMobile ? 0 : 8}>
           <Button
@@ -383,12 +402,7 @@ const AdminRoutingStrategies: React.FC = () => {
             okText="确定"
             cancelText="取消"
           >
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-            >
+            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
               {!isMobile && '删除'}
             </Button>
           </Popconfirm>
@@ -401,11 +415,7 @@ const AdminRoutingStrategies: React.FC = () => {
     <Card
       title="路由策略管理"
       extra={
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleCreate}
-        >
+        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           新建策略
         </Button>
       }
@@ -429,7 +439,9 @@ const AdminRoutingStrategies: React.FC = () => {
               >
                 上一页
               </Button>
-              <span>{pagination.current} / {Math.ceil(pagination.total / pagination.pageSize)}</span>
+              <span>
+                {pagination.current} / {Math.ceil(pagination.total / pagination.pageSize)}
+              </span>
               <Button
                 disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
                 onClick={() => setPagination({ ...pagination, current: pagination.current + 1 })}
@@ -450,8 +462,7 @@ const AdminRoutingStrategies: React.FC = () => {
             ...pagination,
             showSizeChanger: true,
             showTotal: (total) => `共 ${total} 条`,
-            onChange: (page, pageSize) =>
-              setPagination({ ...pagination, current: page, pageSize }),
+            onChange: (page, pageSize) => setPagination({ ...pagination, current: page, pageSize }),
           }}
         />
       )}
@@ -504,9 +515,13 @@ const AdminRoutingStrategies: React.FC = () => {
               <Space wrap>
                 {Object.keys(STRATEGY_PRESETS).map((key) => (
                   <Button key={key} size="small" onClick={() => applyPreset(key)}>
-                    {key === 'price_first' ? '价格优先' :
-                     key === 'latency_first' ? '延迟优先' :
-                     key === 'reliability_first' ? '可靠性优先' : '均衡策略'}
+                    {key === 'price_first'
+                      ? '价格优先'
+                      : key === 'latency_first'
+                        ? '延迟优先'
+                        : key === 'reliability_first'
+                          ? '可靠性优先'
+                          : '均衡策略'}
                   </Button>
                 ))}
               </Space>
@@ -517,14 +532,16 @@ const AdminRoutingStrategies: React.FC = () => {
 
           <Row gutter={16}>
             <Col span={24}>
-              <Form.Item label={
-                <Space>
-                  价格权重
-                  <Tooltip title="价格优先策略建议: 60%">
-                    <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
-                  </Tooltip>
-                </Space>
-              }>
+              <Form.Item
+                label={
+                  <Space>
+                    价格权重
+                    <Tooltip title="价格优先策略建议: 60%">
+                      <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
                 <Row gutter={16} align="middle">
                   <Col flex="auto">
                     <Slider
@@ -552,14 +569,16 @@ const AdminRoutingStrategies: React.FC = () => {
             </Col>
 
             <Col span={24}>
-              <Form.Item label={
-                <Space>
-                  延迟权重
-                  <Tooltip title="延迟优先策略建议: 60%">
-                    <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
-                  </Tooltip>
-                </Space>
-              }>
+              <Form.Item
+                label={
+                  <Space>
+                    延迟权重
+                    <Tooltip title="延迟优先策略建议: 60%">
+                      <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
                 <Row gutter={16} align="middle">
                   <Col flex="auto">
                     <Slider
@@ -587,14 +606,16 @@ const AdminRoutingStrategies: React.FC = () => {
             </Col>
 
             <Col span={24}>
-              <Form.Item label={
-                <Space>
-                  可靠性权重
-                  <Tooltip title="可靠性优先策略建议: 60%">
-                    <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
-                  </Tooltip>
-                </Space>
-              }>
+              <Form.Item
+                label={
+                  <Space>
+                    可靠性权重
+                    <Tooltip title="可靠性优先策略建议: 60%">
+                      <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
                 <Row gutter={16} align="middle">
                   <Col flex="auto">
                     <Slider
@@ -633,8 +654,8 @@ const AdminRoutingStrategies: React.FC = () => {
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item 
-                name="max_retry_count" 
+              <Form.Item
+                name="max_retry_count"
                 label={
                   <Space>
                     最大重试次数
@@ -648,8 +669,8 @@ const AdminRoutingStrategies: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item 
-                name="retry_backoff_base" 
+              <Form.Item
+                name="retry_backoff_base"
                 label={
                   <Space>
                     退避基数(ms)
@@ -675,8 +696,8 @@ const AdminRoutingStrategies: React.FC = () => {
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item 
-                name="circuit_breaker_threshold" 
+              <Form.Item
+                name="circuit_breaker_threshold"
                 label={
                   <Space>
                     熔断阈值(次)
@@ -690,8 +711,8 @@ const AdminRoutingStrategies: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item 
-                name="circuit_breaker_timeout" 
+              <Form.Item
+                name="circuit_breaker_timeout"
                 label={
                   <Space>
                     熔断超时(s)
@@ -710,8 +731,8 @@ const AdminRoutingStrategies: React.FC = () => {
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item 
-                name="is_default" 
+              <Form.Item
+                name="is_default"
                 label={
                   <Space>
                     设为默认策略

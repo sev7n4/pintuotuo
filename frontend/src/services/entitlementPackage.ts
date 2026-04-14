@@ -1,0 +1,26 @@
+import api from './api';
+import type { EntitlementPackage, EntitlementPackageUserView } from '@/types/entitlementPackage';
+
+type UpsertPayload = {
+  package_code?: string;
+  name: string;
+  description?: string;
+  status?: 'active' | 'inactive';
+  sort_order?: number;
+  start_at?: string;
+  end_at?: string;
+  is_featured?: boolean;
+  badge_text?: string;
+  items: Array<{ sku_id: number; default_quantity: number }>;
+};
+
+export const entitlementPackageService = {
+  listAdmin: () => api.get<{ data: EntitlementPackage[] }>('/admin/entitlement-packages'),
+  createAdmin: (data: UpsertPayload) => api.post('/admin/entitlement-packages', data),
+  updateAdmin: (id: number, data: UpsertPayload) =>
+    api.put(`/admin/entitlement-packages/${id}`, data),
+  deleteAdmin: (id: number) => api.delete(`/admin/entitlement-packages/${id}`),
+  listPublic: () => api.get<{ data: EntitlementPackage[] }>('/entitlement-packages'),
+  listMine: () =>
+    api.get<{ data: EntitlementPackageUserView[] }>('/users/me/entitlements/packages'),
+};

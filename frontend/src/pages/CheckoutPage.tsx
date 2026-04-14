@@ -8,6 +8,7 @@ import {
   Statistic,
   Divider,
   message,
+  Alert,
   Empty,
   Row,
   Col,
@@ -153,6 +154,15 @@ const CheckoutPage: React.FC = () => {
       <Row gutter={24}>
         <Col xs={24} lg={16}>
           <Card title="确认订单" style={{ borderRadius: 12 }}>
+            {items.length > 1 && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message="合并为一笔多明细订单"
+                description="提交后将生成一个订单、多条明细；支付成功后会按每条明细分别履约。若只需部分商品，可取消勾选对应行。"
+              />
+            )}
             {isMobile ? (
               <List
                 dataSource={items}
@@ -171,7 +181,9 @@ const CheckoutPage: React.FC = () => {
                             ¥{(record.product.price * record.quantity).toFixed(2)}
                           </span>
                         </Space>
-                        <span>单价 ¥{record.product.price.toFixed(2)} · 数量 {record.quantity}</span>
+                        <span>
+                          单价 ¥{record.product.price.toFixed(2)} · 数量 {record.quantity}
+                        </span>
                       </Space>
                     </Card>
                   </List.Item>

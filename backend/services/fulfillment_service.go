@@ -161,7 +161,7 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 				return err
 			}
 		case skuTypeSubscription:
-			if err = s.fulfillSubscription(tx, userID, item.SKUID, orderID, item.Quantity, skuRow); err != nil {
+			if err = s.fulfillSubscription(tx, userID, item.SKUID, orderID, item.Quantity, skuRow, tokenAmt); err != nil {
 				return err
 			}
 		case skuTypeTrial:
@@ -240,7 +240,7 @@ func (s *FulfillmentService) fulfillComputePoints(tx *sql.Tx, userID, skuID, ord
 	return err
 }
 
-func (s *FulfillmentService) fulfillSubscription(tx *sql.Tx, userID, skuID, orderID, qty int, skuRow skuFulfillmentRow) error {
+func (s *FulfillmentService) fulfillSubscription(tx *sql.Tx, userID, skuID, orderID, qty int, skuRow skuFulfillmentRow, tokenAmount sql.NullInt64) error {
 	period := ""
 	if skuRow.SubscriptionPeriod.Valid {
 		period = skuRow.SubscriptionPeriod.String
@@ -249,7 +249,15 @@ func (s *FulfillmentService) fulfillSubscription(tx *sql.Tx, userID, skuID, orde
 	if skuRow.ValidDays.Valid {
 		validDays = int(skuRow.ValidDays.Int64)
 	}
-	return s.upsertSubscription(tx, userID, skuID, orderID, qty, period, validDays, false)
+	if err := s.upsertSubscription(tx, userID, skuID, orderID, qty, period, validDays, false); err != nil {
+		return err
+	}
+
+	// Scheme 2: subscription SKU can also grant token balance at activation time.
+	if tokenAmount.Valid && tokenAmount.Int64 > 0 {
+		return s.fulfillTokenPack(tx, userID, skuID, orderID, qty, tokenAmount)
+	}
+	return nil
 }
 
 // subscriptionPVAndAnchor binds pricing snapshot from the paid order (baseline if unset).

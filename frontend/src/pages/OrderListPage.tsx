@@ -443,8 +443,12 @@ export const OrderListPage: React.FC = () => {
           <>
             <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
               <Descriptions.Item label="订单号">{selectedOrder.id}</Descriptions.Item>
-              <Descriptions.Item label="商品项数">{selectedOrder.items?.length || 1}</Descriptions.Item>
-              <Descriptions.Item label="总数量">{getOrderItemCount(selectedOrder)}</Descriptions.Item>
+              <Descriptions.Item label="商品项数">
+                {selectedOrder.items?.length || 1}
+              </Descriptions.Item>
+              <Descriptions.Item label="总数量">
+                {getOrderItemCount(selectedOrder)}
+              </Descriptions.Item>
               <Descriptions.Item label="均价">
                 ¥
                 {(
@@ -488,7 +492,9 @@ export const OrderListPage: React.FC = () => {
               renderItem={(item) => (
                 <List.Item>
                   <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-                    <Text>SKU #{item.sku_id} × {item.quantity}</Text>
+                    <Text>
+                      SKU #{item.sku_id} × {item.quantity}
+                    </Text>
                     <Text>¥{item.total_price.toFixed(2)}</Text>
                   </Space>
                 </List.Item>

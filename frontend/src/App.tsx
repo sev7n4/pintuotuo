@@ -31,6 +31,8 @@ import MyServicesPage from '@pages/MyServicesPage';
 import CategoryPage from '@pages/CategoryPage';
 import FavoritesPage from '@pages/FavoritesPage';
 import HistoryPage from '@pages/HistoryPage';
+import EntitlementPackagesPage from '@pages/EntitlementPackagesPage';
+import MyEntitlementsPage from '@pages/MyEntitlementsPage';
 
 // Merchant Pages
 import MerchantDashboard from '@pages/merchant/MerchantDashboard';
@@ -60,6 +62,7 @@ import AdminUserBillings from '@pages/admin/AdminUserBillings';
 import AdminSettlements from '@pages/admin/AdminSettlements';
 import AdminRoutingStrategies from '@pages/admin/AdminRoutingStrategies';
 import AdminReconciliation from '@pages/admin/AdminReconciliation';
+import AdminEntitlementPackages from '@pages/admin/AdminEntitlementPackages';
 
 function LegacyProductDetailRedirect() {
   const { id } = useParams();
@@ -84,6 +87,7 @@ function App() {
             <Route path="/products/:id" element={<LegacyProductDetailRedirect />} />
             <Route path="/catalog" element={<ProductListPage />} />
             <Route path="/catalog/:id" element={<ProductDetailPage />} />
+            <Route path="/packages" element={<EntitlementPackagesPage />} />
 
             {/* Categories */}
             <Route path="/categories" element={<CategoryPage />} />
@@ -116,6 +120,7 @@ function App() {
             {/* My Page（个人主页）；我的服务为同级独立页 */}
             <Route path="/my" element={<MyPage />} />
             <Route path="/my/services" element={<MyServicesPage />} />
+            <Route path="/my/entitlements" element={<MyEntitlementsPage />} />
 
             {/* Favorites */}
             <Route path="/favorites" element={<FavoritesPage />} />
@@ -165,6 +170,7 @@ function App() {
             <Route path="routing-strategies" element={<AdminRoutingStrategies />} />
             <Route path="reconciliation" element={<AdminReconciliation />} />
             <Route path="flash-sales" element={<AdminFlashSales />} />
+            <Route path="entitlement-packages" element={<AdminEntitlementPackages />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -1,16 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Form,
-  Input,
-  Button,
-  Card,
-  message,
-  Space,
-  Typography,
-  Grid,
-  Spin,
-  Alert,
-} from 'antd';
+import { Form, Input, Button, Card, message, Space, Typography, Grid, Spin, Alert } from 'antd';
 import { MobileOutlined } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AuthPhoneSection.module.css';
@@ -111,7 +100,15 @@ export function AuthPhoneSection({
     embedded ? (
       <div>{inner}</div>
     ) : (
-      <Card size="small" title={<><MobileOutlined /> 手机号</>} style={{ marginTop: 16 }}>
+      <Card
+        size="small"
+        title={
+          <>
+            <MobileOutlined /> 手机号
+          </>
+        }
+        style={{ marginTop: 16 }}
+      >
         {inner}
       </Card>
     );
@@ -139,7 +136,8 @@ export function AuthPhoneSection({
                 <Typography.Text code>123456</Typography.Text>
               </li>
               <li>
-                生产：配置真实短信网关对应的 <Typography.Text code>SMS_PROVIDER</Typography.Text> 等变量
+                生产：配置真实短信网关对应的 <Typography.Text code>SMS_PROVIDER</Typography.Text>{' '}
+                等变量
               </li>
             </ul>
           </Typography.Paragraph>
@@ -168,9 +166,12 @@ export function AuthPhoneSection({
           </Button>
         </Form.Item>
       </Form>
-      <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
-        首次手机号验证成功将自动创建账号并登录。开发环境可设置 <code>MOCK_SMS=true</code>，验证码固定为{' '}
-        <code>123456</code>。
+      <Typography.Paragraph
+        type="secondary"
+        style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}
+      >
+        首次手机号验证成功将自动创建账号并登录。开发环境可设置 <code>MOCK_SMS=true</code>
+        ，验证码固定为 <code>123456</code>。
       </Typography.Paragraph>
     </>
   );

@@ -17,10 +17,7 @@ import { WechatOutlined, GithubOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '@stores/authStore';
 import { AuthPhoneSection } from './AuthPhoneSection';
-import {
-  readPrimaryLoginPreference,
-  writePrimaryLoginPreference,
-} from '@/lib/authLoginPreference';
+import { readPrimaryLoginPreference, writePrimaryLoginPreference } from '@/lib/authLoginPreference';
 import styles from './AuthPage.module.css';
 
 export type AuthPageProps = {
@@ -175,7 +172,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
           content: (
             <div>
               <Typography.Paragraph style={{ marginBottom: 8 }}>
-                真实环境会发到邮箱；Mock 模式下请点下方按钮，浏览器将打开验证链接并跳转回本站完成登录。
+                真实环境会发到邮箱；Mock
+                模式下请点下方按钮，浏览器将打开验证链接并跳转回本站完成登录。
               </Typography.Paragraph>
               <Typography.Paragraph copyable={{ text: res.debug_link }} style={{ marginBottom: 0 }}>
                 {res.debug_link}
@@ -270,9 +268,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
                 <Input placeholder="example@email.com" />
               </Form.Item>
               <Form.Item
-                label={
-                  isRegisterRoute ? '密码' : '密码（仅曾用邮箱注册的账号）'
-                }
+                label={isRegisterRoute ? '密码' : '密码（仅曾用邮箱注册的账号）'}
                 name="password"
                 rules={
                   isRegisterRoute
@@ -341,14 +337,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
         </Divider>
         <Space direction="vertical" style={{ width: '100%' }} size="small">
           <Typography.Paragraph type="secondary" style={{ marginBottom: 8, fontSize: 12 }}>
-            邮箱魔法链接、微信扫码、GitHub 与账号绑定由后端开关控制。手机号验证码请切换到「手机登录」（未开启时会说明如何配置）。
+            邮箱魔法链接、微信扫码、GitHub
+            与账号绑定由后端开关控制。手机号验证码请切换到「手机登录」（未开启时会说明如何配置）。
           </Typography.Paragraph>
           <Space wrap>
             <Button
               icon={<WechatOutlined />}
               disabled={!capabilities?.wechat_oauth}
               onClick={() => {
-                if (capabilities?.wechat_oauth) window.location.assign('/api/v1/users/oauth/wechat/start');
+                if (capabilities?.wechat_oauth)
+                  window.location.assign('/api/v1/users/oauth/wechat/start');
               }}
               title={capabilities?.wechat_oauth ? '微信 OAuth' : '未配置 WECHAT_OPEN_APP_ID'}
             >
@@ -358,7 +356,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
               icon={<GithubOutlined />}
               disabled={!capabilities?.github_oauth}
               onClick={() => {
-                if (capabilities?.github_oauth) window.location.assign('/api/v1/users/oauth/github/start');
+                if (capabilities?.github_oauth)
+                  window.location.assign('/api/v1/users/oauth/github/start');
               }}
               title={capabilities?.github_oauth ? 'GitHub OAuth' : '未配置 GITHUB_OAUTH_CLIENT_ID'}
             >

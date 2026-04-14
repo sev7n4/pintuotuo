@@ -21,7 +21,9 @@ export function getSkuCardSubtitle(s: SKUWithSPU): string {
   }
   if (s.sku_type === 'subscription') {
     const m: Record<string, string> = { monthly: '月度', quarterly: '季度', yearly: '年度' };
-    return `${m[s.subscription_period || 'monthly'] || '订阅'} · ${s.model_name || ''}`.trim();
+    const gift =
+      s.token_amount && s.token_amount > 0 ? ` · 赠送${s.token_amount.toLocaleString()}Token` : '';
+    return `${m[s.subscription_period || 'monthly'] || '订阅'}${gift} · ${s.model_name || ''}`.trim();
   }
   if (s.sku_type === 'concurrent' && s.concurrent_requests) {
     return `${s.concurrent_requests} 并发`;

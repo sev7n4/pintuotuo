@@ -1,5 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Button, Radio, Space, Statistic, Divider, message, Spin, Empty, Result, List, Typography } from 'antd';
+import {
+  Card,
+  Button,
+  Radio,
+  Space,
+  Statistic,
+  Divider,
+  message,
+  Spin,
+  Empty,
+  Result,
+  List,
+  Typography,
+} from 'antd';
 import { AlipayCircleOutlined, WechatOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useOrderStore } from '@stores/orderStore';
@@ -55,7 +68,9 @@ const PaymentPage: React.FC = () => {
   };
 
   const itemCount =
-    currentOrder?.items?.reduce((sum, item) => sum + item.quantity, 0) || currentOrder?.quantity || 0;
+    currentOrder?.items?.reduce((sum, item) => sum + item.quantity, 0) ||
+    currentOrder?.quantity ||
+    0;
 
   if (orderLoading) {
     return <Spin />;
@@ -143,7 +158,9 @@ const PaymentPage: React.FC = () => {
             renderItem={(item) => (
               <List.Item>
                 <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-                  <Typography.Text>SKU #{item.sku_id} × {item.quantity}</Typography.Text>
+                  <Typography.Text>
+                    SKU #{item.sku_id} × {item.quantity}
+                  </Typography.Text>
                   <Typography.Text>¥{item.total_price.toFixed(2)}</Typography.Text>
                 </Space>
               </List.Item>

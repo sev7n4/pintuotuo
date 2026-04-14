@@ -1,5 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Button, Modal, Descriptions, message, Statistic, Row, Col, Form, Select, DatePicker, InputNumber, Space } from 'antd';
+import {
+  Card,
+  Table,
+  Tag,
+  Button,
+  Modal,
+  Descriptions,
+  message,
+  Statistic,
+  Row,
+  Col,
+  Form,
+  Select,
+  DatePicker,
+  InputNumber,
+  Space,
+} from 'antd';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import {
@@ -34,7 +50,7 @@ const AdminSettlements = () => {
   const [itemsVisible, setItemsVisible] = useState(false);
   const [settlementItems, setSettlementItems] = useState<SettlementItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
-  const [merchants, setMerchants] = useState<Array<{id: number; company_name: string}>>([]);
+  const [merchants, setMerchants] = useState<Array<{ id: number; company_name: string }>>([]);
   const [generateMerchantVisible, setGenerateMerchantVisible] = useState(false);
   const [generateMerchantLoading, setGenerateMerchantLoading] = useState(false);
   const [selectedMerchantId, setSelectedMerchantId] = useState<number | null>(null);
@@ -48,7 +64,15 @@ const AdminSettlements = () => {
   useEffect(() => {
     fetchSettlements();
     fetchMerchants();
-  }, [filterStatus, filterYearMonth, filterMerchantId, filterMerchantConfirmed, filterFinanceApproved, filterMinAmount, filterMaxAmount]);
+  }, [
+    filterStatus,
+    filterYearMonth,
+    filterMerchantId,
+    filterMerchantConfirmed,
+    filterFinanceApproved,
+    filterMinAmount,
+    filterMaxAmount,
+  ]);
 
   const fetchSettlements = async () => {
     setLoading(true);
@@ -67,7 +91,7 @@ const AdminSettlements = () => {
 
       const response = await fetch(`/api/v1/admin/settlements?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -98,7 +122,7 @@ const AdminSettlements = () => {
     try {
       const response = await fetch('/api/v1/admin/merchants', {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -116,7 +140,7 @@ const AdminSettlements = () => {
     try {
       const response = await fetch(`/api/v1/admin/settlements/${record.id}`, {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -142,7 +166,7 @@ const AdminSettlements = () => {
       const response = await fetch(`/api/v1/admin/settlements/${selectedSettlement.id}/approve`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -169,7 +193,7 @@ const AdminSettlements = () => {
       const response = await fetch(`/api/v1/admin/settlements/${selectedSettlement.id}/mark-paid`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -195,7 +219,7 @@ const AdminSettlements = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
         body: JSON.stringify(values),
       });
@@ -228,7 +252,7 @@ const AdminSettlements = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
         body: JSON.stringify({
           merchant_id: selectedMerchantId,
@@ -261,7 +285,7 @@ const AdminSettlements = () => {
     try {
       const response = await fetch(`/api/v1/admin/settlements/${record.id}/items`, {
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -377,7 +401,12 @@ const AdminSettlements = () => {
           <Button type="link" size="small" onClick={() => handleViewDetail(record)}>
             查看详情
           </Button>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewItems(record)}>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewItems(record)}
+          >
             明细
           </Button>
         </>
@@ -388,7 +417,9 @@ const AdminSettlements = () => {
   const totalSettlements = settlements
     .filter((s) => s.status === 'completed')
     .reduce((sum, s) => sum + s.settlement_amount, 0);
-  const pendingApprovals = settlements.filter((s) => s.merchant_confirmed && !s.finance_approved).length;
+  const pendingApprovals = settlements.filter(
+    (s) => s.merchant_confirmed && !s.finance_approved
+  ).length;
 
   return (
     <div className={styles.settlements}>
@@ -511,9 +542,7 @@ const AdminSettlements = () => {
             </Button>
           </Space>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button onClick={() => setGenerateMerchantVisible(true)}>
-              按商户生成
-            </Button>
+            <Button onClick={() => setGenerateMerchantVisible(true)}>按商户生成</Button>
             <Button type="primary" onClick={() => setGenerateVisible(true)}>
               生成月度结算
             </Button>
@@ -551,7 +580,10 @@ const AdminSettlements = () => {
                 {new Date(selectedSettlement.period_end).toLocaleDateString('zh-CN')}
               </Descriptions.Item>
               <Descriptions.Item label="销售总额(¥)">
-                ¥{selectedSettlement.total_sales_cny?.toFixed(6) || selectedSettlement.total_sales?.toFixed(6) || '0.000000'}
+                ¥
+                {selectedSettlement.total_sales_cny?.toFixed(6) ||
+                  selectedSettlement.total_sales?.toFixed(6) ||
+                  '0.000000'}
               </Descriptions.Item>
               <Descriptions.Item label="Token使用量">
                 {selectedSettlement.total_tokens?.toLocaleString() || '0'}
@@ -606,16 +638,17 @@ const AdminSettlements = () => {
                   审批通过
                 </Button>
               )}
-              {selectedSettlement.finance_approved && selectedSettlement.status === 'processing' && (
-                <Button
-                  type="primary"
-                  icon={<BankOutlined />}
-                  onClick={handleMarkAsPaid}
-                  loading={markPaidLoading}
-                >
-                  标记已打款
-                </Button>
-              )}
+              {selectedSettlement.finance_approved &&
+                selectedSettlement.status === 'processing' && (
+                  <Button
+                    type="primary"
+                    icon={<BankOutlined />}
+                    onClick={handleMarkAsPaid}
+                    loading={markPaidLoading}
+                  >
+                    标记已打款
+                  </Button>
+                )}
             </div>
           </>
         )}
@@ -630,16 +663,19 @@ const AdminSettlements = () => {
         }}
         footer={null}
       >
-        <Form layout="vertical" onFinish={() => {
-          if (!generateYearMonth) {
-            message.warning('请选择年月');
-            return;
-          }
-          handleGenerateSettlements({
-            year: generateYearMonth.year(),
-            month: generateYearMonth.month() + 1,
-          });
-        }}>
+        <Form
+          layout="vertical"
+          onFinish={() => {
+            if (!generateYearMonth) {
+              message.warning('请选择年月');
+              return;
+            }
+            handleGenerateSettlements({
+              year: generateYearMonth.year(),
+              month: generateYearMonth.month() + 1,
+            });
+          }}
+        >
           <Form.Item label="选择年月" required>
             <DatePicker
               picker="month"

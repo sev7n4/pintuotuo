@@ -454,9 +454,7 @@ export const ProductDetailPage: React.FC = () => {
                   key: 'intro',
                   label: '商品介绍',
                   children: (
-                    <Text type="secondary">
-                      {product.description?.trim() || '暂无介绍'}
-                    </Text>
+                    <Text type="secondary">{product.description?.trim() || '暂无介绍'}</Text>
                   ),
                 },
                 {
@@ -466,7 +464,8 @@ export const ProductDetailPage: React.FC = () => {
                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
                       {product.token_count ? (
                         <Text>
-                          包含：<Text strong>{(product.token_count / 10000).toFixed(0)}万 Token</Text>
+                          包含：
+                          <Text strong>{(product.token_count / 10000).toFixed(0)}万 Token</Text>
                         </Text>
                       ) : null}
                       {product.models && product.models.length > 0 ? (
@@ -884,12 +883,16 @@ export const ProductDetailPage: React.FC = () => {
 
               <Title level={5}>使用指南（商品级）</Title>
               <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                以下为通用说明；您实际享有的模型名与调用示例以购买后「我的服务 → 我的 Token」中「本接口调用说明」为准。
+                以下为通用说明；您实际享有的模型名与调用示例以购买后「我的服务 → 我的
+                Token」中「本接口调用说明」为准。
               </Paragraph>
               <ol style={{ paddingLeft: 20 }}>
                 <li>购买成功后，Token 将按规则充值到您的账户（以订单为准）</li>
                 <li>在「我的 Token」可查看余额、创建平台 API 密钥（ptd_ 前缀）</li>
-                <li>支持 OpenAI 兼容路径：将 Base URL 设为平台提供的地址，请求体中填写 model（可用「厂商/模型」或兼容前缀匹配）</li>
+                <li>
+                  支持 OpenAI 兼容路径：将 Base URL 设为平台提供的地址，请求体中填写
+                  model（可用「厂商/模型」或兼容前缀匹配）
+                </li>
                 <li>流式（stream）是否开放以平台公告为准</li>
               </ol>
               {selectedSKU && (
@@ -910,7 +913,10 @@ export const ProductDetailPage: React.FC = () => {
                       ) : null}
                     </li>
                     <li>
-                      OpenAI 兼容示例：<Text code>{`${selectedSKU.model_provider}/${selectedSKU.provider_model_id?.trim() || selectedSKU.model_name}`}</Text>
+                      OpenAI 兼容示例：
+                      <Text
+                        code
+                      >{`${selectedSKU.model_provider}/${selectedSKU.provider_model_id?.trim() || selectedSKU.model_name}`}</Text>
                     </li>
                   </ul>
                 </>

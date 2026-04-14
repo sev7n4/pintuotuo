@@ -21,6 +21,7 @@ import {
   ShoppingCartOutlined,
   UnorderedListOutlined,
   MenuOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import './Layout.css';
@@ -31,6 +32,7 @@ const { useBreakpoint } = Grid;
 function getMainNavSelectedKey(pathname: string): string[] {
   if (pathname === '/') return ['home'];
   if (pathname.startsWith('/catalog')) return ['catalog'];
+  if (pathname.startsWith('/packages')) return ['packages'];
   if (pathname === '/cart' || pathname === '/checkout') return ['cart'];
   if (pathname.startsWith('/orders') || pathname.startsWith('/payment')) return ['orders'];
   return [];
@@ -63,6 +65,11 @@ export default function Layout() {
         icon: <AppstoreOutlined />,
       },
       {
+        key: 'packages',
+        label: <Link to="/packages">权益包</Link>,
+        icon: <GiftOutlined />,
+      },
+      {
         key: 'cart',
         label: <Link to="/cart">购物车</Link>,
         icon: <ShoppingCartOutlined />,
@@ -83,6 +90,7 @@ export default function Layout() {
   const userMenuItems = [
     { key: 'my', label: '我的主页', icon: <UserOutlined /> },
     { key: 'services', label: '我的服务', icon: <CustomerServiceOutlined /> },
+    { key: 'entitlements', label: '我的权益', icon: <GiftOutlined /> },
     { type: 'divider' as const },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
   ];
@@ -90,6 +98,7 @@ export default function Layout() {
   const navPaths: Record<string, string> = {
     home: '/',
     catalog: '/catalog',
+    packages: '/packages',
     cart: '/cart',
     orders: '/orders',
   };
@@ -105,6 +114,11 @@ export default function Layout() {
         key: 'catalog',
         label: '卖场',
         icon: <AppstoreOutlined />,
+      },
+      {
+        key: 'packages',
+        label: '权益包',
+        icon: <GiftOutlined />,
       },
       {
         key: 'cart',
@@ -142,6 +156,9 @@ export default function Layout() {
         break;
       case 'services':
         navigate('/my/services');
+        break;
+      case 'entitlements':
+        navigate('/my/entitlements');
         break;
     }
   };
