@@ -85,7 +85,7 @@ func validateEntitlementPackageReq(req *entitlementPackageUpsertReq, needCode bo
 		}
 		seen[it.SKUID] = struct{}{}
 	}
-	if req.Status != "" && req.Status != "active" && req.Status != "inactive" {
+	if req.Status != "" && req.Status != merchantStatusActive && req.Status != merchantSKUStatusInactive {
 		return apperrors.NewAppError("INVALID_REQUEST", "status 只能是 active/inactive", http.StatusBadRequest, nil)
 	}
 	if req.StartAt != nil && req.EndAt != nil && !req.EndAt.After(*req.StartAt) {
