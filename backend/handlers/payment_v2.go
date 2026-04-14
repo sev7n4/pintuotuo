@@ -339,7 +339,7 @@ func processBalancePayment(db *sql.DB, paymentID, orderID, userID int, amount fl
 	}
 
 	fs := services.NewFulfillmentService()
-	if err = fs.FulfillOrder(tx, orderID); err != nil {
+	if err = fs.FulfillOrderItems(tx, orderID); err != nil {
 		return err
 	}
 
@@ -435,7 +435,7 @@ func AlipayNotify(c *gin.Context) {
 	}
 
 	fs := services.NewFulfillmentService()
-	if err := fs.FulfillOrder(tx, orderID); err != nil {
+	if err := fs.FulfillOrderItems(tx, orderID); err != nil {
 		log.Printf("[AlipayNotify] Fulfillment error: %v", err)
 		c.String(http.StatusInternalServerError, "fail")
 		return
@@ -518,7 +518,7 @@ func WechatNotify(c *gin.Context) {
 	}
 
 	fs := services.NewFulfillmentService()
-	if err := fs.FulfillOrder(tx, orderID); err != nil {
+	if err := fs.FulfillOrderItems(tx, orderID); err != nil {
 		c.String(http.StatusInternalServerError, "<xml><return_code><![CDATA[FAIL]]></return_code></xml>")
 		return
 	}

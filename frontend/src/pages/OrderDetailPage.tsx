@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Button, Descriptions, Tag, Spin, Empty, Space, Typography } from 'antd';
+import { Card, Button, Descriptions, Tag, Spin, Empty, Space, Typography, List } from 'antd';
 import { ArrowLeftOutlined, PayCircleOutlined, TeamOutlined } from '@ant-design/icons';
 import { useOrderStore } from '@/stores/orderStore';
 import { useProductStore } from '@/stores/productStore';
@@ -36,7 +36,7 @@ export const OrderDetailPage: React.FC = () => {
   }, [id, fetchOrderByID]);
 
   useEffect(() => {
-    const catalogId = currentOrder?.sku_id ?? currentOrder?.product_id;
+    const catalogId = currentOrder?.items?.[0]?.sku_id ?? currentOrder?.sku_id ?? currentOrder?.product_id;
     if (catalogId) {
       const loadProduct = async () => {
         const p = await fetchProductByID(catalogId);
@@ -77,6 +77,8 @@ export const OrderDetailPage: React.FC = () => {
     }
   };
 
+  const itemCount = (currentOrder.items || []).reduce((sum, item) => sum + item.quantity, 0) || currentOrder.quantity;
+
   return (
     <div style={{ padding: '20px', maxWidth: 800, margin: '0 auto' }}>
       <Card>
@@ -94,8 +96,11 @@ export const OrderDetailPage: React.FC = () => {
         <Descriptions column={2} bordered>
           <Descriptions.Item label="订单号">#{currentOrder.id}</Descriptions.Item>
           <Descriptions.Item label="商品名称">{product?.name || '加载中...'}</Descriptions.Item>
-          <Descriptions.Item label="单价">¥{currentOrder.unit_price}</Descriptions.Item>
-          <Descriptions.Item label="数量">{currentOrder.quantity}</Descriptions.Item>
+          <Descriptions.Item label="商品项数">{currentOrder.items?.length || 1}</Descriptions.Item>
+          <Descriptions.Item label="总数量">{itemCount}</Descriptions.Item>
+          <Descriptions.Item label="均价">
+            ¥{(currentOrder.total_price / Math.max(itemCount, 1)).toFixed(2)}
+          </Descriptions.Item>
           <Descriptions.Item label="总价">
             <Text strong style={{ color: '#f5222d', fontSize: 18 }}>
               ¥{currentOrder.total_price}
@@ -115,6 +120,27 @@ export const OrderDetailPage: React.FC = () => {
             {new Date(currentOrder.created_at).toLocaleString()}
           </Descriptions.Item>
         </Descriptions>
+
+        <Card
+          size="small"
+          title="订单明细"
+          style={{ marginTop: 16, borderRadius: 12 }}
+          bodyStyle={{ padding: 12 }}
+        >
+          <List
+            size="small"
+            dataSource={currentOrder.items || []}
+            locale={{ emptyText: '暂无明细' }}
+            renderItem={(item) => (
+              <List.Item>
+                <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                  <Text>SKU #{item.sku_id} × {item.quantity}</Text>
+                  <Text strong>¥{item.total_price.toFixed(2)}</Text>
+                </Space>
+              </List.Item>
+            )}
+          />
+        </Card>
 
         <div style={{ marginTop: 24, textAlign: 'center' }}>
           <Space size="large">

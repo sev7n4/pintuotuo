@@ -21,8 +21,7 @@ describe('orderService', () => {
 
   test('createOrder calls api.post with correct parameters', async () => {
     const mockData = {
-      sku_id: 1,
-      quantity: 2,
+      items: [{ sku_id: 1, quantity: 2 }],
     };
     const mockResponse = {
       success: true,
@@ -51,9 +50,7 @@ describe('orderService', () => {
 
   test('createOrder calls api.post with group_id when provided', async () => {
     const mockData = {
-      sku_id: 1,
-      group_id: 1,
-      quantity: 2,
+      items: [{ sku_id: 1, quantity: 2 }],
     };
     const mockResponse = {
       success: true,

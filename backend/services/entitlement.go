@@ -48,13 +48,13 @@ WITH candidates AS (
   SELECT o.pricing_version_id AS pvid,
          o.fulfilled_at::timestamptz AS anchor_t
   FROM orders o
-  INNER JOIN skus s ON s.id = o.sku_id
+  INNER JOIN order_items oi ON oi.order_id = o.id
+  INNER JOIN skus s ON s.id = oi.sku_id
   INNER JOIN spus sp ON sp.id = s.spu_id
   WHERE o.user_id = $1
     AND o.status = 'paid'
     AND o.fulfilled_at IS NOT NULL
     AND o.pricing_version_id IS NOT NULL
-    AND o.sku_id IS NOT NULL
     AND sp.status = 'active'
     AND lower(trim(sp.model_provider)) = lower(trim($2::text))
     AND (

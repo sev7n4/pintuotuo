@@ -12,6 +12,8 @@ import {
   Row,
   Col,
   Checkbox,
+  List,
+  Grid,
 } from 'antd';
 import { AlipayCircleOutlined, WechatOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +24,9 @@ import type { CartItem } from '@/types';
 type PaymentMethod = 'alipay' | 'wechat';
 
 const CheckoutPage: React.FC = () => {
+  const { useBreakpoint } = Grid;
+  const screens = useBreakpoint();
+  const isMobile = screens.xs || (screens.sm && !screens.md);
   const navigate = useNavigate();
   const { items, clear } = useCartStore();
   const { createOrder, isLoading, fetchOrders } = useOrderStore();
@@ -55,33 +60,22 @@ const CheckoutPage: React.FC = () => {
     }
 
     try {
-      const orderPromises = selectedCartItems.map((item) => {
-        const skuId = item.sku_id;
-        return createOrder(skuId, item.quantity, item.group_id);
-      });
-      const orderIds = await Promise.all(orderPromises);
+      const orderId = await createOrder(
+        selectedCartItems.map((item) => ({
+          sku_id: item.sku_id,
+          quantity: item.quantity,
+        }))
+      );
 
       clear();
-
-      const validIds = orderIds.filter((id): id is number => id !== null && id !== undefined);
       await fetchOrders();
-
-      if (validIds.length === 0) {
+      if (!orderId) {
         message.success('订单创建成功');
         navigate('/orders');
         return;
       }
-
-      if (validIds.length === 1) {
-        message.success('订单创建成功，正在跳转到支付页面');
-        navigate(`/payment/${validIds[0]}`);
-        return;
-      }
-
-      message.success(
-        `已创建 ${validIds.length} 笔订单（每类商品一笔）。请先在列表中完成第一笔支付，其余在「我的订单」中继续支付。`
-      );
-      navigate('/orders');
+      message.success('订单创建成功，正在跳转到支付页面');
+      navigate(`/payment/${orderId}`);
     } catch (error) {
       message.error('创建订单失败，请重试');
     }
@@ -158,15 +152,41 @@ const CheckoutPage: React.FC = () => {
 
       <Row gutter={24}>
         <Col xs={24} lg={16}>
-          <Card title="确认订单">
-            <Table columns={columns} dataSource={items} rowKey="id" pagination={false} />
+          <Card title="确认订单" style={{ borderRadius: 12 }}>
+            {isMobile ? (
+              <List
+                dataSource={items}
+                renderItem={(record) => (
+                  <List.Item>
+                    <Card size="small" style={{ width: '100%', borderRadius: 10 }}>
+                      <Space direction="vertical" style={{ width: '100%' }} size={6}>
+                        <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                          <Checkbox
+                            checked={selectedItems.includes(record.id)}
+                            onChange={() => handleSelectItem(record.id)}
+                          >
+                            {record.product.name}
+                          </Checkbox>
+                          <span style={{ color: '#f5222d', fontWeight: 600 }}>
+                            ¥{(record.product.price * record.quantity).toFixed(2)}
+                          </span>
+                        </Space>
+                        <span>单价 ¥{record.product.price.toFixed(2)} · 数量 {record.quantity}</span>
+                      </Space>
+                    </Card>
+                  </List.Item>
+                )}
+              />
+            ) : (
+              <Table columns={columns} dataSource={items} rowKey="id" pagination={false} />
+            )}
           </Card>
         </Col>
 
         <Col xs={24} lg={8}>
           <Card title="订单结算">
             <div style={{ marginBottom: '20px' }}>
-              <p>已选商品: {selectedCartItems.length} 件</p>
+              <p>已选商品: {selectedCartItems.length} 类</p>
             </div>
 
             <Divider>选择支付方式</Divider>

@@ -47,7 +47,26 @@ type Order struct {
 	UnitPrice  float64     `json:"unit_price"`
 	TotalPrice float64     `json:"total_price"`
 	Status     string      `json:"status"` // pending, paid, completed, failed
+	Items      []OrderItem `json:"items,omitempty"`
 	// PricingVersionID binds retail usage pricing to order time; nil = legacy / not set (migration 045).
+	PricingVersionID *int      `json:"pricing_version_id,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// OrderItem represents one SKU line within an order.
+type OrderItem struct {
+	ID               int       `json:"id"`
+	OrderID          int       `json:"order_id"`
+	SKUID            int       `json:"sku_id"`
+	SPUID            int       `json:"spu_id"`
+	Quantity         int       `json:"quantity"`
+	UnitPrice        float64   `json:"unit_price"`
+	TotalPrice       float64   `json:"total_price"`
+	SKUType          string    `json:"sku_type,omitempty"`
+	TokenAmount      *int64    `json:"token_amount,omitempty"`
+	ComputePoints    *float64  `json:"compute_points,omitempty"`
+	FulfilledAt      time.Time `json:"fulfilled_at,omitempty"`
 	PricingVersionID *int      `json:"pricing_version_id,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`

@@ -159,7 +159,7 @@ describe('orderStore', () => {
     } as any);
 
     const store = useOrderStore.getState();
-    await store.createOrder(1, 1, 1);
+    await store.createOrder([{ sku_id: 1, quantity: 1 }]);
 
     const newState = useOrderStore.getState();
     expect(newState.orders).toContainEqual(mockOrder);
@@ -174,7 +174,7 @@ describe('orderStore', () => {
     mockOrderService.createOrder.mockRejectedValue(new Error(errorMessage));
 
     const store = useOrderStore.getState();
-    await expect(store.createOrder(1, 1)).rejects.toThrow(errorMessage);
+    await expect(store.createOrder([{ sku_id: 1, quantity: 1 }])).rejects.toThrow(errorMessage);
 
     const newState = useOrderStore.getState();
     expect(newState.isLoading).toBe(false);

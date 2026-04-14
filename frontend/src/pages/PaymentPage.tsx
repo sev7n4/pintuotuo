@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Button, Radio, Space, Statistic, Divider, message, Spin, Empty, Result } from 'antd';
+import { Card, Button, Radio, Space, Statistic, Divider, message, Spin, Empty, Result, List, Typography } from 'antd';
 import { AlipayCircleOutlined, WechatOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useOrderStore } from '@stores/orderStore';
@@ -53,6 +53,9 @@ const PaymentPage: React.FC = () => {
       setIsPaying(false);
     }
   };
+
+  const itemCount =
+    currentOrder?.items?.reduce((sum, item) => sum + item.quantity, 0) || currentOrder?.quantity || 0;
 
   if (orderLoading) {
     return <Spin />;
@@ -125,12 +128,28 @@ const PaymentPage: React.FC = () => {
             <strong>订单号:</strong> #{currentOrder.id}
           </p>
           <p>
-            <strong>商品ID:</strong> {currentOrder.product_id}
+            <strong>商品项数:</strong> {currentOrder.items?.length || 1}
           </p>
           <p>
-            <strong>数量:</strong> {currentOrder.quantity}
+            <strong>总数量:</strong> {itemCount}
           </p>
         </div>
+
+        <Card size="small" title="订单明细" style={{ marginBottom: 16, borderRadius: 12 }}>
+          <List
+            size="small"
+            dataSource={currentOrder.items || []}
+            locale={{ emptyText: '暂无明细' }}
+            renderItem={(item) => (
+              <List.Item>
+                <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                  <Typography.Text>SKU #{item.sku_id} × {item.quantity}</Typography.Text>
+                  <Typography.Text>¥{item.total_price.toFixed(2)}</Typography.Text>
+                </Space>
+              </List.Item>
+            )}
+          />
+        </Card>
 
         <Divider />
 
