@@ -33,6 +33,8 @@ services:
       - WECHAT_NOTIFY_URL=${WECHAT_NOTIFY_URL}
       - WECHAT_SANDBOX=${WECHAT_SANDBOX:-true}
       - ALLOW_TEST_RECHARGE=${ALLOW_TEST_RECHARGE:-false}
+      # 权益与计价：off 兼容历史；strict 时 API 代理仅允许订单/订阅覆盖的 (provider, model)
+      - ENTITLEMENT_ENFORCEMENT=${ENTITLEMENT_ENFORCEMENT:-off}
       # 登录 / OAuth / 短信：与根目录 .env.example 一致，由服务器 .env 注入
       - FRONTEND_URL=${FRONTEND_URL:-}
       - PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL:-}
