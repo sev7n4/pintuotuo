@@ -34,13 +34,12 @@ export const billingService = {
     api.get<{ trends: BillingTrend[] }>('/admin/billings/trends', { params }),
 
   exportBillingsCSV: (params?: BillingFilter) =>
-    api.get<Blob>('/admin/billings/export', { 
+    api.get<Blob>('/admin/billings/export', {
       params,
-      responseType: 'blob'
+      responseType: 'blob',
     }),
 
-  getBillingProviders: () =>
-    api.get<{ providers: string[] }>('/admin/billings/providers'),
+  getBillingProviders: () => api.get<{ providers: string[] }>('/admin/billings/providers'),
 
   getBillingModels: (params?: { provider?: string }) =>
     api.get<{ models: string[] }>('/admin/billings/models', { params }),
@@ -51,15 +50,14 @@ export const billingService = {
   getUserBillingStats: (params?: BillingFilter) =>
     api.get<BillingStats>('/admin/user-billings/stats', { params }),
 
-  getUserBillingProviders: () =>
-    api.get<{ providers: string[] }>('/admin/user-billings/providers'),
+  getUserBillingProviders: () => api.get<{ providers: string[] }>('/admin/user-billings/providers'),
 
   getUserBillingModels: (params?: { provider?: string }) =>
     api.get<{ models: string[] }>('/admin/user-billings/models', { params }),
 
   exportUserBillingsCSV: (params?: BillingFilter) =>
-    api.get<Blob>('/admin/user-billings/export', { 
+    api.get<Blob>('/admin/user-billings/export', {
       params,
-      responseType: 'blob'
+      responseType: 'blob',
     }),
 };

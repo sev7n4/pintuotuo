@@ -9,6 +9,7 @@ import {
   BarChartOutlined,
   TeamOutlined,
   ShoppingCartOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './MyPage.module.css';
@@ -36,6 +37,12 @@ const MyServicesPage = () => {
       icon: <WalletOutlined />,
       link: '/my-tokens',
       color: '#52c41a',
+    },
+    {
+      title: '我的权益',
+      icon: <GiftOutlined />,
+      link: '/my/entitlements',
+      color: '#722ed1',
     },
     {
       title: '我的收藏',

@@ -578,7 +578,9 @@ const MerchantSKUs = () => {
               type={costGuideMode === 'official' ? 'info' : 'warning'}
               showIcon
               style={{ marginBottom: 12 }}
-              message={costGuideMode === 'official' ? '官方目录默认成本向导' : '自部署自定义成本向导'}
+              message={
+                costGuideMode === 'official' ? '官方目录默认成本向导' : '自部署自定义成本向导'
+              }
               description={
                 costGuideMode === 'official'
                   ? '默认继承平台目录（SPU）参考成本并同步到上架 SKU；适用于官方代理/托管场景。'

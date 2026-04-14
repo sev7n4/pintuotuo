@@ -273,7 +273,9 @@ const Profile = () => {
                                 )}
                               </Space>
                             }
-                            description={<span style={{ fontSize: 12 }}>ID: {item.external_id}</span>}
+                            description={
+                              <span style={{ fontSize: 12 }}>ID: {item.external_id}</span>
+                            }
                           />
                         </List.Item>
                       )}

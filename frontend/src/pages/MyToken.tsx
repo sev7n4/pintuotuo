@@ -533,13 +533,14 @@ const MyToken = () => {
                   <ul style={{ paddingLeft: 20, marginBottom: 8 }}>
                     {usageGuide.items.map((it, idx) => (
                       <li key={`${it.provider_code}-${it.model_example}-${idx}`}>
-                        <Text strong>{it.provider_code}</Text>：请求体{' '}
-                        <Text code>model</Text> 可写{' '}
-                        <Text code>{it.provider_slash_example || `${it.provider_code}/${it.model_example}`}</Text>
+                        <Text strong>{it.provider_code}</Text>：请求体 <Text code>model</Text> 可写{' '}
+                        <Text code>
+                          {it.provider_slash_example || `${it.provider_code}/${it.model_example}`}
+                        </Text>
                         {it.spu_name ? (
                           <>
                             {' '}
-                           （来源：{it.source === 'subscription' ? '订阅' : '订单'}
+                            （来源：{it.source === 'subscription' ? '订阅' : '订单'}
                             {it.spu_name ? ` · ${it.spu_name}` : ''}
                             {it.sku_code ? ` / ${it.sku_code}` : ''}）
                           </>
@@ -549,7 +550,8 @@ const MyToken = () => {
                   </ul>
                   {usageGuide.default_model_example ? (
                     <Paragraph style={{ marginBottom: 0 }}>
-                      默认示例 <Text code>model</Text>：<Text code>{usageGuide.default_model_example}</Text>
+                      默认示例 <Text code>model</Text>：
+                      <Text code>{usageGuide.default_model_example}</Text>
                     </Paragraph>
                   ) : null}
                 </>
@@ -571,7 +573,8 @@ const MyToken = () => {
               <strong>OpenAI 兼容：</strong>在支持自定义 Base URL 的客户端中，将 Base URL 设为{' '}
               <Text code>{openAICompatBase}</Text>，API Key 填本平台密钥；请求{' '}
               <Text code>POST /chat/completions</Text>。 模型可写 <Text code>厂商/模型</Text>（如{' '}
-              <Text code>zhipu/glm-4-flash</Text>）或无前缀模型名（将按平台配置的兼容前缀推断厂商）。流式（stream）暂未支持。
+              <Text code>zhipu/glm-4-flash</Text>
+              ）或无前缀模型名（将按平台配置的兼容前缀推断厂商）。流式（stream）暂未支持。
             </Paragraph>
             <div className={styles.tabHeader}>
               <Button

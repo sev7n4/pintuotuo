@@ -316,7 +316,8 @@ const AdminSPUs = () => {
       title: '参考成本(输入/输出)',
       key: 'provider_rates',
       width: 170,
-      render: (_: unknown, r: SPU) => `${(r.provider_input_rate ?? 0).toFixed(6)} / ${(r.provider_output_rate ?? 0).toFixed(6)}`,
+      render: (_: unknown, r: SPU) =>
+        `${(r.provider_input_rate ?? 0).toFixed(6)} / ${(r.provider_output_rate ?? 0).toFixed(6)}`,
     },
     {
       title: '销量',
@@ -343,7 +344,12 @@ const AdminSPUs = () => {
         const skuCount = record.sku_count ?? 0;
         return (
           <Space size="small">
-            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+            >
               编辑
             </Button>
             <Button
@@ -355,7 +361,13 @@ const AdminSPUs = () => {
               场景
             </Button>
             {skuCount > 0 ? (
-              <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => openDeleteFlow(record)}>
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => openDeleteFlow(record)}
+              >
                 删除
               </Button>
             ) : (
@@ -627,9 +639,12 @@ const AdminSPUs = () => {
         {deleteTarget && (
           <>
             <p>
-              该 SPU 下仍有 <strong>{deleteTarget.sku_count ?? 0}</strong> 个 SKU，删除将<strong>级联删除</strong>这些 SKU。
+              该 SPU 下仍有 <strong>{deleteTarget.sku_count ?? 0}</strong> 个 SKU，删除将
+              <strong>级联删除</strong>这些 SKU。
             </p>
-            <p style={{ marginBottom: 8 }}>请输入 SPU 编码 <strong>{deleteTarget.spu_code}</strong> 以确认：</p>
+            <p style={{ marginBottom: 8 }}>
+              请输入 SPU 编码 <strong>{deleteTarget.spu_code}</strong> 以确认：
+            </p>
             <Input
               placeholder={deleteTarget.spu_code}
               value={deleteConfirmCode}
@@ -669,7 +684,9 @@ const AdminSPUs = () => {
                     hoverable
                     style={{
                       borderColor: selectedScenarios.includes(scenario.id) ? '#1890ff' : undefined,
-                      backgroundColor: selectedScenarios.includes(scenario.id) ? '#e6f7ff' : undefined,
+                      backgroundColor: selectedScenarios.includes(scenario.id)
+                        ? '#e6f7ff'
+                        : undefined,
                     }}
                     onClick={() => {
                       if (selectedScenarios.includes(scenario.id)) {
@@ -682,7 +699,13 @@ const AdminSPUs = () => {
                       }
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
                       <div>
                         <Checkbox
                           checked={selectedScenarios.includes(scenario.id)}

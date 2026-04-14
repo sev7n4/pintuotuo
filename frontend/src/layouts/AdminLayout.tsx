@@ -19,6 +19,7 @@ import {
   DollarOutlined,
   BranchesOutlined,
   AccountBookOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -55,6 +56,11 @@ const menuItems = [
     key: '/admin/skus',
     icon: <TagsOutlined />,
     label: 'SKU管理',
+  },
+  {
+    key: '/admin/entitlement-packages',
+    icon: <GiftOutlined />,
+    label: '权益包管理',
   },
   {
     key: '/admin/model-providers',

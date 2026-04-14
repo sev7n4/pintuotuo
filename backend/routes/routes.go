@@ -308,6 +308,10 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 
 		admin.GET("/platform-settings", handlers.GetAdminPlatformSettings)
 		admin.PUT("/platform-settings", handlers.UpdateAdminPlatformSettings)
+		admin.GET("/entitlement-packages", handlers.ListAdminEntitlementPackages)
+		admin.POST("/entitlement-packages", handlers.CreateAdminEntitlementPackage)
+		admin.PUT("/entitlement-packages/:id", handlers.UpdateAdminEntitlementPackage)
+		admin.DELETE("/entitlement-packages/:id", handlers.DeleteAdminEntitlementPackage)
 	}
 }
 
@@ -354,6 +358,7 @@ func RegisterSKURoutes(router *gin.RouterGroup) {
 		skus.GET("", handlers.ListPublicSKUs)
 		skus.GET("/:id", handlers.GetPublicSKUByID)
 	}
+	router.GET("/entitlement-packages", handlers.ListPublicEntitlementPackages)
 
 	computePoints := router.Group("/compute-points")
 	computePoints.Use(middleware.AuthMiddleware())
@@ -366,6 +371,11 @@ func RegisterSKURoutes(router *gin.RouterGroup) {
 	subscriptions.Use(middleware.AuthMiddleware())
 	{
 		subscriptions.GET("", handlers.GetUserSubscriptions)
+	}
+	myEntitlements := router.Group("/users/me/entitlements")
+	myEntitlements.Use(middleware.AuthMiddleware())
+	{
+		myEntitlements.GET("/packages", handlers.GetMyEntitlementPackages)
 	}
 }
 

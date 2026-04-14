@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Button, Descriptions, Tag, Spin, Empty, Space, Typography, List } from 'antd';
+import { Card, Button, Descriptions, Tag, Spin, Empty, Space, Typography, List, Alert } from 'antd';
 import { ArrowLeftOutlined, PayCircleOutlined, TeamOutlined } from '@ant-design/icons';
 import { useOrderStore } from '@/stores/orderStore';
 import { useProductStore } from '@/stores/productStore';
@@ -36,7 +36,8 @@ export const OrderDetailPage: React.FC = () => {
   }, [id, fetchOrderByID]);
 
   useEffect(() => {
-    const catalogId = currentOrder?.items?.[0]?.sku_id ?? currentOrder?.sku_id ?? currentOrder?.product_id;
+    const catalogId =
+      currentOrder?.items?.[0]?.sku_id ?? currentOrder?.sku_id ?? currentOrder?.product_id;
     if (catalogId) {
       const loadProduct = async () => {
         const p = await fetchProductByID(catalogId);
@@ -77,7 +78,9 @@ export const OrderDetailPage: React.FC = () => {
     }
   };
 
-  const itemCount = (currentOrder.items || []).reduce((sum, item) => sum + item.quantity, 0) || currentOrder.quantity;
+  const itemCount =
+    (currentOrder.items || []).reduce((sum, item) => sum + item.quantity, 0) ||
+    currentOrder.quantity;
 
   return (
     <div style={{ padding: '20px', maxWidth: 800, margin: '0 auto' }}>
@@ -121,6 +124,16 @@ export const OrderDetailPage: React.FC = () => {
           </Descriptions.Item>
         </Descriptions>
 
+        {(currentOrder.items?.length ?? 0) > 1 && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginTop: 16 }}
+            message="多明细订单"
+            description="支付成功后，系统会按下方每一条 SKU 明细分别履约（例如分别开通订阅、分别赠送 Token）。客服对账时请以明细行为准。"
+          />
+        )}
+
         <Card
           size="small"
           title="订单明细"
@@ -134,7 +147,9 @@ export const OrderDetailPage: React.FC = () => {
             renderItem={(item) => (
               <List.Item>
                 <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-                  <Text>SKU #{item.sku_id} × {item.quantity}</Text>
+                  <Text>
+                    SKU #{item.sku_id} × {item.quantity}
+                  </Text>
                   <Text strong>¥{item.total_price.toFixed(2)}</Text>
                 </Space>
               </List.Item>

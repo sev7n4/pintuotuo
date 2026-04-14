@@ -128,7 +128,9 @@ function ModelCompareTooltipView({
           {p.provider.toUpperCase()}
         </Tag>
       </div>
-      <div>延迟 p50：{Math.round(p.latency_p50_ms)} ms · p95：{Math.round(p.latency_p95_ms)} ms</div>
+      <div>
+        延迟 p50：{Math.round(p.latency_p50_ms)} ms · p95：{Math.round(p.latency_p95_ms)} ms
+      </div>
       <div>单次平均扣减：{formatLedgerUnits(Math.round(p.avg_token_deduction))} Tokens</div>
       <div>
         请求数：{p.request_count.toLocaleString()} · 成功率：{srPct}%
@@ -599,8 +601,8 @@ const Consumption: React.FC = () => {
           </Col>
         </Row>
         <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: 12 }}>
-          合计扣减为当前筛选条件下，各次请求「输入 tokens + 输出 tokens」之和（与明细列表一致）；不展示内部计费
-          cost。RPM、TPM 为区间均值。
+          合计扣减为当前筛选条件下，各次请求「输入 tokens + 输出
+          tokens」之和（与明细列表一致）；不展示内部计费 cost。RPM、TPM 为区间均值。
         </Paragraph>
       </Card>
 
@@ -659,12 +661,20 @@ const Consumption: React.FC = () => {
               ) : (
                 <div style={{ width: '100%', height: 280 }}>
                   <ResponsiveContainer>
-                    <BarChart data={providerBarData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <BarChart
+                      data={providerBarData}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <RechartsTooltip />
-                      <Bar dataKey="tokens" name="扣减（输入+输出）" fill="#722ed1" radius={[4, 4, 0, 0]} />
+                      <Bar
+                        dataKey="tokens"
+                        name="扣减（输入+输出）"
+                        fill="#722ed1"
+                        radius={[4, 4, 0, 0]}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -734,7 +744,9 @@ const Consumption: React.FC = () => {
                           content={(props) => (
                             <ModelCompareTooltipView
                               active={props.active}
-                              payload={props.payload as ReadonlyArray<{ payload: ModelComparePoint }>}
+                              payload={
+                                props.payload as ReadonlyArray<{ payload: ModelComparePoint }>
+                              }
                             />
                           )}
                         />
@@ -761,9 +773,13 @@ const Consumption: React.FC = () => {
                       </ScatterChart>
                     </ResponsiveContainer>
                   </div>
-                  <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0, fontSize: 12 }}>
-                    每个气泡为「Provider + 模型」在当前筛选时间范围内的汇总；扣减为输入+输出 Tokens，与明细一致。成功率按
-                    2xx 请求占比。RPM、TPM 按该时间区间长度折算（与上方统计卡片同一口径），用于观察各模型的调用与消耗节奏。
+                  <Paragraph
+                    type="secondary"
+                    style={{ marginTop: 12, marginBottom: 0, fontSize: 12 }}
+                  >
+                    每个气泡为「Provider + 模型」在当前筛选时间范围内的汇总；扣减为输入+输出
+                    Tokens，与明细一致。成功率按 2xx 请求占比。RPM、TPM
+                    按该时间区间长度折算（与上方统计卡片同一口径），用于观察各模型的调用与消耗节奏。
                   </Paragraph>
                 </>
               )}

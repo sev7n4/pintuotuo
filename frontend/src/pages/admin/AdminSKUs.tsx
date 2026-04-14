@@ -309,6 +309,9 @@ const AdminSKUs = () => {
             <span>
               {SUBSCRIPTION_PERIOD_LABELS[record.subscription_period || 'monthly']}
               {record.is_unlimited && ' (无限量)'}
+              {record.token_amount && record.token_amount > 0
+                ? ` · 赠送 ${record.token_amount.toLocaleString()} Token`
+                : ''}
             </span>
           );
         }
@@ -724,6 +727,22 @@ const AdminSKUs = () => {
                       step={1}
                       style={{ width: '100%' }}
                       placeholder="Tokens/天"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item
+                    name="token_amount"
+                    label="开通赠送Token"
+                    extra="支付成功后自动入账，支持方案2订阅送Token"
+                  >
+                    <InputNumber
+                      min={0}
+                      precision={0}
+                      step={1}
+                      style={{ width: '100%' }}
+                      placeholder="0表示不赠送"
+                      formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     />
                   </Form.Item>
                 </Col>

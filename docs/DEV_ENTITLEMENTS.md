@@ -2,20 +2,22 @@
 
 ## 环境变量
 
-| 变量 | 值 | 说明 |
-|------|-----|------|
-| `ENTITLEMENT_ENFORCEMENT` | `off`（默认） | 不强制权益白名单；`api_proxy` 扣费保持与改造前兼容的回退行为 |
-| `ENTITLEMENT_ENFORCEMENT` | `strict` | 预扣前校验权益；仅使用命中权益的 `pricing_version_id` 快照计价，**禁止**无权益时按外网 live 价静默扣费 |
+
+| 变量                        | 值         | 说明                                                                  |
+| ------------------------- | --------- | ------------------------------------------------------------------- |
+| `ENTITLEMENT_ENFORCEMENT` | `off`（默认） | 不强制权益白名单；`api_proxy` 扣费保持与改造前兼容的回退行为                                |
+| `ENTITLEMENT_ENFORCEMENT` | `strict`  | 预扣前校验权益；仅使用命中权益的 `pricing_version_id` 快照计价，**禁止**无权益时按外网 live 价静默扣费 |
+
 
 测试可使用 `services.SetEntitlementEnforcementForTest` 覆盖环境变量（见 `entitlement_test.go`）。
 
 ## 数据表与字段
 
-- **`orders`**：`pricing_version_id` — 已履约订单的价目锚点（下单/履约时写入）。
-- **`user_subscriptions`**：
+- `**orders`**：`pricing_version_id` — 已履约订单的价目锚点（下单/履约时写入）。
+- `**user_subscriptions**`：
   - `pricing_version_id` — 订阅权益的价目锚点；履约与自动续费成功时更新。
   - `entitlement_anchor_at` — 权益锚点时间，与订单 `fulfilled_at` 一起用于「多条命中时取最近」排序。
-- **`pricing_versions` / `pricing_version_spu_rates`**：按 `spu_id` 存快照输入/输出单价。
+- `**pricing_versions` / `pricing_version_spu_rates**`：按 `spu_id` 存快照输入/输出单价。
 
 迁移：`backend/migrations/050_user_subscription_entitlement_pricing.sql`（含回填说明）。
 
