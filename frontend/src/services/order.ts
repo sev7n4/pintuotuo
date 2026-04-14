@@ -2,9 +2,10 @@ import api from './api';
 import { Order, APIResponse, PaginatedResponse } from '@/types';
 
 interface CreateOrderRequest {
-  sku_id: number;
-  group_id?: number;
-  quantity: number;
+  items: Array<{
+    sku_id: number;
+    quantity: number;
+  }>;
 }
 
 interface CancelOrderRequest {

@@ -21,6 +21,11 @@ func NewFulfillmentService() *FulfillmentService {
 	return &FulfillmentService{}
 }
 
+// FulfillOrderItems fulfills all items in one order transactionally.
+func (s *FulfillmentService) FulfillOrderItems(tx *sql.Tx, orderID int) error {
+	return s.FulfillOrder(tx, orderID)
+}
+
 type skuFulfillmentRow struct {
 	SKUType            string
 	TokenAmount        sql.NullInt64
@@ -66,19 +71,14 @@ func EffectiveComputePointsForFulfillment(orderCP, skuCP sql.NullFloat64) sql.Nu
 // FulfillOrder delivers digital goods for a paid order. Idempotent via orders.fulfilled_at.
 func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 	var userID int
-	var skuID sql.NullInt64
-	var qty int
 	var status string
 	var fulfilledAt sql.NullTime
-	var snap orderFulfillmentSnapshot
 
 	err := tx.QueryRow(`
-		SELECT user_id, sku_id, quantity, status, fulfilled_at,
-		       sku_type, token_amount, compute_points
+		SELECT user_id, status, fulfilled_at
 		FROM orders WHERE id = $1 FOR UPDATE`,
 		orderID,
-	).Scan(&userID, &skuID, &qty, &status, &fulfilledAt,
-		&snap.SKUType, &snap.TokenAmount, &snap.ComputePoints)
+	).Scan(&userID, &status, &fulfilledAt)
 	if err != nil {
 		return fmt.Errorf("load order %d: %w", orderID, err)
 	}
@@ -89,64 +89,108 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 	if status != "paid" {
 		return fmt.Errorf("order %d not paid (status=%s)", orderID, status)
 	}
-	if !skuID.Valid || skuID.Int64 <= 0 {
-		return fmt.Errorf("order %d has no sku_id", orderID)
-	}
-	if qty < 1 {
-		qty = 1
-	}
 
-	var skuRow skuFulfillmentRow
-	err = tx.QueryRow(`
-		SELECT sku_type, token_amount, compute_points, subscription_period, valid_days, trial_duration_days
-		FROM skus WHERE id = $1`,
-		skuID.Int64,
-	).Scan(
-		&skuRow.SKUType,
-		&skuRow.TokenAmount,
-		&skuRow.ComputePoints,
-		&skuRow.SubscriptionPeriod,
-		&skuRow.ValidDays,
-		&skuRow.TrialDurationDays,
+	rows, err := tx.Query(`
+		SELECT id, sku_id, quantity, sku_type, token_amount, compute_points, pricing_version_id, fulfilled_at
+		  FROM order_items
+		 WHERE order_id = $1
+		 ORDER BY id ASC
+		 FOR UPDATE`,
+		orderID,
 	)
 	if err != nil {
-		return fmt.Errorf("load sku %d: %w", skuID.Int64, err)
+		return fmt.Errorf("load order_items for order %d: %w", orderID, err)
+	}
+	defer rows.Close()
+
+	type orderItemRow struct {
+		ID               int
+		SKUID            int
+		Quantity         int
+		SKUType          sql.NullString
+		TokenAmount      sql.NullInt64
+		ComputePoints    sql.NullFloat64
+		PricingVersionID sql.NullInt64
+		FulfilledAt      sql.NullTime
+	}
+	items := make([]orderItemRow, 0)
+	for rows.Next() {
+		var item orderItemRow
+		if scanErr := rows.Scan(
+			&item.ID, &item.SKUID, &item.Quantity, &item.SKUType, &item.TokenAmount, &item.ComputePoints, &item.PricingVersionID, &item.FulfilledAt,
+		); scanErr != nil {
+			return fmt.Errorf("scan order_item for order %d: %w", orderID, scanErr)
+		}
+		items = append(items, item)
+	}
+	if len(items) == 0 {
+		return fmt.Errorf("order %d has no order_items", orderID)
 	}
 
-	effectiveType := EffectiveSKUTypeForFulfillment(snap.SKUType, skuRow.SKUType)
-	tokenAmt := EffectiveTokenAmountForFulfillment(snap.TokenAmount, skuRow.TokenAmount)
-	computeAmt := EffectiveComputePointsForFulfillment(snap.ComputePoints, skuRow.ComputePoints)
+	for _, item := range items {
+		if item.FulfilledAt.Valid {
+			continue
+		}
+		if item.Quantity < 1 {
+			item.Quantity = 1
+		}
 
-	st := strings.ToLower(strings.TrimSpace(effectiveType))
-	switch st {
-	case skuTypeTokenPack:
-		if err = s.fulfillTokenPack(tx, userID, int(skuID.Int64), orderID, qty, tokenAmt); err != nil {
-			return err
+		var skuRow skuFulfillmentRow
+		err = tx.QueryRow(`
+			SELECT sku_type, token_amount, compute_points, subscription_period, valid_days, trial_duration_days
+			FROM skus WHERE id = $1`,
+			item.SKUID,
+		).Scan(
+			&skuRow.SKUType,
+			&skuRow.TokenAmount,
+			&skuRow.ComputePoints,
+			&skuRow.SubscriptionPeriod,
+			&skuRow.ValidDays,
+			&skuRow.TrialDurationDays,
+		)
+		if err != nil {
+			return fmt.Errorf("load sku %d: %w", item.SKUID, err)
 		}
-	case skuTypeComputePoints:
-		if err = s.fulfillComputePoints(tx, userID, int(skuID.Int64), orderID, qty, computeAmt); err != nil {
-			return err
-		}
-	case skuTypeSubscription:
-		if err = s.fulfillSubscription(tx, userID, int(skuID.Int64), orderID, qty, skuRow); err != nil {
-			return err
-		}
-	case skuTypeTrial:
-		if err = s.fulfillTrial(tx, userID, int(skuID.Int64), orderID, qty, skuRow); err != nil {
-			return err
-		}
-	case skuTypeConcurrent:
-		if tokenAmt.Valid && tokenAmt.Int64 > 0 {
-			if err = s.fulfillTokenPack(tx, userID, int(skuID.Int64), orderID, qty, tokenAmt); err != nil {
+
+		effectiveType := EffectiveSKUTypeForFulfillment(item.SKUType, skuRow.SKUType)
+		tokenAmt := EffectiveTokenAmountForFulfillment(item.TokenAmount, skuRow.TokenAmount)
+		computeAmt := EffectiveComputePointsForFulfillment(item.ComputePoints, skuRow.ComputePoints)
+
+		st := strings.ToLower(strings.TrimSpace(effectiveType))
+		switch st {
+		case skuTypeTokenPack:
+			if err = s.fulfillTokenPack(tx, userID, item.SKUID, orderID, item.Quantity, tokenAmt); err != nil {
 				return err
 			}
-		} else if computeAmt.Valid && computeAmt.Float64 > 0 {
-			if err = s.fulfillComputePoints(tx, userID, int(skuID.Int64), orderID, qty, computeAmt); err != nil {
+		case skuTypeComputePoints:
+			if err = s.fulfillComputePoints(tx, userID, item.SKUID, orderID, item.Quantity, computeAmt); err != nil {
 				return err
 			}
+		case skuTypeSubscription:
+			if err = s.fulfillSubscription(tx, userID, item.SKUID, orderID, item.Quantity, skuRow); err != nil {
+				return err
+			}
+		case skuTypeTrial:
+			if err = s.fulfillTrial(tx, userID, item.SKUID, orderID, item.Quantity, skuRow); err != nil {
+				return err
+			}
+		case skuTypeConcurrent:
+			if tokenAmt.Valid && tokenAmt.Int64 > 0 {
+				if err = s.fulfillTokenPack(tx, userID, item.SKUID, orderID, item.Quantity, tokenAmt); err != nil {
+					return err
+				}
+			} else if computeAmt.Valid && computeAmt.Float64 > 0 {
+				if err = s.fulfillComputePoints(tx, userID, item.SKUID, orderID, item.Quantity, computeAmt); err != nil {
+					return err
+				}
+			}
+		default:
+			return fmt.Errorf("unknown sku_type %q", effectiveType)
 		}
-	default:
-		return fmt.Errorf("unknown sku_type %q", effectiveType)
+
+		if _, err = tx.Exec(`UPDATE order_items SET fulfilled_at = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, time.Now(), item.ID); err != nil {
+			return fmt.Errorf("mark order_item fulfilled: %w", err)
+		}
 	}
 
 	_, err = tx.Exec(`UPDATE orders SET fulfilled_at = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, time.Now(), orderID)

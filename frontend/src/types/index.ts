@@ -99,10 +99,12 @@ export interface Order {
   /** 纯 SKU 订单可为空 */
   product_id?: number | null;
   sku_id?: number;
+  spu_id?: number;
   group_id: number | null;
   quantity: number;
   unit_price: number;
   total_price: number;
+  items?: OrderItem[];
   status:
     | 'pending'
     | 'paid'
@@ -113,6 +115,23 @@ export interface Order {
     | 'refunding'
     | 'refunded';
   group_status?: 'active' | 'completed' | 'failed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrderItem {
+  id: number;
+  order_id: number;
+  sku_id: number;
+  spu_id: number;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  sku_type?: string;
+  token_amount?: number;
+  compute_points?: number;
+  fulfilled_at?: string;
+  pricing_version_id?: number;
   created_at: string;
   updated_at: string;
 }

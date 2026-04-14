@@ -16,6 +16,7 @@ import {
   Tabs,
   Card,
   Grid,
+  List,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { FundOutlined, ReloadOutlined, TeamOutlined, ShoppingOutlined } from '@ant-design/icons';
@@ -91,6 +92,11 @@ export const OrderListPage: React.FC = () => {
     return order.status === activeTab;
   });
 
+  const getOrderItemCount = (order: Order) =>
+    (order.items || []).reduce((sum, item) => sum + item.quantity, 0) || order.quantity || 0;
+
+  const getPrimarySku = (order: Order) => order.items?.[0]?.sku_id ?? order.sku_id;
+
   const handleCancelOrder = async () => {
     if (!selectedOrder) return;
 
@@ -135,17 +141,22 @@ export const OrderListPage: React.FC = () => {
 
   const handleBuyAgain = async (order: Order) => {
     try {
-      const catalogId = order.sku_id ?? order.product_id;
-      if (catalogId == null) {
+      const skuIds = (order.items || []).map((item) => item.sku_id);
+      const fallbackSku = getPrimarySku(order);
+      const targets = skuIds.length > 0 ? skuIds : fallbackSku ? [fallbackSku] : [];
+      if (targets.length === 0) {
         message.error('无法再次购买：订单缺少 SKU 信息');
         return;
       }
-      const product = await fetchProductByID(catalogId);
-      if (product) {
-        addItem(product, order.quantity);
-        message.success('已添加到购物车');
-        navigate('/cart');
+      for (const sku of targets) {
+        const product = await fetchProductByID(sku);
+        const qty = order.items?.find((item) => item.sku_id === sku)?.quantity || 1;
+        if (product) {
+          addItem(product, qty);
+        }
       }
+      message.success('已添加到购物车');
+      navigate('/cart');
     } catch {
       message.error('商品不存在或已下架');
     }
@@ -185,9 +196,9 @@ export const OrderListPage: React.FC = () => {
         ? [
             {
               title: '数量',
-              dataIndex: 'quantity',
               key: 'quantity',
               width: 80,
+              render: (_: unknown, record: Order) => getOrderItemCount(record),
             },
           ]
         : []),
@@ -338,18 +349,79 @@ export const OrderListPage: React.FC = () => {
         />
 
         <Spin spinning={isLoading}>
-          <Table
-            columns={columns}
-            dataSource={filteredOrders}
-            rowKey="id"
-            scroll={{ x: 600 }}
-            pagination={{
-              pageSize: 10,
-              size: isMobile ? 'small' : 'default',
-            }}
-            locale={{ emptyText: <Empty description="暂无订单" /> }}
-            size={isMobile ? 'small' : 'middle'}
-          />
+          {isMobile ? (
+            <List
+              dataSource={filteredOrders}
+              locale={{ emptyText: <Empty description="暂无订单" /> }}
+              renderItem={(order) => {
+                const s = statusMap[order.status] || { color: 'default', label: order.status };
+                const groupStatus = order.group_id
+                  ? groupStatusMap[order.group_status || 'active']
+                  : null;
+                return (
+                  <List.Item>
+                    <Card size="small" style={{ width: '100%' }}>
+                      <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                        <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                          <Text strong>订单 #{order.id}</Text>
+                          <Text type="danger">¥{order.total_price.toFixed(2)}</Text>
+                        </Space>
+                        <Space wrap>
+                          <Tag color={s.color}>{s.label}</Tag>
+                          {groupStatus && <Tag color={groupStatus.color}>{groupStatus.label}</Tag>}
+                          <Tag>商品 {order.items?.length || 1} 项</Tag>
+                          <Tag>数量 {getOrderItemCount(order)}</Tag>
+                        </Space>
+                        <Space wrap>
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setModalVisible(true);
+                            }}
+                          >
+                            详情
+                          </Button>
+                          {order.status === 'pending' && (
+                            <>
+                              <Button
+                                size="small"
+                                type="primary"
+                                onClick={() => navigate(`/payment/${order.id}`)}
+                              >
+                                支付
+                              </Button>
+                              <Button size="small" danger onClick={() => openCancelModal(order)}>
+                                取消
+                              </Button>
+                            </>
+                          )}
+                          {order.status === 'completed' && (
+                            <Button size="small" onClick={() => handleBuyAgain(order)}>
+                              再次购买
+                            </Button>
+                          )}
+                        </Space>
+                      </Space>
+                    </Card>
+                  </List.Item>
+                );
+              }}
+            />
+          ) : (
+            <Table
+              columns={columns}
+              dataSource={filteredOrders}
+              rowKey="id"
+              scroll={{ x: 600 }}
+              pagination={{
+                pageSize: 10,
+                size: 'default',
+              }}
+              locale={{ emptyText: <Empty description="暂无订单" /> }}
+              size="middle"
+            />
+          )}
         </Spin>
       </Card>
 
@@ -361,44 +433,61 @@ export const OrderListPage: React.FC = () => {
         width={isMobile ? '95%' : 520}
       >
         {selectedOrder && (
-          <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
-            <Descriptions.Item label="订单号">{selectedOrder.id}</Descriptions.Item>
-            <Descriptions.Item label="SKU / 产品">
-              {selectedOrder.sku_id ?? selectedOrder.product_id ?? '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="数量">{selectedOrder.quantity}</Descriptions.Item>
-            <Descriptions.Item label="单价">
-              ¥{(selectedOrder.total_price / selectedOrder.quantity).toFixed(2)}
-            </Descriptions.Item>
-            <Descriptions.Item label="总价">
-              <Text type="danger">¥{selectedOrder.total_price.toFixed(2)}</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="状态">
-              {statusMap[selectedOrder.status]?.label || selectedOrder.status}
-            </Descriptions.Item>
-            <Descriptions.Item label="创建时间" span={2}>
-              {new Date(selectedOrder.created_at).toLocaleString('zh-CN')}
-            </Descriptions.Item>
-            {selectedOrder.group_id && (
-              <>
-                <Descriptions.Item label="拼团ID">
-                  <Button
-                    type="link"
-                    size="small"
-                    onClick={() => {
-                      setModalVisible(false);
-                      navigate(`/groups/${selectedOrder.group_id}`);
-                    }}
-                  >
-                    #{selectedOrder.group_id}
-                  </Button>
-                </Descriptions.Item>
-                <Descriptions.Item label="拼团状态">
-                  {groupStatusMap[selectedOrder.group_status || 'active']?.label || '进行中'}
-                </Descriptions.Item>
-              </>
-            )}
-          </Descriptions>
+          <>
+            <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
+              <Descriptions.Item label="订单号">{selectedOrder.id}</Descriptions.Item>
+              <Descriptions.Item label="商品项数">{selectedOrder.items?.length || 1}</Descriptions.Item>
+              <Descriptions.Item label="总数量">{getOrderItemCount(selectedOrder)}</Descriptions.Item>
+              <Descriptions.Item label="均价">
+                ¥
+                {(
+                  selectedOrder.total_price / Math.max(getOrderItemCount(selectedOrder), 1)
+                ).toFixed(2)}
+              </Descriptions.Item>
+              <Descriptions.Item label="总价">
+                <Text type="danger">¥{selectedOrder.total_price.toFixed(2)}</Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="状态">
+                {statusMap[selectedOrder.status]?.label || selectedOrder.status}
+              </Descriptions.Item>
+              <Descriptions.Item label="创建时间" span={2}>
+                {new Date(selectedOrder.created_at).toLocaleString('zh-CN')}
+              </Descriptions.Item>
+              {selectedOrder.group_id && (
+                <>
+                  <Descriptions.Item label="拼团ID">
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => {
+                        setModalVisible(false);
+                        navigate(`/groups/${selectedOrder.group_id}`);
+                      }}
+                    >
+                      #{selectedOrder.group_id}
+                    </Button>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="拼团状态">
+                    {groupStatusMap[selectedOrder.group_status || 'active']?.label || '进行中'}
+                  </Descriptions.Item>
+                </>
+              )}
+            </Descriptions>
+            <Divider style={{ margin: '12px 0' }}>订单明细</Divider>
+            <List
+              size="small"
+              dataSource={selectedOrder.items || []}
+              locale={{ emptyText: <Text type="secondary">暂无明细</Text> }}
+              renderItem={(item) => (
+                <List.Item>
+                  <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                    <Text>SKU #{item.sku_id} × {item.quantity}</Text>
+                    <Text>¥{item.total_price.toFixed(2)}</Text>
+                  </Space>
+                </List.Item>
+              )}
+            />
+          </>
         )}
       </Modal>
 

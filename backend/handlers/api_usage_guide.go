@@ -117,9 +117,10 @@ func GetAPIUsageGuide(c *gin.Context) {
 	orderRows, err := db.Query(
 		`SELECT sp.name, s.sku_code, sp.model_provider, sp.provider_model_id, sp.model_name
 		 FROM orders o
-		 JOIN skus s ON o.sku_id = s.id
+		 JOIN order_items oi ON oi.order_id = o.id
+		 JOIN skus s ON oi.sku_id = s.id
 		 JOIN spus sp ON s.spu_id = sp.id
-		 WHERE o.user_id = $1 AND o.sku_id IS NOT NULL
+		 WHERE o.user_id = $1
 		   AND o.status IN ('paid', 'completed')`,
 		userIDInt,
 	)

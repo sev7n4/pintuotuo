@@ -31,10 +31,10 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	var req struct {
-		ProductID int `json:"product_id"`
-		SKUID     int `json:"sku_id"`
-		GroupID   int `json:"group_id"`
-		Quantity  int `json:"quantity" binding:"required,gt=0"`
+		Items []struct {
+			SKUID    int `json:"sku_id" binding:"required,gt=0"`
+			Quantity int `json:"quantity" binding:"required,gt=0"`
+		} `json:"items" binding:"required,min=1"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -42,94 +42,9 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 
-	if req.SKUID <= 0 {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MISSING_SKU",
-			"sku_id is required",
-			http.StatusBadRequest,
-			nil,
-		))
-		return
-	}
-
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	var skuID, spuID int
-	var retailPrice, wholesalePrice float64
-	var stock int
-	var skuType string
-
-	var groupEnabled bool
-	var minGroupSize, maxGroupSize int
-	var groupDiscountRate sql.NullFloat64
-	var tokenAmount sql.NullInt64
-	var computePoints sql.NullFloat64
-	var subscriptionPeriod sql.NullString
-	var validDays sql.NullInt64
-	var trialDurationDays sql.NullInt64
-
-	err := db.QueryRow(
-		`SELECT s.id, s.spu_id, s.retail_price, s.wholesale_price, s.stock, s.sku_type,
-			s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
-			s.token_amount, s.compute_points, s.subscription_period, s.valid_days, s.trial_duration_days
-		 FROM skus s JOIN spus sp ON s.spu_id = sp.id 
-		 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
-		req.SKUID,
-	).Scan(&skuID, &spuID, &retailPrice, &wholesalePrice, &stock, &skuType,
-		&groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate,
-		&tokenAmount, &computePoints, &subscriptionPeriod, &validDays, &trialDurationDays)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
-		return
-	}
-
-	periodStr := ""
-	if subscriptionPeriod.Valid {
-		periodStr = subscriptionPeriod.String
-	}
-	trialDays := 0
-	if trialDurationDays.Valid {
-		trialDays = int(trialDurationDays.Int64)
-	}
-	tokAmt := int64(0)
-	if tokenAmount.Valid {
-		tokAmt = tokenAmount.Int64
-	}
-	cp := 0.0
-	if computePoints.Valid {
-		cp = computePoints.Float64
-	}
-	vd := 0
-	if validDays.Valid {
-		vd = int(validDays.Int64)
-	}
-	if err = services.ValidateSKUForOrder(skuType, tokAmt, cp, periodStr, vd, trialDays); err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"INVALID_SKU_CONFIG",
-			err.Error(),
-			http.StatusBadRequest,
-			nil,
-		))
-		return
-	}
-
-	if req.GroupID > 0 && !groupEnabled {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"SKU_GROUP_NOT_ENABLED",
-			"This SKU does not support group purchase",
-			http.StatusBadRequest,
-			nil,
-		))
-		return
-	}
-	skuID = req.SKUID
-
-	if stock != -1 && stock < req.Quantity {
-		middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
 		return
 	}
 
@@ -145,57 +60,138 @@ func CreateOrder(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
-	result, execErr := tx.Exec(
-		"UPDATE skus SET stock = stock - $1 WHERE id = $2 AND (stock = -1 OR stock >= $1)",
-		req.Quantity, skuID,
-	)
-	if execErr != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"STOCK_UPDATE_FAILED",
-			"Failed to update stock",
-			http.StatusInternalServerError,
-			execErr,
-		))
-		return
+	type pendingItem struct {
+		item        models.OrderItem
+		tokenAmount sql.NullInt64
+		cpAmount    sql.NullFloat64
 	}
+	items := make([]pendingItem, 0, len(req.Items))
+	totalQty := 0
+	totalPrice := 0.0
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
-		return
-	}
-
-	var order models.Order
-	unitPrice := retailPrice
-	if wholesalePrice > 0 && wholesalePrice < retailPrice {
-		unitPrice = wholesalePrice
-	}
-	totalPrice := unitPrice * float64(req.Quantity)
-
-	var groupID interface{}
-	if req.GroupID > 0 {
-		groupID = req.GroupID
-	} else {
-		groupID = nil
-	}
-
-	var pid interface{} = nil
-	var productID sql.NullInt64
 	pv := services.BaselinePricingVersionID(tx)
 	var pvArg interface{}
 	if pv.Valid {
 		pvArg = pv.Int64
-	} else {
-		pvArg = nil
 	}
+
+	for _, in := range req.Items {
+		var skuID, spuID int
+		var retailPrice, wholesalePrice float64
+		var stock int
+		var skuType string
+		var tokenAmount sql.NullInt64
+		var computePoints sql.NullFloat64
+		var subscriptionPeriod sql.NullString
+		var validDays sql.NullInt64
+		var trialDurationDays sql.NullInt64
+
+		err = tx.QueryRow(
+			`SELECT s.id, s.spu_id, s.retail_price, s.wholesale_price, s.stock, s.sku_type,
+				s.token_amount, s.compute_points, s.subscription_period, s.valid_days, s.trial_duration_days
+			 FROM skus s JOIN spus sp ON s.spu_id = sp.id
+			 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
+			in.SKUID,
+		).Scan(
+			&skuID, &spuID, &retailPrice, &wholesalePrice, &stock, &skuType,
+			&tokenAmount, &computePoints, &subscriptionPeriod, &validDays, &trialDurationDays,
+		)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+			return
+		}
+
+		periodStr := ""
+		if subscriptionPeriod.Valid {
+			periodStr = subscriptionPeriod.String
+		}
+		trialDays := 0
+		if trialDurationDays.Valid {
+			trialDays = int(trialDurationDays.Int64)
+		}
+		tokAmt := int64(0)
+		if tokenAmount.Valid {
+			tokAmt = tokenAmount.Int64
+		}
+		cp := 0.0
+		if computePoints.Valid {
+			cp = computePoints.Float64
+		}
+		vd := 0
+		if validDays.Valid {
+			vd = int(validDays.Int64)
+		}
+		if err = services.ValidateSKUForOrder(skuType, tokAmt, cp, periodStr, vd, trialDays); err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_SKU_CONFIG",
+				err.Error(),
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+
+		result, execErr := tx.Exec(
+			"UPDATE skus SET stock = stock - $1 WHERE id = $2 AND (stock = -1 OR stock >= $1)",
+			in.Quantity, skuID,
+		)
+		if execErr != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"STOCK_UPDATE_FAILED",
+				"Failed to update stock",
+				http.StatusInternalServerError,
+				execErr,
+			))
+			return
+		}
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			middleware.RespondWithError(c, apperrors.ErrInsufficientStock)
+			return
+		}
+
+		unitPrice := retailPrice
+		if wholesalePrice > 0 && wholesalePrice < retailPrice {
+			unitPrice = wholesalePrice
+		}
+		lineTotal := unitPrice * float64(in.Quantity)
+
+		item := models.OrderItem{
+			SKUID:     skuID,
+			SPUID:     spuID,
+			Quantity:  in.Quantity,
+			UnitPrice: unitPrice,
+			TotalPrice: lineTotal,
+			SKUType:   skuType,
+		}
+		if tokenAmount.Valid {
+			t := tokenAmount.Int64
+			item.TokenAmount = &t
+		}
+		if computePoints.Valid {
+			cpVal := computePoints.Float64
+			item.ComputePoints = &cpVal
+		}
+		if pv.Valid {
+			pvInt := int(pv.Int64)
+			item.PricingVersionID = &pvInt
+		}
+		items = append(items, pendingItem{item: item, tokenAmount: tokenAmount, cpAmount: computePoints})
+		totalQty += in.Quantity
+		totalPrice += lineTotal
+	}
+
+	var order models.Order
+	var productID sql.NullInt64
+	var skuID sql.NullInt64
+	var spuID sql.NullInt64
 	var pricingVID sql.NullInt64
 	err = tx.QueryRow(
-		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		 RETURNING id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id, created_at, updated_at`,
-		userID, pid, skuID, spuID, groupID, req.Quantity, unitPrice, totalPrice, orderStatusPending, pvArg,
-	).Scan(&order.ID, &order.UserID, &productID, &order.SKUID, &order.SPUID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &pricingVID, &order.CreatedAt, &order.UpdatedAt)
-
+		userID, nil, nil, nil, nil, totalQty, 0, totalPrice, orderStatusPending, pvArg,
+	).Scan(&order.ID, &order.UserID, &productID, &skuID, &spuID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &pricingVID, &order.CreatedAt, &order.UpdatedAt)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"ORDER_CREATION_FAILED",
@@ -209,6 +205,42 @@ func CreateOrder(c *gin.Context) {
 	if pricingVID.Valid {
 		v := int(pricingVID.Int64)
 		order.PricingVersionID = &v
+	}
+
+	order.Items = make([]models.OrderItem, 0, len(items))
+	for _, pi := range items {
+		item := pi.item
+		var itemID int
+		var itemPV sql.NullInt64
+		var createdAt, updatedAt time.Time
+		var fulfilledAt sql.NullTime
+		err = tx.QueryRow(
+			`INSERT INTO order_items (order_id, sku_id, spu_id, quantity, unit_price, total_price, pricing_version_id, sku_type, token_amount, compute_points)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			 RETURNING id, pricing_version_id, fulfilled_at, created_at, updated_at`,
+			order.ID, item.SKUID, item.SPUID, item.Quantity, item.UnitPrice, item.TotalPrice, pvArg, item.SKUType, pi.tokenAmount, pi.cpAmount,
+		).Scan(&itemID, &itemPV, &fulfilledAt, &createdAt, &updatedAt)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"ORDER_ITEM_CREATION_FAILED",
+				"Failed to create order item",
+				http.StatusInternalServerError,
+				err,
+			))
+			return
+		}
+		item.ID = itemID
+		item.OrderID = order.ID
+		item.CreatedAt = createdAt
+		item.UpdatedAt = updatedAt
+		if itemPV.Valid {
+			v := int(itemPV.Int64)
+			item.PricingVersionID = &v
+		}
+		if fulfilledAt.Valid {
+			item.FulfilledAt = fulfilledAt.Time
+		}
+		order.Items = append(order.Items, item)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -226,6 +258,54 @@ func CreateOrder(c *gin.Context) {
 		"message": "success",
 		"data":    order,
 	})
+}
+
+func loadOrderItems(db *sql.DB, orderID int) ([]models.OrderItem, error) {
+	rows, err := db.Query(
+		`SELECT id, order_id, sku_id, spu_id, quantity, unit_price, total_price,
+		        sku_type, token_amount, compute_points, fulfilled_at, pricing_version_id, created_at, updated_at
+		   FROM order_items
+		  WHERE order_id = $1
+		  ORDER BY id ASC`,
+		orderID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]models.OrderItem, 0)
+	for rows.Next() {
+		var item models.OrderItem
+		var tokenAmount sql.NullInt64
+		var computePoints sql.NullFloat64
+		var fulfilledAt sql.NullTime
+		var pricingVID sql.NullInt64
+		if scanErr := rows.Scan(
+			&item.ID, &item.OrderID, &item.SKUID, &item.SPUID, &item.Quantity, &item.UnitPrice, &item.TotalPrice,
+			&item.SKUType, &tokenAmount, &computePoints, &fulfilledAt, &pricingVID, &item.CreatedAt, &item.UpdatedAt,
+		); scanErr != nil {
+			return nil, scanErr
+		}
+		if tokenAmount.Valid {
+			v := tokenAmount.Int64
+			item.TokenAmount = &v
+		}
+		if computePoints.Valid {
+			v := computePoints.Float64
+			item.ComputePoints = &v
+		}
+		if fulfilledAt.Valid {
+			item.FulfilledAt = fulfilledAt.Time
+		}
+		if pricingVID.Valid {
+			v := int(pricingVID.Int64)
+			item.PricingVersionID = &v
+		}
+		items = append(items, item)
+	}
+
+	return items, nil
 }
 
 // ListOrders lists all orders for current user
@@ -258,7 +338,7 @@ func ListOrders(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		`SELECT id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at 
+		`SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, pricing_version_id, created_at, updated_at
 		 FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
 		userID, perPageNum, offset,
 	)
@@ -271,18 +351,22 @@ func ListOrders(c *gin.Context) {
 	var orders []models.Order
 	for rows.Next() {
 		var o models.Order
-		var productID, skuID, spuID sql.NullInt64
-		err := rows.Scan(&o.ID, &o.UserID, &productID, &skuID, &spuID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &o.CreatedAt, &o.UpdatedAt)
+		var productID sql.NullInt64
+		var pricingVID sql.NullInt64
+		err := rows.Scan(&o.ID, &o.UserID, &productID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &pricingVID, &o.CreatedAt, &o.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 		applyNullOrderProductID(&o, productID)
-		if skuID.Valid {
-			o.SKUID = int(skuID.Int64)
+		if pricingVID.Valid {
+			v := int(pricingVID.Int64)
+			o.PricingVersionID = &v
 		}
-		if spuID.Valid {
-			o.SPUID = int(spuID.Int64)
+		o.Items, err = loadOrderItems(db, o.ID)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
 		}
 		orders = append(orders, o)
 	}
@@ -336,22 +420,26 @@ func GetOrderByID(c *gin.Context) {
 	}
 
 	var order models.Order
-	var productID, skuID, spuID sql.NullInt64
+	var productID sql.NullInt64
+	var pricingVID sql.NullInt64
 	err := db.QueryRow(
-		`SELECT id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, created_at, updated_at 
+		`SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, pricing_version_id, created_at, updated_at
 		 FROM orders WHERE id = $1 AND user_id = $2`, id, userID,
-	).Scan(&order.ID, &order.UserID, &productID, &skuID, &spuID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &order.CreatedAt, &order.UpdatedAt)
+	).Scan(&order.ID, &order.UserID, &productID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &pricingVID, &order.CreatedAt, &order.UpdatedAt)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
 	}
 
 	applyNullOrderProductID(&order, productID)
-	if skuID.Valid {
-		order.SKUID = int(skuID.Int64)
+	if pricingVID.Valid {
+		v := int(pricingVID.Int64)
+		order.PricingVersionID = &v
 	}
-	if spuID.Valid {
-		order.SPUID = int(spuID.Int64)
+	order.Items, err = loadOrderItems(db, order.ID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
 	}
 
 	if orderJSON, err := json.Marshal(order); err == nil {
@@ -382,15 +470,12 @@ func CancelOrder(c *gin.Context) {
 	}
 
 	var orderInfo struct {
-		status    string
-		productID sql.NullInt64
-		skuID     sql.NullInt64
-		quantity  int
+		status string
 	}
 	err := db.QueryRow(
-		"SELECT status, product_id, sku_id, quantity FROM orders WHERE id = $1 AND user_id = $2",
+		"SELECT status FROM orders WHERE id = $1 AND user_id = $2",
 		id, userID,
-	).Scan(&orderInfo.status, &orderInfo.productID, &orderInfo.skuID, &orderInfo.quantity)
+	).Scan(&orderInfo.status)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
@@ -440,12 +525,18 @@ func CancelOrder(c *gin.Context) {
 		order.SPUID = int(spuIDNull.Int64)
 	}
 
-	if orderInfo.skuID.Valid && orderInfo.skuID.Int64 > 0 {
-		_, err = tx.Exec(
-			"UPDATE skus SET stock = stock + $1 WHERE id = $2",
-			orderInfo.quantity, orderInfo.skuID.Int64,
-		)
-	}
+	_, err = tx.Exec(
+		`UPDATE skus s
+		   SET stock = stock + oi.qty
+		  FROM (
+		    SELECT sku_id, SUM(quantity) AS qty
+		      FROM order_items
+		     WHERE order_id = $1
+		     GROUP BY sku_id
+		  ) oi
+		 WHERE s.id = oi.sku_id`,
+		order.ID,
+	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"STOCK_RESTORE_FAILED",
@@ -518,16 +609,20 @@ func CreateGroup(c *gin.Context) {
 
 	var skuID, spuID int
 	var retailPrice float64
+	var skuType string
+	var tokenAmount sql.NullInt64
+	var computePoints sql.NullFloat64
 	var groupEnabled bool
 	var minGroupSize, maxGroupSize int
 	var groupDiscountRate sql.NullFloat64
 
 	err := db.QueryRow(
-		`SELECT s.id, s.spu_id, s.retail_price, s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate
+		`SELECT s.id, s.spu_id, s.retail_price, s.sku_type, s.token_amount, s.compute_points,
+		        s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate
 		 FROM skus s JOIN spus sp ON s.spu_id = sp.id 
 		 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
 		req.SKUID,
-	).Scan(&skuID, &spuID, &retailPrice, &groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate)
+	).Scan(&skuID, &spuID, &retailPrice, &skuType, &tokenAmount, &computePoints, &groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
@@ -588,13 +683,28 @@ func CreateGroup(c *gin.Context) {
 	err = db.QueryRow(
 		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-		userID, nilPID, skuID, spuID, group.ID, 1, groupPrice, groupPrice, orderStatusPending, pvCreateArg,
+		userID, nilPID, nil, nil, group.ID, 1, 0, groupPrice, orderStatusPending, pvCreateArg,
 	).Scan(&orderID)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"ORDER_CREATION_FAILED",
 			"Failed to create order for group creator",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	_, err = db.Exec(
+		`INSERT INTO order_items (order_id, sku_id, spu_id, quantity, unit_price, total_price, pricing_version_id, sku_type, token_amount, compute_points)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		orderID, skuID, spuID, 1, groupPrice, groupPrice, pvCreateArg, skuType, tokenAmount, computePoints,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"ORDER_ITEM_CREATION_FAILED",
+			"Failed to create order item for group creator",
 			http.StatusInternalServerError,
 			err,
 		))
@@ -858,12 +968,15 @@ func JoinGroup(c *gin.Context) {
 		return
 	}
 	var retailPrice float64
+	var skuType string
+	var tokenAmount sql.NullInt64
+	var computePoints sql.NullFloat64
 	var groupDiscountRate sql.NullFloat64
 	err = db.QueryRow(
-		`SELECT s.retail_price, s.group_discount_rate 
+		`SELECT s.retail_price, s.sku_type, s.token_amount, s.compute_points, s.group_discount_rate 
 		 FROM skus s WHERE s.id = $1 AND s.status = 'active'`,
 		group.SKUID,
-	).Scan(&retailPrice, &groupDiscountRate)
+	).Scan(&retailPrice, &skuType, &tokenAmount, &computePoints, &groupDiscountRate)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 		return
@@ -882,13 +995,28 @@ func JoinGroup(c *gin.Context) {
 	err = db.QueryRow(
 		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-		userID, nilPID, group.SKUID, group.SPUID, group.ID, 1, unitPrice, unitPrice, orderStatusPending, pvJoinArg,
+		userID, nilPID, nil, nil, group.ID, 1, 0, unitPrice, orderStatusPending, pvJoinArg,
 	).Scan(&orderID)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"ORDER_CREATION_FAILED",
 			"Failed to create order",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	_, err = db.Exec(
+		`INSERT INTO order_items (order_id, sku_id, spu_id, quantity, unit_price, total_price, pricing_version_id, sku_type, token_amount, compute_points)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		orderID, group.SKUID, group.SPUID, 1, unitPrice, unitPrice, pvJoinArg, skuType, tokenAmount, computePoints,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"ORDER_ITEM_CREATION_FAILED",
+			"Failed to create order item",
 			http.StatusInternalServerError,
 			err,
 		))
