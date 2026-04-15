@@ -38,9 +38,9 @@ export class RegisterPage {
 
   async register(email: string, password: string, role: 'user' | 'merchant' = 'user') {
     if (role === 'merchant') {
-      await this.page.getByText('商户入驻').click();
+      await this.page.getByRole('radio', { name: '商户入驻' }).click();
     } else {
-      await this.page.getByText('个人用户').click();
+      await this.page.getByRole('radio', { name: '个人用户' }).click();
     }
     await this.page.getByPlaceholder('example@email.com').fill(email);
     await this.page.getByPlaceholder(/设置密码/).fill(password);

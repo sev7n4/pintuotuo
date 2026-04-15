@@ -121,7 +121,8 @@ func RegisterUser(c *gin.Context) {
 	defer func() { _ = tx.Rollback() }()
 
 	if role == roleMerchant && merchantRegisterRequiresInvite(mode) {
-		id, err := services.ConsumeMerchantInviteTx(tx, req.InviteCode)
+		var id int
+		id, err = services.ConsumeMerchantInviteTx(tx, req.InviteCode)
 		if err != nil {
 			if err == services.ErrInviteInvalid {
 				middleware.RespondWithError(c, apperrors.NewAppError(

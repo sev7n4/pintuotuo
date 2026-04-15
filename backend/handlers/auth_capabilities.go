@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/config"
@@ -27,10 +26,7 @@ type AuthCapabilities struct {
 // GetAuthCapabilities GET /users/auth/capabilities（无需登录）
 func GetAuthCapabilities(c *gin.Context) {
 	mockSMS := os.Getenv("MOCK_SMS") == envTrue
-	mode := strings.ToLower(strings.TrimSpace(os.Getenv("MERCHANT_REGISTER_MODE")))
-	if mode == "" {
-		mode = "invite_only"
-	}
+	mode := merchantRegisterMode()
 	cap := AuthCapabilities{
 		SMS:                  os.Getenv("SMS_PROVIDER") != "" || mockSMS,
 		EmailMagic:           os.Getenv("AUTH_MAGIC_LINK") == envTrue,
@@ -38,7 +34,7 @@ func GetAuthCapabilities(c *gin.Context) {
 		GithubOAuth:          os.Getenv("GITHUB_OAUTH_CLIENT_ID") != "",
 		AccountLinking:       os.Getenv("AUTH_ACCOUNT_LINKING") == envTrue || os.Getenv("GITHUB_OAUTH_CLIENT_ID") != "" || os.Getenv("WECHAT_OPEN_APP_ID") != "",
 		MerchantRegisterMode: mode,
-		AdminMFARequired:     os.Getenv("ADMIN_MFA_REQUIRED") == "true" || os.Getenv("ADMIN_MFA_REQUIRED") == "1",
+		AdminMFARequired:     adminMFARequired(),
 	}
 	c.JSON(http.StatusOK, cap)
 }

@@ -186,7 +186,8 @@ func RegisterWithSMS(c *gin.Context) {
 	defer func() { _ = tx.Rollback() }()
 
 	if role == roleMerchant && merchantRegisterRequiresInvite(mode) {
-		id, err := services.ConsumeMerchantInviteTx(tx, req.InviteCode)
+		var id int
+		id, err = services.ConsumeMerchantInviteTx(tx, req.InviteCode)
 		if err != nil {
 			if err == services.ErrInviteInvalid {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "MERCHANT_INVITE_INVALID", "message": "邀请码无效、已过期或已用尽"})
@@ -218,7 +219,8 @@ func RegisterWithSMS(c *gin.Context) {
 	}
 	user.Phone = &phone
 
-	if _, err := tx.Exec(`INSERT INTO tokens (user_id, balance) VALUES ($1, $2)`, user.ID, 0); err != nil {
+	_, err = tx.Exec(`INSERT INTO tokens (user_id, balance) VALUES ($1, $2)`, user.ID, 0)
+	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
