@@ -22,8 +22,13 @@ func ValidateTOTP(code string, secretBase32 string) bool {
 		return false
 	}
 	now := time.Now().Unix()
+	baseCounter := now / 30
 	for _, skew := range []int64{-1, 0, 1} {
-		if hotpMatch(key, uint64(now/30+skew), c) {
+		counter := baseCounter + skew
+		if counter < 0 {
+			continue
+		}
+		if hotpMatch(key, uint64(counter), c) {
 			return true
 		}
 	}
