@@ -31,3 +31,25 @@
   padding-top: 4px !important;
   padding-bottom: 4px !important;
 }
+
+.totalPriceBlock {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(22, 119, 255, 0.1) 0%, rgba(22, 119, 255, 0.02) 100%);
+  border: 1px solid rgba(22, 119, 255, 0.18);
+}
+
+.totalPriceLabel {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-bottom: 4px;
+}
+
+.totalPriceValue {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1677ff;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}

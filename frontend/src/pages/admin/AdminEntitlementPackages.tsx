@@ -26,7 +26,7 @@ import {
 import { skuService } from '@/services/sku';
 import type { EntitlementPackage } from '@/types/entitlementPackage';
 import { getApiErrorMessage } from '@/utils/apiError';
-import { ENTITLEMENT_CATEGORY_OPTIONS } from '@/types/entitlementPackage';
+import { ENTITLEMENT_CATEGORY_ADMIN_OPTIONS } from '@/types/entitlementPackage';
 import type { SKUWithSPU } from '@/types/sku';
 import dayjs from 'dayjs';
 
@@ -72,7 +72,7 @@ function packageTotalPrice(pkg: EntitlementPackage): number {
 function collectPackagePreviewWarnings(pkg: EntitlementPackage): string[] {
   const w: string[] = [];
   if (pkg.status !== 'active') {
-    w.push('当前状态非「在售」，用户端 /entitlement-packages 不会展示该包。');
+    w.push('当前状态非「在售」，用户端 /packages 不会展示该包。');
   }
   const now = dayjs();
   if (pkg.start_at && dayjs(pkg.start_at).isAfter(now)) {
@@ -157,7 +157,7 @@ export default function AdminEntitlementPackages() {
       setRows(pkgRes.data.data || []);
       setSkus(skuRes.data.data || []);
     } catch {
-      message.error('加载权益包数据失败');
+      message.error('加载套餐包数据失败');
     } finally {
       setLoading(false);
     }
@@ -219,7 +219,7 @@ export default function AdminEntitlementPackages() {
       const skuIDs = (v.items || []).map((i) => i.sku_id as number);
       const dedup = new Set(skuIDs);
       if (dedup.size !== skuIDs.length) {
-        message.error('同一权益包内不能重复选择同一个 SKU');
+        message.error('同一套餐包内不能重复选择同一规格');
         return;
       }
       if (v.start_at && v.end_at && !v.end_at.isAfter(v.start_at)) {
@@ -251,10 +251,10 @@ export default function AdminEntitlementPackages() {
       };
       if (editing) {
         await entitlementPackageService.updateAdmin(editing.id, payload);
-        message.success('权益包已更新');
+        message.success('套餐包已更新');
       } else {
         await entitlementPackageService.createAdmin(payload);
-        message.success('权益包已创建');
+        message.success('套餐包已创建');
       }
       setOpen(false);
       loadData();
@@ -268,7 +268,7 @@ export default function AdminEntitlementPackages() {
   const remove = async (id: number) => {
     try {
       await entitlementPackageService.deleteAdmin(id);
-      message.success('权益包已删除');
+      message.success('套餐包已删除');
       loadData();
     } catch {
       message.error('删除失败');
@@ -293,7 +293,7 @@ export default function AdminEntitlementPackages() {
       const skuIDs = (v.items || []).map((i) => i.sku_id as number);
       const dedup = new Set(skuIDs);
       if (dedup.size !== skuIDs.length) {
-        message.error('同一权益包内不能重复选择同一个 SKU');
+        message.error('同一套餐包内不能重复选择同一规格');
         return;
       }
       if (v.start_at && v.end_at && !v.end_at.isAfter(v.start_at)) {
@@ -318,16 +318,26 @@ export default function AdminEntitlementPackages() {
 
   return (
     <Card
-      title="权益包管理"
+      title="套餐包管理"
       extra={
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          新建权益包
+          新建套餐包
         </Button>
       }
     >
-      <Table
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 12 }}
+        message="套餐包与拼团"
+        description="套餐包为组合一口价下单，保存配置与当前库存解耦；前台下单时仍会校验可售与库存。若需单品拼团，请在支持拼团的商品详情页发起。"
+      />
+      <div style={{ width: '100%', overflowX: 'auto' }}>
+        <Table
         rowKey="id"
         loading={loading}
+        size="small"
+        scroll={{ x: 960 }}
         dataSource={rows}
         columns={[
           { title: '编码', dataIndex: 'package_code', key: 'package_code', width: 140 },
@@ -396,7 +406,7 @@ export default function AdminEntitlementPackages() {
                 <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(r)}>
                   编辑
                 </Button>
-                <Popconfirm title="确认删除该权益包？" onConfirm={() => remove(r.id)}>
+                <Popconfirm title="确认删除该套餐包？" onConfirm={() => remove(r.id)}>
                   <Button type="link" danger icon={<DeleteOutlined />}>
                     删除
                   </Button>
@@ -405,11 +415,12 @@ export default function AdminEntitlementPackages() {
             ),
           },
         ]}
-      />
+        />
+      </div>
 
       <Modal
         open={open}
-        title={editing ? '编辑权益包' : '新建权益包'}
+        title={editing ? '编辑套餐包' : '新建套餐包'}
         onCancel={() => setOpen(false)}
         onOk={submit}
         width="min(920px, 100%)"
@@ -481,7 +492,7 @@ export default function AdminEntitlementPackages() {
               <Col xs={24} md={12}>
                 <Form.Item name="category_code" label="分类">
                   <Select
-                    options={ENTITLEMENT_CATEGORY_OPTIONS.filter((o) => o.value !== 'all')}
+                    options={ENTITLEMENT_CATEGORY_ADMIN_OPTIONS}
                     placeholder="选择分类"
                   />
                 </Form.Item>
@@ -609,7 +620,7 @@ export default function AdminEntitlementPackages() {
       </Modal>
 
       <Modal
-        title="用户端预览（权益包卡片）"
+        title="用户端预览（套餐包卡片）"
         open={previewOpen}
         onCancel={() => {
           setPreviewOpen(false);
@@ -653,9 +664,6 @@ export default function AdminEntitlementPackages() {
                   {previewPkg.badge_text ? <Tag color="purple">{previewPkg.badge_text}</Tag> : null}
                   {previewPkg.badge_text_secondary ? (
                     <Tag color="cyan">{previewPkg.badge_text_secondary}</Tag>
-                  ) : null}
-                  {!previewPkg.badge_text && !previewPkg.badge_text_secondary ? (
-                    <Tag color="blue">权益包</Tag>
                   ) : null}
                 </Space>
               }

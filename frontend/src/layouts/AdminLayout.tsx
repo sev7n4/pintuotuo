@@ -60,7 +60,7 @@ const menuItems = [
   {
     key: '/admin/entitlement-packages',
     icon: <GiftOutlined />,
-    label: '权益包管理',
+    label: '套餐包管理',
   },
   {
     key: '/admin/model-providers',

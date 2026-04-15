@@ -23,6 +23,7 @@ type EntitlementPackageItem struct {
 	RetailPrice     float64 `json:"retail_price"`
 	DisplayName     string  `json:"display_name,omitempty"`
 	ValueNote       string  `json:"value_note,omitempty"`
+	LineCovered     *bool   `json:"line_covered,omitempty"`
 	SKUStatus       string  `json:"sku_status,omitempty"`
 	SPUStatus       string  `json:"spu_status,omitempty"`
 	Stock           int     `json:"stock"`
@@ -239,7 +240,7 @@ func CreateAdminEntitlementPackage(c *gin.Context) {
 			DefaultQuantity int
 		}{SKUID: it.SKUID, DefaultQuantity: it.DefaultQuantity}
 	}
-	if err = validateEntitlementPackageSKULines(tx, lines); err != nil {
+	if err = validateEntitlementPackageSKUReferences(tx, lines); err != nil {
 		if ae, ok := err.(*apperrors.AppError); ok {
 			middleware.RespondWithError(c, ae)
 			return
@@ -335,7 +336,7 @@ func UpdateAdminEntitlementPackage(c *gin.Context) {
 			DefaultQuantity int
 		}{SKUID: it.SKUID, DefaultQuantity: it.DefaultQuantity}
 	}
-	if err = validateEntitlementPackageSKULines(tx, lines); err != nil {
+	if err = validateEntitlementPackageSKUReferences(tx, lines); err != nil {
 		if ae, ok := err.(*apperrors.AppError); ok {
 			middleware.RespondWithError(c, ae)
 			return
@@ -538,8 +539,12 @@ func GetMyEntitlementPackages(c *gin.Context) {
 		p.Items = items
 		finalizeEntitlementPackage(&p.EntitlementPackage)
 		p.TotalItems = len(items)
-		for _, it := range items {
-			if _, ok = covered[it.SKUID]; ok {
+		for i := range p.Items {
+			it := &p.Items[i]
+			_, has := covered[it.SKUID]
+			v := has
+			it.LineCovered = &v
+			if has {
 				p.CoveredItems++
 			}
 		}

@@ -15,6 +15,8 @@ export interface EntitlementPackageItem {
   stock?: number;
   line_purchasable?: boolean;
   line_issue?: string;
+  /** 仅「我的权益」接口：当前账号是否已具备该明细 */
+  line_covered?: boolean;
 }
 
 export interface EntitlementPackage {
@@ -47,9 +49,17 @@ export interface EntitlementPackageUserView extends EntitlementPackage {
   is_active: boolean;
 }
 
-/** 前台筛选 / 管理端下拉 */
-export const ENTITLEMENT_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+/** 前台 /packages 分类筛选（不含 general，「通用」类套餐仅在「全部」下展示） */
+export const ENTITLEMENT_PACKAGE_FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: 'all', label: '全部' },
+  { value: 'personal', label: '个人月包' },
+  { value: 'boost', label: '加油包' },
+  { value: 'team', label: '小团队' },
+  { value: 'enterprise', label: '企业' },
+];
+
+/** 管理端编辑分类（含 general） */
+export const ENTITLEMENT_CATEGORY_ADMIN_OPTIONS: { value: string; label: string }[] = [
   { value: 'general', label: '通用' },
   { value: 'personal', label: '个人月包' },
   { value: 'boost', label: '加油包' },

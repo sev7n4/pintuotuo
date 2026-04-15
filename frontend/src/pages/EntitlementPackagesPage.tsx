@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, List, Space, Spin, Typography, message, Segmented } from 'antd';
+import { List, Space, Spin, Typography, message, Segmented } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useOrderStore } from '@/stores/orderStore';
 import { entitlementPackageService } from '@/services/entitlementPackage';
 import type { EntitlementPackage } from '@/types/entitlementPackage';
-import { ENTITLEMENT_CATEGORY_OPTIONS } from '@/types/entitlementPackage';
+import { ENTITLEMENT_PACKAGE_FILTER_OPTIONS } from '@/types/entitlementPackage';
 import { EntitlementPackageCard } from '@/components/entitlement/EntitlementPackageCard';
 import { getApiErrorMessage } from '@/utils/apiError';
 import styles from './EntitlementPackagesPage.module.css';
@@ -68,7 +68,7 @@ export default function EntitlementPackagesPage() {
 
   const handleOneClickOrder = async (pkgID: string, pkg: EntitlementPackage) => {
     if (pkg.purchasable === false) {
-      message.warning(pkg.unavailable_reason || '当前权益包暂不可购买');
+      message.warning(pkg.unavailable_reason || '当前套餐包暂不可购买');
       return;
     }
     const items = (pkg.items || []).map((s) => ({
@@ -76,18 +76,18 @@ export default function EntitlementPackagesPage() {
       quantity: s.default_quantity || 1,
     }));
     if (items.length === 0) {
-      message.warning('当前权益包暂不可购买，请联系运营配置 SKU。');
+      message.warning('当前套餐暂不可购买，请联系运营配置商品明细。');
       return;
     }
     setSubmittingID(pkgID);
     try {
       const orderID = await createOrder(items);
       if (!orderID) {
-        message.success('权益包订单已创建');
+        message.success('套餐订单已创建');
         navigate('/orders');
         return;
       }
-      message.success('权益包订单已创建，正在跳转支付');
+      message.success('套餐订单已创建，正在跳转支付');
       navigate(`/payment/${orderID}`);
     } catch (e) {
       message.error(getApiErrorMessage(e));
@@ -109,31 +109,28 @@ export default function EntitlementPackagesPage() {
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
         <div>
           <Title level={3} style={{ marginBottom: 8 }}>
-            权益包
+            套餐包
           </Title>
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            将多个 SKU 作为一个“权益包”理解与购买，避免分散下单。
+            一次购买，组合履约（订阅、Token 等按套餐约定发放）。
           </Paragraph>
         </div>
         <div className={styles.toolbar}>
           <Segmented
             value={category}
             onChange={(v) => setCategory(String(v))}
-            options={ENTITLEMENT_CATEGORY_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
+            options={ENTITLEMENT_PACKAGE_FILTER_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
             style={{ flex: 1, maxWidth: '100%' }}
           />
         </div>
-        <Alert
-          type="info"
-          showIcon
-          message="权益包下单说明"
-          description="点击「一键组合下单」会生成一个多明细订单，支付后按每个明细履约（订阅、Token 赠送等）。不可购买的包会标明原因。"
-        />
+        <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
+          套餐包为组合一口价下单；若需单品拼团，请在支持拼团的商品详情页发起。
+        </Paragraph>
         <Spin spinning={loading}>
           <List
             grid={{ gutter: 16, xs: 1, sm: 1, md: 2 }}
             dataSource={filtered}
-            locale={{ emptyText: '该分类下暂无权益包' }}
+            locale={{ emptyText: '该分类下暂无套餐包' }}
             renderItem={(pkg) => (
               <List.Item>
                 <div id={`pkg-card-${pkg.package_code}`}>

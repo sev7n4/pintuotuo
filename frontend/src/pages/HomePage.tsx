@@ -275,12 +275,12 @@ const HomePage = () => {
 
       <Card style={{ marginBottom: 16, borderRadius: 12 }}>
         <Space direction="vertical" size={6}>
-          <Text strong>权益包专区</Text>
+          <Text strong>套餐包专区</Text>
           <Text type="secondary">
-            将多个模型与赠送 Token 打包购买，适合想一步开通可用权益的用户。
+            多模型与赠送 Token 组合定价，一步开通可用权益。
           </Text>
           <Button type="primary" onClick={() => navigate('/packages')}>
-            查看权益包
+            查看套餐包
           </Button>
         </Space>
       </Card>

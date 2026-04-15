@@ -8,6 +8,29 @@ import (
 	apperrors "github.com/pintuotuo/backend/errors"
 )
 
+// validateEntitlementPackageSKUReferences only checks that each sku_id exists (admin config save; sellability enforced at checkout).
+func validateEntitlementPackageSKUReferences(tx *sql.Tx, items []struct {
+	SKUID           int
+	DefaultQuantity int
+}) error {
+	for _, it := range items {
+		var one int
+		err := tx.QueryRow(`SELECT 1 FROM skus WHERE id = $1`, it.SKUID).Scan(&one)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return apperrors.NewAppError(
+					"ENTITLEMENT_SKU_NOT_FOUND",
+					fmt.Sprintf("SKU %d 不存在", it.SKUID),
+					http.StatusBadRequest,
+					nil,
+				)
+			}
+			return err
+		}
+	}
+	return nil
+}
+
 func validateEntitlementPackageSKULines(tx *sql.Tx, items []struct {
 	SKUID           int
 	DefaultQuantity int

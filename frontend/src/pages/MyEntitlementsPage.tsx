@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Card, Col, Empty, List, Row, Space, Spin, Statistic, Tag, Typography } from 'antd';
+import { Card, Col, Empty, List, Row, Space, Skeleton, Spin, Statistic, Tag, Typography } from 'antd';
 import { WalletOutlined, ApiOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
 import { tokenService } from '@/services/token';
@@ -7,6 +7,7 @@ import { entitlementPackageService } from '@/services/entitlementPackage';
 import type { APIUsageGuideResponse } from '@/types';
 import type { UserSubscriptionWithSKU } from '@/types/sku';
 import type { EntitlementPackageUserView } from '@/types/entitlementPackage';
+import { PackageItemsCollapse } from '@/components/entitlement/PackageItemsCollapse';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -17,7 +18,8 @@ type TokenBalanceResp = {
 };
 
 export default function MyEntitlementsPage() {
-  const [loading, setLoading] = useState(true);
+  const [loadingMain, setLoadingMain] = useState(true);
+  const [loadingExtras, setLoadingExtras] = useState(true);
   const [subs, setSubs] = useState<UserSubscriptionWithSKU[]>([]);
   const [packages, setPackages] = useState<EntitlementPackageUserView[]>([]);
   const [usageGuide, setUsageGuide] = useState<APIUsageGuideResponse | null>(null);
@@ -26,30 +28,54 @@ export default function MyEntitlementsPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      setLoadingMain(true);
       try {
-        const [subRes, guideRes, balRes, pkgRes] = await Promise.all([
+        const [subRes, pkgRes] = await Promise.all([
           skuService.getUserSubscriptions(),
-          tokenService.getAPIUsageGuide(),
-          tokenService.getBalance(),
           entitlementPackageService.listMine(),
         ]);
-        if (cancelled) return;
-        setSubs(subRes.data.data || []);
-        setUsageGuide(guideRes.data.data || null);
-        setPackages(pkgRes.data.data || []);
-        setBalance({
-          balance: Number(balRes.data?.balance || 0),
-          total_earned: Number(balRes.data?.total_earned || 0),
-          total_used: Number(balRes.data?.total_used || 0),
-        });
+        if (!cancelled) {
+          setSubs(subRes.data.data || []);
+          setPackages(pkgRes.data.data || []);
+        }
       } catch {
         if (!cancelled) {
           setSubs([]);
-          setUsageGuide(null);
+          setPackages([]);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadingMain(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingExtras(true);
+      try {
+        const [guideRes, balRes] = await Promise.all([
+          tokenService.getAPIUsageGuide(),
+          tokenService.getBalance(),
+        ]);
+        if (!cancelled) {
+          setUsageGuide(guideRes.data.data || null);
+          setBalance({
+            balance: Number(balRes.data?.balance || 0),
+            total_earned: Number(balRes.data?.total_earned || 0),
+            total_used: Number(balRes.data?.total_used || 0),
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setUsageGuide(null);
+          setBalance(null);
+        }
+      } finally {
+        if (!cancelled) setLoadingExtras(false);
       }
     })();
     return () => {
@@ -65,70 +91,70 @@ export default function MyEntitlementsPage() {
             我的权益
           </Title>
           <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            统一查看可用模型权益、订阅有效期与可扣费余额。
+            查看模型与套餐权益、订阅有效期及可扣费余额。
           </Paragraph>
         </div>
 
         <Row gutter={[16, 16]}>
           <Col xs={24} md={8}>
             <Card>
-              <Statistic
-                title="当前余额"
-                value={balance?.balance || 0}
-                suffix="Token"
-                prefix={<WalletOutlined />}
-              />
+              <Skeleton loading={loadingExtras} active paragraph={{ rows: 1 }}>
+                <Statistic
+                  title="当前余额"
+                  value={balance?.balance ?? 0}
+                  suffix="Token"
+                  prefix={<WalletOutlined />}
+                />
+                <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
+                  支付成功后，若套餐含赠送 Token，将并入此处余额。
+                </Paragraph>
+              </Skeleton>
             </Card>
           </Col>
           <Col xs={24} md={8}>
             <Card>
-              <Statistic title="累计获得" value={balance?.total_earned || 0} suffix="Token" />
+              <Skeleton loading={loadingExtras} active paragraph={{ rows: 1 }}>
+                <Statistic title="累计获得" value={balance?.total_earned ?? 0} suffix="Token" />
+              </Skeleton>
             </Card>
           </Col>
           <Col xs={24} md={8}>
             <Card>
-              <Statistic
-                title="有效订阅"
-                value={subs.length}
-                suffix="项"
-                prefix={<SafetyCertificateOutlined />}
-              />
+              <Spin spinning={loadingMain}>
+                <Statistic
+                  title="有效订阅"
+                  value={subs.length}
+                  suffix="项"
+                  prefix={<SafetyCertificateOutlined />}
+                />
+              </Spin>
             </Card>
           </Col>
         </Row>
 
-        <Alert
-          type="info"
-          showIcon
-          message="计费提醒"
-          description="即便已订阅模型，调用时仍会按 token 用量扣减余额；若订阅 SKU 配置了赠送 token，会在支付后自动入账。"
-        />
-
-        <Spin spinning={loading}>
-          <Card title="权益包状态">
+        <Spin spinning={loadingMain}>
+          <Card title="套餐包状态">
             {packages.length === 0 ? (
-              <Empty description="暂无权益包配置" />
+              <Empty description="暂无套餐包配置" />
             ) : (
               <List
                 dataSource={packages}
                 renderItem={(p) => (
                   <List.Item>
-                    <Space direction="vertical" size={2}>
-                      <Text strong>{p.name}</Text>
-                      <Text type="secondary">
-                        覆盖进度：{p.covered_items}/{p.total_items}
-                      </Text>
-                      <Space wrap>
-                        {(p.items || []).map((it) => (
-                          <Tag key={`${p.id}-${it.id}`} color={p.is_active ? 'green' : 'default'}>
-                            {it.spu_name}
-                          </Tag>
-                        ))}
+                    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                      <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
+                        <Space direction="vertical" size={2}>
+                          <Text strong>{p.name}</Text>
+                          <Text type="secondary">
+                            覆盖进度：{p.covered_items}/{p.total_items}
+                          </Text>
+                        </Space>
+                        <Tag color={p.is_active ? 'success' : 'warning'}>
+                          {p.is_active ? '已激活' : '未覆盖完整'}
+                        </Tag>
                       </Space>
+                      <PackageItemsCollapse items={p.items || []} mode="mine" />
                     </Space>
-                    <Tag color={p.is_active ? 'success' : 'warning'}>
-                      {p.is_active ? '已激活' : '未覆盖完整'}
-                    </Tag>
                   </List.Item>
                 )}
               />
@@ -146,10 +172,11 @@ export default function MyEntitlementsPage() {
                     <Space direction="vertical" size={2}>
                       <Text strong>{s.spu_name}</Text>
                       <Text type="secondary">
-                        SKU: {s.sku_code} · 到期：{new Date(s.end_date).toLocaleDateString('zh-CN')}
+                        规格：{s.sku_code} · 到期：
+                        {new Date(s.end_date).toLocaleDateString('zh-CN')}
                       </Text>
                     </Space>
-                    <Tag color="green">active</Tag>
+                    <Tag color="green">生效中</Tag>
                   </List.Item>
                 )}
               />
@@ -163,26 +190,29 @@ export default function MyEntitlementsPage() {
               </span>
             }
           >
-            {(usageGuide?.items?.length || 0) === 0 ? (
-              <Empty description="暂无可调用模型，请先购买权益包或订阅" />
-            ) : (
-              <List
-                dataSource={usageGuide?.items || []}
-                renderItem={(it) => (
-                  <List.Item>
-                    <Space direction="vertical" size={2}>
-                      <Text>
-                        <Tag color="blue">{it.provider_code}</Tag>
-                        <Text code>{it.provider_slash_example || it.model_example}</Text>
-                      </Text>
-                      <Text type="secondary">
-                        来源：{it.source === 'subscription' ? '订阅' : '订单'} {it.spu_name || ''}
-                      </Text>
-                    </Space>
-                  </List.Item>
-                )}
-              />
-            )}
+            <Skeleton loading={loadingExtras} active paragraph={{ rows: 3 }}>
+              {(usageGuide?.items?.length || 0) === 0 ? (
+                <Empty description="暂无可调用模型，请先购买套餐或订阅" />
+              ) : (
+                <List
+                  dataSource={usageGuide?.items || []}
+                  renderItem={(it) => (
+                    <List.Item>
+                      <Space direction="vertical" size={2}>
+                        <Text>
+                          <Tag color="blue">{it.provider_code}</Tag>
+                          <Text code>{it.provider_slash_example || it.model_example}</Text>
+                        </Text>
+                        <Text type="secondary">
+                          来源：{it.source === 'subscription' ? '订阅' : '订单'}{' '}
+                          {it.spu_name || ''}
+                        </Text>
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              )}
+            </Skeleton>
           </Card>
         </Spin>
       </Space>
