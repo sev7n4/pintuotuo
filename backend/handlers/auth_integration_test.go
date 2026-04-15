@@ -38,6 +38,7 @@ func TestIntegration_MerchantRegistrationFlow(t *testing.T) {
 	defer cleanupTestUser(db, testEmail)
 
 	t.Run("merchant registration creates user and merchant records", func(t *testing.T) {
+		t.Setenv("MERCHANT_REGISTER_MODE", "open")
 		router := gin.New()
 		router.POST("/users/register", RegisterUser)
 

@@ -14,6 +14,7 @@ import {
   Segmented,
 } from 'antd';
 import { WechatOutlined, GithubOutlined } from '@ant-design/icons';
+import { isAxiosError } from 'axios';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '@stores/authStore';
 import { AuthPhoneSection } from './AuthPhoneSection';
@@ -31,6 +32,8 @@ type AuthCapabilities = {
   wechat_oauth: boolean;
   github_oauth: boolean;
   account_linking: boolean;
+  merchant_register_mode?: string;
+  admin_mfa_required?: boolean;
 };
 
 const defaultAuthCapabilities: AuthCapabilities = {
@@ -39,6 +42,8 @@ const defaultAuthCapabilities: AuthCapabilities = {
   wechat_oauth: false,
   github_oauth: false,
   account_linking: false,
+  merchant_register_mode: 'invite_only',
+  admin_mfa_required: false,
 };
 
 /**
@@ -67,12 +72,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
     return p.get('oauth') === '1' && Boolean(p.get('token'));
   }, [location.search]);
 
+  const inviteFromUrl = useMemo(() => {
+    const p = new URLSearchParams(location.search);
+    return (p.get('invite') || '').trim();
+  }, [location.search]);
+
   const loadCapabilities = useCallback(() => {
     fetch('/api/v1/users/auth/capabilities')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data && typeof data.sms === 'boolean') {
-          setCapabilities(data);
+          setCapabilities({ ...defaultAuthCapabilities, ...data });
         } else {
           setCapabilities(defaultAuthCapabilities);
         }
@@ -121,28 +131,60 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
     path === '/register' || (path === '/' && defaultMode === 'register') ? 'register' : 'login';
   const isRegisterRoute = authTab === 'register';
 
+  const viteMerchantMode = import.meta.env.VITE_MERCHANT_REGISTER_MODE as string | undefined;
+  const effectiveMerchantMode =
+    capabilities?.merchant_register_mode || viteMerchantMode || 'invite_only';
+  const canShowMerchantRegister =
+    effectiveMerchantMode === 'open' || (inviteFromUrl.length > 0 && isRegisterRoute);
+
+  useEffect(() => {
+    if (isRegisterRoute && inviteFromUrl) {
+      setRegisterRole('merchant');
+    }
+  }, [isRegisterRoute, inviteFromUrl]);
+
+  useEffect(() => {
+    if (isRegisterRoute && !canShowMerchantRegister && registerRole === 'merchant') {
+      setRegisterRole('user');
+    }
+  }, [isRegisterRoute, canShowMerchantRegister, registerRole]);
+
   const onEmailPasswordSubmit = async (values: {
     email: string;
     password: string;
     rememberMe?: boolean;
+    totp_code?: string;
+    invite_code?: string;
   }) => {
     try {
       if (isRegisterRoute) {
-        await register(values.email, values.password, registerRole);
+        const inviteCode =
+          registerRole === 'merchant' && effectiveMerchantMode !== 'open'
+            ? (values.invite_code || '').trim() || inviteFromUrl
+            : undefined;
+        await register(values.email, values.password, registerRole, inviteCode);
         writePrimaryLoginPreference('email');
         message.success('注册成功');
       } else {
-        await login(values.email, values.password, values.rememberMe || false);
+        await login(
+          values.email,
+          values.password,
+          values.rememberMe || false,
+          values.totp_code?.trim() || undefined
+        );
         writePrimaryLoginPreference('email');
         message.success('登录成功');
       }
     } catch (err) {
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-          : isRegisterRoute
-            ? '注册失败，请检查邮箱与密码'
-            : '登录失败，请检查邮箱和密码';
+      let errorMsg = isRegisterRoute
+        ? '注册失败，请检查邮箱与密码'
+        : '登录失败，请检查邮箱和密码';
+      if (isAxiosError(err)) {
+        const d = err.response?.data as { message?: string } | undefined;
+        if (d?.message) errorMsg = d.message;
+      } else if (err instanceof Error && err.message) {
+        errorMsg = err.message;
+      }
       message.error(errorMsg);
     }
   };
@@ -235,7 +277,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
           style={{ marginBottom: 16 }}
         />
 
-        {isRegisterRoute && primaryLogin === 'email' && (
+        {isRegisterRoute && primaryLogin === 'email' && canShowMerchantRegister && (
           <Segmented
             block
             value={registerRole}
@@ -245,6 +287,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
               { label: '商户入驻', value: 'merchant' },
             ]}
             style={{ marginBottom: 16 }}
+          />
+        )}
+        {isRegisterRoute && primaryLogin === 'email' && !canShowMerchantRegister && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="商户入驻仅支持邀请制"
+            description="请使用运营提供的邀请链接（含 invite 参数）打开本页后再选择「商户入驻」，或联系平台获取二维码。"
           />
         )}
 
@@ -283,6 +334,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
                   placeholder={isRegisterRoute ? '设置密码（至少 6 位）' : '输入密码'}
                 />
               </Form.Item>
+              {!isRegisterRoute && capabilities?.admin_mfa_required && (
+                <Form.Item label="身份验证码 (TOTP)" name="totp_code">
+                  <Input placeholder="已启用 MFA 的管理员请填写" autoComplete="one-time-code" />
+                </Form.Item>
+              )}
+              {isRegisterRoute &&
+                primaryLogin === 'email' &&
+                registerRole === 'merchant' &&
+                effectiveMerchantMode !== 'open' && (
+                  <Form.Item
+                    label="邀请码"
+                    name="invite_code"
+                    rules={[{ required: true, message: '请输入邀请码或从邀请链接进入' }]}
+                    initialValue={inviteFromUrl}
+                  >
+                    <Input placeholder="扫描邀请二维码链接中的邀请码" />
+                  </Form.Item>
+                )}
               {!isRegisterRoute && (
                 <Form.Item name="rememberMe" valuePropName="checked">
                   <Checkbox>记住我</Checkbox>

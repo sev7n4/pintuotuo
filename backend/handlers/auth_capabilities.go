@@ -14,22 +14,27 @@ import (
 
 // AuthCapabilities 描述当前环境已启用的扩展认证能力（供前端展示/灰度）。
 type AuthCapabilities struct {
-	SMS            bool `json:"sms"`
-	EmailMagic     bool `json:"email_magic"`
-	WechatOAuth    bool `json:"wechat_oauth"`
-	GithubOAuth    bool `json:"github_oauth"`
-	AccountLinking bool `json:"account_linking"`
+	SMS                  bool   `json:"sms"`
+	EmailMagic           bool   `json:"email_magic"`
+	WechatOAuth          bool   `json:"wechat_oauth"`
+	GithubOAuth          bool   `json:"github_oauth"`
+	AccountLinking       bool   `json:"account_linking"`
+	MerchantRegisterMode string `json:"merchant_register_mode"` // open | invite_only | hidden
+	AdminMFARequired     bool   `json:"admin_mfa_required"`
 }
 
 // GetAuthCapabilities GET /users/auth/capabilities（无需登录）
 func GetAuthCapabilities(c *gin.Context) {
 	mockSMS := os.Getenv("MOCK_SMS") == envTrue
+	mode := merchantRegisterMode()
 	cap := AuthCapabilities{
-		SMS:            os.Getenv("SMS_PROVIDER") != "" || mockSMS,
-		EmailMagic:     os.Getenv("AUTH_MAGIC_LINK") == envTrue,
-		WechatOAuth:    os.Getenv("WECHAT_OPEN_APP_ID") != "",
-		GithubOAuth:    os.Getenv("GITHUB_OAUTH_CLIENT_ID") != "",
-		AccountLinking: os.Getenv("AUTH_ACCOUNT_LINKING") == envTrue || os.Getenv("GITHUB_OAUTH_CLIENT_ID") != "" || os.Getenv("WECHAT_OPEN_APP_ID") != "",
+		SMS:                  os.Getenv("SMS_PROVIDER") != "" || mockSMS,
+		EmailMagic:           os.Getenv("AUTH_MAGIC_LINK") == envTrue,
+		WechatOAuth:          os.Getenv("WECHAT_OPEN_APP_ID") != "",
+		GithubOAuth:          os.Getenv("GITHUB_OAUTH_CLIENT_ID") != "",
+		AccountLinking:       os.Getenv("AUTH_ACCOUNT_LINKING") == envTrue || os.Getenv("GITHUB_OAUTH_CLIENT_ID") != "" || os.Getenv("WECHAT_OPEN_APP_ID") != "",
+		MerchantRegisterMode: mode,
+		AdminMFARequired:     adminMFARequired(),
 	}
 	c.JSON(http.StatusOK, cap)
 }

@@ -12,6 +12,7 @@ import (
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/services"
 )
 
 const (
@@ -363,7 +364,7 @@ func ApproveMerchant(c *gin.Context) {
 
 	var merchant models.Merchant
 	err = db.QueryRow(
-		`UPDATE merchants SET status = 'active', reviewed_at = CURRENT_TIMESTAMP, review_note = NULL, updated_at = CURRENT_TIMESTAMP 
+		`UPDATE merchants SET status = 'active', lifecycle_status = 'active', reviewed_at = CURRENT_TIMESTAMP, review_note = NULL, updated_at = CURRENT_TIMESTAMP 
 		 WHERE id = $1 
 		 RETURNING id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, status, created_at, updated_at`,
 		merchantID,
@@ -384,6 +385,9 @@ func ApproveMerchant(c *gin.Context) {
 	adminID, _ := adminActorID(c)
 	if err := insertMerchantAuditLog(db, merchant.ID, adminID, "approve", merchant.CompanyName, nil); err != nil {
 		stdlog.Printf("merchant audit log (approve): %v", err)
+	}
+	if err := services.InsertPlatformAuditLog(db, "merchant", merchant.ID, "approve", adminID, c, nil); err != nil {
+		stdlog.Printf("platform audit log (approve merchant): %v", err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -473,6 +477,9 @@ func RejectMerchant(c *gin.Context) {
 	}
 	if err := insertMerchantAuditLog(db, merchant.ID, adminID, "reject", merchant.CompanyName, reasonPtr); err != nil {
 		stdlog.Printf("merchant audit log (reject): %v", err)
+	}
+	if err := services.InsertPlatformAuditLog(db, "merchant", merchant.ID, "reject", adminID, c, map[string]interface{}{"reason": req.Reason}); err != nil {
+		stdlog.Printf("platform audit log (reject merchant): %v", err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

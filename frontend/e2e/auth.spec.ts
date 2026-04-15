@@ -115,10 +115,11 @@ test.describe('Registration', () => {
     await registerPage.goto();
   });
 
-  test('should have buyer and merchant registration tabs', async ({ page }) => {
+  test('should hide merchant entry by default in invite-only mode', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText('个人用户')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('商户入驻')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('商户入驻仅支持邀请制')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.ant-segmented-item-label', { hasText: '个人用户' })).toHaveCount(0);
+    await expect(page.locator('.ant-segmented-item-label', { hasText: '商户入驻' })).toHaveCount(0);
   });
 
   test('should register new user and redirect to home', async ({ page }) => {
@@ -129,12 +130,10 @@ test.describe('Registration', () => {
     await expect(page).toHaveURL(/.*\//);
   });
 
-  test('should register as merchant and redirect to merchant dashboard', async ({ page }) => {
-    const uniqueEmail = `merchant${Date.now()}@example.com`;
-    await registerPage.register(uniqueEmail, 'Test123456!', 'merchant');
-    
-    await page.waitForURL(/.*merchant/, { timeout: 15000 });
-    await expect(page).toHaveURL(/.*merchant/);
+  test('should show merchant option when invite param is present', async ({ page }) => {
+    await page.goto('/register?invite=e2e-demo-code');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('商户入驻')).toBeVisible({ timeout: 10000 });
   });
 
   test('should show error for duplicate email', async ({ page }) => {

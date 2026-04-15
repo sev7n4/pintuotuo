@@ -61,6 +61,8 @@ func RegisterUserRoutes(router *gin.RouterGroup) {
 			auth.GET("/me", handlers.GetCurrentUser)
 			auth.GET("/me/identities", handlers.GetUserIdentities)
 			auth.PUT("/me", handlers.UpdateCurrentUser)
+			auth.POST("/me/mfa/totp/setup", handlers.PostAdminTOTPSetup)
+			auth.POST("/me/mfa/totp/confirm", handlers.PostAdminTOTPConfirm)
 		}
 
 		users.GET("/:id", handlers.GetUserByID)
@@ -275,6 +277,7 @@ func RegisterNotificationRoutes(router *gin.RouterGroup) {
 
 func RegisterAdminRoutes(router *gin.RouterGroup) {
 	admin := router.Group("/admin")
+	admin.Use(middleware.AdminIPAllowlistMiddleware())
 	admin.Use(middleware.AuthMiddleware())
 	{
 		admin.GET("/users", handlers.GetAdminUsers)
@@ -286,6 +289,8 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.PATCH("/merchants/:id", handlers.PatchAdminMerchant)
 		admin.POST("/merchants/:id/approve", handlers.ApproveMerchant)
 		admin.POST("/merchants/:id/reject", handlers.RejectMerchant)
+		admin.GET("/merchant-invites", handlers.ListMerchantInvites)
+		admin.POST("/merchant-invites", handlers.CreateMerchantInvite)
 
 		admin.GET("/spus", handlers.ListSPUs)
 		admin.GET("/spus/:id", handlers.GetSPUByID)

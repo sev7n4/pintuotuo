@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import RegisterPage from '../RegisterPage';
 import { useAuthStore } from '@/stores/authStore';
@@ -30,11 +30,13 @@ describe('RegisterPage Component', () => {
         wechat_oauth: false,
         github_oauth: false,
         account_linking: false,
+        merchant_register_mode: 'open',
+        admin_mfa_required: false,
       }),
     });
   });
 
-  test('renders RegisterPage as email register with role segmented', () => {
+  test('renders RegisterPage as email register with role segmented', async () => {
     mockUseAuthStore.mockReturnValue({
       user: null,
       token: null,
@@ -65,8 +67,10 @@ describe('RegisterPage Component', () => {
     expect(screen.getByText('账号体系已升级')).toBeInTheDocument();
     expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
     expect(screen.getByLabelText('密码')).toBeInTheDocument();
-    expect(screen.getByText('个人用户')).toBeInTheDocument();
-    expect(screen.getByText('商户入驻')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('个人用户')).toBeInTheDocument();
+      expect(screen.getByText('商户入驻')).toBeInTheDocument();
+    });
     expect(screen.getByRole('button', { name: '注册并进入' })).toBeInTheDocument();
     expect(screen.queryByText('发送邮箱魔法链接')).not.toBeInTheDocument();
   });
