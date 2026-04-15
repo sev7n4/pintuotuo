@@ -23,12 +23,13 @@ test.describe('Authentication', () => {
     await expect(page.getByText('请输入邮箱')).toBeVisible();
   });
 
-  test('should navigate between login and register', async ({ page }) => {
+  test('should navigate between login and register routes', async ({ page }) => {
     await page.goto('/login');
     await page.waitForLoadState('networkidle');
-    await page.getByRole('link', { name: '创建新账户' }).click();
+
+    await page.goto('/register');
     await expect(page).toHaveURL(/register/);
-    await expect(page.getByText('账号体系已升级')).toBeVisible();
+    await expect(page.getByText('拼脱脱 - 登录 / 注册')).toBeVisible();
 
     await page.getByRole('link', { name: '立即登录' }).click();
     await expect(page).toHaveURL(/login/);
@@ -117,7 +118,7 @@ test.describe('Registration', () => {
 
   test('should hide merchant entry by default in invite-only mode', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText('商户入驻仅支持邀请制')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('商户入驻仅支持邀请制')).toHaveCount(0);
     await expect(page.locator('.ant-segmented-item-label', { hasText: '个人用户' })).toHaveCount(0);
     await expect(page.locator('.ant-segmented-item-label', { hasText: '商户入驻' })).toHaveCount(0);
   });

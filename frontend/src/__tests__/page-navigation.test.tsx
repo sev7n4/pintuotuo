@@ -204,7 +204,7 @@ describe('Page Navigation Integration Tests', () => {
       });
     });
 
-    test('should show unified auth Segmented and register notice', async () => {
+    test('should show unified auth Segmented on register route', async () => {
       mockUseAuthStore.mockReturnValue({
         user: null,
         token: null,
@@ -239,7 +239,6 @@ describe('Page Navigation Integration Tests', () => {
       });
       expect(screen.getByText('邮箱注册')).toBeInTheDocument();
       expect(screen.getByText('手机注册')).toBeInTheDocument();
-      expect(screen.getByText('账号体系已升级')).toBeInTheDocument();
     });
   });
 
@@ -1167,7 +1166,7 @@ describe('Page Navigation Integration Tests', () => {
       });
     });
 
-    test('should show login and register links when user is not authenticated', async () => {
+    test('should show login link when user is not authenticated', async () => {
       mockUseAuthStore.mockReturnValue({
         user: null,
         token: null,
@@ -1205,7 +1204,7 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       expect(screen.getByText('登录')).toBeInTheDocument();
-      expect(screen.getByText('注册')).toBeInTheDocument();
+      expect(screen.queryByText('注册')).not.toBeInTheDocument();
       expect(screen.queryByTestId('user-dropdown')).not.toBeInTheDocument();
     });
 

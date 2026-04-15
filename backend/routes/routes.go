@@ -291,6 +291,7 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.POST("/merchants/:id/reject", handlers.RejectMerchant)
 		admin.GET("/merchant-invites", handlers.ListMerchantInvites)
 		admin.POST("/merchant-invites", handlers.CreateMerchantInvite)
+		admin.POST("/merchant-invites/:id/revoke", handlers.RevokeMerchantInvite)
 
 		admin.GET("/spus", handlers.ListSPUs)
 		admin.GET("/spus/:id", handlers.GetSPUByID)

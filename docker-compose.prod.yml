@@ -55,6 +55,13 @@ services:
       - WECHAT_OPEN_APP_SECRET=${WECHAT_OPEN_APP_SECRET:-}
       - WECHAT_OAUTH_REDIRECT_URI=${WECHAT_OAUTH_REDIRECT_URI:-}
       - AUTH_ACCOUNT_LINKING=${AUTH_ACCOUNT_LINKING:-}
+      # 邀请制商户入驻 / 管理员安全策略
+      - MERCHANT_REGISTER_MODE=${MERCHANT_REGISTER_MODE:-open}
+      - ADMIN_MFA_REQUIRED=${ADMIN_MFA_REQUIRED:-false}
+      - ADMIN_ALLOWED_CIDRS=${ADMIN_ALLOWED_CIDRS:-}
+      - MFA_TOTP_ISSUER=${MFA_TOTP_ISSUER:-Pintuotuo}
+      - PUBLIC_APP_BASE_URL=${PUBLIC_APP_BASE_URL:-}
+      - FRONTEND_ORIGIN=${FRONTEND_ORIGIN:-}
       # 勿在此注入 HTTP(S)_PROXY 空值：会导致 Go 出站行为与未设置时不一致。
       # 若大陆机房必须走代理访问 github.com，请使用 docker-compose.proxy.override.yml.example 合并启动。
     depends_on:
@@ -83,6 +90,7 @@ services:
       args:
         - VITE_API_URL=${VITE_API_URL:-http://backend:8080/api/v1}
         - VITE_ALLOW_MOCK_RECHARGE=${VITE_ALLOW_MOCK_RECHARGE:-false}
+        - VITE_MERCHANT_REGISTER_MODE=${VITE_MERCHANT_REGISTER_MODE:-open}
     container_name: pintuotuo-frontend
     restart: unless-stopped
     ports:

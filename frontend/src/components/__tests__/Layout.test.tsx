@@ -45,7 +45,7 @@ describe('Layout Component', () => {
     });
   });
 
-  test('renders Layout with login/register links when not authenticated', () => {
+  test('renders Layout with login link when not authenticated', () => {
     // 模拟未认证状态
     mockUseAuthStore.mockReturnValue({
       user: null,
@@ -72,9 +72,9 @@ describe('Layout Component', () => {
     expect(screen.getByText('购物车')).toBeInTheDocument();
     expect(screen.queryByText('我的订单')).not.toBeInTheDocument();
 
-    // 检查登录/注册链接
+    // 检查登录入口
     expect(screen.getByText('登录')).toBeInTheDocument();
-    expect(screen.getByText('注册')).toBeInTheDocument();
+    expect(screen.queryByText('注册')).not.toBeInTheDocument();
   });
 
   test('renders Layout with user dropdown when authenticated', () => {

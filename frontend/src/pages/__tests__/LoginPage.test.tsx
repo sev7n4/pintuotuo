@@ -430,9 +430,9 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
 
       expect(screen.getByText('拼脱脱 - 登录 / 注册')).toBeInTheDocument();
       expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
-      expect(screen.getByLabelText('密码（仅曾用邮箱注册的账号）')).toBeInTheDocument();
+      expect(screen.getByLabelText('密码')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '密码登录' })).toBeInTheDocument();
-      expect(screen.getByText('创建新账户')).toBeInTheDocument();
+      expect(screen.getByText('首次使用可通过手机号验证码或邮箱魔法链接直接登录')).toBeInTheDocument();
     });
 
     test('should have correct placeholder text', () => {
@@ -461,8 +461,8 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
     });
   });
 
-  describe('TC-AUTH-006: 导航到注册页面', () => {
-    test('should navigate to register page when create account is clicked', async () => {
+  describe('TC-AUTH-006: 登录页展示说明', () => {
+    test('should show onboarding hint text on login page', async () => {
       mockUseAuthStore.mockReturnValue({
         user: null,
         token: null,
@@ -481,20 +481,10 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         <MemoryRouter initialEntries={['/login']}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<div>Register Page</div>} />
           </Routes>
         </MemoryRouter>
       );
-
-      const createAccountButton = screen.getByText('创建新账户');
-
-      await act(async () => {
-        fireEvent.click(createAccountButton);
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('Register Page')).toBeInTheDocument();
-      });
+      expect(screen.getByText('首次使用可通过手机号验证码或邮箱魔法链接直接登录')).toBeInTheDocument();
     });
   });
 
