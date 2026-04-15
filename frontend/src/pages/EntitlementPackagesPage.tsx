@@ -1,19 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, List, Space, Spin, Tag, Typography, message } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { Alert, List, Space, Spin, Typography, message, Segmented } from 'antd';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useOrderStore } from '@/stores/orderStore';
 import { entitlementPackageService } from '@/services/entitlementPackage';
 import type { EntitlementPackage } from '@/types/entitlementPackage';
-import dayjs from 'dayjs';
+import { ENTITLEMENT_CATEGORY_OPTIONS } from '@/types/entitlementPackage';
+import { EntitlementPackageCard } from '@/components/entitlement/EntitlementPackageCard';
+import { getApiErrorMessage } from '@/utils/apiError';
+import styles from './EntitlementPackagesPage.module.css';
 
-const { Title, Paragraph, Text } = Typography;
+const { Title, Paragraph } = Typography;
 
 export default function EntitlementPackagesPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { createOrder } = useOrderStore();
   const [loading, setLoading] = useState(true);
   const [submittingID, setSubmittingID] = useState<string>('');
   const [packages, setPackages] = useState<EntitlementPackage[]>([]);
+  const [category, setCategory] = useState<string>('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +38,8 @@ export default function EntitlementPackagesPage() {
     };
   }, []);
 
+  const highlightCode = searchParams.get('pkg') || searchParams.get('highlight') || '';
+
   const packageView = useMemo(
     () =>
       packages.map((pkg) => {
@@ -45,7 +52,25 @@ export default function EntitlementPackagesPage() {
     [packages]
   );
 
+  const filtered = useMemo(() => {
+    if (category === 'all') return packageView;
+    return packageView.filter((p) => (p.category_code || 'general') === category);
+  }, [packageView, category]);
+
+  useEffect(() => {
+    if (!highlightCode || filtered.length === 0) return;
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`pkg-card-${highlightCode}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [highlightCode, filtered]);
+
   const handleOneClickOrder = async (pkgID: string, pkg: EntitlementPackage) => {
+    if (pkg.purchasable === false) {
+      message.warning(pkg.unavailable_reason || '当前权益包暂不可购买');
+      return;
+    }
     const items = (pkg.items || []).map((s) => ({
       sku_id: s.sku_id,
       quantity: s.default_quantity || 1,
@@ -64,15 +89,23 @@ export default function EntitlementPackagesPage() {
       }
       message.success('权益包订单已创建，正在跳转支付');
       navigate(`/payment/${orderID}`);
-    } catch {
-      message.error('权益包下单失败，请稍后重试');
+    } catch (e) {
+      message.error(getApiErrorMessage(e));
     } finally {
       setSubmittingID('');
     }
   };
 
+  const copyShareLink = (code: string) => {
+    const url = `${window.location.origin}/packages?pkg=${encodeURIComponent(code)}`;
+    void navigator.clipboard.writeText(url).then(
+      () => message.success('链接已复制'),
+      () => message.error('复制失败')
+    );
+  };
+
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', padding: 16 }}>
+    <div className={styles.page}>
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
         <div>
           <Title level={3} style={{ marginBottom: 8 }}>
@@ -82,62 +115,35 @@ export default function EntitlementPackagesPage() {
             将多个 SKU 作为一个“权益包”理解与购买，避免分散下单。
           </Paragraph>
         </div>
+        <div className={styles.toolbar}>
+          <Segmented
+            value={category}
+            onChange={(v) => setCategory(String(v))}
+            options={ENTITLEMENT_CATEGORY_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
+            style={{ flex: 1, maxWidth: '100%' }}
+          />
+        </div>
         <Alert
           type="info"
           showIcon
           message="权益包下单说明"
-          description="点击「一键组合下单」会生成一个多明细订单，支付后按每个明细履约（订阅、Token赠送等）。"
+          description="点击「一键组合下单」会生成一个多明细订单，支付后按每个明细履约（订阅、Token 赠送等）。不可购买的包会标明原因。"
         />
         <Spin spinning={loading}>
           <List
             grid={{ gutter: 16, xs: 1, sm: 1, md: 2 }}
-            dataSource={packageView}
+            dataSource={filtered}
+            locale={{ emptyText: '该分类下暂无权益包' }}
             renderItem={(pkg) => (
               <List.Item>
-                <Card
-                  title={pkg.name}
-                  extra={
-                    <Space>
-                      {pkg.is_featured ? <Tag color="gold">推荐</Tag> : null}
-                      {pkg.badge_text ? (
-                        <Tag color="purple">{pkg.badge_text}</Tag>
-                      ) : (
-                        <Tag color="blue">权益包</Tag>
-                      )}
-                    </Space>
-                  }
-                  actions={[
-                    <Button
-                      key="buy"
-                      type="primary"
-                      loading={submittingID === String(pkg.id)}
-                      onClick={() => handleOneClickOrder(String(pkg.id), pkg)}
-                    >
-                      一键组合下单
-                    </Button>,
-                  ]}
-                >
-                  <Paragraph type="secondary">{pkg.description}</Paragraph>
-                  {(pkg.start_at || pkg.end_at) && (
-                    <Paragraph type="secondary" style={{ marginBottom: 8 }}>
-                      有效期：
-                      {pkg.start_at
-                        ? dayjs(pkg.start_at).format('YYYY-MM-DD HH:mm')
-                        : '不限'} ~{' '}
-                      {pkg.end_at ? dayjs(pkg.end_at).format('YYYY-MM-DD HH:mm') : '不限'}
-                    </Paragraph>
-                  )}
-                  <Paragraph style={{ marginBottom: 8 }}>
-                    组合总价：<Text strong>¥{pkg.totalPrice.toFixed(2)}</Text>
-                  </Paragraph>
-                  <Space wrap style={{ marginBottom: 8 }}>
-                    {(pkg.items || []).map((s) => (
-                      <Tag key={s.id} color="green">
-                        {s.spu_name} / {s.sku_code} x{s.default_quantity}
-                      </Tag>
-                    ))}
-                  </Space>
-                </Card>
+                <div id={`pkg-card-${pkg.package_code}`}>
+                  <EntitlementPackageCard
+                    pkg={pkg}
+                    loading={submittingID === String(pkg.id)}
+                    onBuy={() => handleOneClickOrder(String(pkg.id), pkg)}
+                    onCopyShareLink={() => copyShareLink(pkg.package_code)}
+                  />
+                </div>
               </List.Item>
             )}
           />

@@ -6,6 +6,11 @@ export interface EntitlementPackageItem {
   sku_type: string;
   default_quantity: number;
   retail_price: number;
+  sku_status?: string;
+  spu_status?: string;
+  stock?: number;
+  line_purchasable?: boolean;
+  line_issue?: string;
 }
 
 export interface EntitlementPackage {
@@ -19,6 +24,14 @@ export interface EntitlementPackage {
   end_at?: string;
   is_featured: boolean;
   badge_text?: string;
+  category_code?: string;
+  badge_text_secondary?: string;
+  marketing_line?: string;
+  promo_label?: string;
+  promo_ends_at?: string;
+  /** 后端聚合：是否满足 SKU+SPU 在售且库存足够 */
+  purchasable?: boolean;
+  unavailable_reason?: string;
   items: EntitlementPackageItem[];
   created_at: string;
   updated_at: string;
@@ -29,3 +42,13 @@ export interface EntitlementPackageUserView extends EntitlementPackage {
   total_items: number;
   is_active: boolean;
 }
+
+/** 前台筛选 / 管理端下拉 */
+export const ENTITLEMENT_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'all', label: '全部' },
+  { value: 'general', label: '通用' },
+  { value: 'personal', label: '个人月包' },
+  { value: 'boost', label: '加油包' },
+  { value: 'team', label: '小团队' },
+  { value: 'enterprise', label: '企业' },
+];

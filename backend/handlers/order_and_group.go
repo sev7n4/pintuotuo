@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -97,7 +98,16 @@ func CreateOrder(c *gin.Context) {
 			&tokenAmount, &computePoints, &subscriptionPeriod, &validDays, &trialDurationDays,
 		)
 		if err != nil {
-			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+			if errors.Is(err, sql.ErrNoRows) {
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"ORDER_LINE_SKU_UNAVAILABLE",
+					"包含不可售或已下架的商品，请刷新页面后重试",
+					http.StatusBadRequest,
+					nil,
+				))
+				return
+			}
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 

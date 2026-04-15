@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Order, APIResponse, PaginatedResponse } from '@/types';
 import { orderService } from '@/services/order';
+import { getApiErrorMessage } from '@/utils/apiError';
 
 interface OrderState {
   orders: Order[];
@@ -63,9 +64,9 @@ export const useOrderStore = create<OrderState>((set) => ({
       set({ isLoading: false });
       return null;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '创建订单失败';
-      set({ error: message, isLoading: false });
-      throw error;
+      const msg = getApiErrorMessage(error);
+      set({ error: msg, isLoading: false });
+      throw new Error(msg);
     }
   },
 
