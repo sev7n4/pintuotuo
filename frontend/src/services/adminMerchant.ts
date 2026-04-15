@@ -42,6 +42,20 @@ export interface MerchantAuditLog {
   created_at: string;
 }
 
+export interface MerchantInvite {
+  id: number;
+  code: string;
+  max_uses: number;
+  used_count: number;
+  expires_at?: string;
+  revoked_at?: string;
+  note: string;
+  created_at: string;
+  status?: 'active' | 'revoked' | 'expired' | 'used_up' | string;
+  creator?: string;
+  register_url?: string;
+}
+
 export interface AuditLogListResponse {
   data: MerchantAuditLog[];
   total: number;
@@ -98,4 +112,17 @@ export const adminMerchantService = {
       `/admin/merchants/${merchantId}`,
       body
     ),
+
+  listMerchantInvites: (params?: { status?: string; keyword?: string; limit?: number }) =>
+    api.get<{ code: number; message: string; data: MerchantInvite[] }>('/admin/merchant-invites', { params }),
+
+  createMerchantInvite: (body: { max_uses: number; expires_in?: string; note?: string }) =>
+    api.post<{
+      code: number;
+      message: string;
+      data: { id: number; code: string; max_uses: number; expires_at?: string; note: string; register_url: string };
+    }>('/admin/merchant-invites', body),
+
+  revokeMerchantInvite: (id: number, reason?: string) =>
+    api.post<{ code: number; message: string }>(`/admin/merchant-invites/${id}/revoke`, { reason: reason ?? '' }),
 };

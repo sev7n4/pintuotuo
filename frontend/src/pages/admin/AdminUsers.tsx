@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Table, Card, Tag, Space, Button, Modal, Form, Input, message } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Table, Card, Tag, Space, Button, Modal, Form, Input, message, Select } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -15,6 +15,8 @@ const AdminUsers: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [keyword, setKeyword] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -64,12 +66,22 @@ const AdminUsers: React.FC = () => {
     }
   };
 
+  const filteredUsers = useMemo(() => {
+    const text = keyword.trim().toLowerCase();
+    return users.filter((u) => {
+      if (roleFilter && u.role !== roleFilter) return false;
+      if (!text) return true;
+      return [u.email, u.name, u.role, `${u.id}`].join(' ').toLowerCase().includes(text);
+    });
+  }, [users, roleFilter, keyword]);
+
   const columns: ColumnsType<User> = [
     {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
       width: 80,
+      fixed: 'left',
     },
     {
       title: '邮箱',
@@ -103,6 +115,8 @@ const AdminUsers: React.FC = () => {
       title: '注册时间',
       dataIndex: 'created_at',
       key: 'created_at',
+      width: 170,
+      responsive: ['md'],
       render: (date: string) => new Date(date).toLocaleString('zh-CN'),
     },
   ];
@@ -117,13 +131,44 @@ const AdminUsers: React.FC = () => {
           </Button>
         }
       >
-        <Table
-          columns={columns}
-          dataSource={users}
-          rowKey="id"
-          loading={loading}
-          pagination={{ pageSize: 10 }}
-        />
+        <Space wrap style={{ marginBottom: 16, width: '100%' }}>
+          <Select
+            style={{ width: 140 }}
+            allowClear
+            placeholder="角色筛选"
+            value={roleFilter || undefined}
+            options={[
+              { value: 'admin', label: '管理员' },
+              { value: 'merchant', label: '商户' },
+              { value: 'user', label: '用户' },
+            ]}
+            onChange={(v) => setRoleFilter(v ?? '')}
+          />
+          <Input.Search
+            style={{ width: 300, maxWidth: '100%' }}
+            allowClear
+            placeholder="关键词（邮箱/用户名/ID）"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+          />
+          <Button
+            onClick={() => {
+              setRoleFilter('');
+              setKeyword('');
+            }}
+          >
+            重置
+          </Button>
+        </Space>
+        <div style={{ overflowX: 'auto' }}>
+          <Table
+            columns={columns}
+            dataSource={filteredUsers}
+            rowKey="id"
+            loading={loading}
+            pagination={{ pageSize: 10, showSizeChanger: false, showTotal: (total) => `共 ${total} 条` }}
+          />
+        </div>
       </Card>
 
       <Modal

@@ -33,6 +33,7 @@ import {
   MERCHANT_BUSINESS_CATEGORY_OPTIONS,
   labelForBusinessCategory,
 } from '@/services/adminMerchant';
+import InviteManagementPanel from '@/components/admin/InviteManagementPanel';
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -88,6 +89,8 @@ const AdminMerchants = () => {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditPagination, setAuditPagination] = useState({ current: 1, pageSize: 20, total: 0 });
   const [auditActionFilter, setAuditActionFilter] = useState<string>('');
+  const [auditKeyword, setAuditKeyword] = useState('');
+  const [auditMerchantID, setAuditMerchantID] = useState<string>('');
 
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedMerchant, setSelectedMerchant] = useState<PendingMerchant | null>(null);
@@ -148,12 +151,29 @@ const AdminMerchants = () => {
         page,
         per_page: auditPagination.pageSize,
         action: auditActionFilter || undefined,
+        merchant_id: auditMerchantID ? Number(auditMerchantID) : undefined,
       });
-      setAuditLogs(response.data.data);
+      const raw = response.data.data || [];
+      const keyword = auditKeyword.trim().toLowerCase();
+      const filtered = keyword
+        ? raw.filter((item) => {
+            const text = [
+              item.admin_email || '',
+              item.reason || '',
+              item.company_name_snapshot || '',
+              item.action || '',
+              `${item.merchant_id ?? ''}`,
+            ]
+              .join(' ')
+              .toLowerCase();
+            return text.includes(keyword);
+          })
+        : raw;
+      setAuditLogs(filtered);
       setAuditPagination((p) => ({
         ...p,
         current: page,
-        total: response.data.total,
+        total: keyword ? filtered.length : response.data.total,
       }));
     } catch {
       message.error('获取审核记录失败');
@@ -178,7 +198,7 @@ const AdminMerchants = () => {
     if (activeTab === 'audit') {
       fetchAuditLogs(1);
     }
-  }, [activeTab, auditActionFilter]);
+  }, [activeTab, auditActionFilter, auditMerchantID]);
 
   const handleApprove = (merchant: PendingMerchant) => {
     Modal.confirm({
@@ -377,8 +397,8 @@ const AdminMerchants = () => {
   ];
 
   const auditColumns: ColumnsType<MerchantAuditLog> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
-    { title: '商户ID', dataIndex: 'merchant_id', key: 'merchant_id', width: 90 },
+    { title: 'ID', dataIndex: 'id', key: 'id', width: 70, fixed: 'left' },
+    { title: '商户ID', dataIndex: 'merchant_id', key: 'merchant_id', width: 90, fixed: 'left' },
     {
       title: '操作',
       dataIndex: 'action',
@@ -390,6 +410,7 @@ const AdminMerchants = () => {
       title: '公司(快照)',
       dataIndex: 'company_name_snapshot',
       key: 'company_name_snapshot',
+      width: 180,
       ellipsis: true,
     },
     {
@@ -403,6 +424,7 @@ const AdminMerchants = () => {
       title: '操作人',
       key: 'admin',
       width: 180,
+      responsive: ['md'],
       render: (_: unknown, r: MerchantAuditLog) =>
         r.admin_email || (r.admin_user_id ? `#${r.admin_user_id}` : '-'),
     },
@@ -411,6 +433,7 @@ const AdminMerchants = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 160,
+      responsive: ['md'],
       render: (d: string) => formatDate(d),
     },
   ];
@@ -516,12 +539,11 @@ const AdminMerchants = () => {
               label: '审核记录',
               children: (
                 <>
-                  <Space style={{ marginBottom: 16 }}>
-                    <span>操作类型：</span>
+                  <Space wrap style={{ marginBottom: 16, width: '100%' }}>
                     <Select
                       style={{ width: 140 }}
                       allowClear
-                      placeholder="全部"
+                      placeholder="操作类型"
                       value={auditActionFilter || undefined}
                       options={[
                         { value: 'approve', label: '通过' },
@@ -530,6 +552,33 @@ const AdminMerchants = () => {
                       ]}
                       onChange={(v) => setAuditActionFilter(v ?? '')}
                     />
+                    <Input
+                      style={{ width: 140 }}
+                      placeholder="商户ID"
+                      value={auditMerchantID}
+                      onChange={(e) => setAuditMerchantID(e.target.value.replace(/[^\d]/g, ''))}
+                    />
+                    <Input.Search
+                      style={{ width: 260, maxWidth: '100%' }}
+                      allowClear
+                      placeholder="关键词（公司/原因/操作人）"
+                      value={auditKeyword}
+                      onChange={(e) => setAuditKeyword(e.target.value)}
+                      onSearch={() => fetchAuditLogs(1)}
+                    />
+                    <Button type="primary" onClick={() => fetchAuditLogs(1)}>
+                      查询
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setAuditActionFilter('');
+                        setAuditMerchantID('');
+                        setAuditKeyword('');
+                        fetchAuditLogs(1);
+                      }}
+                    >
+                      重置
+                    </Button>
                   </Space>
                   <Table
                     columns={auditColumns}
@@ -546,6 +595,11 @@ const AdminMerchants = () => {
                   />
                 </>
               ),
+            },
+            {
+              key: 'invites',
+              label: '邀请管理',
+              children: <InviteManagementPanel visible={activeTab === 'invites'} />,
             },
           ]}
         />

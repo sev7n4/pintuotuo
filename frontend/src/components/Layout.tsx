@@ -218,7 +218,6 @@ export default function Layout() {
           ) : (
             <Space>
               <Link to="/login">登录</Link>
-              <Link to="/register">注册</Link>
             </Space>
           )}
         </div>

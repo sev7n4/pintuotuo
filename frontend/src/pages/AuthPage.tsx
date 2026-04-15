@@ -7,7 +7,6 @@ import {
   message,
   Modal,
   Checkbox,
-  Alert,
   Divider,
   Typography,
   Space,
@@ -250,16 +249,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
   return (
     <div className={styles.authPage}>
       <Card className={`${styles.authCard} auth-card`} title={cardTitle}>
-        {isRegisterRoute && (
-          <Alert
-            type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
-            message="账号体系已升级"
-            description="已切换为无感注册：手机号验证码或邮箱魔法链接首次通过即自动创建账号。"
-          />
-        )}
-
         <Segmented
           block
           value={primaryLogin}
@@ -289,16 +278,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
             style={{ marginBottom: 16 }}
           />
         )}
-        {isRegisterRoute && primaryLogin === 'email' && !canShowMerchantRegister && (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-            message="商户入驻仅支持邀请制"
-            description="请使用运营提供的邀请链接（含 invite 参数）打开本页后再选择「商户入驻」，或联系平台获取二维码。"
-          />
-        )}
-
         {primaryLogin === 'email' ? (
           <>
             <Form
@@ -318,9 +297,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
               >
                 <Input placeholder="example@email.com" />
               </Form.Item>
-              <Form.Item
-                label={isRegisterRoute ? '密码' : '密码（仅曾用邮箱注册的账号）'}
-                name="password"
+              <Form.Item label="密码" name="password"
                 rules={
                   isRegisterRoute
                     ? [
@@ -379,7 +356,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
               type="secondary"
               style={{ marginTop: 10, marginBottom: 0, fontSize: 12 }}
             >
-              邮箱魔法链接开启后，首次验证通过会自动创建账号并登录；未开启时可继续使用上方邮箱密码登录。手机登录请切换到「手机登录」。
+              可使用邮箱密码或手机验证码登录。若开启邮箱魔法链接，也可一键登录。
             </Typography.Paragraph>
           </>
         ) : (
@@ -393,7 +370,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
 
         {!isRegisterRoute ? (
           <Typography.Paragraph style={{ marginTop: 16, marginBottom: 0, textAlign: 'center' }}>
-            <Link to="/register">创建新账户</Link>
+            首次使用可通过手机号验证码或邮箱魔法链接直接登录
           </Typography.Paragraph>
         ) : (
           <Typography.Paragraph style={{ marginTop: 16, marginBottom: 0, textAlign: 'center' }}>
@@ -402,13 +379,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
         )}
 
         <Divider plain>
-          <Typography.Text type="secondary">更多方式（需服务端配置）</Typography.Text>
+          <Typography.Text type="secondary">其他登录方式</Typography.Text>
         </Divider>
         <Space direction="vertical" style={{ width: '100%' }} size="small">
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 8, fontSize: 12 }}>
-            邮箱魔法链接、微信扫码、GitHub
-            与账号绑定由后端开关控制。手机号验证码请切换到「手机登录」（未开启时会说明如何配置）。
-          </Typography.Paragraph>
           <Space wrap>
             <Button
               icon={<WechatOutlined />}
@@ -417,7 +390,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
                 if (capabilities?.wechat_oauth)
                   window.location.assign('/api/v1/users/oauth/wechat/start');
               }}
-              title={capabilities?.wechat_oauth ? '微信 OAuth' : '未配置 WECHAT_OPEN_APP_ID'}
+              title={capabilities?.wechat_oauth ? '微信登录' : '当前暂不可用'}
             >
               微信登录
             </Button>
@@ -428,16 +401,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
                 if (capabilities?.github_oauth)
                   window.location.assign('/api/v1/users/oauth/github/start');
               }}
-              title={capabilities?.github_oauth ? 'GitHub OAuth' : '未配置 GITHUB_OAUTH_CLIENT_ID'}
+              title={capabilities?.github_oauth ? 'GitHub 登录' : '当前暂不可用'}
             >
               GitHub
             </Button>
           </Space>
-          {capabilities?.account_linking && (
-            <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
-              账号绑定（邮箱 / 微信 / GitHub）已在服务端开启，请前往「个人资料」关联。
-            </Typography.Paragraph>
-          )}
         </Space>
       </Card>
     </div>

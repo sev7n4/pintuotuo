@@ -64,7 +64,6 @@ describe('RegisterPage Component', () => {
     );
 
     expect(screen.getByText('拼脱脱 - 登录 / 注册')).toBeInTheDocument();
-    expect(screen.getByText('账号体系已升级')).toBeInTheDocument();
     expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
     expect(screen.getByLabelText('密码')).toBeInTheDocument();
     await waitFor(() => {

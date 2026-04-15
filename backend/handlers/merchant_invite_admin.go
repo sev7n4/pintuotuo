@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,10 @@ type createMerchantInviteBody struct {
 	MaxUses   int    `json:"max_uses"`
 	ExpiresIn string `json:"expires_in"` // 如 720h、168h，空表示不过期
 	Note      string `json:"note"`
+}
+
+type revokeMerchantInviteBody struct {
+	Reason string `json:"reason"`
 }
 
 // CreateMerchantInvite POST /admin/merchant-invites
@@ -126,12 +131,44 @@ func ListMerchantInvites(c *gin.Context) {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	rows, err := db.Query(`
-		SELECT id, code, max_uses, used_count, expires_at, revoked_at, COALESCE(note,''), created_at
-		FROM merchant_invites
-		ORDER BY id DESC
-		LIMIT 100
-	`)
+	statusFilter := strings.TrimSpace(c.Query("status"))
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	limit := 100
+	if v := strings.TrimSpace(c.Query("limit")); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 && parsed <= 300 {
+			limit = parsed
+		}
+	}
+	where := []string{"1=1"}
+	args := []interface{}{}
+	argN := 1
+	if keyword != "" {
+		where = append(where, "(i.code ILIKE $"+strconv.Itoa(argN)+" OR COALESCE(i.note,'') ILIKE $"+strconv.Itoa(argN)+" OR COALESCE(u.email,'') ILIKE $"+strconv.Itoa(argN)+")")
+		args = append(args, "%"+keyword+"%")
+		argN++
+	}
+	if statusFilter == "active" {
+		where = append(where, "i.revoked_at IS NULL", "(i.expires_at IS NULL OR i.expires_at > NOW())", "i.used_count < i.max_uses")
+	}
+	if statusFilter == "revoked" {
+		where = append(where, "i.revoked_at IS NOT NULL")
+	}
+	if statusFilter == "expired" {
+		where = append(where, "i.revoked_at IS NULL", "i.expires_at IS NOT NULL", "i.expires_at <= NOW()")
+	}
+	if statusFilter == "used_up" {
+		where = append(where, "i.used_count >= i.max_uses")
+	}
+
+	args = append(args, limit)
+	q := `
+		SELECT i.id, i.code, i.max_uses, i.used_count, i.expires_at, i.revoked_at, COALESCE(i.note,''), i.created_at, i.created_by_user_id, COALESCE(u.email,'')
+		FROM merchant_invites i
+		LEFT JOIN users u ON u.id = i.created_by_user_id
+		WHERE ` + strings.Join(where, " AND ") + `
+		ORDER BY i.id DESC
+		LIMIT $` + strconv.Itoa(argN)
+	rows, err := db.Query(q, args...)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
@@ -146,12 +183,21 @@ func ListMerchantInvites(c *gin.Context) {
 		RevokedAt *time.Time `json:"revoked_at,omitempty"`
 		Note      string     `json:"note"`
 		CreatedAt time.Time  `json:"created_at"`
+		Status    string     `json:"status"`
+		Creator   string     `json:"creator,omitempty"`
+		Register  string     `json:"register_url,omitempty"`
+	}
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_APP_BASE_URL")), "/")
+	if base == "" {
+		base = strings.TrimRight(strings.TrimSpace(os.Getenv("FRONTEND_ORIGIN")), "/")
 	}
 	var list []inviteRow
 	for rows.Next() {
 		var r inviteRow
 		var exp, rev sql.NullTime
-		if err := rows.Scan(&r.ID, &r.Code, &r.MaxUses, &r.UsedCount, &exp, &rev, &r.Note, &r.CreatedAt); err != nil {
+		var createdBy sql.NullInt64
+		var creatorEmail string
+		if err := rows.Scan(&r.ID, &r.Code, &r.MaxUses, &r.UsedCount, &exp, &rev, &r.Note, &r.CreatedAt, &createdBy, &creatorEmail); err != nil {
 			continue
 		}
 		if exp.Valid {
@@ -162,10 +208,70 @@ func ListMerchantInvites(c *gin.Context) {
 			t := rev.Time
 			r.RevokedAt = &t
 		}
+		if creatorEmail != "" {
+			r.Creator = creatorEmail
+		}
+		r.Status = inviteStatus(r.RevokedAt, r.ExpiresAt, r.UsedCount, r.MaxUses)
+		if base != "" {
+			r.Register = base + "/register?invite=" + r.Code
+		}
 		list = append(list, r)
 	}
 	if list == nil {
 		list = []inviteRow{}
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success", "data": list})
+}
+
+func inviteStatus(revokedAt *time.Time, expiresAt *time.Time, usedCount, maxUses int) string {
+	if revokedAt != nil {
+		return "revoked"
+	}
+	if expiresAt != nil && time.Now().After(*expiresAt) {
+		return "expired"
+	}
+	if usedCount >= maxUses {
+		return "used_up"
+	}
+	return "active"
+}
+
+// RevokeMerchantInvite POST /admin/merchant-invites/:id/revoke
+func RevokeMerchantInvite(c *gin.Context) {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != roleAdmin {
+		middleware.RespondWithError(c, apperrors.NewAppError("FORBIDDEN", "Admin access required", http.StatusForbidden, nil))
+		return
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+	inviteID, err := strconv.Atoi(id)
+	if err != nil || inviteID <= 0 {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+	var body revokeMerchantInviteBody
+	_ = c.ShouldBindJSON(&body)
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	res, err := db.Exec(`UPDATE merchant_invites SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP) WHERE id = $1`, inviteID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
+		middleware.RespondWithError(c, apperrors.NewAppError("NOT_FOUND", "invite not found", http.StatusNotFound, nil))
+		return
+	}
+	adminID, _ := adminActorID(c)
+	_ = services.InsertPlatformAuditLog(db, "merchant_invite", inviteID, "revoke", adminID, c, map[string]interface{}{"reason": strings.TrimSpace(body.Reason)})
+	c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success"})
 }
