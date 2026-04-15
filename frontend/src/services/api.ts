@@ -29,10 +29,17 @@ instance.interceptors.response.use(
   (error: AxiosError) => {
     console.error('API Error:', error.message, error.config?.url);
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('remember_me');
-      sessionStorage.removeItem('auth_token');
-      window.location.href = '/login';
+      const url = String(error.config?.url ?? '');
+      const isAuthLogin =
+        url.includes('/users/login') ||
+        url.includes('/users/sms/login') ||
+        url.includes('/email/magic/verify');
+      if (!isAuthLogin) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('remember_me');
+        sessionStorage.removeItem('auth_token');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

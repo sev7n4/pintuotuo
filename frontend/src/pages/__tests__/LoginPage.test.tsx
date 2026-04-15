@@ -28,6 +28,8 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
         wechat_oauth: false,
         github_oauth: false,
         account_linking: false,
+        merchant_register_mode: 'invite_only',
+        admin_mfa_required: false,
       }),
     });
   });
@@ -92,7 +94,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', true);
+        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', true, undefined);
       });
     });
 
@@ -153,7 +155,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('merchant@example.com', 'password123', true);
+        expect(mockLogin).toHaveBeenCalledWith('merchant@example.com', 'password123', true, undefined);
       });
     });
 
@@ -214,7 +216,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('admin@example.com', 'password123', true);
+        expect(mockLogin).toHaveBeenCalledWith('admin@example.com', 'password123', true, undefined);
       });
     });
   });
@@ -360,7 +362,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('wrong@example.com', 'wrongpassword', true);
+        expect(mockLogin).toHaveBeenCalledWith('wrong@example.com', 'wrongpassword', true, undefined);
       });
     });
 
@@ -603,7 +605,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('wrong@example.com', 'wrongpassword', true);
+        expect(mockLogin).toHaveBeenCalledWith('wrong@example.com', 'wrongpassword', true, undefined);
       });
 
       await act(async () => {
@@ -613,7 +615,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('correct@example.com', 'correctpassword', true);
+        expect(mockLogin).toHaveBeenCalledWith('correct@example.com', 'correctpassword', true, undefined);
       });
     });
   });
@@ -672,7 +674,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', true);
+        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', true, undefined);
       });
     });
   });
@@ -751,7 +753,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', true);
+        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', true, undefined);
       });
     });
 
@@ -800,7 +802,7 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', false);
+        expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', false, undefined);
       });
     });
   });

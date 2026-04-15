@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isAxiosError } from 'axios';
 import { User, APIResponse } from '@/types';
 import { authService } from '@/services/auth';
 import { userService } from '@/services/user';
@@ -16,10 +17,16 @@ export interface AuthState {
   isAuthenticated: boolean;
   rememberMe: boolean;
 
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  register: (email: string, password: string, role?: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean, totpCode?: string) => Promise<void>;
+  register: (email: string, password: string, role?: string, inviteCode?: string) => Promise<void>;
   loginWithSms: (phone: string, code: string) => Promise<void>;
-  registerWithSms: (phone: string, code: string, password: string, role?: string) => Promise<void>;
+  registerWithSms: (
+    phone: string,
+    code: string,
+    password: string,
+    role?: string,
+    inviteCode?: string
+  ) => Promise<void>;
   sendSmsCode: (phone: string) => Promise<{ message?: string; debug_code?: string } | undefined>;
   sendEmailMagicLink?: (
     email: string
@@ -43,10 +50,14 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: !!getTokenFromStorage(),
   rememberMe: localStorage.getItem('remember_me') === 'true',
 
-  login: async (email, password, rememberMe = false) => {
+  login: async (email, password, rememberMe = false, totpCode) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await authService.login({ email, password });
+      const response = await authService.login({
+        email,
+        password,
+        totp_code: totpCode || undefined,
+      });
       const apiResponse = response.data as APIResponse<LoginResponse>;
       const data = apiResponse.data;
       if (data) {
@@ -61,16 +72,27 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ user, token, isAuthenticated: true, isLoading: false, rememberMe });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '登录失败';
+      let message = '登录失败';
+      if (isAxiosError(error)) {
+        const d = error.response?.data as { message?: string } | undefined;
+        if (d?.message) message = d.message;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
       set({ error: message, isLoading: false });
       throw error;
     }
   },
 
-  register: async (email, password, role = 'user') => {
+  register: async (email, password, role = 'user', inviteCode) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await authService.register({ email, password, role });
+      const response = await authService.register({
+        email,
+        password,
+        role,
+        invite_code: inviteCode || undefined,
+      });
       const apiResponse = response.data as APIResponse<LoginResponse>;
       const data = apiResponse.data;
       if (data) {
@@ -105,10 +127,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  registerWithSms: async (phone, code, password, role = 'user') => {
+  registerWithSms: async (phone, code, password, role = 'user', inviteCode) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await authService.registerWithSms({ phone, code, password, role });
+      const response = await authService.registerWithSms({
+        phone,
+        code,
+        password,
+        role,
+        invite_code: inviteCode || undefined,
+      });
       const apiResponse = response.data as APIResponse<LoginResponse>;
       const data = apiResponse.data;
       if (data) {

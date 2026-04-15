@@ -137,6 +137,8 @@ describe('Page Navigation Integration Tests', () => {
           wechat_oauth: false,
           github_oauth: false,
           account_linking: false,
+          merchant_register_mode: 'open',
+          admin_mfa_required: false,
         }),
       });
     });
@@ -198,7 +200,7 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       await waitFor(() => {
-        expect(mockRegister).toHaveBeenCalledWith('cuser@example.com', 'password123', 'user');
+        expect(mockRegister).toHaveBeenCalledWith('cuser@example.com', 'password123', 'user', undefined);
       });
     });
 

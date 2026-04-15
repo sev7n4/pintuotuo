@@ -4,6 +4,7 @@ import { User, APIResponse } from '@/types';
 interface LoginRequest {
   email: string;
   password: string;
+  totp_code?: string;
 }
 
 interface LoginResponse {
@@ -15,6 +16,7 @@ interface RegisterRequest {
   email: string;
   password: string;
   role?: string;
+  invite_code?: string;
 }
 
 export const authService = {
@@ -31,8 +33,13 @@ export const authService = {
   sendEmailMagicLink: (email: string) =>
     api.post<{ message?: string; debug_link?: string }>('/users/email/magic/send', { email }),
 
-  registerWithSms: (data: { phone: string; code: string; password: string; role?: string }) =>
-    api.post<APIResponse<LoginResponse>>('/users/sms/register', data),
+  registerWithSms: (data: {
+    phone: string;
+    code: string;
+    password: string;
+    role?: string;
+    invite_code?: string;
+  }) => api.post<APIResponse<LoginResponse>>('/users/sms/register', data),
 
   loginWithSms: (phone: string, code: string) =>
     api.post<APIResponse<LoginResponse>>('/users/sms/login', { phone, code }),

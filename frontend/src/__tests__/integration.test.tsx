@@ -63,6 +63,8 @@ describe('Integration Tests', () => {
         wechat_oauth: false,
         github_oauth: false,
         account_linking: false,
+        merchant_register_mode: 'open',
+        admin_mfa_required: false,
       }),
     });
   });
@@ -137,8 +139,13 @@ describe('Integration Tests', () => {
       error: null,
       isAuthenticated,
       rememberMe: false,
-      login: async (email: string, password: string, _remember?: boolean) => {
-        const result = await mockLogin(email, password);
+      login: async (
+        email: string,
+        password: string,
+        rememberMe?: boolean,
+        totpCode?: string
+      ) => {
+        const result = await mockLogin(email, password, rememberMe, totpCode);
         isAuthenticated = true;
         return result;
       },
@@ -229,7 +236,7 @@ describe('Integration Tests', () => {
     });
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123');
+      expect(mockLogin).toHaveBeenCalledWith('user@example.com', 'password123', true, undefined);
     });
   });
 
@@ -299,7 +306,7 @@ describe('Integration Tests', () => {
     });
 
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledWith('newuser@example.com', 'password123', 'user');
+      expect(mockRegister).toHaveBeenCalledWith('newuser@example.com', 'password123', 'user', undefined);
     });
     expect(mockBindReferralCode).not.toHaveBeenCalled();
   });
@@ -1048,7 +1055,7 @@ describe('Integration Tests', () => {
     });
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123', true);
+      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123', true, undefined);
     });
   });
 

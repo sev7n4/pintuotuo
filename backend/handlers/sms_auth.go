@@ -19,6 +19,7 @@ import (
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/services"
 )
 
 var phoneCN = regexp.MustCompile(`^1[3-9]\d{9}$`)
@@ -114,10 +115,11 @@ func SendSMSCode(c *gin.Context) {
 }
 
 type smsRegisterBody struct {
-	Phone    string `json:"phone" binding:"required"`
-	Code     string `json:"code" binding:"required"`
-	Password string `json:"password" binding:"required,min=6"`
-	Role     string `json:"role"`
+	Phone      string `json:"phone" binding:"required"`
+	Code       string `json:"code" binding:"required"`
+	Password   string `json:"password" binding:"required,min=6"`
+	Role       string `json:"role"`
+	InviteCode string `json:"invite_code"`
 }
 
 // RegisterWithSMS POST /users/sms/register — 验证短信后注册并登录（与邮箱注册一致返回 token）
@@ -165,15 +167,42 @@ func RegisterWithSMS(c *gin.Context) {
 		return
 	}
 
+	if strings.TrimSpace(req.Role) == roleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin_register_forbidden", "message": "不允许通过公开注册创建管理员账号"})
+		return
+	}
 	role := roleUser
 	if req.Role == roleMerchant {
 		role = roleMerchant
 	}
+	mode := merchantRegisterMode()
+	var inviteID *int
+
+	tx, err := db.Begin()
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if role == roleMerchant && merchantRegisterRequiresInvite(mode) {
+		id, err := services.ConsumeMerchantInviteTx(tx, req.InviteCode)
+		if err != nil {
+			if err == services.ErrInviteInvalid {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "MERCHANT_INVITE_INVALID", "message": "邀请码无效、已过期或已用尽"})
+				return
+			}
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		inviteID = &id
+	}
+
 	displayName := phone
 	hash := hashPassword(req.Password)
 
 	var user models.User
-	err := db.QueryRow(
+	err = tx.QueryRow(
 		`INSERT INTO users (email, name, password_hash, role, status, phone) VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING id, email, name, role, created_at, updated_at`,
 		email, displayName, hash, role, "active", phone,
@@ -189,12 +218,30 @@ func RegisterWithSMS(c *gin.Context) {
 	}
 	user.Phone = &phone
 
-	if _, err := db.Exec(`INSERT INTO tokens (user_id, balance) VALUES ($1, $2)`, user.ID, 0); err != nil {
+	if _, err := tx.Exec(`INSERT INTO tokens (user_id, balance) VALUES ($1, $2)`, user.ID, 0); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 	if role == roleMerchant {
-		_, _ = db.Exec(`INSERT INTO merchants (user_id, company_name, status) VALUES ($1, $2, $3)`, user.ID, displayName, "pending")
+		if inviteID != nil {
+			_, err = tx.Exec(
+				`INSERT INTO merchants (user_id, company_name, status, merchant_invite_id, lifecycle_status) VALUES ($1, $2, $3, $4, 'trial')`,
+				user.ID, displayName, "pending", *inviteID,
+			)
+		} else {
+			_, err = tx.Exec(
+				`INSERT INTO merchants (user_id, company_name, status, lifecycle_status) VALUES ($1, $2, $3, 'trial')`,
+				user.ID, displayName, "pending",
+			)
+		}
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
 	}
 
 	token := generateToken(user.ID, user.Email, user.Role)
