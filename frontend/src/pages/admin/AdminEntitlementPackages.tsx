@@ -19,9 +19,13 @@ import {
   Col,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
-import { entitlementPackageService } from '@/services/entitlementPackage';
+import {
+  entitlementPackageService,
+  type EntitlementPackageUpsertPayload,
+} from '@/services/entitlementPackage';
 import { skuService } from '@/services/sku';
 import type { EntitlementPackage } from '@/types/entitlementPackage';
+import { getApiErrorMessage } from '@/utils/apiError';
 import { ENTITLEMENT_CATEGORY_OPTIONS } from '@/types/entitlementPackage';
 import type { SKUWithSPU } from '@/types/sku';
 import dayjs from 'dayjs';
@@ -43,7 +47,12 @@ type FormValues = {
   marketing_line?: string;
   promo_label?: string;
   promo_ends_at?: dayjs.Dayjs;
-  items: Array<{ sku_id?: number; default_quantity: number }>;
+  items: Array<{
+    sku_id?: number;
+    default_quantity: number;
+    display_name?: string;
+    value_note?: string;
+  }>;
 };
 
 type PreviewContext = {
@@ -100,6 +109,8 @@ function buildDraftPackagePreview(v: FormValues, skuList: SKUWithSPU[]): Entitle
       sku_type: s?.sku_type ?? '',
       default_quantity: line.default_quantity,
       retail_price: s != null ? Number(s.retail_price) : 0,
+      display_name: line.display_name?.trim(),
+      value_note: line.value_note?.trim(),
     };
   });
   return {
@@ -189,6 +200,8 @@ export default function AdminEntitlementPackages() {
       items: (row.items || []).map((it) => ({
         sku_id: it.sku_id,
         default_quantity: it.default_quantity,
+        display_name: it.display_name,
+        value_note: it.value_note,
       })),
     });
     setOpen(true);
@@ -213,16 +226,28 @@ export default function AdminEntitlementPackages() {
         message.error('结束时间必须晚于开始时间');
         return;
       }
-      const payload = {
-        ...v,
+      const itemsPayload = (v.items || []).map((it) => ({
+        sku_id: Number(it.sku_id),
+        default_quantity: Math.max(1, Math.floor(Number(it.default_quantity ?? 1))),
+        display_name: (it.display_name || '').trim(),
+        value_note: (it.value_note || '').trim(),
+      }));
+      const payload: EntitlementPackageUpsertPayload = {
+        name: (v.name || '').trim(),
+        description: (v.description || '').trim(),
+        status: v.status,
+        sort_order: Number(v.sort_order ?? 0),
         start_at: v.start_at ? v.start_at.toISOString() : undefined,
         end_at: v.end_at ? v.end_at.toISOString() : undefined,
+        is_featured: !!v.is_featured,
+        badge_text: (v.badge_text || '').trim(),
         category_code: v.category_code || 'general',
+        badge_text_secondary: (v.badge_text_secondary || '').trim(),
+        marketing_line: (v.marketing_line || '').trim(),
+        promo_label: (v.promo_label || '').trim(),
         promo_ends_at: v.promo_ends_at ? v.promo_ends_at.toISOString() : undefined,
-        items: (v.items || []).map((it) => ({
-          sku_id: it.sku_id as number,
-          default_quantity: it.default_quantity,
-        })),
+        items: itemsPayload,
+        ...(!editing ? { package_code: (v.package_code || '').trim() } : {}),
       };
       if (editing) {
         await entitlementPackageService.updateAdmin(editing.id, payload);
@@ -233,8 +258,10 @@ export default function AdminEntitlementPackages() {
       }
       setOpen(false);
       loadData();
-    } catch {
-      // form validation or api error
+    } catch (e: unknown) {
+      const maybeForm = e as { errorFields?: unknown };
+      if (maybeForm?.errorFields) return;
+      message.error(getApiErrorMessage(e, '保存失败'));
     }
   };
 
@@ -546,6 +573,28 @@ export default function AdminEntitlementPackages() {
                             <InputNumber min={1} precision={0} style={{ width: '100%' }} />
                           </Form.Item>
                         </Col>
+                        <Col span={24}>
+                          <Form.Item
+                            name={[f.name, 'display_name']}
+                            label="对用户展示名称（可选）"
+                            tooltip="填写后将优先于 SPU 名称展示，可弱化技术向命名"
+                          >
+                            <Input placeholder="留空则使用 SPU 名称" allowClear />
+                          </Form.Item>
+                        </Col>
+                        <Col span={24}>
+                          <Form.Item
+                            name={[f.name, 'value_note']}
+                            label="单项价值说明（可选）"
+                            tooltip="留空时前台展示为「单价 × 数量」推算金额"
+                          >
+                            <Input.TextArea
+                              rows={2}
+                              placeholder="如：含 30 天 Pro 订阅；或按月折算更划算等"
+                              allowClear
+                            />
+                          </Form.Item>
+                        </Col>
                       </Row>
                     </Card>
                   ))}
@@ -635,7 +684,7 @@ export default function AdminEntitlementPackages() {
               <Space wrap>
                 {(previewPkg.items || []).map((it) => (
                   <Tag key={`${it.sku_id}-${it.id}`} color="green">
-                    {it.spu_name} / {it.sku_code} ×{it.default_quantity}
+                    {(it.display_name?.trim() || it.spu_name) || it.sku_code} ×{it.default_quantity}
                   </Tag>
                 ))}
               </Space>

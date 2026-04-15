@@ -6,6 +6,10 @@ export interface EntitlementPackageItem {
   sku_type: string;
   default_quantity: number;
   retail_price: number;
+  /** 运营配置：对用户展示的短名称，可覆盖敏感/技术向 SPU 名 */
+  display_name?: string;
+  /** 运营配置：单项价值说明 */
+  value_note?: string;
   sku_status?: string;
   spu_status?: string;
   stock?: number;

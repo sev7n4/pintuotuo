@@ -1,9 +1,35 @@
-import { Button, Card, Space, Tag, Typography } from 'antd';
+import { Button, Card, Collapse, Space, Tag, Typography } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
-import type { EntitlementPackage } from '@/types/entitlementPackage';
+import type { EntitlementPackage, EntitlementPackageItem } from '@/types/entitlementPackage';
 import dayjs from 'dayjs';
+import styles from './EntitlementPackageCard.module.css';
 
 const { Paragraph, Text } = Typography;
+
+function skuTypeLabel(skuType: string): string {
+  const m: Record<string, string> = {
+    subscription: '订阅',
+    token_pack: 'Token',
+    trial: '试用',
+    concurrent: '并发',
+  };
+  return m[skuType] || skuType || '—';
+}
+
+function lineDisplayName(it: EntitlementPackageItem): string {
+  const d = it.display_name?.trim();
+  if (d) return d;
+  return it.spu_name || it.sku_code || '—';
+}
+
+function lineValueHint(it: EntitlementPackageItem): string {
+  const note = it.value_note?.trim();
+  if (note) return note;
+  const unit = Number(it.retail_price || 0);
+  const q = Number(it.default_quantity || 1);
+  const sub = unit * q;
+  return `单价 ¥${unit.toFixed(2)} × ${q} = ¥${sub.toFixed(2)}`;
+}
 
 type Props = {
   pkg: EntitlementPackage & { totalPrice: number };
@@ -77,14 +103,54 @@ export function EntitlementPackageCard({ pkg, loading, onBuy, onCopyShareLink }:
           </Button>
         </Paragraph>
       ) : null}
-      <Space wrap style={{ marginBottom: 4 }}>
-        {(pkg.items || []).map((s) => (
-          <Tag key={s.id} color={s.line_purchasable === false ? 'error' : 'green'}>
-            {s.spu_name} / {s.sku_code} ×{s.default_quantity}
-            {s.line_issue ? `（${s.line_issue}）` : ''}
-          </Tag>
-        ))}
-      </Space>
+      <Collapse
+        bordered={false}
+        className={styles.collapse}
+        defaultActiveKey={[]}
+        items={[
+          {
+            key: 'lines',
+            label: (
+              <Text type="secondary">
+                包内明细（{pkg.items?.length ?? 0} 项）<Text strong>点击展开</Text>
+              </Text>
+            ),
+            children: (
+              <div>
+                {(pkg.items || []).map((it) => (
+                  <div key={it.id} className={styles.itemDetail}>
+                    <div className={styles.itemRow}>
+                      <div>
+                        <Text strong>{lineDisplayName(it)}</Text>
+                        <div className={styles.itemMeta}>
+                          类型：{skuTypeLabel(it.sku_type)} · 数量：{it.default_quantity}
+                          {it.sku_code ? (
+                            <>
+                              {' '}
+                              · 编码 <Text code>{it.sku_code}</Text>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+                      {it.line_purchasable === false ? (
+                        <Tag color="error">不可售</Tag>
+                      ) : (
+                        <Tag color="success">可售</Tag>
+                      )}
+                    </div>
+                    <Paragraph type="secondary" style={{ margin: '8px 0 0', fontSize: 13 }}>
+                      价值说明：{lineValueHint(it)}
+                      {it.line_issue ? (
+                        <Text type="danger"> （{it.line_issue}）</Text>
+                      ) : null}
+                    </Paragraph>
+                  </div>
+                ))}
+              </div>
+            ),
+          },
+        ]}
+      />
     </Card>
   );
 }
