@@ -272,11 +272,14 @@ func CreateOrder(c *gin.Context) {
 
 func loadOrderItems(db *sql.DB, orderID int) ([]models.OrderItem, error) {
 	rows, err := db.Query(
-		`SELECT id, order_id, sku_id, spu_id, quantity, unit_price, total_price,
-		        sku_type, token_amount, compute_points, fulfilled_at, pricing_version_id, created_at, updated_at
-		   FROM order_items
-		  WHERE order_id = $1
-		  ORDER BY id ASC`,
+		`SELECT oi.id, oi.order_id, oi.sku_id, oi.spu_id, oi.quantity, oi.unit_price, oi.total_price,
+		        oi.sku_type, COALESCE(sp.name, ''), COALESCE(s.sku_code, ''),
+		        oi.token_amount, oi.compute_points, oi.fulfilled_at, oi.pricing_version_id, oi.created_at, oi.updated_at
+		   FROM order_items oi
+		   LEFT JOIN spus sp ON oi.spu_id = sp.id
+		   LEFT JOIN skus s ON oi.sku_id = s.id
+		  WHERE oi.order_id = $1
+		  ORDER BY oi.id ASC`,
 		orderID,
 	)
 	if err != nil {
@@ -293,7 +296,8 @@ func loadOrderItems(db *sql.DB, orderID int) ([]models.OrderItem, error) {
 		var pricingVID sql.NullInt64
 		if scanErr := rows.Scan(
 			&item.ID, &item.OrderID, &item.SKUID, &item.SPUID, &item.Quantity, &item.UnitPrice, &item.TotalPrice,
-			&item.SKUType, &tokenAmount, &computePoints, &fulfilledAt, &pricingVID, &item.CreatedAt, &item.UpdatedAt,
+			&item.SKUType, &item.SPUName, &item.SKUCode,
+			&tokenAmount, &computePoints, &fulfilledAt, &pricingVID, &item.CreatedAt, &item.UpdatedAt,
 		); scanErr != nil {
 			return nil, scanErr
 		}
@@ -316,6 +320,36 @@ func loadOrderItems(db *sql.DB, orderID int) ([]models.OrderItem, error) {
 	}
 
 	return items, nil
+}
+
+func enrichOrderGroupStatus(db *sql.DB, o *models.Order) {
+	if o == nil || o.GroupID == nil {
+		return
+	}
+	gid, ok := groupIDToInt(o.GroupID)
+	if !ok || gid <= 0 {
+		return
+	}
+	var st sql.NullString
+	if err := db.QueryRow(`SELECT status FROM groups WHERE id = $1`, gid).Scan(&st); err == nil && st.Valid {
+		o.GroupStatus = st.String
+	}
+}
+
+func groupIDToInt(v interface{}) (int, bool) {
+	if v == nil {
+		return 0, false
+	}
+	switch x := v.(type) {
+	case int:
+		return x, true
+	case int64:
+		return int(x), true
+	case float64:
+		return int(x), true
+	default:
+		return 0, false
+	}
 }
 
 // ListOrders lists all orders for current user
@@ -348,8 +382,13 @@ func ListOrders(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		`SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, pricing_version_id, created_at, updated_at
-		 FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+		`SELECT o.id, o.user_id, o.product_id, o.group_id, o.quantity, o.unit_price, o.total_price, o.status, o.pricing_version_id, o.created_at, o.updated_at,
+		        g.status AS group_status
+		   FROM orders o
+		   LEFT JOIN groups g ON o.group_id = g.id
+		  WHERE o.user_id = $1
+		  ORDER BY o.created_at DESC
+		  LIMIT $2 OFFSET $3`,
 		userID, perPageNum, offset,
 	)
 	if err != nil {
@@ -363,7 +402,8 @@ func ListOrders(c *gin.Context) {
 		var o models.Order
 		var productID sql.NullInt64
 		var pricingVID sql.NullInt64
-		err := rows.Scan(&o.ID, &o.UserID, &productID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &pricingVID, &o.CreatedAt, &o.UpdatedAt)
+		var groupSt sql.NullString
+		err := rows.Scan(&o.ID, &o.UserID, &productID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &pricingVID, &o.CreatedAt, &o.UpdatedAt, &groupSt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -372,6 +412,9 @@ func ListOrders(c *gin.Context) {
 		if pricingVID.Valid {
 			v := int(pricingVID.Int64)
 			o.PricingVersionID = &v
+		}
+		if groupSt.Valid {
+			o.GroupStatus = groupSt.String
 		}
 		o.Items, err = loadOrderItems(db, o.ID)
 		if err != nil {
@@ -413,6 +456,10 @@ func GetOrderByID(c *gin.Context) {
 		var order models.Order
 		if err := json.Unmarshal([]byte(cachedOrder), &order); err == nil {
 			if order.UserID == userID.(int) {
+				db := config.GetDB()
+				if db != nil {
+					enrichOrderGroupStatus(db, &order)
+				}
 				c.JSON(http.StatusOK, gin.H{
 					"code":    0,
 					"message": "success",
@@ -432,10 +479,15 @@ func GetOrderByID(c *gin.Context) {
 	var order models.Order
 	var productID sql.NullInt64
 	var pricingVID sql.NullInt64
+	var groupSt sql.NullString
 	err := db.QueryRow(
-		`SELECT id, user_id, product_id, group_id, quantity, unit_price, total_price, status, pricing_version_id, created_at, updated_at
-		 FROM orders WHERE id = $1 AND user_id = $2`, id, userID,
-	).Scan(&order.ID, &order.UserID, &productID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &pricingVID, &order.CreatedAt, &order.UpdatedAt)
+		`SELECT o.id, o.user_id, o.product_id, o.group_id, o.quantity, o.unit_price, o.total_price, o.status, o.pricing_version_id, o.created_at, o.updated_at,
+		        g.status AS group_status
+		   FROM orders o
+		   LEFT JOIN groups g ON o.group_id = g.id
+		  WHERE o.id = $1 AND o.user_id = $2`,
+		id, userID,
+	).Scan(&order.ID, &order.UserID, &productID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &pricingVID, &order.CreatedAt, &order.UpdatedAt, &groupSt)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
@@ -445,6 +497,9 @@ func GetOrderByID(c *gin.Context) {
 	if pricingVID.Valid {
 		v := int(pricingVID.Int64)
 		order.PricingVersionID = &v
+	}
+	if groupSt.Valid {
+		order.GroupStatus = groupSt.String
 	}
 	order.Items, err = loadOrderItems(db, order.ID)
 	if err != nil {

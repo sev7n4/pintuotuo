@@ -37,17 +37,18 @@ type Product struct {
 
 // Order represents a user's order
 type Order struct {
-	ID         int         `json:"id"`
-	UserID     int         `json:"user_id"`
-	ProductID  *int        `json:"product_id,omitempty"` // NULL for SKU-only orders (migration 020)
-	SKUID      int         `json:"sku_id,omitempty"`
-	SPUID      int         `json:"spu_id,omitempty"`
-	GroupID    interface{} `json:"group_id"` // Can be NULL
-	Quantity   int         `json:"quantity"`
-	UnitPrice  float64     `json:"unit_price"`
-	TotalPrice float64     `json:"total_price"`
-	Status     string      `json:"status"` // pending, paid, completed, failed
-	Items      []OrderItem `json:"items,omitempty"`
+	ID          int         `json:"id"`
+	UserID      int         `json:"user_id"`
+	ProductID   *int        `json:"product_id,omitempty"` // NULL for SKU-only orders (migration 020)
+	SKUID       int         `json:"sku_id,omitempty"`
+	SPUID       int         `json:"spu_id,omitempty"`
+	GroupID     interface{} `json:"group_id"`               // Can be NULL
+	GroupStatus string      `json:"group_status,omitempty"` // from groups.status when group_id set
+	Quantity    int         `json:"quantity"`
+	UnitPrice   float64     `json:"unit_price"`
+	TotalPrice  float64     `json:"total_price"`
+	Status      string      `json:"status"` // pending, paid, completed, failed
+	Items       []OrderItem `json:"items,omitempty"`
 	// PricingVersionID binds retail usage pricing to order time; nil = legacy / not set (migration 045).
 	PricingVersionID *int      `json:"pricing_version_id,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
@@ -64,6 +65,8 @@ type OrderItem struct {
 	UnitPrice        float64   `json:"unit_price"`
 	TotalPrice       float64   `json:"total_price"`
 	SKUType          string    `json:"sku_type,omitempty"`
+	SPUName          string    `json:"spu_name,omitempty"`
+	SKUCode          string    `json:"sku_code,omitempty"`
 	TokenAmount      *int64    `json:"token_amount,omitempty"`
 	ComputePoints    *float64  `json:"compute_points,omitempty"`
 	FulfilledAt      time.Time `json:"fulfilled_at,omitempty"`

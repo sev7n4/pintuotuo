@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Table,
   Button,
@@ -18,11 +18,18 @@ import {
   Grid,
   List,
   Alert,
+  Collapse,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { FundOutlined, ReloadOutlined, TeamOutlined, ShoppingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '@stores/orderStore';
+import { getApiErrorMessage } from '@/utils/apiError';
+import {
+  canReorderFromOrder,
+  getOrderProductSummary,
+  orderItemLineTitle,
+} from '@/utils/orderSummary';
 import { useCartStore } from '@stores/cartStore';
 import { useProductStore } from '@stores/productStore';
 import type { Order } from '@/types';
@@ -66,7 +73,15 @@ const statusTabs = [
 
 export const OrderListPage: React.FC = () => {
   const navigate = useNavigate();
-  const { orders, isLoading, error, fetchOrders, cancelOrder, requestRefund } = useOrderStore();
+  const {
+    orders,
+    isLoading,
+    error,
+    fetchOrders,
+    cancelOrder,
+    requestRefund,
+    createOrder,
+  } = useOrderStore();
   const { addItem } = useCartStore();
   const { fetchProductByID } = useProductStore();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -140,38 +155,63 @@ export const OrderListPage: React.FC = () => {
     }
   };
 
-  const handleBuyAgain = async (order: Order) => {
-    try {
-      const skuIds = (order.items || []).map((item) => item.sku_id);
-      const fallbackSku = getPrimarySku(order);
-      const targets = skuIds.length > 0 ? skuIds : fallbackSku ? [fallbackSku] : [];
-      if (targets.length === 0) {
-        message.error('无法再次购买：订单缺少 SKU 信息');
+  const handleBuyAgain = useCallback(
+    async (order: Order) => {
+      try {
+        const skuIds = (order.items || []).map((item) => item.sku_id);
+        const fallbackSku = getPrimarySku(order);
+        const targets = skuIds.length > 0 ? skuIds : fallbackSku ? [fallbackSku] : [];
+        if (targets.length === 0) {
+          message.error('无法再次购买：订单缺少商品明细');
+          return;
+        }
+        for (const sku of targets) {
+          const product = await fetchProductByID(sku);
+          const qty = order.items?.find((item) => item.sku_id === sku)?.quantity || 1;
+          if (product) {
+            addItem(product, qty);
+          }
+        }
+        message.success('已加入购物车');
+        navigate('/cart');
+      } catch {
+        message.error('商品不存在或已下架');
+      }
+    },
+    [addItem, fetchProductByID, navigate]
+  );
+
+  const handleQuickReorder = useCallback(
+    async (order: Order) => {
+      const lines = order.items || [];
+      if (lines.length === 0) {
+        message.error('订单无明细，无法同配置下单');
         return;
       }
-      for (const sku of targets) {
-        const product = await fetchProductByID(sku);
-        const qty = order.items?.find((item) => item.sku_id === sku)?.quantity || 1;
-        if (product) {
-          addItem(product, qty);
+      try {
+        const newId = await createOrder(
+          lines.map((i) => ({ sku_id: i.sku_id, quantity: i.quantity }))
+        );
+        if (newId) {
+          message.success('已生成新订单');
+          navigate(`/payment/${newId}`);
         }
+      } catch (e) {
+        message.error(getApiErrorMessage(e, '下单失败'));
       }
-      message.success('已添加到购物车');
-      navigate('/cart');
-    } catch {
-      message.error('商品不存在或已下架');
-    }
-  };
+    },
+    [createOrder, navigate]
+  );
 
-  const openCancelModal = (order: Order) => {
+  const openCancelModal = useCallback((order: Order) => {
     setSelectedOrder(order);
     setCancelModalVisible(true);
-  };
+  }, []);
 
-  const openRefundModal = (order: Order) => {
+  const openRefundModal = useCallback((order: Order) => {
     setSelectedOrder(order);
     setRefundModalVisible(true);
-  };
+  }, []);
 
   const columns: ColumnsType<Order> = useMemo(
     () => [
@@ -186,10 +226,15 @@ export const OrderListPage: React.FC = () => {
       ...(screens.md
         ? [
             {
-              title: '产品ID',
-              dataIndex: 'product_id',
-              key: 'product_id',
-              width: 100,
+              title: '商品摘要',
+              key: 'summary',
+              width: 220,
+              ellipsis: true,
+              render: (_: unknown, record: Order) => (
+                <Text ellipsis title={getOrderProductSummary(record)}>
+                  {getOrderProductSummary(record)}
+                </Text>
+              ),
             },
           ]
         : []),
@@ -260,15 +305,20 @@ export const OrderListPage: React.FC = () => {
             >
               详情
             </Button>
-            {record.status === 'completed' && (
-              <Button
-                type="link"
-                size="small"
-                icon={<ReloadOutlined />}
-                onClick={() => handleBuyAgain(record)}
-              >
-                {!isMobile && '再次购买'}
-              </Button>
+            {canReorderFromOrder(record) && (
+              <>
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<ReloadOutlined />}
+                  onClick={() => handleBuyAgain(record)}
+                >
+                  {isMobile ? '加购' : '加入购物车'}
+                </Button>
+                <Button type="link" size="small" onClick={() => handleQuickReorder(record)}>
+                  {isMobile ? '再下一单' : '同配置下单'}
+                </Button>
+              </>
             )}
             {record.status === 'pending' && (
               <>
@@ -290,21 +340,29 @@ export const OrderListPage: React.FC = () => {
                 {!isMobile && '退款'}
               </Button>
             )}
-            {record.group_id && record.group_status === 'active' && (
+            {record.group_id && (
               <Button
                 type="link"
                 size="small"
                 icon={<TeamOutlined />}
                 onClick={() => navigate(`/groups/${record.group_id}`)}
               >
-                {!isMobile && '拼团'}
+                {isMobile ? '团' : '拼团详情'}
               </Button>
             )}
           </Space>
         ),
       },
     ],
-    [screens, isMobile, navigate]
+    [
+      screens,
+      isMobile,
+      navigate,
+      handleBuyAgain,
+      handleQuickReorder,
+      openCancelModal,
+      openRefundModal,
+    ]
   );
 
   if (error) {
@@ -352,7 +410,8 @@ export const OrderListPage: React.FC = () => {
           type="info"
           showIcon
           style={{ marginBottom: 12, borderRadius: 10 }}
-          message="订单支持多明细展示：一个订单可包含多个 SKU 条目，详情中可查看每个条目的数量与金额。"
+          message="多明细订单与复购"
+          description="列表「商品摘要」展示主商品名称；展开详情可查看每条规格、数量与金额。支持「加入购物车」或「同配置下单」快速复购。"
         />
 
         <Spin spinning={isLoading}>
@@ -373,11 +432,14 @@ export const OrderListPage: React.FC = () => {
                           <Text strong>订单 #{order.id}</Text>
                           <Text type="danger">¥{order.total_price.toFixed(2)}</Text>
                         </Space>
+                        <Text type="secondary" ellipsis style={{ maxWidth: '100%' }}>
+                          {getOrderProductSummary(order)}
+                        </Text>
                         <Space wrap>
                           <Tag color={s.color}>{s.label}</Tag>
                           {groupStatus && <Tag color={groupStatus.color}>{groupStatus.label}</Tag>}
-                          <Tag>商品 {order.items?.length || 1} 项</Tag>
-                          <Tag>数量 {getOrderItemCount(order)}</Tag>
+                          <Tag>{order.items?.length || 1} 项</Tag>
+                          <Tag>共 {getOrderItemCount(order)} 件</Tag>
                         </Space>
                         <Space wrap>
                           <Button
@@ -403,10 +465,15 @@ export const OrderListPage: React.FC = () => {
                               </Button>
                             </>
                           )}
-                          {order.status === 'completed' && (
-                            <Button size="small" onClick={() => handleBuyAgain(order)}>
-                              再次购买
-                            </Button>
+                          {canReorderFromOrder(order) && (
+                            <>
+                              <Button size="small" onClick={() => handleBuyAgain(order)}>
+                                加购
+                              </Button>
+                              <Button size="small" type="primary" onClick={() => handleQuickReorder(order)}>
+                                再下一单
+                              </Button>
+                            </>
                           )}
                         </Space>
                       </Space>
@@ -484,21 +551,39 @@ export const OrderListPage: React.FC = () => {
                 </>
               )}
             </Descriptions>
-            <Divider style={{ margin: '12px 0' }}>订单明细</Divider>
-            <List
-              size="small"
-              dataSource={selectedOrder.items || []}
-              locale={{ emptyText: <Text type="secondary">暂无明细</Text> }}
-              renderItem={(item) => (
-                <List.Item>
-                  <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-                    <Text>
-                      SKU #{item.sku_id} × {item.quantity}
-                    </Text>
-                    <Text>¥{item.total_price.toFixed(2)}</Text>
-                  </Space>
-                </List.Item>
-              )}
+            <Divider style={{ margin: '12px 0' }}>商品明细</Divider>
+            <Collapse
+              defaultActiveKey={['lines']}
+              items={[
+                {
+                  key: 'lines',
+                  label: `共 ${selectedOrder.items?.length || 0} 条明细（展开查看）`,
+                  children: (
+                    <List
+                      size="small"
+                      dataSource={selectedOrder.items || []}
+                      locale={{ emptyText: <Text type="secondary">暂无明细</Text> }}
+                      renderItem={(item) => (
+                        <List.Item>
+                          <Space
+                            direction="vertical"
+                            size={0}
+                            style={{ width: '100%' }}
+                          >
+                            <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                              <Text>{orderItemLineTitle(item)}</Text>
+                              <Text strong>¥{item.total_price.toFixed(2)}</Text>
+                            </Space>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              数量 {item.quantity} · 单价 ¥{item.unit_price.toFixed(2)}
+                            </Text>
+                          </Space>
+                        </List.Item>
+                      )}
+                    />
+                  ),
+                },
+              ]}
             />
           </>
         )}
