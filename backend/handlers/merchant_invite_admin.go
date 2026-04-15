@@ -27,6 +27,13 @@ type revokeMerchantInviteBody struct {
 	Reason string `json:"reason"`
 }
 
+const (
+	inviteStateActive  = "active"
+	inviteStateRevoked = "revoked"
+	inviteStateExpired = "expired"
+	inviteStateUsedUp  = "used_up"
+)
+
 // CreateMerchantInvite POST /admin/merchant-invites
 func CreateMerchantInvite(c *gin.Context) {
 	userRole, exists := c.Get("user_role")
@@ -147,16 +154,16 @@ func ListMerchantInvites(c *gin.Context) {
 		args = append(args, "%"+keyword+"%")
 		argN++
 	}
-	if statusFilter == "active" {
+	if statusFilter == inviteStateActive {
 		where = append(where, "i.revoked_at IS NULL", "(i.expires_at IS NULL OR i.expires_at > NOW())", "i.used_count < i.max_uses")
 	}
-	if statusFilter == "revoked" {
+	if statusFilter == inviteStateRevoked {
 		where = append(where, "i.revoked_at IS NOT NULL")
 	}
-	if statusFilter == "expired" {
+	if statusFilter == inviteStateExpired {
 		where = append(where, "i.revoked_at IS NULL", "i.expires_at IS NOT NULL", "i.expires_at <= NOW()")
 	}
-	if statusFilter == "used_up" {
+	if statusFilter == inviteStateUsedUp {
 		where = append(where, "i.used_count >= i.max_uses")
 	}
 
@@ -225,15 +232,15 @@ func ListMerchantInvites(c *gin.Context) {
 
 func inviteStatus(revokedAt *time.Time, expiresAt *time.Time, usedCount, maxUses int) string {
 	if revokedAt != nil {
-		return "revoked"
+		return inviteStateRevoked
 	}
 	if expiresAt != nil && time.Now().After(*expiresAt) {
-		return "expired"
+		return inviteStateExpired
 	}
 	if usedCount >= maxUses {
-		return "used_up"
+		return inviteStateUsedUp
 	}
-	return "active"
+	return inviteStateActive
 }
 
 // RevokeMerchantInvite POST /admin/merchant-invites/:id/revoke
