@@ -15,11 +15,14 @@ import {
   DatePicker,
   Alert,
   Typography,
+  Row,
+  Col,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
 import { entitlementPackageService } from '@/services/entitlementPackage';
 import { skuService } from '@/services/sku';
 import type { EntitlementPackage } from '@/types/entitlementPackage';
+import { ENTITLEMENT_CATEGORY_OPTIONS } from '@/types/entitlementPackage';
 import type { SKUWithSPU } from '@/types/sku';
 import dayjs from 'dayjs';
 
@@ -35,7 +38,12 @@ type FormValues = {
   end_at?: dayjs.Dayjs;
   is_featured?: boolean;
   badge_text?: string;
-  items: Array<{ sku_id: number; default_quantity: number }>;
+  category_code?: string;
+  badge_text_secondary?: string;
+  marketing_line?: string;
+  promo_label?: string;
+  promo_ends_at?: dayjs.Dayjs;
+  items: Array<{ sku_id?: number; default_quantity: number }>;
 };
 
 type PreviewContext = {
@@ -68,16 +76,25 @@ function collectPackagePreviewWarnings(pkg: EntitlementPackage): string[] {
       `已过下架时间（结束：${dayjs(pkg.end_at).format('YYYY-MM-DD HH:mm')}），用户端暂不展示。`
     );
   }
+  if (pkg.purchasable === false && pkg.unavailable_reason) {
+    w.push(`可售性：用户端将禁用下单 — ${pkg.unavailable_reason}`);
+  }
+  for (const it of pkg.items || []) {
+    if (it.line_purchasable === false && it.line_issue) {
+      w.push(`明细 ${it.sku_code}：${it.line_issue}`);
+    }
+  }
   return w;
 }
 
 function buildDraftPackagePreview(v: FormValues, skuList: SKUWithSPU[]): EntitlementPackage {
   const byId = new Map(skuList.map((s) => [s.id, s]));
   const items = (v.items || []).map((line, idx) => {
-    const s = byId.get(line.sku_id);
+    const skuID = Number(line.sku_id);
+    const s = byId.get(skuID);
     return {
       id: -(idx + 1),
-      sku_id: line.sku_id,
+      sku_id: skuID,
       sku_code: s?.sku_code ?? '—',
       spu_name: s?.spu_name ?? '（请选择有效 SKU）',
       sku_type: s?.sku_type ?? '',
@@ -94,9 +111,15 @@ function buildDraftPackagePreview(v: FormValues, skuList: SKUWithSPU[]): Entitle
     sort_order: v.sort_order ?? 0,
     is_featured: !!v.is_featured,
     badge_text: v.badge_text?.trim(),
+    category_code: v.category_code || 'general',
+    badge_text_secondary: v.badge_text_secondary?.trim(),
+    marketing_line: v.marketing_line?.trim(),
+    promo_label: v.promo_label?.trim(),
+    promo_ends_at: v.promo_ends_at?.toISOString(),
     start_at: v.start_at?.toISOString(),
     end_at: v.end_at?.toISOString(),
     items,
+    purchasable: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -118,7 +141,7 @@ export default function AdminEntitlementPackages() {
     try {
       const [pkgRes, skuRes] = await Promise.all([
         entitlementPackageService.listAdmin(),
-        skuService.getSKUs({ per_page: 200, scope: 'all' }),
+        skuService.getSKUs({ per_page: 500, scope: 'sellable' }),
       ]);
       setRows(pkgRes.data.data || []);
       setSkus(skuRes.data.data || []);
@@ -140,7 +163,8 @@ export default function AdminEntitlementPackages() {
       status: 'active',
       sort_order: 0,
       is_featured: false,
-      items: [{ sku_id: 0, default_quantity: 1 }],
+      category_code: 'general',
+      items: [{ default_quantity: 1 }],
     });
     setOpen(true);
   };
@@ -157,6 +181,11 @@ export default function AdminEntitlementPackages() {
       end_at: row.end_at ? dayjs(row.end_at) : undefined,
       is_featured: row.is_featured,
       badge_text: row.badge_text,
+      category_code: row.category_code || 'general',
+      badge_text_secondary: row.badge_text_secondary,
+      marketing_line: row.marketing_line,
+      promo_label: row.promo_label,
+      promo_ends_at: row.promo_ends_at ? dayjs(row.promo_ends_at) : undefined,
       items: (row.items || []).map((it) => ({
         sku_id: it.sku_id,
         default_quantity: it.default_quantity,
@@ -168,7 +197,13 @@ export default function AdminEntitlementPackages() {
   const submit = async () => {
     try {
       const v = await form.validateFields();
-      const skuIDs = (v.items || []).map((i) => i.sku_id);
+      for (const line of v.items || []) {
+        if (!line.sku_id || line.sku_id <= 0) {
+          message.error('请为每一行选择 SKU（仅展示 SKU 与所属 SPU 均在售的商品）');
+          return;
+        }
+      }
+      const skuIDs = (v.items || []).map((i) => i.sku_id as number);
       const dedup = new Set(skuIDs);
       if (dedup.size !== skuIDs.length) {
         message.error('同一权益包内不能重复选择同一个 SKU');
@@ -182,6 +217,12 @@ export default function AdminEntitlementPackages() {
         ...v,
         start_at: v.start_at ? v.start_at.toISOString() : undefined,
         end_at: v.end_at ? v.end_at.toISOString() : undefined,
+        category_code: v.category_code || 'general',
+        promo_ends_at: v.promo_ends_at ? v.promo_ends_at.toISOString() : undefined,
+        items: (v.items || []).map((it) => ({
+          sku_id: it.sku_id as number,
+          default_quantity: it.default_quantity,
+        })),
       };
       if (editing) {
         await entitlementPackageService.updateAdmin(editing.id, payload);
@@ -216,7 +257,13 @@ export default function AdminEntitlementPackages() {
   const openDraftPreview = async () => {
     try {
       const v = await form.validateFields();
-      const skuIDs = (v.items || []).map((i) => i.sku_id);
+      for (const line of v.items || []) {
+        if (!line.sku_id || line.sku_id <= 0) {
+          message.error('请为每一行选择 SKU');
+          return;
+        }
+      }
+      const skuIDs = (v.items || []).map((i) => i.sku_id as number);
       const dedup = new Set(skuIDs);
       if (dedup.size !== skuIDs.length) {
         message.error('同一权益包内不能重复选择同一个 SKU');
@@ -264,12 +311,24 @@ export default function AdminEntitlementPackages() {
             render: (_, r) => (
               <Space wrap>
                 {(r.items || []).map((it) => (
-                  <Tag key={it.id}>
+                  <Tag key={it.id} color={it.line_purchasable === false ? 'error' : 'default'}>
                     {it.sku_code} x{it.default_quantity}
+                    {it.line_issue ? ` (${it.line_issue})` : ''}
                   </Tag>
                 ))}
               </Space>
             ),
+          },
+          {
+            title: '可售',
+            key: 'sell',
+            width: 88,
+            render: (_, r) =>
+              r.purchasable === false ? (
+                <Tag color="error">异常</Tag>
+              ) : (
+                <Tag color="success">正常</Tag>
+              ),
           },
           {
             title: '状态',
@@ -326,7 +385,8 @@ export default function AdminEntitlementPackages() {
         title={editing ? '编辑权益包' : '新建权益包'}
         onCancel={() => setOpen(false)}
         onOk={submit}
-        width={860}
+        width="min(920px, 100%)"
+        styles={{ body: { maxHeight: 'min(85vh, 900px)', overflowY: 'auto' } }}
         footer={[
           <Button key="preview" icon={<EyeOutlined />} onClick={openDraftPreview}>
             预览用户端
@@ -344,94 +404,158 @@ export default function AdminEntitlementPackages() {
             type="info"
             showIcon
             style={{ marginBottom: 12 }}
-            message="配置建议：同一权益包内避免重复 SKU；可通过时间窗控制活动期，通过推荐/角标提升曝光。"
+            message="配置建议：SKU 下拉仅含「SKU 在售且所属 SPU 在售」；保存时会校验库存是否满足默认数量。"
           />
-          <Form.Item
-            name="package_code"
-            label="包编码"
-            rules={[{ required: !editing, message: '请输入包编码' }]}
-          >
-            <Input placeholder="如 P1_CODING" disabled={!!editing} />
-          </Form.Item>
-          <Form.Item
-            name="name"
-            label="包名称"
-            rules={[{ required: true, message: '请输入包名称' }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Space style={{ width: '100%' }} size={16}>
-            <Form.Item name="status" label="状态" rules={[{ required: true }]}>
-              <Select
-                style={{ width: 180 }}
-                options={[{ value: 'active' }, { value: 'inactive' }]}
-              />
-            </Form.Item>
-            <Form.Item name="sort_order" label="排序">
-              <InputNumber min={0} precision={0} />
-            </Form.Item>
-            <Form.Item name="is_featured" label="推荐位">
-              <Select
-                style={{ width: 140 }}
-                options={[
-                  { label: '否', value: false },
-                  { label: '是', value: true },
-                ]}
-              />
-            </Form.Item>
-          </Space>
-          <Space style={{ width: '100%' }} size={16}>
-            <Form.Item name="badge_text" label="角标文案">
-              <Input placeholder="如 限时特惠 / 新客推荐" />
-            </Form.Item>
-            <Form.Item name="start_at" label="开始时间">
-              <DatePicker showTime />
-            </Form.Item>
-            <Form.Item name="end_at" label="结束时间">
-              <DatePicker showTime />
-            </Form.Item>
-          </Space>
+          <Card size="small" title="基础信息" style={{ marginBottom: 12 }}>
+            <Row gutter={[16, 8]}>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="package_code"
+                  label="包编码"
+                  rules={[{ required: !editing, message: '请输入包编码' }]}
+                >
+                  <Input placeholder="如 P-CODING-001" disabled={!!editing} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="name"
+                  label="包名称"
+                  rules={[{ required: true, message: '请输入包名称' }]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="description" label="描述">
+                  <Input.TextArea rows={2} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item name="status" label="状态" rules={[{ required: true }]}>
+                  <Select options={[{ value: 'active' }, { value: 'inactive' }]} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item name="sort_order" label="排序">
+                  <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item name="is_featured" label="推荐位">
+                  <Select
+                    options={[
+                      { label: '否', value: false },
+                      { label: '是', value: true },
+                    ]}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="category_code" label="分类">
+                  <Select
+                    options={ENTITLEMENT_CATEGORY_OPTIONS.filter((o) => o.value !== 'all')}
+                    placeholder="选择分类"
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="marketing_line" label="一句话卖点（前台）">
+                  <Input placeholder="可选，展示在包卡片上" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
 
-          <Form.List name="items">
-            {(fields, { add, remove: removeField }) => (
-              <>
-                {fields.map((f) => (
-                  <Space key={f.key} align="baseline" style={{ display: 'flex', marginBottom: 8 }}>
-                    <Form.Item
-                      name={[f.name, 'sku_id']}
-                      rules={[{ required: true, message: '请选择SKU' }]}
-                      style={{ minWidth: 420 }}
+          <Card size="small" title="展示与活动" style={{ marginBottom: 12 }}>
+            <Row gutter={[16, 8]}>
+              <Col xs={24} md={8}>
+                <Form.Item name="badge_text" label="主角标">
+                  <Input placeholder="如 限时特惠" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="badge_text_secondary" label="次角标">
+                  <Input placeholder="如 赠算力" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="promo_label" label="活动标签（轻量）">
+                  <Input placeholder="如 限时立减（展示用）" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="start_at" label="定时上架（可选）">
+                  <DatePicker showTime style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="end_at" label="定时下架（可选）">
+                  <DatePicker showTime style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="promo_ends_at" label="活动结束时间（展示）">
+                  <DatePicker showTime style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card size="small" title="SKU 明细（可售池）">
+            <Form.List name="items">
+              {(fields, { add, remove: removeField }) => (
+                <>
+                  {fields.map((f) => (
+                    <Card
+                      key={f.key}
+                      size="small"
+                      type="inner"
+                      style={{ marginBottom: 8 }}
+                      title={`明细 #${f.name + 1}`}
+                      extra={
+                        <Button type="link" danger size="small" onClick={() => removeField(f.name)}>
+                          删除
+                        </Button>
+                      }
                     >
-                      <Select
-                        showSearch
-                        optionFilterProp="label"
-                        placeholder="选择SKU"
-                        options={skus.map((s) => ({
-                          value: s.id,
-                          label: `${s.sku_code} / ${s.spu_name}`,
-                        }))}
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      name={[f.name, 'default_quantity']}
-                      rules={[{ required: true, message: '数量' }]}
-                    >
-                      <InputNumber min={1} precision={0} />
-                    </Form.Item>
-                    <Button type="link" danger onClick={() => removeField(f.name)}>
-                      删除
-                    </Button>
-                  </Space>
-                ))}
-                <Button type="dashed" onClick={() => add({ sku_id: 0, default_quantity: 1 })}>
-                  添加SKU明细
-                </Button>
-              </>
-            )}
-          </Form.List>
+                      <Row gutter={[12, 8]}>
+                        <Col xs={24} md={16}>
+                          <Form.Item
+                            name={[f.name, 'sku_id']}
+                            label="SKU"
+                            rules={[{ required: true, message: '请选择 SKU' }]}
+                          >
+                            <Select
+                              showSearch
+                              optionFilterProp="label"
+                              placeholder="仅可选在售 SKU"
+                              options={skus.map((s) => ({
+                                value: s.id,
+                                label: `${s.sku_code} / ${s.spu_name} (¥${Number(s.retail_price).toFixed(2)})`,
+                              }))}
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={8}>
+                          <Form.Item
+                            name={[f.name, 'default_quantity']}
+                            label="数量"
+                            rules={[{ required: true, message: '数量' }]}
+                          >
+                            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                    </Card>
+                  ))}
+                  <Button type="dashed" block onClick={() => add({ default_quantity: 1 })}>
+                    添加 SKU 明细
+                  </Button>
+                </>
+              )}
+            </Form.List>
+          </Card>
         </Form>
       </Modal>
 
@@ -477,11 +601,13 @@ export default function AdminEntitlementPackages() {
               extra={
                 <Space size={4} wrap>
                   {previewPkg.is_featured ? <Tag color="gold">推荐</Tag> : null}
-                  {previewPkg.badge_text ? (
-                    <Tag color="purple">{previewPkg.badge_text}</Tag>
-                  ) : (
+                  {previewPkg.badge_text ? <Tag color="purple">{previewPkg.badge_text}</Tag> : null}
+                  {previewPkg.badge_text_secondary ? (
+                    <Tag color="cyan">{previewPkg.badge_text_secondary}</Tag>
+                  ) : null}
+                  {!previewPkg.badge_text && !previewPkg.badge_text_secondary ? (
                     <Tag color="blue">权益包</Tag>
-                  )}
+                  ) : null}
                 </Space>
               }
             >

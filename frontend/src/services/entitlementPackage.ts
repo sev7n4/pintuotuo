@@ -11,6 +11,11 @@ type UpsertPayload = {
   end_at?: string;
   is_featured?: boolean;
   badge_text?: string;
+  category_code?: string;
+  badge_text_secondary?: string;
+  marketing_line?: string;
+  promo_label?: string;
+  promo_ends_at?: string;
   items: Array<{ sku_id: number; default_quantity: number }>;
 };
 
