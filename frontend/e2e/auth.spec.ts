@@ -117,8 +117,8 @@ test.describe('Registration', () => {
 
   test('should hide merchant entry by default in invite-only mode', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText('个人用户')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('商户入驻仅支持邀请制')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.ant-segmented-item-label', { hasText: '个人用户' })).toHaveCount(0);
     await expect(page.locator('.ant-segmented-item-label', { hasText: '商户入驻' })).toHaveCount(0);
   });
 

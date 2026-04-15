@@ -39,8 +39,6 @@ export class RegisterPage {
   async register(email: string, password: string, role: 'user' | 'merchant' = 'user') {
     if (role === 'merchant') {
       await this.page.locator('.ant-segmented-item-label', { hasText: '商户入驻' }).first().click();
-    } else {
-      await this.page.locator('.ant-segmented-item-label', { hasText: '个人用户' }).first().click();
     }
     await this.page.getByPlaceholder('example@email.com').fill(email);
     await this.page.getByPlaceholder(/设置密码/).fill(password);
