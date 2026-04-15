@@ -19,10 +19,14 @@ import {
   Col,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
-import { entitlementPackageService } from '@/services/entitlementPackage';
+import {
+  entitlementPackageService,
+  type EntitlementPackageUpsertPayload,
+} from '@/services/entitlementPackage';
 import { skuService } from '@/services/sku';
 import type { EntitlementPackage } from '@/types/entitlementPackage';
-import { ENTITLEMENT_CATEGORY_OPTIONS } from '@/types/entitlementPackage';
+import { getApiErrorMessage } from '@/utils/apiError';
+import { ENTITLEMENT_CATEGORY_ADMIN_OPTIONS } from '@/types/entitlementPackage';
 import type { SKUWithSPU } from '@/types/sku';
 import dayjs from 'dayjs';
 
@@ -43,7 +47,12 @@ type FormValues = {
   marketing_line?: string;
   promo_label?: string;
   promo_ends_at?: dayjs.Dayjs;
-  items: Array<{ sku_id?: number; default_quantity: number }>;
+  items: Array<{
+    sku_id?: number;
+    default_quantity: number;
+    display_name?: string;
+    value_note?: string;
+  }>;
 };
 
 type PreviewContext = {
@@ -63,7 +72,7 @@ function packageTotalPrice(pkg: EntitlementPackage): number {
 function collectPackagePreviewWarnings(pkg: EntitlementPackage): string[] {
   const w: string[] = [];
   if (pkg.status !== 'active') {
-    w.push('当前状态非「在售」，用户端 /entitlement-packages 不会展示该包。');
+    w.push('当前状态非「在售」，用户端 /packages 不会展示该包。');
   }
   const now = dayjs();
   if (pkg.start_at && dayjs(pkg.start_at).isAfter(now)) {
@@ -100,6 +109,8 @@ function buildDraftPackagePreview(v: FormValues, skuList: SKUWithSPU[]): Entitle
       sku_type: s?.sku_type ?? '',
       default_quantity: line.default_quantity,
       retail_price: s != null ? Number(s.retail_price) : 0,
+      display_name: line.display_name?.trim(),
+      value_note: line.value_note?.trim(),
     };
   });
   return {
@@ -146,7 +157,7 @@ export default function AdminEntitlementPackages() {
       setRows(pkgRes.data.data || []);
       setSkus(skuRes.data.data || []);
     } catch {
-      message.error('加载权益包数据失败');
+      message.error('加载套餐包数据失败');
     } finally {
       setLoading(false);
     }
@@ -189,6 +200,8 @@ export default function AdminEntitlementPackages() {
       items: (row.items || []).map((it) => ({
         sku_id: it.sku_id,
         default_quantity: it.default_quantity,
+        display_name: it.display_name,
+        value_note: it.value_note,
       })),
     });
     setOpen(true);
@@ -206,42 +219,56 @@ export default function AdminEntitlementPackages() {
       const skuIDs = (v.items || []).map((i) => i.sku_id as number);
       const dedup = new Set(skuIDs);
       if (dedup.size !== skuIDs.length) {
-        message.error('同一权益包内不能重复选择同一个 SKU');
+        message.error('同一套餐包内不能重复选择同一规格');
         return;
       }
       if (v.start_at && v.end_at && !v.end_at.isAfter(v.start_at)) {
         message.error('结束时间必须晚于开始时间');
         return;
       }
-      const payload = {
-        ...v,
+      const itemsPayload = (v.items || []).map((it) => ({
+        sku_id: Number(it.sku_id),
+        default_quantity: Math.max(1, Math.floor(Number(it.default_quantity ?? 1))),
+        display_name: (it.display_name || '').trim(),
+        value_note: (it.value_note || '').trim(),
+      }));
+      const payload: EntitlementPackageUpsertPayload = {
+        name: (v.name || '').trim(),
+        description: (v.description || '').trim(),
+        status: v.status,
+        sort_order: Number(v.sort_order ?? 0),
         start_at: v.start_at ? v.start_at.toISOString() : undefined,
         end_at: v.end_at ? v.end_at.toISOString() : undefined,
+        is_featured: !!v.is_featured,
+        badge_text: (v.badge_text || '').trim(),
         category_code: v.category_code || 'general',
+        badge_text_secondary: (v.badge_text_secondary || '').trim(),
+        marketing_line: (v.marketing_line || '').trim(),
+        promo_label: (v.promo_label || '').trim(),
         promo_ends_at: v.promo_ends_at ? v.promo_ends_at.toISOString() : undefined,
-        items: (v.items || []).map((it) => ({
-          sku_id: it.sku_id as number,
-          default_quantity: it.default_quantity,
-        })),
+        items: itemsPayload,
+        ...(!editing ? { package_code: (v.package_code || '').trim() } : {}),
       };
       if (editing) {
         await entitlementPackageService.updateAdmin(editing.id, payload);
-        message.success('权益包已更新');
+        message.success('套餐包已更新');
       } else {
         await entitlementPackageService.createAdmin(payload);
-        message.success('权益包已创建');
+        message.success('套餐包已创建');
       }
       setOpen(false);
       loadData();
-    } catch {
-      // form validation or api error
+    } catch (e: unknown) {
+      const maybeForm = e as { errorFields?: unknown };
+      if (maybeForm?.errorFields) return;
+      message.error(getApiErrorMessage(e, '保存失败'));
     }
   };
 
   const remove = async (id: number) => {
     try {
       await entitlementPackageService.deleteAdmin(id);
-      message.success('权益包已删除');
+      message.success('套餐包已删除');
       loadData();
     } catch {
       message.error('删除失败');
@@ -266,7 +293,7 @@ export default function AdminEntitlementPackages() {
       const skuIDs = (v.items || []).map((i) => i.sku_id as number);
       const dedup = new Set(skuIDs);
       if (dedup.size !== skuIDs.length) {
-        message.error('同一权益包内不能重复选择同一个 SKU');
+        message.error('同一套餐包内不能重复选择同一规格');
         return;
       }
       if (v.start_at && v.end_at && !v.end_at.isAfter(v.start_at)) {
@@ -291,16 +318,26 @@ export default function AdminEntitlementPackages() {
 
   return (
     <Card
-      title="权益包管理"
+      title="套餐包管理"
       extra={
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          新建权益包
+          新建套餐包
         </Button>
       }
     >
-      <Table
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 12 }}
+        message="套餐包与拼团"
+        description="套餐包为组合一口价下单，保存配置与当前库存解耦；前台下单时仍会校验可售与库存。若需单品拼团，请在支持拼团的商品详情页发起。"
+      />
+      <div style={{ width: '100%', overflowX: 'auto' }}>
+        <Table
         rowKey="id"
         loading={loading}
+        size="small"
+        scroll={{ x: 960 }}
         dataSource={rows}
         columns={[
           { title: '编码', dataIndex: 'package_code', key: 'package_code', width: 140 },
@@ -369,7 +406,7 @@ export default function AdminEntitlementPackages() {
                 <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(r)}>
                   编辑
                 </Button>
-                <Popconfirm title="确认删除该权益包？" onConfirm={() => remove(r.id)}>
+                <Popconfirm title="确认删除该套餐包？" onConfirm={() => remove(r.id)}>
                   <Button type="link" danger icon={<DeleteOutlined />}>
                     删除
                   </Button>
@@ -378,11 +415,12 @@ export default function AdminEntitlementPackages() {
             ),
           },
         ]}
-      />
+        />
+      </div>
 
       <Modal
         open={open}
-        title={editing ? '编辑权益包' : '新建权益包'}
+        title={editing ? '编辑套餐包' : '新建套餐包'}
         onCancel={() => setOpen(false)}
         onOk={submit}
         width="min(920px, 100%)"
@@ -454,7 +492,7 @@ export default function AdminEntitlementPackages() {
               <Col xs={24} md={12}>
                 <Form.Item name="category_code" label="分类">
                   <Select
-                    options={ENTITLEMENT_CATEGORY_OPTIONS.filter((o) => o.value !== 'all')}
+                    options={ENTITLEMENT_CATEGORY_ADMIN_OPTIONS}
                     placeholder="选择分类"
                   />
                 </Form.Item>
@@ -546,6 +584,28 @@ export default function AdminEntitlementPackages() {
                             <InputNumber min={1} precision={0} style={{ width: '100%' }} />
                           </Form.Item>
                         </Col>
+                        <Col span={24}>
+                          <Form.Item
+                            name={[f.name, 'display_name']}
+                            label="对用户展示名称（可选）"
+                            tooltip="填写后将优先于 SPU 名称展示，可弱化技术向命名"
+                          >
+                            <Input placeholder="留空则使用 SPU 名称" allowClear />
+                          </Form.Item>
+                        </Col>
+                        <Col span={24}>
+                          <Form.Item
+                            name={[f.name, 'value_note']}
+                            label="单项价值说明（可选）"
+                            tooltip="留空时前台展示为「单价 × 数量」推算金额"
+                          >
+                            <Input.TextArea
+                              rows={2}
+                              placeholder="如：含 30 天 Pro 订阅；或按月折算更划算等"
+                              allowClear
+                            />
+                          </Form.Item>
+                        </Col>
                       </Row>
                     </Card>
                   ))}
@@ -560,7 +620,7 @@ export default function AdminEntitlementPackages() {
       </Modal>
 
       <Modal
-        title="用户端预览（权益包卡片）"
+        title="用户端预览（套餐包卡片）"
         open={previewOpen}
         onCancel={() => {
           setPreviewOpen(false);
@@ -605,9 +665,6 @@ export default function AdminEntitlementPackages() {
                   {previewPkg.badge_text_secondary ? (
                     <Tag color="cyan">{previewPkg.badge_text_secondary}</Tag>
                   ) : null}
-                  {!previewPkg.badge_text && !previewPkg.badge_text_secondary ? (
-                    <Tag color="blue">权益包</Tag>
-                  ) : null}
                 </Space>
               }
             >
@@ -635,7 +692,7 @@ export default function AdminEntitlementPackages() {
               <Space wrap>
                 {(previewPkg.items || []).map((it) => (
                   <Tag key={`${it.sku_id}-${it.id}`} color="green">
-                    {it.spu_name} / {it.sku_code} ×{it.default_quantity}
+                    {(it.display_name?.trim() || it.spu_name) || it.sku_code} ×{it.default_quantity}
                   </Tag>
                 ))}
               </Space>

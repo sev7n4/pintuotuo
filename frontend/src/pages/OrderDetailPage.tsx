@@ -1,9 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Button, Descriptions, Tag, Spin, Empty, Space, Typography, List, Alert } from 'antd';
-import { ArrowLeftOutlined, PayCircleOutlined, TeamOutlined } from '@ant-design/icons';
+import {
+  Card,
+  Button,
+  Descriptions,
+  Tag,
+  Spin,
+  Empty,
+  Space,
+  Typography,
+  List,
+  Alert,
+  Collapse,
+  message,
+} from 'antd';
+import {
+  ArrowLeftOutlined,
+  PayCircleOutlined,
+  TeamOutlined,
+  ShoppingCartOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons';
 import { useOrderStore } from '@/stores/orderStore';
-import { useProductStore } from '@/stores/productStore';
+import {
+  canReorderFromOrder,
+  orderItemLineTitle,
+} from '@/utils/orderSummary';
+import { getApiErrorMessage } from '@/utils/apiError';
 
 const { Title, Text } = Typography;
 
@@ -25,27 +48,53 @@ const groupStatusMap: Record<string, { color: string; label: string }> = {
 export const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentOrder, isLoading, error, fetchOrderByID } = useOrderStore();
-  const { fetchProductByID } = useProductStore();
-  const [product, setProduct] = useState<any>(null);
+  const { currentOrder, isLoading, error, fetchOrderByID, createOrder } = useOrderStore();
+  const [cartLoading, setCartLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
-      fetchOrderByID(parseInt(id));
+      void fetchOrderByID(parseInt(id, 10));
     }
   }, [id, fetchOrderByID]);
 
-  useEffect(() => {
-    const catalogId =
-      currentOrder?.items?.[0]?.sku_id ?? currentOrder?.sku_id ?? currentOrder?.product_id;
-    if (catalogId) {
-      const loadProduct = async () => {
-        const p = await fetchProductByID(catalogId);
-        setProduct(p);
-      };
-      loadProduct();
+  const handleQuickReorder = useCallback(async () => {
+    if (!currentOrder?.items?.length) {
+      message.error('订单无明细，无法复购');
+      return;
     }
-  }, [currentOrder, fetchProductByID]);
+    try {
+      const newId = await createOrder(
+        currentOrder.items.map((i) => ({ sku_id: i.sku_id, quantity: i.quantity }))
+      );
+      if (newId) {
+        message.success('已生成新订单');
+        navigate(`/payment/${newId}`);
+      }
+    } catch (e) {
+      message.error(getApiErrorMessage(e, '下单失败'));
+    }
+  }, [createOrder, currentOrder, navigate]);
+
+  const handleAddToCart = useCallback(async () => {
+    if (!currentOrder?.items?.length) return;
+    setCartLoading(true);
+    try {
+      const { useCartStore } = await import('@/stores/cartStore');
+      const { useProductStore } = await import('@/stores/productStore');
+      const { addItem } = useCartStore.getState();
+      const { fetchProductByID } = useProductStore.getState();
+      for (const line of currentOrder.items) {
+        const product = await fetchProductByID(line.sku_id);
+        if (product) addItem(product, line.quantity);
+      }
+      message.success('已加入购物车');
+      navigate('/cart');
+    } catch {
+      message.error('加入购物车失败');
+    } finally {
+      setCartLoading(false);
+    }
+  }, [currentOrder, navigate]);
 
   if (isLoading) {
     return (
@@ -66,7 +115,8 @@ export const OrderDetailPage: React.FC = () => {
   }
 
   const statusInfo = statusMap[currentOrder.status] || statusMap.pending;
-  const groupStatusInfo = currentOrder.group_id ? groupStatusMap.active : null;
+  const groupStatusKey = currentOrder.group_status || 'active';
+  const groupStatusInfo = currentOrder.group_id ? groupStatusMap[groupStatusKey] : null;
 
   const handlePay = () => {
     navigate(`/payment/${currentOrder.id}`);
@@ -81,6 +131,16 @@ export const OrderDetailPage: React.FC = () => {
   const itemCount =
     (currentOrder.items || []).reduce((sum, item) => sum + item.quantity, 0) ||
     currentOrder.quantity;
+
+  const summaryLine =
+    currentOrder.product_id != null && Number(currentOrder.product_id) > 0
+      ? `商品 #${currentOrder.product_id}`
+      : (() => {
+          const items = currentOrder.items || [];
+          if (items.length === 0) return '—';
+          const n = items[0].spu_name?.trim() || `规格 #${items[0].sku_id}`;
+          return items.length === 1 ? n : `${n} 等 ${items.length} 项`;
+        })();
 
   return (
     <div style={{ padding: '20px', maxWidth: 800, margin: '0 auto' }}>
@@ -98,7 +158,7 @@ export const OrderDetailPage: React.FC = () => {
 
         <Descriptions column={2} bordered>
           <Descriptions.Item label="订单号">#{currentOrder.id}</Descriptions.Item>
-          <Descriptions.Item label="商品名称">{product?.name || '加载中...'}</Descriptions.Item>
+          <Descriptions.Item label="商品摘要">{summaryLine}</Descriptions.Item>
           <Descriptions.Item label="商品项数">{currentOrder.items?.length || 1}</Descriptions.Item>
           <Descriptions.Item label="总数量">{itemCount}</Descriptions.Item>
           <Descriptions.Item label="均价">
@@ -115,7 +175,7 @@ export const OrderDetailPage: React.FC = () => {
           {currentOrder.group_id && (
             <Descriptions.Item label="拼团状态">
               <Tag color={groupStatusInfo?.color || 'default'}>
-                {groupStatusInfo?.label || '未知'}
+                {groupStatusInfo?.label || currentOrder.group_status || '—'}
               </Tag>
             </Descriptions.Item>
           )}
@@ -130,7 +190,7 @@ export const OrderDetailPage: React.FC = () => {
             showIcon
             style={{ marginTop: 16 }}
             message="多明细订单"
-            description="支付成功后，系统会按下方每一条 SKU 明细分别履约（例如分别开通订阅、分别赠送 Token）。客服对账时请以明细行为准。"
+            description="支付成功后，系统按每条明细分别履约（如订阅、Token 等）。对账与售后以明细为准。"
           />
         )}
 
@@ -140,29 +200,63 @@ export const OrderDetailPage: React.FC = () => {
           style={{ marginTop: 16, borderRadius: 12 }}
           bodyStyle={{ padding: 12 }}
         >
-          <List
-            size="small"
-            dataSource={currentOrder.items || []}
-            locale={{ emptyText: '暂无明细' }}
-            renderItem={(item) => (
-              <List.Item>
-                <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-                  <Text>
-                    SKU #{item.sku_id} × {item.quantity}
-                  </Text>
-                  <Text strong>¥{item.total_price.toFixed(2)}</Text>
-                </Space>
-              </List.Item>
-            )}
+          <Collapse
+            defaultActiveKey={['lines']}
+            items={[
+              {
+                key: 'lines',
+                label: `共 ${currentOrder.items?.length || 0} 条（展开查看名称、类型、数量与金额）`,
+                children: (
+                  <List
+                    size="small"
+                    dataSource={currentOrder.items || []}
+                    locale={{ emptyText: '暂无明细' }}
+                    renderItem={(item) => (
+                      <List.Item>
+                        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                          <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                            <Text>{orderItemLineTitle(item)}</Text>
+                            <Text strong>¥{item.total_price.toFixed(2)}</Text>
+                          </Space>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            数量 {item.quantity} · 单价 ¥{item.unit_price.toFixed(2)}
+                          </Text>
+                        </Space>
+                      </List.Item>
+                    )}
+                  />
+                ),
+              },
+            ]}
           />
         </Card>
 
         <div style={{ marginTop: 24, textAlign: 'center' }}>
-          <Space size="large">
+          <Space size="middle" wrap>
             {currentOrder.status === 'pending' && (
               <Button type="primary" size="large" icon={<PayCircleOutlined />} onClick={handlePay}>
                 立即支付
               </Button>
+            )}
+            {canReorderFromOrder(currentOrder) && (
+              <>
+                <Button
+                  size="large"
+                  icon={<ShoppingCartOutlined />}
+                  loading={cartLoading}
+                  onClick={() => void handleAddToCart()}
+                >
+                  加入购物车
+                </Button>
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<ThunderboltOutlined />}
+                  onClick={() => void handleQuickReorder()}
+                >
+                  同配置再下一单
+                </Button>
+              </>
             )}
             {currentOrder.group_id && (
               <Button size="large" icon={<TeamOutlined />} onClick={handleViewGroup}>

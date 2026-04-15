@@ -2,6 +2,8 @@ import { Button, Card, Space, Tag, Typography } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
 import type { EntitlementPackage } from '@/types/entitlementPackage';
 import dayjs from 'dayjs';
+import { PackageItemsCollapse } from './PackageItemsCollapse';
+import styles from './EntitlementPackageCard.module.css';
 
 const { Paragraph, Text } = Typography;
 
@@ -23,11 +25,7 @@ export function EntitlementPackageCard({ pkg, loading, onBuy, onCopyShareLink }:
         <Space wrap size={4}>
           {pkg.is_featured ? <Tag color="gold">推荐</Tag> : null}
           {pkg.badge_text ? <Tag color="purple">{pkg.badge_text}</Tag> : null}
-          {pkg.badge_text_secondary ? (
-            <Tag color="cyan">{pkg.badge_text_secondary}</Tag>
-          ) : (
-            <Tag color="blue">权益包</Tag>
-          )}
+          {pkg.badge_text_secondary ? <Tag color="cyan">{pkg.badge_text_secondary}</Tag> : null}
         </Space>
       }
       actions={[
@@ -62,9 +60,10 @@ export function EntitlementPackageCard({ pkg, loading, onBuy, onCopyShareLink }:
           ) : null}
         </Paragraph>
       )}
-      <Paragraph style={{ marginBottom: 8 }}>
-        组合总价：<Text strong>¥{pkg.totalPrice.toFixed(2)}</Text>
-      </Paragraph>
+      <div className={styles.totalPriceBlock}>
+        <div className={styles.totalPriceLabel}>组合总价</div>
+        <div className={styles.totalPriceValue}>¥{pkg.totalPrice.toFixed(2)}</div>
+      </div>
       {!canBuy && pkg.unavailable_reason ? (
         <Paragraph type="danger" style={{ marginBottom: 8 }}>
           {pkg.unavailable_reason}
@@ -77,14 +76,7 @@ export function EntitlementPackageCard({ pkg, loading, onBuy, onCopyShareLink }:
           </Button>
         </Paragraph>
       ) : null}
-      <Space wrap style={{ marginBottom: 4 }}>
-        {(pkg.items || []).map((s) => (
-          <Tag key={s.id} color={s.line_purchasable === false ? 'error' : 'green'}>
-            {s.spu_name} / {s.sku_code} ×{s.default_quantity}
-            {s.line_issue ? `（${s.line_issue}）` : ''}
-          </Tag>
-        ))}
-      </Space>
+      <PackageItemsCollapse items={pkg.items || []} mode="shop" />
     </Card>
   );
 }

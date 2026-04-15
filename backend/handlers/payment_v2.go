@@ -349,6 +349,7 @@ func processBalancePayment(db *sql.DB, paymentID, orderID, userID int, amount fl
 	ctx := context.Background()
 	cache.Delete(ctx, cache.TokenBalanceKey(userID))
 	cache.Delete(ctx, cache.ComputePointBalanceKey(userID))
+	invalidateOrderCachesAfterPayment(db, orderID)
 	return nil
 }
 
@@ -450,6 +451,7 @@ func AlipayNotify(c *gin.Context) {
 	ctx := context.Background()
 	cache.Delete(ctx, cache.TokenBalanceKey(userID))
 	cache.Delete(ctx, cache.ComputePointBalanceKey(userID))
+	invalidateOrderCachesAfterPayment(db, orderID)
 
 	log.Printf("[AlipayNotify] Payment completed successfully: order_id=%d", orderID)
 	c.String(http.StatusOK, "success")
@@ -531,8 +533,21 @@ func WechatNotify(c *gin.Context) {
 	ctx := context.Background()
 	cache.Delete(ctx, cache.TokenBalanceKey(payUserID))
 	cache.Delete(ctx, cache.ComputePointBalanceKey(payUserID))
+	invalidateOrderCachesAfterPayment(db, orderID)
 
 	c.String(http.StatusOK, "<xml><return_code><![CDATA[SUCCESS]]></return_code></xml>")
+}
+
+func invalidateOrderCachesAfterPayment(db *sql.DB, orderID int) {
+	if db == nil || orderID <= 0 {
+		return
+	}
+	ctx := context.Background()
+	cache.Delete(ctx, cache.OrderKey(orderID))
+	var gid sql.NullInt64
+	if err := db.QueryRow("SELECT group_id FROM orders WHERE id = $1", orderID).Scan(&gid); err == nil && gid.Valid {
+		cache.Delete(ctx, cache.GroupKey(int(gid.Int64)))
+	}
 }
 
 func GetPaymentStatus(c *gin.Context) {

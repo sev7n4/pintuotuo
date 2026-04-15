@@ -66,7 +66,7 @@ export default function Layout() {
       },
       {
         key: 'packages',
-        label: <Link to="/packages">权益包</Link>,
+        label: <Link to="/packages">套餐包</Link>,
         icon: <GiftOutlined />,
       },
       {
@@ -117,7 +117,7 @@ export default function Layout() {
       },
       {
         key: 'packages',
-        label: '权益包',
+        label: '套餐包',
         icon: <GiftOutlined />,
       },
       {

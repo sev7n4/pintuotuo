@@ -101,6 +101,8 @@ export interface Order {
   sku_id?: number;
   spu_id?: number;
   group_id: number | null;
+  /** 拼团当前状态（来自 groups.status） */
+  group_status?: 'active' | 'completed' | 'failed';
   quantity: number;
   unit_price: number;
   total_price: number;
@@ -114,7 +116,6 @@ export interface Order {
     | 'cancelled'
     | 'refunding'
     | 'refunded';
-  group_status?: 'active' | 'completed' | 'failed';
   created_at: string;
   updated_at: string;
 }
@@ -124,6 +125,8 @@ export interface OrderItem {
   order_id: number;
   sku_id: number;
   spu_id: number;
+  spu_name?: string;
+  sku_code?: string;
   quantity: number;
   unit_price: number;
   total_price: number;

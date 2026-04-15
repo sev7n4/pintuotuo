@@ -21,6 +21,9 @@ type EntitlementPackageItem struct {
 	SKUType         string  `json:"sku_type"`
 	DefaultQuantity int     `json:"default_quantity"`
 	RetailPrice     float64 `json:"retail_price"`
+	DisplayName     string  `json:"display_name,omitempty"`
+	ValueNote       string  `json:"value_note,omitempty"`
+	LineCovered     *bool   `json:"line_covered,omitempty"`
 	SKUStatus       string  `json:"sku_status,omitempty"`
 	SPUStatus       string  `json:"spu_status,omitempty"`
 	Stock           int     `json:"stock"`
@@ -74,8 +77,10 @@ type entitlementPackageUpsertReq struct {
 	PromoLabel         string     `json:"promo_label"`
 	PromoEndsAt        *time.Time `json:"promo_ends_at"`
 	Items              []struct {
-		SKUID           int `json:"sku_id"`
-		DefaultQuantity int `json:"default_quantity"`
+		SKUID           int    `json:"sku_id"`
+		DefaultQuantity int    `json:"default_quantity"`
+		DisplayName     string `json:"display_name"`
+		ValueNote       string `json:"value_note"`
 	} `json:"items"`
 }
 
@@ -114,6 +119,7 @@ func validateEntitlementPackageReq(req *entitlementPackageUpsertReq, needCode bo
 func loadEntitlementPackageItems(db *sql.DB, packageID int) ([]EntitlementPackageItem, error) {
 	rows, err := db.Query(
 		`SELECT epi.id, epi.sku_id, s.sku_code, sp.name, s.sku_type, epi.default_quantity, s.retail_price,
+		        COALESCE(epi.display_name, ''), COALESCE(epi.value_note, ''),
 		        s.status, sp.status, s.stock
 		 FROM entitlement_package_items epi
 		 JOIN skus s ON epi.sku_id = s.id
@@ -131,6 +137,7 @@ func loadEntitlementPackageItems(db *sql.DB, packageID int) ([]EntitlementPackag
 		var it EntitlementPackageItem
 		if err = rows.Scan(
 			&it.ID, &it.SKUID, &it.SKUCode, &it.SPUName, &it.SKUType, &it.DefaultQuantity, &it.RetailPrice,
+			&it.DisplayName, &it.ValueNote,
 			&it.SKUStatus, &it.SPUStatus, &it.Stock,
 		); err != nil {
 			return nil, err
@@ -233,7 +240,7 @@ func CreateAdminEntitlementPackage(c *gin.Context) {
 			DefaultQuantity int
 		}{SKUID: it.SKUID, DefaultQuantity: it.DefaultQuantity}
 	}
-	if err = validateEntitlementPackageSKULines(tx, lines); err != nil {
+	if err = validateEntitlementPackageSKUReferences(tx, lines); err != nil {
 		if ae, ok := err.(*apperrors.AppError); ok {
 			middleware.RespondWithError(c, ae)
 			return
@@ -269,8 +276,10 @@ func CreateAdminEntitlementPackage(c *gin.Context) {
 	}
 	for _, it := range req.Items {
 		if _, err = tx.Exec(
-			`INSERT INTO entitlement_package_items (package_id, sku_id, default_quantity) VALUES ($1, $2, $3)`,
+			`INSERT INTO entitlement_package_items (package_id, sku_id, default_quantity, display_name, value_note)
+			 VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''))`,
 			packageID, it.SKUID, it.DefaultQuantity,
+			strings.TrimSpace(it.DisplayName), strings.TrimSpace(it.ValueNote),
 		); err != nil {
 			middleware.RespondWithError(c, apperrors.NewAppError("CREATE_FAILED", "写入权益包明细失败", http.StatusInternalServerError, err))
 			return
@@ -327,7 +336,7 @@ func UpdateAdminEntitlementPackage(c *gin.Context) {
 			DefaultQuantity int
 		}{SKUID: it.SKUID, DefaultQuantity: it.DefaultQuantity}
 	}
-	if err = validateEntitlementPackageSKULines(tx, lines); err != nil {
+	if err = validateEntitlementPackageSKUReferences(tx, lines); err != nil {
 		if ae, ok := err.(*apperrors.AppError); ok {
 			middleware.RespondWithError(c, ae)
 			return
@@ -361,8 +370,10 @@ func UpdateAdminEntitlementPackage(c *gin.Context) {
 	}
 	for _, it := range req.Items {
 		if _, err = tx.Exec(
-			`INSERT INTO entitlement_package_items (package_id, sku_id, default_quantity) VALUES ($1, $2, $3)`,
+			`INSERT INTO entitlement_package_items (package_id, sku_id, default_quantity, display_name, value_note)
+			 VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''))`,
 			packageID, it.SKUID, it.DefaultQuantity,
+			strings.TrimSpace(it.DisplayName), strings.TrimSpace(it.ValueNote),
 		); err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -528,8 +539,12 @@ func GetMyEntitlementPackages(c *gin.Context) {
 		p.Items = items
 		finalizeEntitlementPackage(&p.EntitlementPackage)
 		p.TotalItems = len(items)
-		for _, it := range items {
-			if _, ok = covered[it.SKUID]; ok {
+		for i := range p.Items {
+			it := &p.Items[i]
+			_, has := covered[it.SKUID]
+			v := has
+			it.LineCovered = &v
+			if has {
 				p.CoveredItems++
 			}
 		}
