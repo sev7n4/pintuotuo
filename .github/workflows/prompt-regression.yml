@@ -25,11 +25,22 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Check prompt regression secrets
+        id: check-secrets
+        run: |
+          if [ -n "${PROMPTFOO_BASE_URL}" ] && [ -n "${PROMPTFOO_API_KEY}" ] && [ -n "${PROMPTFOO_MODEL}" ]; then
+            echo "ready=true" >> $GITHUB_OUTPUT
+          else
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "Prompt regression skipped: missing PROMPTFOO_* secrets" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Run prompt regression
+        if: steps.check-secrets.outputs.ready == 'true'
         run: bash scripts/run_prompt_evals.sh
 
       - name: Upload prompt regression report
-        if: always()
+        if: always() && steps.check-secrets.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: promptfoo-report
