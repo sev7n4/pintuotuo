@@ -172,10 +172,20 @@ export interface Token {
 export interface TokenTransaction {
   id: number;
   user_id: number;
-  type: 'purchase' | 'usage' | 'transfer' | 'reward' | 'refund' | 'recharge';
+  type: 'purchase' | 'usage' | 'transfer' | 'reward' | 'refund' | 'recharge' | 'expired';
   amount: number;
   reason?: string;
   order_id?: number;
+  created_at: string;
+}
+
+/** 余额批次（后端 FIFO 扣减、按到期优先）；加油包入账多为带 expires_at 的批次 */
+export interface TokenLot {
+  id: number;
+  remaining_amount: number;
+  lot_type: string;
+  expires_at: string | null;
+  order_item_id?: number | null;
   created_at: string;
 }
 

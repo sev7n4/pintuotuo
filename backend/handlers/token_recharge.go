@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 )
@@ -32,15 +33,7 @@ func applyRechargeSuccessInTx(tx *sql.Tx, order *RechargeOrder) error {
 		return fmt.Errorf("recharge order not pending or missing")
 	}
 
-	_, err = tx.Exec(`
-		INSERT INTO tokens (user_id, balance, total_used, total_earned)
-		VALUES ($1, $2, 0, $2)
-		ON CONFLICT (user_id) DO UPDATE SET
-			balance = tokens.balance + EXCLUDED.balance,
-			total_earned = tokens.total_earned + EXCLUDED.balance,
-			updated_at = NOW()
-	`, order.UserID, order.Amount)
-	if err != nil {
+	if err = billing.CreditLegacyLot(tx, order.UserID, order.Amount, "recharge"); err != nil {
 		return err
 	}
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/pintuotuo/backend/billing"
 )
 
 const (
@@ -153,15 +155,15 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 		st := strings.ToLower(strings.TrimSpace(effectiveType))
 		switch st {
 		case skuTypeTokenPack:
-			if err = s.fulfillTokenPack(tx, userID, item.SKUID, orderID, item.Quantity, tokenAmt); err != nil {
+			if err = s.fulfillTokenPack(tx, userID, item.SKUID, orderID, item.ID, item.Quantity, tokenAmt, "token_pack"); err != nil {
 				return err
 			}
 		case skuTypeComputePoints:
-			if err = s.fulfillComputePoints(tx, userID, item.SKUID, orderID, item.Quantity, computeAmt); err != nil {
+			if err = s.fulfillComputePoints(tx, userID, item.SKUID, orderID, item.ID, item.Quantity, computeAmt); err != nil {
 				return err
 			}
 		case skuTypeSubscription:
-			if err = s.fulfillSubscription(tx, userID, item.SKUID, orderID, item.Quantity, skuRow, tokenAmt); err != nil {
+			if err = s.fulfillSubscription(tx, userID, item.SKUID, orderID, item.ID, item.Quantity, skuRow, tokenAmt); err != nil {
 				return err
 			}
 		case skuTypeTrial:
@@ -170,11 +172,11 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 			}
 		case skuTypeConcurrent:
 			if tokenAmt.Valid && tokenAmt.Int64 > 0 {
-				if err = s.fulfillTokenPack(tx, userID, item.SKUID, orderID, item.Quantity, tokenAmt); err != nil {
+				if err = s.fulfillTokenPack(tx, userID, item.SKUID, orderID, item.ID, item.Quantity, tokenAmt, "token_pack"); err != nil {
 					return err
 				}
 			} else if computeAmt.Valid && computeAmt.Float64 > 0 {
-				if err = s.fulfillComputePoints(tx, userID, item.SKUID, orderID, item.Quantity, computeAmt); err != nil {
+				if err = s.fulfillComputePoints(tx, userID, item.SKUID, orderID, item.ID, item.Quantity, computeAmt); err != nil {
 					return err
 				}
 			}
@@ -191,56 +193,43 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 	return err
 }
 
-func (s *FulfillmentService) fulfillTokenPack(tx *sql.Tx, userID, skuID, orderID, qty int, tokenAmount sql.NullInt64) error {
+// fulfillTokenPack credits a dated token lot (default 365d). lotType examples: token_pack, subscription_bonus.
+func (s *FulfillmentService) fulfillTokenPack(tx *sql.Tx, userID, skuID, orderID, orderItemID, qty int, tokenAmount sql.NullInt64, lotType string) error {
 	if !tokenAmount.Valid || tokenAmount.Int64 <= 0 {
 		return fmt.Errorf("token_pack sku %d has no token_amount", skuID)
 	}
+	if lotType == "" {
+		lotType = "token_pack"
+	}
 	add := float64(tokenAmount.Int64) * float64(qty)
-	_, err := tx.Exec(`
-		INSERT INTO tokens (user_id, balance, total_used, total_earned)
-		VALUES ($1, $2, 0, $2)
-		ON CONFLICT (user_id) DO UPDATE SET
-			balance = tokens.balance + EXCLUDED.balance,
-			total_earned = tokens.total_earned + EXCLUDED.balance,
-			updated_at = NOW()`,
-		userID, add,
-	)
-	if err != nil {
+	exp := time.Now().UTC().AddDate(0, 0, billing.DefaultTokenLotValidDays)
+	if err := billing.CreditTokenLot(tx, userID, add, &exp, orderItemID, lotType); err != nil {
 		return fmt.Errorf("token_pack credit: %w", err)
 	}
-	_, err = tx.Exec(
+	_, err := tx.Exec(
 		`INSERT INTO token_transactions (user_id, type, amount, reason, order_id) VALUES ($1, 'purchase', $2, $3, $4)`,
 		userID, add, fmt.Sprintf("订单商品 #%d", orderID), orderID,
 	)
 	return err
 }
 
-func (s *FulfillmentService) fulfillComputePoints(tx *sql.Tx, userID, skuID, orderID, qty int, computePoints sql.NullFloat64) error {
+func (s *FulfillmentService) fulfillComputePoints(tx *sql.Tx, userID, skuID, orderID, orderItemID, qty int, computePoints sql.NullFloat64) error {
 	if !computePoints.Valid || computePoints.Float64 <= 0 {
 		return fmt.Errorf("compute_points sku %d has no compute_points", skuID)
 	}
 	add := computePoints.Float64 * float64(qty)
-	// Single retail ledger: same as token_pack, credits `tokens` (internal units per order snapshot).
-	_, err := tx.Exec(`
-		INSERT INTO tokens (user_id, balance, total_used, total_earned)
-		VALUES ($1, $2, 0, $2)
-		ON CONFLICT (user_id) DO UPDATE SET
-			balance = tokens.balance + EXCLUDED.balance,
-			total_earned = tokens.total_earned + EXCLUDED.balance,
-			updated_at = NOW()`,
-		userID, add,
-	)
-	if err != nil {
+	// No expiry: same pool semantics as legacy recharge (可后续改为与 token_pack 一致).
+	if err := billing.CreditTokenLot(tx, userID, add, nil, orderItemID, "compute_points"); err != nil {
 		return fmt.Errorf("compute_points credit (tokens ledger): %w", err)
 	}
-	_, err = tx.Exec(
+	_, err := tx.Exec(
 		`INSERT INTO token_transactions (user_id, type, amount, reason, order_id) VALUES ($1, 'purchase', $2, $3, $4)`,
 		userID, add, fmt.Sprintf("订单商品 #%d (compute_points SKU)", orderID), orderID,
 	)
 	return err
 }
 
-func (s *FulfillmentService) fulfillSubscription(tx *sql.Tx, userID, skuID, orderID, qty int, skuRow skuFulfillmentRow, tokenAmount sql.NullInt64) error {
+func (s *FulfillmentService) fulfillSubscription(tx *sql.Tx, userID, skuID, orderID, orderItemID, qty int, skuRow skuFulfillmentRow, tokenAmount sql.NullInt64) error {
 	period := ""
 	if skuRow.SubscriptionPeriod.Valid {
 		period = skuRow.SubscriptionPeriod.String
@@ -255,7 +244,7 @@ func (s *FulfillmentService) fulfillSubscription(tx *sql.Tx, userID, skuID, orde
 
 	// Scheme 2: subscription SKU can also grant token balance at activation time.
 	if tokenAmount.Valid && tokenAmount.Int64 > 0 {
-		return s.fulfillTokenPack(tx, userID, skuID, orderID, qty, tokenAmount)
+		return s.fulfillTokenPack(tx, userID, skuID, orderID, orderItemID, qty, tokenAmount, "subscription_bonus")
 	}
 	return nil
 }

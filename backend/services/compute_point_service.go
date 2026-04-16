@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 
+	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/models"
 )
@@ -29,16 +30,7 @@ func (s *ComputePointService) CreditComputePoints(userID int, points float64, de
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec(`
-		INSERT INTO tokens (user_id, balance, total_used, total_earned)
-		VALUES ($1, $2, 0, $2)
-		ON CONFLICT (user_id) DO UPDATE SET
-			balance = tokens.balance + EXCLUDED.balance,
-			total_earned = tokens.total_earned + EXCLUDED.balance,
-			updated_at = NOW()`,
-		userID, points,
-	)
-	if err != nil {
+	if err = billing.CreditLegacyLot(tx, userID, points, "compute_points"); err != nil {
 		return nil, err
 	}
 

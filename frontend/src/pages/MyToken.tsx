@@ -32,7 +32,7 @@ import {
 } from '@ant-design/icons';
 import { useTokenStore } from '@/stores/tokenStore';
 import { tokenService } from '@/services/token';
-import { UserAPIKey, RechargeOrder, APIUsageGuideResponse } from '@/types';
+import { UserAPIKey, RechargeOrder, APIUsageGuideResponse, TokenLot } from '@/types';
 import styles from './MyToken.module.css';
 
 const { TabPane } = Tabs;
@@ -82,12 +82,28 @@ const MyToken = () => {
   const [newKeyDisplay, setNewKeyDisplay] = useState<string | null>(null);
   const [usageGuide, setUsageGuide] = useState<APIUsageGuideResponse | null>(null);
   const [usageGuideLoading, setUsageGuideLoading] = useState(false);
+  const [tokenLots, setTokenLots] = useState<TokenLot[]>([]);
+  const [lotsLoading, setLotsLoading] = useState(false);
+
+  const fetchTokenLots = async () => {
+    setLotsLoading(true);
+    try {
+      const res = await tokenService.getTokenLots();
+      const rows = (res.data as { data?: TokenLot[] })?.data;
+      setTokenLots(Array.isArray(rows) ? rows : []);
+    } catch {
+      setTokenLots([]);
+    } finally {
+      setLotsLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchBalance();
     fetchTransactions();
     fetchAPIKeys();
     fetchRechargeOrders();
+    fetchTokenLots();
   }, [fetchBalance, fetchTransactions, fetchAPIKeys, fetchRechargeOrders]);
 
   useEffect(() => {
@@ -202,6 +218,7 @@ const MyToken = () => {
   const transactionTypeMap: Record<string, { color: string; text: string }> = {
     purchase: { color: 'green', text: '购买' },
     usage: { color: 'orange', text: '使用' },
+    expired: { color: 'default', text: '过期' },
     transfer: { color: 'blue', text: '转账' },
     reward: { color: 'purple', text: '奖励' },
     refund: { color: 'cyan', text: '退款' },
@@ -412,6 +429,46 @@ const MyToken = () => {
         </Col>
       </Row>
 
+      <Card title="余额批次（先到期先扣）" style={{ marginBottom: 16 }} loading={lotsLoading}>
+        <Paragraph type="secondary" style={{ marginBottom: 12 }}>
+          购买 Token 包 / 订阅赠送等会按批次入账；带有效期的批次将优先于「长期有效」余额被消耗。
+        </Paragraph>
+        <Table<TokenLot>
+          size="small"
+          rowKey="id"
+          pagination={false}
+          dataSource={tokenLots}
+          locale={{ emptyText: '暂无批次明细（或全部为已合并的长期余额）' }}
+          columns={[
+            {
+              title: '剩余',
+              dataIndex: 'remaining_amount',
+              key: 'remaining_amount',
+              render: (v: number) => v.toLocaleString(),
+            },
+            {
+              title: '类型',
+              dataIndex: 'lot_type',
+              key: 'lot_type',
+              width: 120,
+            },
+            {
+              title: '到期时间',
+              dataIndex: 'expires_at',
+              key: 'expires_at',
+              render: (v: string | null) =>
+                v ? new Date(v).toLocaleString('zh-CN') : '长期有效',
+            },
+            {
+              title: '创建时间',
+              dataIndex: 'created_at',
+              key: 'created_at',
+              render: (v: string) => new Date(v).toLocaleString('zh-CN'),
+            },
+          ]}
+        />
+      </Card>
+
       <Card className={styles.actionCard}>
         <Space wrap size="middle" className={styles.actionBar}>
           <Button
@@ -438,6 +495,7 @@ const MyToken = () => {
               fetchTransactions();
               fetchAPIKeys();
               fetchRechargeOrders();
+              fetchTokenLots();
             }}
           >
             刷新

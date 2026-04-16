@@ -170,6 +170,7 @@ func RegisterTokenRoutes(router *gin.RouterGroup) {
 	tokens.Use(middleware.AuthMiddleware())
 	{
 		tokens.GET("/balance", handlers.GetTokenBalance)
+		tokens.GET("/lots", handlers.GetTokenLots)
 		tokens.GET("/consumption", handlers.GetTokenConsumption)
 		tokens.POST("/transfer", handlers.TransferTokens)
 
