@@ -163,6 +163,21 @@ const CheckoutPage: React.FC = () => {
                 description="提交后将生成一个订单、多条明细；支付成功后会按每条明细分别履约。若只需部分商品，可取消勾选对应行。"
               />
             )}
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="补充 Token（加油包）"
+              description={
+                <span>
+                  若调用时余额不足，可前往{' '}
+                  <a href="/catalog" onClick={(e) => { e.preventDefault(); navigate('/catalog'); }}>
+                    卖场选购 Token 包
+                  </a>
+                  ；入账按批次有效期，先到期先扣（详见「我的 Token」页）。
+                </span>
+              }
+            />
             {isMobile ? (
               <List
                 dataSource={items}

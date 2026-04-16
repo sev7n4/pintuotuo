@@ -1,6 +1,7 @@
 import api from './api';
 import {
   Token,
+  TokenLot,
   TokenTransaction,
   UserAPIKey,
   APIResponse,
@@ -12,6 +13,8 @@ export const tokenService = {
   getAPIUsageGuide: () => api.get<{ data: APIUsageGuideResponse }>('/tokens/api-usage-guide'),
 
   getBalance: () => api.get<Token>('/tokens/balance'),
+
+  getTokenLots: () => api.get<{ data: TokenLot[] }>('/tokens/lots'),
 
   getConsumption: () => api.get<TokenTransaction[]>('/tokens/consumption'),
 

@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
@@ -523,42 +525,27 @@ func TransferTokens(c *gin.Context) {
 		return
 	}
 
+	if err = billing.ForfeitExpiredLots(tx, senderIDInt); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	err = tx.QueryRow(`SELECT balance FROM tokens WHERE user_id = $1`, senderIDInt).Scan(&senderBalance)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
 	if senderBalance < req.Amount {
 		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
 		return
 	}
 
-	res, err := tx.Exec(
-		`UPDATE tokens SET balance = balance - $1, updated_at = NOW() WHERE user_id = $2 AND balance >= $1`,
-		req.Amount, senderIDInt,
-	)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"TOKEN_TRANSFER_FAILED",
-			"Failed to transfer tokens",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-	if rows != 1 {
+	if err = billing.DebitLotsFIFO(tx, senderIDInt, req.Amount, false); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
 		return
 	}
 
-	_, err = tx.Exec(`
-		INSERT INTO tokens (user_id, balance, total_used, total_earned)
-		VALUES ($1, $2, 0, 0)
-		ON CONFLICT (user_id) DO UPDATE SET
-			balance = tokens.balance + EXCLUDED.balance,
-			updated_at = NOW()
-	`, recipientID, req.Amount)
-	if err != nil {
+	if err = billing.CreditLegacyLot(tx, recipientID, req.Amount, "transfer_in"); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"TOKEN_TRANSFER_FAILED",
 			"Failed to transfer tokens",
@@ -611,4 +598,72 @@ func TransferTokens(c *gin.Context) {
 	cache.Delete(ctx, cache.TokenBalanceKey(recipientID))
 
 	c.JSON(http.StatusOK, gin.H{"message": "Transfer successful"})
+}
+
+// GetTokenLots returns non-empty token lots for FIFO / expiry display (加油包批次).
+func GetTokenLots(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+	uid, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	rows, err := db.Query(`
+		SELECT id, remaining_amount, expires_at, lot_type, order_item_id, created_at
+		  FROM token_lots
+		 WHERE user_id = $1 AND remaining_amount > 0
+		 ORDER BY expires_at ASC NULLS LAST, id ASC`,
+		uid,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer rows.Close()
+
+	var out []gin.H
+	for rows.Next() {
+		var id int
+		var rem float64
+		var exp sql.NullTime
+		var lotType string
+		var oi sql.NullInt64
+		var createdAt interface{}
+		if err = rows.Scan(&id, &rem, &exp, &lotType, &oi, &createdAt); err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		row := gin.H{
+			"id":               id,
+			"remaining_amount": rem,
+			"lot_type":         lotType,
+			"created_at":       createdAt,
+			"expires_at":       nil,
+			"order_item_id":    nil,
+		}
+		if exp.Valid {
+			row["expires_at"] = exp.Time.UTC().Format(time.RFC3339)
+		}
+		if oi.Valid {
+			row["order_item_id"] = oi.Int64
+		}
+		out = append(out, row)
+	}
+	if err = rows.Err(); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	if out == nil {
+		out = []gin.H{}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": out})
 }

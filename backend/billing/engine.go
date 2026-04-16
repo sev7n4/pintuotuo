@@ -121,15 +121,19 @@ func (e *BillingEngine) DeductBalance(userID int, amount float64, reason string,
 		return fmt.Errorf("failed to get current balance: %w", err)
 	}
 
+	if err = ForfeitExpiredLots(tx, userID); err != nil {
+		return err
+	}
+	err = tx.QueryRow("SELECT balance FROM tokens WHERE user_id = $1", userID).Scan(&currentBalance)
+	if err != nil {
+		return fmt.Errorf("failed to get current balance: %w", err)
+	}
+
 	if currentBalance < amount {
 		return fmt.Errorf("insufficient balance: current=%.2f, required=%.2f", currentBalance, amount)
 	}
 
-	_, err = tx.Exec(
-		"UPDATE tokens SET balance = balance - $1, total_used = total_used + $1, updated_at = $2 WHERE user_id = $3",
-		amount, time.Now(), userID,
-	)
-	if err != nil {
+	if err = DebitLotsFIFO(tx, userID, amount, true); err != nil {
 		return fmt.Errorf("failed to deduct balance: %w", err)
 	}
 
@@ -163,15 +167,19 @@ func (e *BillingEngine) DeductBalanceTx(tx *sql.Tx, userID int, amount float64, 
 		return fmt.Errorf("failed to get current balance: %w", err)
 	}
 
+	if err = ForfeitExpiredLots(tx, userID); err != nil {
+		return err
+	}
+	err = tx.QueryRow("SELECT balance FROM tokens WHERE user_id = $1", userID).Scan(&currentBalance)
+	if err != nil {
+		return fmt.Errorf("failed to get current balance: %w", err)
+	}
+
 	if currentBalance < amount {
 		return fmt.Errorf("insufficient balance: current=%.2f, required=%.2f", currentBalance, amount)
 	}
 
-	_, err = tx.Exec(
-		"UPDATE tokens SET balance = balance - $1, total_used = total_used + $1, updated_at = $2 WHERE user_id = $3",
-		amount, time.Now(), userID,
-	)
-	if err != nil {
+	if err = DebitLotsFIFO(tx, userID, amount, true); err != nil {
 		return fmt.Errorf("failed to deduct balance: %w", err)
 	}
 
@@ -204,24 +212,7 @@ func (e *BillingEngine) AddBalance(userID int, amount float64, reason string, or
 	}
 	defer tx.Rollback()
 
-	var exists bool
-	err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM tokens WHERE user_id = $1)", userID).Scan(&exists)
-	if err != nil {
-		return fmt.Errorf("failed to check token existence: %w", err)
-	}
-
-	if !exists {
-		_, err = tx.Exec(
-			"INSERT INTO tokens (user_id, balance, total_used, total_earned) VALUES ($1, $2, 0, $2)",
-			userID, amount,
-		)
-	} else {
-		_, err = tx.Exec(
-			"UPDATE tokens SET balance = balance + $1, total_earned = total_earned + $1, updated_at = $2 WHERE user_id = $3",
-			amount, time.Now(), userID,
-		)
-	}
-	if err != nil {
+	if err = CreditLegacyLot(tx, userID, amount, "credit"); err != nil {
 		return fmt.Errorf("failed to add balance: %w", err)
 	}
 
@@ -595,15 +586,19 @@ func (e *BillingEngine) PreDeductBalance(userID int, amount int64, reason string
 		return fmt.Errorf("failed to get current balance: %w", err)
 	}
 
+	if err = ForfeitExpiredLots(tx, userID); err != nil {
+		return err
+	}
+	err = tx.QueryRow("SELECT balance FROM tokens WHERE user_id = $1", userID).Scan(&currentBalance)
+	if err != nil {
+		return fmt.Errorf("failed to get current balance: %w", err)
+	}
+
 	if currentBalance < float64(amount) {
 		return fmt.Errorf("insufficient balance: current=%.0f, required=%d", currentBalance, amount)
 	}
 
-	_, err = tx.Exec(
-		"UPDATE tokens SET balance = balance - $1, updated_at = $2 WHERE user_id = $3",
-		amount, time.Now(), userID,
-	)
-	if err != nil {
+	if err = DebitLotsFIFO(tx, userID, float64(amount), false); err != nil {
 		return fmt.Errorf("failed to pre-deduct balance: %w", err)
 	}
 
@@ -659,20 +654,15 @@ func (e *BillingEngine) SettlePreDeduct(userID int, requestID string, actualUsag
 	diff := preDeductAmount - actualUsage
 
 	if diff > 0 {
-		_, err = tx.Exec(
-			"UPDATE tokens SET balance = balance + $1, updated_at = $2 WHERE user_id = $3",
-			diff, time.Now(), userID,
-		)
-		if err != nil {
+		if err = CreditLegacyLot(tx, userID, float64(diff), "prededuct_refund"); err != nil {
 			return fmt.Errorf("failed to refund balance: %w", err)
 		}
 	} else if diff < 0 {
-		extraNeeded := -diff
-		_, err = tx.Exec(
-			"UPDATE tokens SET balance = balance - $1, total_used = total_used + $1, updated_at = $2 WHERE user_id = $3",
-			extraNeeded, time.Now(), userID,
-		)
-		if err != nil {
+		extraNeeded := float64(-diff)
+		if err = ForfeitExpiredLots(tx, userID); err != nil {
+			return err
+		}
+		if err = DebitLotsFIFO(tx, userID, extraNeeded, true); err != nil {
 			return fmt.Errorf("failed to deduct extra balance: %w", err)
 		}
 	}
@@ -734,11 +724,7 @@ func (e *BillingEngine) CancelPreDeduct(userID int, requestID string) error {
 		return nil
 	}
 
-	_, err = tx.Exec(
-		"UPDATE tokens SET balance = balance + $1, updated_at = $2 WHERE user_id = $3",
-		preDeductAmount, time.Now(), userID,
-	)
-	if err != nil {
+	if err = CreditLegacyLot(tx, userID, float64(preDeductAmount), "prededuct_cancel"); err != nil {
 		return fmt.Errorf("failed to refund balance: %w", err)
 	}
 
