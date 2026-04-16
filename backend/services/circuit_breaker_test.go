@@ -20,8 +20,8 @@ func TestNewCircuitBreaker(t *testing.T) {
 		t.Errorf("Expected timeout=60s, got %v", cb.timeout)
 	}
 
-	if cb.state != CircuitStateOpen {
-		t.Errorf("Expected initial state=open, got %s", cb.state)
+	if cb.state != CircuitStateClosed {
+		t.Errorf("Expected initial state=closed, got %s", cb.state)
 	}
 }
 
@@ -49,19 +49,19 @@ func TestCircuitBreakerAllowRequest(t *testing.T) {
 	cb := NewCircuitBreaker(3, 1*time.Second)
 
 	if !cb.AllowRequest() {
-		t.Error("Should allow request in open state")
+		t.Error("Should allow request in closed state")
 	}
 
 	cb.RecordFailure()
 	cb.RecordFailure()
 	cb.RecordFailure()
 
-	if cb.GetState() != CircuitStateClosed {
-		t.Error("Should be closed after 3 failures")
+	if cb.GetState() != CircuitStateOpen {
+		t.Error("Should be open after 3 failures")
 	}
 
 	if cb.AllowRequest() {
-		t.Error("Should not allow request in closed state")
+		t.Error("Should not allow request in open state")
 	}
 
 	time.Sleep(1100 * time.Millisecond)
@@ -81,8 +81,8 @@ func TestCircuitBreakerRecordSuccess(t *testing.T) {
 	cb.RecordFailure()
 	cb.RecordFailure()
 
-	if cb.GetState() != CircuitStateClosed {
-		t.Error("Should be closed after failures")
+	if cb.GetState() != CircuitStateOpen {
+		t.Error("Should be open after failures")
 	}
 
 	time.Sleep(100 * time.Millisecond)
@@ -94,8 +94,8 @@ func TestCircuitBreakerRecordSuccess(t *testing.T) {
 	cb.RecordSuccess()
 	cb.RecordSuccess()
 
-	if cb.GetState() != CircuitStateOpen {
-		t.Errorf("Should be open after 3 successes in half-open, got %s", cb.GetState())
+	if cb.GetState() != CircuitStateClosed {
+		t.Errorf("Should be closed after 3 successes in half-open, got %s", cb.GetState())
 	}
 }
 
@@ -103,22 +103,22 @@ func TestCircuitBreakerRecordFailure(t *testing.T) {
 	cb := NewCircuitBreaker(3, 60*time.Second)
 
 	cb.RecordFailure()
-	if cb.GetState() != CircuitStateOpen {
-		t.Error("Should still be open after 1 failure")
+	if cb.GetState() != CircuitStateClosed {
+		t.Error("Should still be closed after 1 failure")
 	}
 
 	cb.RecordFailure()
 	cb.RecordFailure()
 
-	if cb.GetState() != CircuitStateClosed {
-		t.Error("Should be closed after 3 failures")
+	if cb.GetState() != CircuitStateOpen {
+		t.Error("Should be open after 3 failures")
 	}
 
 	cb.state = CircuitStateHalfOpen
 	cb.RecordFailure()
 
-	if cb.GetState() != CircuitStateClosed {
-		t.Error("Should be closed after failure in half-open state")
+	if cb.GetState() != CircuitStateOpen {
+		t.Error("Should be open after failure in half-open state")
 	}
 }
 
@@ -155,7 +155,7 @@ func TestCircuitBreakerConcurrent(t *testing.T) {
 		<-done
 	}
 
-	if cb.GetState() != CircuitStateOpen {
-		t.Error("Should remain open after concurrent successes")
+	if cb.GetState() != CircuitStateClosed {
+		t.Error("Should remain closed after concurrent successes")
 	}
 }

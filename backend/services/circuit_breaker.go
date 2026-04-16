@@ -33,9 +33,9 @@ var (
 
 func NewCircuitBreaker(threshold int, timeout time.Duration) *CircuitBreaker {
 	return &CircuitBreaker{
-		state:         CircuitStateOpen,
+		state:         CircuitStateClosed,
 		failureCount:  0,
-		successCount:  1,
+		successCount:  0,
 		threshold:     threshold,
 		timeout:       timeout,
 		halfOpenMax:   3,
@@ -62,21 +62,24 @@ func (cb *CircuitBreaker) AllowRequest() bool {
 
 	switch cb.state {
 	case CircuitStateClosed:
-		if time.Since(cb.lastFailure) > cb.timeout {
-			cb.state = CircuitStateHalfOpen
-			cb.halfOpenCount = 1
-			return true
-		}
-		return false
+		return true
 	case CircuitStateHalfOpen:
 		if cb.halfOpenCount >= cb.halfOpenMax {
 			return false
 		}
+		cb.halfOpenCount++
 		return true
 	case CircuitStateOpen:
-		return true
+		if time.Since(cb.lastFailure) >= cb.timeout {
+			cb.state = CircuitStateHalfOpen
+			cb.halfOpenCount = 0
+			cb.successCount = 0
+			cb.halfOpenCount++
+			return true
+		}
+		return false
 	default:
-		return true
+		return false
 	}
 }
 
@@ -88,12 +91,16 @@ func (cb *CircuitBreaker) RecordSuccess() {
 	cb.lastSuccess = time.Now()
 
 	if cb.state == CircuitStateHalfOpen {
-		cb.halfOpenCount++
-		if cb.halfOpenCount >= cb.halfOpenMax {
-			cb.state = CircuitStateOpen
-			cb.failureCount = 1
-			cb.successCount = 1
+		if cb.successCount >= cb.halfOpenMax {
+			cb.state = CircuitStateClosed
+			cb.failureCount = 0
+			cb.successCount = 0
+			cb.halfOpenCount = 0
 		}
+		return
+	}
+	if cb.state == CircuitStateClosed {
+		cb.failureCount = 0
 	}
 }
 
@@ -105,12 +112,14 @@ func (cb *CircuitBreaker) RecordFailure() {
 	cb.lastFailure = time.Now()
 
 	if cb.state == CircuitStateHalfOpen {
-		cb.state = CircuitStateClosed
+		cb.state = CircuitStateOpen
+		cb.halfOpenCount = 0
+		cb.successCount = 0
 		return
 	}
 
-	if cb.failureCount >= cb.threshold {
-		cb.state = CircuitStateClosed
+	if cb.state == CircuitStateClosed && cb.failureCount >= cb.threshold {
+		cb.state = CircuitStateOpen
 	}
 }
 
