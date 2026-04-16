@@ -22,6 +22,7 @@ import {
   UnorderedListOutlined,
   MenuOutlined,
   GiftOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import './Layout.css';
@@ -33,6 +34,7 @@ function getMainNavSelectedKey(pathname: string): string[] {
   if (pathname === '/') return ['home'];
   if (pathname.startsWith('/catalog')) return ['catalog'];
   if (pathname.startsWith('/packages')) return ['packages'];
+  if (pathname.startsWith('/fuel-station')) return ['fuelStation'];
   if (pathname === '/cart' || pathname === '/checkout') return ['cart'];
   if (pathname.startsWith('/orders') || pathname.startsWith('/payment')) return ['orders'];
   return [];
@@ -70,6 +72,11 @@ export default function Layout() {
         icon: <GiftOutlined />,
       },
       {
+        key: 'fuelStation',
+        label: <Link to="/fuel-station">加油站</Link>,
+        icon: <ThunderboltOutlined />,
+      },
+      {
         key: 'cart',
         label: <Link to="/cart">购物车</Link>,
         icon: <ShoppingCartOutlined />,
@@ -99,6 +106,7 @@ export default function Layout() {
     home: '/',
     catalog: '/catalog',
     packages: '/packages',
+    fuelStation: '/fuel-station',
     cart: '/cart',
     orders: '/orders',
   };
@@ -119,6 +127,11 @@ export default function Layout() {
         key: 'packages',
         label: '套餐包',
         icon: <GiftOutlined />,
+      },
+      {
+        key: 'fuelStation',
+        label: '加油站',
+        icon: <ThunderboltOutlined />,
       },
       {
         key: 'cart',

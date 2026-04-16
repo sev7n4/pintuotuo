@@ -59,6 +59,12 @@ const CheckoutPage: React.FC = () => {
       message.warning('请选择要结算的商品');
       return;
     }
+    const hasFuelPack = selectedCartItems.some((item) => item.sku_type === 'token_pack');
+    const hasNonFuelPack = selectedCartItems.some((item) => item.sku_type !== 'token_pack');
+    if (hasFuelPack && !hasNonFuelPack) {
+      message.warning('加油包不可单独购买，请至少搭配一个模型商品或套餐包');
+      return;
+    }
 
     try {
       const orderId = await createOrder(
@@ -167,14 +173,18 @@ const CheckoutPage: React.FC = () => {
               type="info"
               showIcon
               style={{ marginBottom: 16 }}
-              message="补充 Token（加油包）"
+              message="加油包购买规则"
               description={
                 <span>
-                  若调用时余额不足，可前往{' '}
+                  加油包不可单独购买，需与至少一个在售模型商品或套餐包组合下单；如需补充余额，可前往{' '}
                   <a href="/catalog" onClick={(e) => { e.preventDefault(); navigate('/catalog'); }}>
-                    卖场选购 Token 包
+                    卖场
                   </a>
-                  ；入账按批次有效期，先到期先扣（详见「我的 Token」页）。
+                  或{' '}
+                  <a href="/fuel-station" onClick={(e) => { e.preventDefault(); navigate('/fuel-station'); }}>
+                    模型加油站
+                  </a>
+                  选择组合方案。入账按批次有效期，先到期先扣（详见「我的 Token」页）。
                 </span>
               }
             />

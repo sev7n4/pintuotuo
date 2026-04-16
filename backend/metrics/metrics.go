@@ -232,6 +232,15 @@ var (
 		},
 		[]string{"method"},
 	)
+
+	// Fuel pack restriction counter
+	FuelPackRestrictionTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "fuel_pack_restriction_total",
+			Help: "Total count of blocked fuel-pack-only purchase attempts",
+		},
+		[]string{"source", "reason_code"},
+	)
 )
 
 // Pricing Service Metrics
@@ -440,6 +449,11 @@ func RecordOrderCreation(status string, valueInCents int64, currency string) {
 func RecordPaymentProcessed(method, status string, valueInCents int64) {
 	PaymentsProcessed.WithLabelValues(method, status).Inc()
 	PaymentValue.WithLabelValues(method).Observe(float64(valueInCents))
+}
+
+// RecordFuelPackRestriction records blocked fuel-pack-only attempts.
+func RecordFuelPackRestriction(source, reasonCode string) {
+	FuelPackRestrictionTotal.WithLabelValues(source, reasonCode).Inc()
 }
 
 // RecordApplicationError records an application error

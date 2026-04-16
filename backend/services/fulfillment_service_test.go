@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pintuotuo/backend/billing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,4 +70,14 @@ func TestEffectiveComputePointsForFulfillment_PrefersOrder(t *testing.T) {
 	got := EffectiveComputePointsForFulfillment(o, s)
 	assert.True(t, got.Valid)
 	assert.InDelta(t, 12.5, got.Float64, 1e-9)
+}
+
+func TestEffectiveTokenLotValidDays_Default(t *testing.T) {
+	got := EffectiveTokenLotValidDays(sql.NullInt64{Valid: false})
+	assert.Equal(t, billing.DefaultTokenLotValidDays, got)
+}
+
+func TestEffectiveTokenLotValidDays_FromSKU(t *testing.T) {
+	got := EffectiveTokenLotValidDays(sql.NullInt64{Valid: true, Int64: 30})
+	assert.Equal(t, 30, got)
 }

@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/logger"
+	"github.com/pintuotuo/backend/metrics"
 	"github.com/pintuotuo/backend/middleware"
 )
 
@@ -29,6 +31,9 @@ type EntitlementPackageItem struct {
 	Stock           int     `json:"stock"`
 	LinePurchasable bool    `json:"line_purchasable"`
 	LineIssue       string  `json:"line_issue,omitempty"`
+	ModelProvider   string  `json:"-"`
+	ModelName       string  `json:"-"`
+	ProviderModelID string  `json:"-"`
 }
 
 type EntitlementPackage struct {
@@ -120,7 +125,8 @@ func loadEntitlementPackageItems(db *sql.DB, packageID int) ([]EntitlementPackag
 	rows, err := db.Query(
 		`SELECT epi.id, epi.sku_id, s.sku_code, sp.name, s.sku_type, epi.default_quantity, s.retail_price,
 		        COALESCE(epi.display_name, ''), COALESCE(epi.value_note, ''),
-		        s.status, sp.status, s.stock
+		        s.status, sp.status, s.stock,
+		        COALESCE(sp.model_provider, ''), COALESCE(sp.model_name, ''), COALESCE(sp.provider_model_id, '')
 		 FROM entitlement_package_items epi
 		 JOIN skus s ON epi.sku_id = s.id
 		 JOIN spus sp ON s.spu_id = sp.id
@@ -139,6 +145,7 @@ func loadEntitlementPackageItems(db *sql.DB, packageID int) ([]EntitlementPackag
 			&it.ID, &it.SKUID, &it.SKUCode, &it.SPUName, &it.SKUType, &it.DefaultQuantity, &it.RetailPrice,
 			&it.DisplayName, &it.ValueNote,
 			&it.SKUStatus, &it.SPUStatus, &it.Stock,
+			&it.ModelProvider, &it.ModelName, &it.ProviderModelID,
 		); err != nil {
 			return nil, err
 		}
@@ -248,6 +255,19 @@ func CreateAdminEntitlementPackage(c *gin.Context) {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
+	if err = validateEntitlementPackageBundlePolicy(tx, lines); err != nil {
+		metrics.RecordFuelPackRestriction("admin_entitlement_package_create", "FUEL_PACK_PURCHASE_RESTRICTED")
+		logger.LogWarn(c.Request.Context(), "fuel_pack_policy", "Blocked entitlement package create without model SKU", map[string]interface{}{
+			"source": "admin_entitlement_package_create",
+			"code":   "FUEL_PACK_PURCHASE_RESTRICTED",
+		})
+		if ae, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, ae)
+			return
+		}
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	var packageID int
 	err = tx.QueryRow(
@@ -337,6 +357,19 @@ func UpdateAdminEntitlementPackage(c *gin.Context) {
 		}{SKUID: it.SKUID, DefaultQuantity: it.DefaultQuantity}
 	}
 	if err = validateEntitlementPackageSKUReferences(tx, lines); err != nil {
+		if ae, ok := err.(*apperrors.AppError); ok {
+			middleware.RespondWithError(c, ae)
+			return
+		}
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	if err = validateEntitlementPackageBundlePolicy(tx, lines); err != nil {
+		metrics.RecordFuelPackRestriction("admin_entitlement_package_update", "FUEL_PACK_PURCHASE_RESTRICTED")
+		logger.LogWarn(c.Request.Context(), "fuel_pack_policy", "Blocked entitlement package update without model SKU", map[string]interface{}{
+			"source": "admin_entitlement_package_update",
+			"code":   "FUEL_PACK_PURCHASE_RESTRICTED",
+		})
 		if ae, ok := err.(*apperrors.AppError); ok {
 			middleware.RespondWithError(c, ae)
 			return

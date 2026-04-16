@@ -12,7 +12,10 @@ import (
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/logger"
+	"github.com/pintuotuo/backend/metrics"
 	"github.com/pintuotuo/backend/middleware"
+	"github.com/pintuotuo/backend/services"
 )
 
 type FlashSale struct {
@@ -252,9 +255,36 @@ func CreateFlashSale(c *gin.Context) {
 
 	for _, p := range req.Skus {
 		var originalPrice float64
-		err := tx.QueryRow("SELECT retail_price FROM skus WHERE id = $1 AND status = 'active'", p.SKUID).Scan(&originalPrice)
+		var skuType, modelProvider, modelName, providerModelID string
+		err := tx.QueryRow(
+			`SELECT s.retail_price, s.sku_type, COALESCE(sp.model_provider, ''), COALESCE(sp.model_name, ''), COALESCE(sp.provider_model_id, '')
+			 FROM skus s
+			 JOIN spus sp ON s.spu_id = sp.id
+			 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
+			p.SKUID,
+		).Scan(&originalPrice, &skuType, &modelProvider, &modelName, &providerModelID)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+			return
+		}
+		if err := services.ValidateFuelPackBundle([]services.OrderLinePolicyInput{{
+			SKUType:         skuType,
+			ModelProvider:   modelProvider,
+			ModelName:       modelName,
+			ProviderModelID: providerModelID,
+		}}); err != nil {
+			metrics.RecordFuelPackRestriction("admin_flash_sale", "FUEL_PACK_PURCHASE_RESTRICTED")
+			logger.LogWarn(c.Request.Context(), "fuel_pack_policy", "Blocked flash sale sku without model entitlement", map[string]interface{}{
+				"source": "admin_flash_sale",
+				"sku_id": p.SKUID,
+				"code":   "FUEL_PACK_PURCHASE_RESTRICTED",
+			})
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"FUEL_PACK_PURCHASE_RESTRICTED",
+				"加油包不可单独购买，秒杀活动仅支持带模型商品",
+				http.StatusBadRequest,
+				nil,
+			))
 			return
 		}
 

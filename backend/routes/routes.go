@@ -118,6 +118,7 @@ func RegisterCatalogRoutes(router *gin.RouterGroup) {
 		catalog.GET("/scenarios", handlers.GetScenarios)
 		catalog.GET("/scenarios/:scenario/spus", handlers.GetSPUsByScenario)
 		catalog.GET("/spus/:id/performance", handlers.GetSPUPerformance)
+		catalog.GET("/fuel-station-config", handlers.GetFuelStationConfig)
 
 		merchants := catalog.Group("/merchants")
 		merchants.Use(middleware.AuthMiddleware())
@@ -315,6 +316,10 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 
 		admin.GET("/platform-settings", handlers.GetAdminPlatformSettings)
 		admin.PUT("/platform-settings", handlers.UpdateAdminPlatformSettings)
+		admin.GET("/fuel-station-config", handlers.GetAdminFuelStationConfig)
+		admin.PUT("/fuel-station-config", handlers.UpdateAdminFuelStationConfig)
+		admin.GET("/fuel-station-templates", handlers.GetAdminFuelStationTemplateLibrary)
+		admin.PUT("/fuel-station-templates", handlers.UpdateAdminFuelStationTemplateLibrary)
 		admin.GET("/entitlement-packages", handlers.ListAdminEntitlementPackages)
 		admin.POST("/entitlement-packages", handlers.CreateAdminEntitlementPackage)
 		admin.PUT("/entitlement-packages/:id", handlers.UpdateAdminEntitlementPackage)

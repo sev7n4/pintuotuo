@@ -64,6 +64,13 @@ func EffectiveComputePointsForFulfillment(orderCP, skuCP sql.NullFloat64) sql.Nu
 	return skuCP
 }
 
+func EffectiveTokenLotValidDays(validDays sql.NullInt64) int {
+	if validDays.Valid && validDays.Int64 > 0 {
+		return int(validDays.Int64)
+	}
+	return billing.DefaultTokenLotValidDays
+}
+
 // FulfillOrder delivers digital goods for a paid order. Idempotent via orders.fulfilled_at.
 func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 	var userID int
@@ -155,7 +162,7 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 		st := strings.ToLower(strings.TrimSpace(effectiveType))
 		switch st {
 		case skuTypeTokenPack:
-			if err = s.fulfillTokenPack(tx, userID, item.SKUID, orderID, item.ID, item.Quantity, tokenAmt, "token_pack"); err != nil {
+			if err = s.fulfillTokenPack(tx, userID, item.SKUID, orderID, item.ID, item.Quantity, tokenAmt, skuRow.ValidDays, "token_pack"); err != nil {
 				return err
 			}
 		case skuTypeComputePoints:
@@ -172,7 +179,7 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 			}
 		case skuTypeConcurrent:
 			if tokenAmt.Valid && tokenAmt.Int64 > 0 {
-				if err = s.fulfillTokenPack(tx, userID, item.SKUID, orderID, item.ID, item.Quantity, tokenAmt, "token_pack"); err != nil {
+				if err = s.fulfillTokenPack(tx, userID, item.SKUID, orderID, item.ID, item.Quantity, tokenAmt, skuRow.ValidDays, "token_pack"); err != nil {
 					return err
 				}
 			} else if computeAmt.Valid && computeAmt.Float64 > 0 {
@@ -193,8 +200,8 @@ func (s *FulfillmentService) FulfillOrder(tx *sql.Tx, orderID int) error {
 	return err
 }
 
-// fulfillTokenPack credits a dated token lot (default 365d). lotType examples: token_pack, subscription_bonus.
-func (s *FulfillmentService) fulfillTokenPack(tx *sql.Tx, userID, skuID, orderID, orderItemID, qty int, tokenAmount sql.NullInt64, lotType string) error {
+// fulfillTokenPack credits a dated token lot (SKU valid_days, fallback default). lotType examples: token_pack, subscription_bonus.
+func (s *FulfillmentService) fulfillTokenPack(tx *sql.Tx, userID, skuID, orderID, orderItemID, qty int, tokenAmount sql.NullInt64, validDays sql.NullInt64, lotType string) error {
 	if !tokenAmount.Valid || tokenAmount.Int64 <= 0 {
 		return fmt.Errorf("token_pack sku %d has no token_amount", skuID)
 	}
@@ -202,7 +209,7 @@ func (s *FulfillmentService) fulfillTokenPack(tx *sql.Tx, userID, skuID, orderID
 		lotType = "token_pack"
 	}
 	add := float64(tokenAmount.Int64) * float64(qty)
-	exp := time.Now().UTC().AddDate(0, 0, billing.DefaultTokenLotValidDays)
+	exp := time.Now().UTC().AddDate(0, 0, EffectiveTokenLotValidDays(validDays))
 	if err := billing.CreditTokenLot(tx, userID, add, &exp, orderItemID, lotType); err != nil {
 		return fmt.Errorf("token_pack credit: %w", err)
 	}
@@ -244,7 +251,7 @@ func (s *FulfillmentService) fulfillSubscription(tx *sql.Tx, userID, skuID, orde
 
 	// Scheme 2: subscription SKU can also grant token balance at activation time.
 	if tokenAmount.Valid && tokenAmount.Int64 > 0 {
-		return s.fulfillTokenPack(tx, userID, skuID, orderID, orderItemID, qty, tokenAmount, "subscription_bonus")
+		return s.fulfillTokenPack(tx, userID, skuID, orderID, orderItemID, qty, tokenAmount, skuRow.ValidDays, "subscription_bonus")
 	}
 	return nil
 }
