@@ -21,19 +21,19 @@ type FuelStationTierConfig struct {
 }
 
 type FuelStationSectionConfig struct {
-	Code        string                `json:"code"`
-	Name        string                `json:"name"`
-	Description string                `json:"description"`
-	Badge       string                `json:"badge"`
-	SortOrder   int                   `json:"sort_order"`
-	Status      string                `json:"status"`
+	Code        string                  `json:"code"`
+	Name        string                  `json:"name"`
+	Description string                  `json:"description"`
+	Badge       string                  `json:"badge"`
+	SortOrder   int                     `json:"sort_order"`
+	Status      string                  `json:"status"`
 	Tiers       []FuelStationTierConfig `json:"tiers"`
 }
 
 type FuelStationConfig struct {
-	PageTitle    string                    `json:"page_title"`
-	PageSubtitle string                    `json:"page_subtitle"`
-	RuleText     string                    `json:"rule_text"`
+	PageTitle    string                     `json:"page_title"`
+	PageSubtitle string                     `json:"page_subtitle"`
+	RuleText     string                     `json:"rule_text"`
 	Sections     []FuelStationSectionConfig `json:"sections"`
 }
 
@@ -239,4 +239,3 @@ func UpdateFuelStationTemplateLibrary(ctx context.Context, templates []FuelStati
 	}
 	return templates, nil
 }
-

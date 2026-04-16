@@ -267,12 +267,13 @@ func CreateFlashSale(c *gin.Context) {
 			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 			return
 		}
-		if err := services.ValidateFuelPackBundle([]services.OrderLinePolicyInput{{
+		validateErr := services.ValidateFuelPackBundle([]services.OrderLinePolicyInput{{
 			SKUType:         skuType,
 			ModelProvider:   modelProvider,
 			ModelName:       modelName,
 			ProviderModelID: providerModelID,
-		}}); err != nil {
+		}})
+		if validateErr != nil {
 			metrics.RecordFuelPackRestriction("admin_flash_sale", "FUEL_PACK_PURCHASE_RESTRICTED")
 			logger.LogWarn(c.Request.Context(), "fuel_pack_policy", "Blocked flash sale sku without model entitlement", map[string]interface{}{
 				"source": "admin_flash_sale",

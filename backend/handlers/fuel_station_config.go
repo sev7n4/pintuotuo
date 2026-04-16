@@ -29,9 +29,9 @@ type fuelStationConfigRequest struct {
 
 type fuelStationTemplateLibraryRequest struct {
 	Templates []struct {
-		Key         string                 `json:"key"`
-		Name        string                 `json:"name"`
-		Description string                 `json:"description"`
+		Key         string                   `json:"key"`
+		Name        string                   `json:"name"`
+		Description string                   `json:"description"`
 		Payload     fuelStationConfigRequest `json:"payload"`
 	} `json:"templates"`
 }
@@ -154,4 +154,3 @@ func UpdateAdminFuelStationTemplateLibrary(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": out})
 }
-
