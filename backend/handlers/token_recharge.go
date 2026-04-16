@@ -33,7 +33,7 @@ func applyRechargeSuccessInTx(tx *sql.Tx, order *RechargeOrder) error {
 		return fmt.Errorf("recharge order not pending or missing")
 	}
 
-	if err := billing.CreditLegacyLot(tx, order.UserID, order.Amount, "recharge"); err != nil {
+	if err = billing.CreditLegacyLot(tx, order.UserID, order.Amount, "recharge"); err != nil {
 		return err
 	}
 

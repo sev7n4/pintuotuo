@@ -30,7 +30,7 @@ func (s *ComputePointService) CreditComputePoints(userID int, points float64, de
 	}
 	defer tx.Rollback()
 
-	if err := billing.CreditLegacyLot(tx, userID, points, "compute_points"); err != nil {
+	if err = billing.CreditLegacyLot(tx, userID, points, "compute_points"); err != nil {
 		return nil, err
 	}
 
