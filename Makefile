@@ -1,4 +1,4 @@
-.PHONY: help setup dev-backend dev-frontend dev test build clean docker-up docker-down migrate
+.PHONY: help setup dev-backend dev-frontend dev test build clean docker-up docker-down migrate prompt-eval
 
 # Go 模块缓存：部分 IDE/沙箱会把 GOMODCACHE 指到不完整路径，导致 go test 报「源文件不存在」。
 # 统一通过 scripts/ensure-go-modcache.sh 回退到 $HOME/go/pkg/mod（可被环境变量预先覆盖）。
@@ -33,6 +33,9 @@ test: ## Run all tests
 	@echo "$(BLUE)Running tests...$(NC)"
 	cd backend && go test ./... -v
 	cd frontend && npm test
+
+prompt-eval: ## Promptfoo 回归（需环境变量 PROMPTFOO_BASE_URL、PROMPTFOO_API_KEY、PROMPTFOO_MODEL）
+	@bash scripts/run_prompt_evals.sh
 
 test-backend: ## Run backend tests only
 	@echo "$(BLUE)Running backend tests...$(NC)"

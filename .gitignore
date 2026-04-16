@@ -136,8 +136,14 @@ harness_engineering_learning.md
 # 本地业务草稿（勿提交）
 userright-tools.md
 
-# Deploy docs (keep local only)
-deploy/
+# Deploy：目录下曾用「整目录忽略 + git add -f」跟踪配置；以下子树由仓库维护，新文件可直接 git add
+deploy/*
+!deploy/alertmanager/
+!deploy/alertmanager/**
+!deploy/grafana/
+!deploy/grafana/**
+!deploy/prometheus/
+!deploy/prometheus/**
 
 # Docs folder (keep local only)
 docs/
