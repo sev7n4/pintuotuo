@@ -28,7 +28,10 @@ import (
 	"github.com/pintuotuo/backend/utils"
 )
 
-const providerAnthropic = "anthropic"
+const (
+	providerAnthropic = "anthropic"
+	apiFormatOpenAI   = "openai"
+)
 
 // 路由策略来源（trace / 落库 effective_policy_source，与 JSON 对外字段一致）
 const (
@@ -506,7 +509,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
 	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if cfg.APIFormat != "openai" || active == "" || active == "none" {
+	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == "none" {
 		return cfg
 	}
 	switch active {
@@ -524,7 +527,7 @@ func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
 
 func resolveGatewayAuthToken(cfg providerRuntimeConfig, fallbackToken string) string {
 	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if cfg.APIFormat != "openai" || active == "" || active == "none" {
+	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == "none" {
 		return fallbackToken
 	}
 	switch active {
