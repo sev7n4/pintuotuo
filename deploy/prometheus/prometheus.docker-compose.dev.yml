@@ -1,0 +1,25 @@
+# 仅用于仓库根目录 docker-compose.yml 的本地开发栈。
+# 生产与完整监控栈仍使用同目录下的 prometheus.yml（含 exporter / 网关等 job）。
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'pintuotuo-backend'
+    static_configs:
+      - targets: ['backend:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
