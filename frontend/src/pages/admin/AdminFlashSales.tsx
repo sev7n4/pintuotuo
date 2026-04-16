@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Card, Typography, Form, Input, InputNumber, Button, Space, message } from 'antd';
+import { Card, Typography, Form, Input, InputNumber, Button, Space, message, Alert } from 'antd';
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import api from '@/services/api';
+import { skuService } from '@/services/sku';
 
 const { Title } = Typography;
 
@@ -16,6 +17,12 @@ const AdminFlashSales = () => {
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
 
+  const isStrictModelSKU = (provider?: string, modelName?: string, providerModelID?: string) => {
+    const p = String(provider || '').trim().toLowerCase();
+    if (!p || p === 'internal' || p === 'virtual_goods') return false;
+    return Boolean(String(providerModelID || '').trim() || String(modelName || '').trim());
+  };
+
   const onFinish = async (values: {
     name: string;
     description?: string;
@@ -25,6 +32,16 @@ const AdminFlashSales = () => {
   }) => {
     setLoading(true);
     try {
+      for (const row of values.skus || []) {
+        const skuID = Number(row.sku_id);
+        const res = await skuService.getSKU(skuID);
+        const sku = res.data.data;
+        if (sku.sku_type === 'token_pack' && !isStrictModelSKU(sku.model_provider, sku.model_name, sku.provider_model_id)) {
+          message.warning(`SKU ${skuID} 不可单独作为加油包秒杀，请改为带模型商品`);
+          setLoading(false);
+          return;
+        }
+      }
       const skus = (values.skus || []).map((row) => ({
         sku_id: Number(row.sku_id),
         flash_price: Number(row.flash_price),
@@ -51,6 +68,13 @@ const AdminFlashSales = () => {
   return (
     <div>
       <Title level={2}>秒杀配置</Title>
+      <Alert
+        type="warning"
+        showIcon
+        style={{ marginBottom: 12 }}
+        message="加油包限制"
+        description="加油包不可单独购买。秒杀活动中若配置纯加油包 SKU，会在提交前拦截并提示。"
+      />
       <Card>
         <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ skus: [{}] }}>
           <Form.Item

@@ -33,6 +33,7 @@ import FavoritesPage from '@pages/FavoritesPage';
 import HistoryPage from '@pages/HistoryPage';
 import EntitlementPackagesPage from '@pages/EntitlementPackagesPage';
 import MyEntitlementsPage from '@pages/MyEntitlementsPage';
+import FuelStationPage from '@pages/FuelStationPage';
 
 // Merchant Pages
 import MerchantDashboard from '@pages/merchant/MerchantDashboard';
@@ -57,6 +58,7 @@ import AdminSPUs from '@pages/admin/AdminSPUs';
 import AdminSKUs from '@pages/admin/AdminSKUs';
 import AdminModelProviders from '@pages/admin/AdminModelProviders';
 import AdminFlashSales from '@pages/admin/AdminFlashSales';
+import AdminFuelStation from '@pages/admin/AdminFuelStation';
 import AdminBillings from '@pages/admin/AdminBillings';
 import AdminUserBillings from '@pages/admin/AdminUserBillings';
 import AdminSettlements from '@pages/admin/AdminSettlements';
@@ -88,6 +90,7 @@ function App() {
             <Route path="/catalog" element={<ProductListPage />} />
             <Route path="/catalog/:id" element={<ProductDetailPage />} />
             <Route path="/packages" element={<EntitlementPackagesPage />} />
+            <Route path="/fuel-station" element={<FuelStationPage />} />
 
             {/* Categories */}
             <Route path="/categories" element={<CategoryPage />} />
@@ -170,6 +173,7 @@ function App() {
             <Route path="routing-strategies" element={<AdminRoutingStrategies />} />
             <Route path="reconciliation" element={<AdminReconciliation />} />
             <Route path="flash-sales" element={<AdminFlashSales />} />
+            <Route path="fuel-station" element={<AdminFuelStation />} />
             <Route path="entitlement-packages" element={<AdminEntitlementPackages />} />
           </Route>
         </Routes>

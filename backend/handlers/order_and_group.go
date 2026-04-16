@@ -14,6 +14,8 @@ import (
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/logger"
+	"github.com/pintuotuo/backend/metrics"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
@@ -67,6 +69,7 @@ func CreateOrder(c *gin.Context) {
 		cpAmount    sql.NullFloat64
 	}
 	items := make([]pendingItem, 0, len(req.Items))
+	policyLines := make([]services.OrderLinePolicyInput, 0, len(req.Items))
 	totalQty := 0
 	totalPrice := 0.0
 
@@ -87,15 +90,18 @@ func CreateOrder(c *gin.Context) {
 		var validDays sql.NullInt64
 		var trialDurationDays sql.NullInt64
 
+		var modelProvider, modelName, providerModelID sql.NullString
 		err = tx.QueryRow(
 			`SELECT s.id, s.spu_id, s.retail_price, s.wholesale_price, s.stock, s.sku_type,
-				s.token_amount, s.compute_points, s.subscription_period, s.valid_days, s.trial_duration_days
+				s.token_amount, s.compute_points, s.subscription_period, s.valid_days, s.trial_duration_days,
+				sp.model_provider, sp.model_name, sp.provider_model_id
 			 FROM skus s JOIN spus sp ON s.spu_id = sp.id
 			 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
 			in.SKUID,
 		).Scan(
 			&skuID, &spuID, &retailPrice, &wholesalePrice, &stock, &skuType,
 			&tokenAmount, &computePoints, &subscriptionPeriod, &validDays, &trialDurationDays,
+			&modelProvider, &modelName, &providerModelID,
 		)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -187,8 +193,29 @@ func CreateOrder(c *gin.Context) {
 			item.PricingVersionID = &pvInt
 		}
 		items = append(items, pendingItem{item: item, tokenAmount: tokenAmount, cpAmount: computePoints})
+		policyLines = append(policyLines, services.OrderLinePolicyInput{
+			SKUType:         skuType,
+			ModelProvider:   modelProvider.String,
+			ModelName:       modelName.String,
+			ProviderModelID: providerModelID.String,
+		})
 		totalQty += in.Quantity
 		totalPrice += lineTotal
+	}
+	if err = services.ValidateFuelPackBundle(policyLines); err != nil {
+		metrics.RecordFuelPackRestriction("create_order", "FUEL_PACK_PURCHASE_RESTRICTED")
+		logger.LogWarn(c.Request.Context(), "fuel_pack_policy", "Blocked token_pack-only create order", map[string]interface{}{
+			"user_id": userID,
+			"source":  "create_order",
+			"code":    "FUEL_PACK_PURCHASE_RESTRICTED",
+		})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FUEL_PACK_PURCHASE_RESTRICTED",
+			err.Error(),
+			http.StatusBadRequest,
+			nil,
+		))
+		return
 	}
 
 	var order models.Order
@@ -680,16 +707,39 @@ func CreateGroup(c *gin.Context) {
 	var groupEnabled bool
 	var minGroupSize, maxGroupSize int
 	var groupDiscountRate sql.NullFloat64
+	var modelProvider, modelName, providerModelID sql.NullString
 
 	err := db.QueryRow(
 		`SELECT s.id, s.spu_id, s.retail_price, s.sku_type, s.token_amount, s.compute_points,
-		        s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate
+		        s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
+		        sp.model_provider, sp.model_name, sp.provider_model_id
 		 FROM skus s JOIN spus sp ON s.spu_id = sp.id 
 		 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
 		req.SKUID,
-	).Scan(&skuID, &spuID, &retailPrice, &skuType, &tokenAmount, &computePoints, &groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate)
+	).Scan(&skuID, &spuID, &retailPrice, &skuType, &tokenAmount, &computePoints, &groupEnabled, &minGroupSize, &maxGroupSize, &groupDiscountRate, &modelProvider, &modelName, &providerModelID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
+	}
+	if err = services.ValidateFuelPackBundle([]services.OrderLinePolicyInput{{
+		SKUType:         skuType,
+		ModelProvider:   modelProvider.String,
+		ModelName:       modelName.String,
+		ProviderModelID: providerModelID.String,
+	}}); err != nil {
+		metrics.RecordFuelPackRestriction("create_group", "FUEL_PACK_PURCHASE_RESTRICTED")
+		logger.LogWarn(c.Request.Context(), "fuel_pack_policy", "Blocked token_pack-only group create", map[string]interface{}{
+			"user_id": userID,
+			"source":  "create_group",
+			"code":    "FUEL_PACK_PURCHASE_RESTRICTED",
+			"sku_id":  req.SKUID,
+		})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FUEL_PACK_PURCHASE_RESTRICTED",
+			"加油包不支持单独发起拼团，请选择带模型的商品",
+			http.StatusBadRequest,
+			nil,
+		))
 		return
 	}
 
@@ -1037,13 +1087,38 @@ func JoinGroup(c *gin.Context) {
 	var tokenAmount sql.NullInt64
 	var computePoints sql.NullFloat64
 	var groupDiscountRate sql.NullFloat64
+	var modelProvider, modelName, providerModelID sql.NullString
 	err = db.QueryRow(
-		`SELECT s.retail_price, s.sku_type, s.token_amount, s.compute_points, s.group_discount_rate 
-		 FROM skus s WHERE s.id = $1 AND s.status = 'active'`,
+		`SELECT s.retail_price, s.sku_type, s.token_amount, s.compute_points, s.group_discount_rate,
+		        sp.model_provider, sp.model_name, sp.provider_model_id
+		 FROM skus s
+		 JOIN spus sp ON s.spu_id = sp.id
+		 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
 		group.SKUID,
-	).Scan(&retailPrice, &skuType, &tokenAmount, &computePoints, &groupDiscountRate)
+	).Scan(&retailPrice, &skuType, &tokenAmount, &computePoints, &groupDiscountRate, &modelProvider, &modelName, &providerModelID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
+		return
+	}
+	if err = services.ValidateFuelPackBundle([]services.OrderLinePolicyInput{{
+		SKUType:         skuType,
+		ModelProvider:   modelProvider.String,
+		ModelName:       modelName.String,
+		ProviderModelID: providerModelID.String,
+	}}); err != nil {
+		metrics.RecordFuelPackRestriction("join_group", "FUEL_PACK_PURCHASE_RESTRICTED")
+		logger.LogWarn(c.Request.Context(), "fuel_pack_policy", "Blocked token_pack-only join group", map[string]interface{}{
+			"user_id": userID,
+			"source":  "join_group",
+			"code":    "FUEL_PACK_PURCHASE_RESTRICTED",
+			"sku_id":  group.SKUID,
+		})
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FUEL_PACK_PURCHASE_RESTRICTED",
+			"加油包不支持单独参团，请选择带模型的商品",
+			http.StatusBadRequest,
+			nil,
+		))
 		return
 	}
 	unitPrice := retailPrice * (1 - utils.NormalizeGroupDiscountRateNull(groupDiscountRate))

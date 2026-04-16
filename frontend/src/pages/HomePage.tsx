@@ -66,6 +66,12 @@ const quickNavItems: QuickNav[] = [
     icon: <ClockCircleOutlined />,
     link: '/catalog?sort=new',
   },
+  {
+    key: 'fuel',
+    name: '加油站',
+    icon: <ThunderboltOutlined />,
+    link: '/fuel-station',
+  },
 ];
 
 const HomePage = () => {

@@ -78,6 +78,11 @@ const menuItems = [
     label: '秒杀配置',
   },
   {
+    key: '/admin/fuel-station',
+    icon: <ThunderboltOutlined />,
+    label: '加油站专区',
+  },
+  {
     key: '/admin/orders',
     icon: <ShoppingCartOutlined />,
     label: '订单管理',
