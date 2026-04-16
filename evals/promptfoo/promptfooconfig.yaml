@@ -1,0 +1,26 @@
+description: pintuotuo llm regression baseline
+
+providers:
+  - id: openai:chat
+    config:
+      apiBaseUrl: ${PROMPTFOO_BASE_URL}
+      apiKey: ${PROMPTFOO_API_KEY}
+      model: ${PROMPTFOO_MODEL}
+
+prompts:
+  - file://evals/promptfoo/prompts/system.txt
+  - file://evals/promptfoo/prompts/user-template.txt
+
+tests: file://evals/promptfoo/cases/core-regression.csv
+
+defaultTest:
+  options:
+    provider:
+      temperature: 0
+  assert:
+    - type: latency
+      threshold: 5000
+    - type: contains-any
+      value:
+        - "{{expected_keyword_1}}"
+        - "{{expected_keyword_2}}"

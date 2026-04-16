@@ -62,6 +62,14 @@ services:
       - MFA_TOTP_ISSUER=${MFA_TOTP_ISSUER:-Pintuotuo}
       - PUBLIC_APP_BASE_URL=${PUBLIC_APP_BASE_URL:-}
       - FRONTEND_ORIGIN=${FRONTEND_ORIGIN:-}
+      # LLM 上游聚合网关（双轨评估）
+      - LLM_GATEWAY_ACTIVE=${LLM_GATEWAY_ACTIVE:-none}
+      - LLM_GATEWAY_LITELLM_URL=${LLM_GATEWAY_LITELLM_URL:-http://litellm:4000}
+      - LLM_GATEWAY_ONEAPI_URL=${LLM_GATEWAY_ONEAPI_URL:-http://oneapi:3000}
+      - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-false}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-}
       # 勿在此注入 HTTP(S)_PROXY 空值：会导致 Go 出站行为与未设置时不一致。
       # 若大陆机房必须走代理访问 github.com，请使用 docker-compose.proxy.override.yml.example 合并启动。
     depends_on:
@@ -164,6 +172,7 @@ services:
       - '--web.enable-lifecycle'
     volumes:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
@@ -187,6 +196,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/etc/grafana/dashboards:ro
     ports:
       - "3001:3000"
     depends_on:
@@ -199,6 +209,52 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: pintuotuo-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./deploy/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - pintuotuo-network
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: pintuotuo-litellm
+    restart: unless-stopped
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - MOONSHOT_API_KEY=${MOONSHOT_API_KEY:-}
+    command: ["--host", "0.0.0.0", "--port", "4000"]
+    ports:
+      - "4000:4000"
+    networks:
+      - pintuotuo-network
+    profiles: ["llm-gateway"]
+
+  oneapi:
+    image: ghcr.io/songquanpeng/one-api:latest
+    container_name: pintuotuo-oneapi
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+      - SESSION_SECRET=${ONEAPI_SESSION_SECRET:-change_me}
+      - SQL_DSN=${ONEAPI_SQL_DSN:-}
+      - REDIS_CONN_STRING=${ONEAPI_REDIS_CONN_STRING:-}
+    ports:
+      - "3002:3000"
+    networks:
+      - pintuotuo-network
+    profiles: ["llm-gateway"]
+
 networks:
   pintuotuo-network:
     driver: bridge
@@ -208,3 +264,4 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+  alertmanager_data:

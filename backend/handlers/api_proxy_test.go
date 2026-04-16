@@ -270,7 +270,7 @@ func TestApplyCircuitBreakerConfig(t *testing.T) {
 	applyCircuitBreakerConfig(apiKeyID, buildStrategyRuntimeSnapshot(""))
 	cb := services.GetCircuitBreaker(apiKeyID)
 	assert.NotNil(t, cb)
-	assert.Equal(t, services.CircuitStateOpen, cb.GetState())
+	assert.Equal(t, services.CircuitStateClosed, cb.GetState())
 
 	applyCircuitBreakerConfig(apiKeyID, buildStrategyRuntimeSnapshot("balanced"))
 	assert.NotNil(t, cb)

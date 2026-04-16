@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -53,8 +54,10 @@ func (p *RetryPolicy) calculateDelay(attempt int) time.Duration {
 }
 
 func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 &&
-		(s == substr || len(s) > len(substr) && s[:len(substr)] == substr)
+	if strings.TrimSpace(s) == "" || strings.TrimSpace(substr) == "" {
+		return false
+	}
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
 
 func ExecuteWithRetry(ctx context.Context, fn func() error, policy *RetryPolicy) error {

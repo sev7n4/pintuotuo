@@ -1,0 +1,37 @@
+name: Prompt Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'evals/promptfoo/**'
+      - 'scripts/run_prompt_evals.sh'
+      - '.github/workflows/prompt-regression.yml'
+
+jobs:
+  prompt-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PROMPTFOO_BASE_URL: ${{ secrets.PROMPTFOO_BASE_URL }}
+      PROMPTFOO_API_KEY: ${{ secrets.PROMPTFOO_API_KEY }}
+      PROMPTFOO_MODEL: ${{ secrets.PROMPTFOO_MODEL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run prompt regression
+        run: bash scripts/run_prompt_evals.sh
+
+      - name: Upload prompt regression report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptfoo-report
+          path: evals/promptfoo/reports/promptfoo-report.json
+          retention-days: 7

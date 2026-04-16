@@ -20,6 +20,14 @@ jest.mock('@/services/product', () => ({
   },
 }));
 
+jest.mock('@/components/CatalogFilterDrawer', () => ({
+  CatalogFilterDrawer: jest.fn(() => null),
+}));
+
+jest.mock('@/components/ScenarioFilter', () => ({
+  ScenarioFilter: jest.fn(() => null),
+}));
+
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: jest.fn(),
@@ -78,7 +86,11 @@ jest.mock('antd', () => ({
       </div>
     )),
   },
-  Select: jest.fn(() => null),
+  Select: Object.assign(jest.fn(({ children }) => <div data-testid="select">{children}</div>), {
+    Option: jest.fn(({ children, value }) => (
+      <div data-testid={`select-option-${String(value)}`}>{children}</div>
+    )),
+  }),
   Button: jest.fn(({ type, children, onClick }) => (
     <button data-testid="button" onClick={onClick} className={type === 'primary' ? 'primary' : ''}>
       {children}

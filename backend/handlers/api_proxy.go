@@ -148,6 +148,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	}
 	c.Header("X-Request-ID", requestID)
 	c.Header("X-Trace-ID", requestID)
+	traceSpan := services.StartLLMTrace(requestID, userIDInt)
+	defer traceSpan.Finish(c.Request.Context())
 
 	var strictPricingVID *int
 	if services.EntitlementEnforcementStrict() {
@@ -292,6 +294,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
+	providerCfg = applyGatewayOverride(providerCfg)
+	traceSpan.SetRoute(req.Provider, req.Model)
 
 	baseURL := strings.TrimRight(providerCfg.APIBaseURL, "/")
 	if baseURL == "" {
@@ -358,15 +362,18 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		httpReq.Header.Set("x-api-key", decryptedKey)
 		httpReq.Header.Set("anthropic-version", "2023-06-01")
 	default:
-		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", decryptedKey))
+		authToken := resolveGatewayAuthToken(providerCfg, decryptedKey)
+		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 	}
 
 	client := &http.Client{Timeout: 60 * time.Second}
 	strategySnapshot := buildStrategyRuntimeSnapshot(selectedStrategy)
 	applyCircuitBreakerConfig(apiKey.ID, strategySnapshot)
 	retryPolicy := buildRetryPolicy(strategySnapshot)
-	resp, err := executeProviderRequestWithRetry(client, httpReq, retryPolicy)
+	resp, retryCount, err := executeProviderRequestWithRetry(client, httpReq, retryPolicy)
 	if err != nil {
+		traceSpan.SetStatusCode(http.StatusBadGateway)
+		traceSpan.SetErrorCode("API_REQUEST_FAILED")
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		services.GetSmartRouter().RecordRequestResult(apiKey.ID, false)
 		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
@@ -398,6 +405,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	var apiResp APIProxyResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
+		traceSpan.SetStatusCode(resp.StatusCode)
+		traceSpan.SetErrorCode("UNMARSHAL_PROXY_RESPONSE_FAILED")
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		c.Data(resp.StatusCode, "application/json", body)
 		return
@@ -489,9 +498,46 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	}
 
 	decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
-	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, apiKey.ID, int(time.Since(decisionStart).Milliseconds()))
+	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, apiKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCount)
 
+	traceSpan.SetStatusCode(resp.StatusCode)
 	c.Data(resp.StatusCode, "application/json", body)
+}
+
+func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
+	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
+	if cfg.APIFormat != "openai" || active == "" || active == "none" {
+		return cfg
+	}
+	switch active {
+	case "litellm":
+		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
+			cfg.APIBaseURL = strings.TrimRight(base, "/") + "/v1"
+		}
+	case "oneapi":
+		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_ONEAPI_URL")); base != "" {
+			cfg.APIBaseURL = strings.TrimRight(base, "/") + "/v1"
+		}
+	}
+	return cfg
+}
+
+func resolveGatewayAuthToken(cfg providerRuntimeConfig, fallbackToken string) string {
+	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
+	if cfg.APIFormat != "openai" || active == "" || active == "none" {
+		return fallbackToken
+	}
+	switch active {
+	case "litellm":
+		if token := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY")); token != "" {
+			return token
+		}
+	case "oneapi":
+		if token := strings.TrimSpace(os.Getenv("ONEAPI_ACCESS_TOKEN")); token != "" {
+			return token
+		}
+	}
+	return fallbackToken
 }
 
 func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTokens, outputTokens int, strictPricingVID *int) (float64, error) {
@@ -833,26 +879,28 @@ func recordHealthCheckerProxyOutcome(c *gin.Context, apiKeyID int, success bool,
 	}
 }
 
-func insertRoutingDecision(db *sql.DB, requestID string, userID int, req APIProxyRequest, strategy string, candidatesJSON []byte, selectedAPIKeyID int, latencyMs int) error {
+func insertRoutingDecision(db *sql.DB, requestID string, userID int, req APIProxyRequest, strategy string, candidatesJSON []byte, selectedAPIKeyID int, latencyMs int, retryCount int) error {
 	if db == nil {
 		return nil
 	}
+	wasRetry := retryCount > 0
 	_, err := db.Exec(
 		`INSERT INTO routing_decisions
 		(request_id, user_id, model_requested, strategy_used, candidates, selected_provider, selected_api_key_id, decision_latency_ms, was_retry, retry_count)
-		VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, FALSE, 0)`,
-		requestID, userID, req.Model, strategy, candidatesJSON, selectedAPIKeyID, latencyMs,
+		VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8, $9)`,
+		requestID, userID, req.Model, strategy, candidatesJSON, selectedAPIKeyID, latencyMs, wasRetry, retryCount,
 	)
 	return err
 }
 
-func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request, policy *services.RetryPolicy) (*http.Response, error) {
+func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request, policy *services.RetryPolicy) (*http.Response, int, error) {
 	if policy == nil {
 		policy = services.DefaultRetryPolicy
 	}
 	var (
-		resp *http.Response
-		err  error
+		resp       *http.Response
+		err        error
+		retryCount int
 	)
 	ctx := baseReq.Context()
 	for i := 0; i <= policy.MaxRetries; i++ {
@@ -866,7 +914,7 @@ func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request,
 
 		resp, err = client.Do(req) // #nosec G704 -- upstream URL from admin-configured model_providers.api_base_url, not user-supplied host
 		if err == nil && resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < http.StatusInternalServerError {
-			return resp, nil
+			return resp, retryCount, nil
 		}
 
 		if resp != nil && (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= http.StatusInternalServerError) {
@@ -876,11 +924,12 @@ func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request,
 
 		shouldRetry, delay := policy.ShouldRetry(err, i)
 		if !shouldRetry {
-			return nil, err
+			return nil, retryCount, err
 		}
+		retryCount++
 		time.Sleep(delay)
 	}
-	return nil, err
+	return nil, retryCount, err
 }
 
 func buildRetryPolicy(snapshot strategyRuntimeSnapshot) *services.RetryPolicy {

@@ -39,6 +39,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 // Suppress console errors in tests (optional)
 const originalError = console.error;
+const originalWarn = console.warn;
 beforeAll(() => {
   console.error = (...args: any[]) => {
     if (
@@ -49,8 +50,19 @@ beforeAll(() => {
     }
     originalError.call(console, ...args);
   };
+  console.warn = (...args: any[]) => {
+    const first = typeof args[0] === 'string' ? args[0] : '';
+    if (
+      first.includes('React Router Future Flag Warning') &&
+      (first.includes('v7_startTransition') || first.includes('v7_relativeSplatPath'))
+    ) {
+      return;
+    }
+    originalWarn.call(console, ...args);
+  };
 });
 
 afterAll(() => {
   console.error = originalError;
+  console.warn = originalWarn;
 });

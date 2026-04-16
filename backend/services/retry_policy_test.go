@@ -155,7 +155,8 @@ func TestContains(t *testing.T) {
 	}{
 		{"timeout error", "timeout", true},
 		{"connection refused", "connection", true},
-		{"invalid request", "valid", false},
+		{"invalid request", "valid", true},
+		{"TIMEOUT while waiting", "timeout", true},
 		{"", "test", false},
 		{"test", "", false},
 	}
