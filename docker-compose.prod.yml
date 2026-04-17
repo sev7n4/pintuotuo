@@ -228,7 +228,7 @@ services:
       - pintuotuo-network
 
   litellm:
-    image: ghcr.io/berriai/litellm:main-stable
+    image: berriai/litellm:main-stable
     container_name: pintuotuo-litellm
     restart: unless-stopped
     environment:
@@ -244,7 +244,7 @@ services:
     profiles: ["llm-gateway"]
 
   oneapi:
-    image: ghcr.io/songquanpeng/one-api:latest
+    image: songquanpeng/one-api:latest
     container_name: pintuotuo-oneapi
     restart: unless-stopped
     environment:

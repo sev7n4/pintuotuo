@@ -5,6 +5,8 @@
 ### 0.1 部署行为
 
 - 生产部署采用「CI 预构建镜像 + 服务器拉取启动」：使用 **`docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway`**，会拉起 **LiteLLM**（`pintuotuo-litellm`）与 **OneAPI**（`pintuotuo-oneapi`）。部署流水线在启动后会检查这两个容器处于 **running**。
+- `backend`/`frontend` 由 CI 推送到 GHCR（按 commit SHA 打 tag）；流程会自动清理历史镜像 tag，仅保留最近 2 个版本。
+- `litellm`/`oneapi` 使用公开镜像源（Docker Hub），避免服务器对第三方 GHCR 拉取权限依赖。
 - 服务器项目目录下的 **`.env`** 需与 `docker-compose.prod.yml` 对齐（说明见仓库根目录 `.env.example`），至少关注：
   - **`LLM_GATEWAY_ACTIVE`**：`none` | `litellm` | `oneapi`（切网关前可保持 `none`，仅先验证容器与冒烟脚本）。
   - **`LLM_GATEWAY_LITELLM_URL` / `LLM_GATEWAY_ONEAPI_URL`**：Compose 默认 `http://litellm:4000`、`http://oneapi:3000` 即可。
