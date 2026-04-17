@@ -193,13 +193,15 @@ jobs:
           from: "GitHub Actions <${{ secrets.SMTP_USERNAME }}>"
         continue-on-error: true
 
-      - name: Cleanup GHCR tags (keep latest 2)
+      # 过激进会删掉仍被 main / 手动部署引用的 tag，导致服务器 docker compose pull 报 manifest not found。
+      # 与 backend / frontend 各保留最近若干「包版本」（通常对应每次 push 的 sha tag）。
+      - name: Cleanup GHCR tags (keep latest 15 per package)
         if: always()
         uses: actions/github-script@v7
         continue-on-error: true
         with:
           script: |
-            const keep = 2;
+            const keep = 15;
             const owner = context.repo.owner;
             const packages = ['pintuotuo-backend', 'pintuotuo-frontend'];
 
