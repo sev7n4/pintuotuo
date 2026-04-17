@@ -4,7 +4,7 @@
 
 ### 0.1 部署行为
 
-- 生产部署命令使用 **`docker-compose -f docker-compose.prod.yml --profile llm-gateway`**，会拉起 **LiteLLM**（`pintuotuo-litellm`）与 **OneAPI**（`pintuotuo-oneapi`）。部署流水线在启动后会检查这两个容器处于 **running**。
+- 生产部署采用「CI 预构建镜像 + 服务器拉取启动」：使用 **`docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway`**，会拉起 **LiteLLM**（`pintuotuo-litellm`）与 **OneAPI**（`pintuotuo-oneapi`）。部署流水线在启动后会检查这两个容器处于 **running**。
 - 服务器项目目录下的 **`.env`** 需与 `docker-compose.prod.yml` 对齐（说明见仓库根目录 `.env.example`），至少关注：
   - **`LLM_GATEWAY_ACTIVE`**：`none` | `litellm` | `oneapi`（切网关前可保持 `none`，仅先验证容器与冒烟脚本）。
   - **`LLM_GATEWAY_LITELLM_URL` / `LLM_GATEWAY_ONEAPI_URL`**：Compose 默认 `http://litellm:4000`、`http://oneapi:3000` 即可。

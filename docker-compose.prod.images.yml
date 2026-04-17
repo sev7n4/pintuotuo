@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ghcr.io/sev7n4/pintuotuo-backend:${IMAGE_TAG}
+
+  frontend:
+    image: ghcr.io/sev7n4/pintuotuo-frontend:${IMAGE_TAG}
