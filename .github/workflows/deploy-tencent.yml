@@ -72,6 +72,8 @@ jobs:
           IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway pull
           echo "Starting containers (no server-side build)..."
           IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway up -d
+          echo "Pruning dangling images to keep disk stable..."
+          docker image prune -f >/dev/null || true
           echo "Verifying gateway containers are running..."
           if ! docker ps --format '{{.Names}}' | grep -q '^pintuotuo-litellm$'; then
             echo "ERROR: pintuotuo-litellm not in running containers"
