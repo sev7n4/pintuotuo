@@ -69,7 +69,16 @@ jobs:
           git reset --hard origin/main
           echo "Login GHCR and pull prebuilt images..."
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway pull
+          for i in 1 2 3 4 5; do
+            if IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway pull; then
+              break
+            fi
+            if [ "$i" -eq 5 ]; then
+              echo "ERROR: docker compose pull failed after $i attempts"
+              exit 1
+            fi
+            sleep $((i * 20))
+          done
           echo "Starting containers (no server-side build)..."
           IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway up -d
           echo "Pruning dangling images to keep disk stable..."
@@ -183,3 +192,39 @@ jobs:
           to: ${{ secrets.DEPLOYMENT_NOTIFICATION_EMAIL }}
           from: "GitHub Actions <${{ secrets.SMTP_USERNAME }}>"
         continue-on-error: true
+
+      - name: Cleanup GHCR tags (keep latest 2)
+        if: always()
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const keep = 2;
+            const owner = context.repo.owner;
+            const packages = ['pintuotuo-backend', 'pintuotuo-frontend'];
+
+            for (const pkg of packages) {
+              const versions = await github.paginate(
+                github.rest.packages.getAllPackageVersionsForPackageOwnedByUser,
+                {
+                  package_type: 'container',
+                  package_name: pkg,
+                  username: owner,
+                  per_page: 100,
+                }
+              );
+
+              versions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              const stale = versions.slice(keep);
+
+              core.info(`${pkg}: total=${versions.length}, delete=${stale.length}`);
+              for (const v of stale) {
+                await github.rest.packages.deletePackageVersionForUser({
+                  package_type: 'container',
+                  package_name: pkg,
+                  username: owner,
+                  package_version_id: v.id,
+                });
+                core.info(`deleted ${pkg}@${v.name} (${v.id})`);
+              }
+            }
