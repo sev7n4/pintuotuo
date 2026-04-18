@@ -31,6 +31,8 @@ import (
 const (
 	providerAnthropic = "anthropic"
 	apiFormatOpenAI   = "openai"
+	// llmGatewayLitellm 与 LLM_GATEWAY_ACTIVE=litellm 对齐（goconst）
+	llmGatewayLitellm = "litellm"
 )
 
 // 路由策略来源（trace / 落库 effective_policy_source，与 JSON 对外字段一致）
@@ -545,7 +547,7 @@ func applyLitellmGatewayRetryCap(policy *services.RetryPolicy) *services.RetryPo
 		return policy
 	}
 	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if active != "litellm" {
+	if active != llmGatewayLitellm {
 		return policy
 	}
 	cap := 1
@@ -580,7 +582,7 @@ func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
 		return cfg
 	}
 	switch active {
-	case "litellm":
+	case llmGatewayLitellm:
 		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
 			cfg.APIBaseURL = strings.TrimRight(base, "/") + "/v1"
 		}
@@ -594,7 +596,7 @@ func resolveGatewayAuthToken(cfg providerRuntimeConfig, fallbackToken string) st
 		return fallbackToken
 	}
 	switch active {
-	case "litellm":
+	case llmGatewayLitellm:
 		if token := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY")); token != "" {
 			return token
 		}
