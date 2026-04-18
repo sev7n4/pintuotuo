@@ -209,3 +209,6 @@ router_settings:
 
 litellm_settings:
   drop_params: true
+  # Prometheus /metrics（与 deploy/prometheus 抓取 litellm:4000 对齐；见 docs/proxy/prometheus）
+  callbacks:
+    - prometheus
