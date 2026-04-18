@@ -1,4 +1,5 @@
 // Command litellm-catalog-sync: 以 DB 商品目录为单一事实来源，生成或校验 LiteLLM model_list 与 litellm_proxy_config.yaml 一致。
+// 厂商→上游与密钥环境变量：见 deploy/litellm/provider_gateway_map.json 与 deploy/litellm/SSOT_ROUTING.md。
 //
 // 用法:
 //

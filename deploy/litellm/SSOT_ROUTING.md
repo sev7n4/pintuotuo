@@ -19,6 +19,15 @@
 3. 运行 **`make litellm-catalog-verify`**，确保每个 **active SPU** 在 yaml 中有对应 `model_name`。
 4. 在 `.env` 配置映射表中的 `*_API_KEY`，重建 LiteLLM 容器。
 
+### 合并 `litellm-catalog-generate` 输出
+
+`make litellm-catalog-generate` 写入（默认）**`deploy/litellm/generated_model_list.fragment.yaml`**（gitignore，不落库）。用途：
+
+- **对照**：将片段与 `litellm_proxy_config.yaml` 里现有 `model_list` 条目逐条比对；缺则 **手工追加**到 yaml（保持缩进与注释风格）。
+- **不自动覆盖全文件**：当前仓库仍保留手搓 **P0 全量**与 **router_settings**；生成物只覆盖「DB 里 active SPU ∩ 映射表中有 code」的推导结果，二者可能不完全相等（例如 P0 多出来的模型）。
+
+合并后务必再跑 **`make litellm-catalog-verify`**（需 `DATABASE_URL`）。
+
 ## 历史说明
 
 原 `catalog_provider_map.json` 仅支持 `litellm_prefix`，无法表达「阶跃需 `openai/{id}` + 独立 `api_base`」等形态，已由 **`provider_gateway_map.json`** 替代（`litellm_model_template` + 可选 `api_base`）。
