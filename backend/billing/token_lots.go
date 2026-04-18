@@ -29,7 +29,6 @@ func ForfeitExpiredLots(tx *sql.Tx, userID int) error {
 	if err != nil {
 		return fmt.Errorf("forfeit select lots: %w", err)
 	}
-	defer rows.Close()
 
 	var total float64
 	var ids []int
@@ -37,13 +36,18 @@ func ForfeitExpiredLots(tx *sql.Tx, userID int) error {
 		var id int
 		var rem float64
 		if err = rows.Scan(&id, &rem); err != nil {
+			_ = rows.Close()
 			return fmt.Errorf("scan lot: %w", err)
 		}
 		total += rem
 		ids = append(ids, id)
 	}
 	if err = rows.Err(); err != nil {
+		_ = rows.Close()
 		return err
+	}
+	if err = rows.Close(); err != nil {
+		return fmt.Errorf("close forfeit rows: %w", err)
 	}
 	if len(ids) == 0 {
 		return nil
@@ -87,7 +91,6 @@ func DebitLotsFIFO(tx *sql.Tx, userID int, amount float64, updateTotalUsed bool)
 		return err
 	}
 
-	need := amount
 	rows, err := tx.Query(`
 		SELECT id, remaining_amount
 		  FROM token_lots
@@ -101,18 +104,34 @@ func DebitLotsFIFO(tx *sql.Tx, userID int, amount float64, updateTotalUsed bool)
 	if err != nil {
 		return fmt.Errorf("debit select lots: %w", err)
 	}
-	defer rows.Close()
 
-	var scanned float64
+	type lotRow struct {
+		id  int
+		rem float64
+	}
+	var lots []lotRow
 	for rows.Next() {
+		var r lotRow
+		if err = rows.Scan(&r.id, &r.rem); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan lot: %w", err)
+		}
+		lots = append(lots, r)
+	}
+	if err = rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err = rows.Close(); err != nil {
+		return fmt.Errorf("close debit rows: %w", err)
+	}
+
+	need := amount
+	for _, r := range lots {
 		if need <= 0.000001 {
 			break
 		}
-		var id int
-		var rem float64
-		if err = rows.Scan(&id, &rem); err != nil {
-			return fmt.Errorf("scan lot: %w", err)
-		}
+		id, rem := r.id, r.rem
 		take := rem
 		if take > need {
 			take = need
@@ -123,10 +142,6 @@ func DebitLotsFIFO(tx *sql.Tx, userID int, amount float64, updateTotalUsed bool)
 			return fmt.Errorf("update lot: %w", err)
 		}
 		need = round2(need - take)
-		scanned += take
-	}
-	if err = rows.Err(); err != nil {
-		return err
 	}
 
 	if need > 0.01 {
