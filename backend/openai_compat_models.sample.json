@@ -5,7 +5,12 @@
       "id": "deepseek/deepseek-chat",
       "object": "model",
       "created": 1735689600,
-      "owned_by": "deepseek"
+      "owned_by": "deepseek",
+      "pricing": {
+        "input_per_1k_tokens": 0.001,
+        "output_per_1k_tokens": 0.002,
+        "currency": "CNY"
+      }
     },
     {
       "id": "zhipu/glm-4-air",

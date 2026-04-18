@@ -144,6 +144,8 @@ deploy/*
 !deploy/grafana/**
 !deploy/prometheus/
 !deploy/prometheus/**
+!deploy/litellm/
+!deploy/litellm/**
 
 # Docs folder (keep local only)
 docs/

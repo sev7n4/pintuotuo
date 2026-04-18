@@ -45,6 +45,33 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 4,
+      "title": "LiteLLM target up",
+      "description": "Prometheus job litellm:4000；0 表示网关不可达或未启动 llm-gateway profile",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "up{job=\"litellm\"}",
+          "legendFormat": "litellm",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Backend target up",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "up{job=\"pintuotuo-backend\"}",
+          "legendFormat": "backend",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "templating": { "list": [] },

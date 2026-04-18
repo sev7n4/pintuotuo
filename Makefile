@@ -89,6 +89,17 @@ reconcile-check: ## Full-database usage ledger check (api_usage_logs vs token_tr
 	@echo "$(BLUE)Running usage reconciliation...$(NC)"
 	cd backend && go run ./cmd/reconcile
 
+litellm-catalog-verify: ## 校验 litellm_proxy_config.yaml 覆盖库内 active SPU（需 DATABASE_URL）
+	@echo "$(BLUE)Verifying LiteLLM model_list vs catalog...$(NC)"
+	cd backend && go run ./cmd/litellm-catalog-sync -verify \
+		-config ../deploy/litellm/litellm_proxy_config.yaml \
+		-map ../deploy/litellm/catalog_provider_map.json
+
+litellm-catalog-verify-soft: ## 同上，-soft 仅警告（种子库与 P0 全量列表不一致时）
+	cd backend && go run ./cmd/litellm-catalog-sync -verify -soft \
+		-config ../deploy/litellm/litellm_proxy_config.yaml \
+		-map ../deploy/litellm/catalog_provider_map.json
+
 migrate-create: ## Create new migration file (usage: make migrate-create name=migration_name)
 	@if [ -z "$(name)" ]; then echo "Usage: make migrate-create name=migration_name"; exit 1; fi
 	@echo "Creating migration: $(name)"
