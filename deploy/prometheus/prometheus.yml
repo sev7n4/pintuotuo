@@ -38,9 +38,3 @@ scrape_configs:
       - targets: ['litellm:4000']
     metrics_path: '/metrics'
     scrape_interval: 15s
-
-  - job_name: 'oneapi'
-    static_configs:
-      - targets: ['oneapi:3000']
-    metrics_path: '/metrics'
-    scrape_interval: 15s

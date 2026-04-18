@@ -62,13 +62,11 @@ services:
       - MFA_TOTP_ISSUER=${MFA_TOTP_ISSUER:-Pintuotuo}
       - PUBLIC_APP_BASE_URL=${PUBLIC_APP_BASE_URL:-}
       - FRONTEND_ORIGIN=${FRONTEND_ORIGIN:-}
-      # LLM 上游聚合网关（双轨评估）
+      # LLM 上游聚合网关（仅 LiteLLM）
       - LLM_GATEWAY_ACTIVE=${LLM_GATEWAY_ACTIVE:-none}
       - LLM_GATEWAY_LITELLM_URL=${LLM_GATEWAY_LITELLM_URL:-http://litellm:4000}
-      - LLM_GATEWAY_ONEAPI_URL=${LLM_GATEWAY_ONEAPI_URL:-http://oneapi:3000}
-      # 与 api_proxy resolveGatewayAuthToken 一致：网关模式下调 LiteLLM/OneAPI 时优先用平台 Key；不配则回退商户 Key（BYOK）
+      # 与 api_proxy resolveGatewayAuthToken 一致：LLM_GATEWAY_ACTIVE=litellm 时优先用 LITELLM_MASTER_KEY；不配则回退商户 Key（BYOK）
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
-      - ONEAPI_ACCESS_TOKEN=${ONEAPI_ACCESS_TOKEN:-}
       - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-false}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
@@ -236,24 +234,25 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - MOONSHOT_API_KEY=${MOONSHOT_API_KEY:-}
-    command: ["--host", "0.0.0.0", "--port", "4000"]
+      # P1 扩展厂商（与 deploy/litellm/litellm_proxy_config.yaml 中 model_list 对应）
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - ZAI_API_KEY=${ZAI_API_KEY:-}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+    volumes:
+      - ./deploy/litellm/litellm_proxy_config.yaml:/app/litellm_proxy_config.yaml:ro
+    command:
+      [
+        "--config",
+        "/app/litellm_proxy_config.yaml",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "4000",
+      ]
     ports:
       - "4000:4000"
-    networks:
-      - pintuotuo-network
-    profiles: ["llm-gateway"]
-
-  oneapi:
-    image: justsong/one-api:latest
-    container_name: pintuotuo-oneapi
-    restart: unless-stopped
-    environment:
-      - TZ=Asia/Shanghai
-      - SESSION_SECRET=${ONEAPI_SESSION_SECRET:-change_me}
-      - SQL_DSN=${ONEAPI_SQL_DSN:-}
-      - REDIS_CONN_STRING=${ONEAPI_REDIS_CONN_STRING:-}
-    ports:
-      - "3002:3000"
     networks:
       - pintuotuo-network
     profiles: ["llm-gateway"]
