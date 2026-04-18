@@ -31,6 +31,8 @@ import (
 const (
 	providerAnthropic = "anthropic"
 	apiFormatOpenAI   = "openai"
+	// llmGatewayLitellm 与 LLM_GATEWAY_ACTIVE=litellm 对齐（goconst）
+	llmGatewayLitellm = "litellm"
 )
 
 // 路由策略来源（trace / 落库 effective_policy_source，与 JSON 对外字段一致）
@@ -369,10 +371,33 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 	}
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	applyProxyUpstreamHeaders(c, httpReq, requestID)
+
 	strategySnapshot := buildStrategyRuntimeSnapshot(selectedStrategy)
 	applyCircuitBreakerConfig(apiKey.ID, strategySnapshot)
+
+	if req.Stream {
+		if providerCfg.APIFormat != apiFormatOpenAI {
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"STREAMING_NOT_SUPPORTED",
+				"Streaming is only supported for OpenAI-compatible providers",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+		httpReq.Header.Set("Accept", "text/event-stream")
+		streamClient := &http.Client{Timeout: 15 * time.Minute}
+		executeProxyChatCompletionStream(c, streamClient, httpReq, requestID, userIDInt, req, requestPath, startTime, db,
+			billingEngine, apiKey, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
+			decisionStart, traceSpan, strategySnapshot)
+		return
+	}
+
+	client := &http.Client{Timeout: 60 * time.Second}
 	retryPolicy := buildRetryPolicy(strategySnapshot)
+	retryPolicy = applyLitellmGatewayRetryCap(retryPolicy)
 	resp, retryCount, err := executeProviderRequestWithRetry(client, httpReq, retryPolicy)
 	if err != nil {
 		traceSpan.SetStatusCode(http.StatusBadGateway)
@@ -413,6 +438,12 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		c.Data(resp.StatusCode, "application/json", body)
 		return
+	}
+
+	if sm := strings.TrimSpace(apiResp.Model); sm != "" && sm != strings.TrimSpace(req.Model) {
+		logger.LogInfo(c.Request.Context(), "api_proxy", "upstream response model differs from request (e.g. gateway fallback)", map[string]interface{}{
+			"request_id": requestID, "requested_model": req.Model, "response_model": sm,
+		})
 	}
 
 	latency := int(time.Since(startTime).Milliseconds())
@@ -507,13 +538,51 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	c.Data(resp.StatusCode, "application/json", body)
 }
 
+// applyProxyUpstreamHeaders 将本请求的追踪关联信息传给上游（含 LiteLLM），便于与网关 /metrics、日志对齐定界。
+// 见 deploy/litellm/README.md 与 LiteLLM reliability 文档。
+// applyLitellmGatewayRetryCap 在走 LiteLLM 网关时限制业务层 HTTP 重试次数，避免与网关 router num_retries 叠加放大。
+// 环境变量 API_PROXY_LITELLM_MAX_RETRIES 表示 MaxRetries 上限（默认 1，即最多 2 次出站尝试）。
+func applyLitellmGatewayRetryCap(policy *services.RetryPolicy) *services.RetryPolicy {
+	if policy == nil {
+		return policy
+	}
+	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
+	if active != llmGatewayLitellm {
+		return policy
+	}
+	cap := 1
+	if v := strings.TrimSpace(os.Getenv("API_PROXY_LITELLM_MAX_RETRIES")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			cap = n
+		}
+	}
+	if policy.MaxRetries > cap {
+		p := *policy
+		p.MaxRetries = cap
+		return &p
+	}
+	return policy
+}
+
+func applyProxyUpstreamHeaders(c *gin.Context, httpReq *http.Request, requestID string) {
+	if strings.TrimSpace(requestID) != "" {
+		httpReq.Header.Set("X-Request-ID", requestID)
+	}
+	// W3C Trace Context + baggage（若入口或客户端已注入则透传）
+	for _, h := range []string{"traceparent", "tracestate", "baggage"} {
+		if v := strings.TrimSpace(c.GetHeader(h)); v != "" {
+			httpReq.Header.Set(h, v)
+		}
+	}
+}
+
 func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
 	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
 	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == "none" {
 		return cfg
 	}
 	switch active {
-	case "litellm":
+	case llmGatewayLitellm:
 		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
 			cfg.APIBaseURL = strings.TrimRight(base, "/") + "/v1"
 		}
@@ -527,7 +596,7 @@ func resolveGatewayAuthToken(cfg providerRuntimeConfig, fallbackToken string) st
 		return fallbackToken
 	}
 	switch active {
-	case "litellm":
+	case llmGatewayLitellm:
 		if token := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY")); token != "" {
 			return token
 		}

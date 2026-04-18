@@ -64,6 +64,8 @@ services:
       - FRONTEND_ORIGIN=${FRONTEND_ORIGIN:-}
       # LLM 上游聚合网关（仅 LiteLLM）
       - LLM_GATEWAY_ACTIVE=${LLM_GATEWAY_ACTIVE:-none}
+      # 与网关 router num_retries 叠加时限制业务层 HTTP 重试上限（MaxRetries，默认 1）
+      - API_PROXY_LITELLM_MAX_RETRIES=${API_PROXY_LITELLM_MAX_RETRIES:-1}
       - LLM_GATEWAY_LITELLM_URL=${LLM_GATEWAY_LITELLM_URL:-http://litellm:4000}
       # 与 api_proxy resolveGatewayAuthToken 一致：LLM_GATEWAY_ACTIVE=litellm 时优先用 LITELLM_MASTER_KEY；不配则回退商户 Key（BYOK）
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}

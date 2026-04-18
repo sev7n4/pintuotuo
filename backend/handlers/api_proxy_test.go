@@ -416,3 +416,42 @@ func TestTrySelectAPIKeyWithSmartRouter_EmptyProviderSkipsInjection(t *testing.T
 	}, "balanced")
 	assert.Nil(t, pick.APIKeyID)
 }
+
+func TestApplyLitellmGatewayRetryCap(t *testing.T) {
+	t.Run("no_litellm_gateway_no_cap", func(t *testing.T) {
+		t.Setenv("LLM_GATEWAY_ACTIVE", "")
+		t.Setenv("API_PROXY_LITELLM_MAX_RETRIES", "1")
+		p := *services.DefaultRetryPolicy
+		p.MaxRetries = 5
+		out := applyLitellmGatewayRetryCap(&p)
+		require.NotNil(t, out)
+		assert.Equal(t, 5, out.MaxRetries)
+	})
+	t.Run("litellm_caps_retries", func(t *testing.T) {
+		t.Setenv("LLM_GATEWAY_ACTIVE", "litellm")
+		t.Setenv("API_PROXY_LITELLM_MAX_RETRIES", "1")
+		p := *services.DefaultRetryPolicy
+		p.MaxRetries = 5
+		out := applyLitellmGatewayRetryCap(&p)
+		require.NotNil(t, out)
+		assert.Equal(t, 1, out.MaxRetries)
+	})
+}
+
+func TestApplyProxyUpstreamHeaders(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/proxy", nil)
+	c.Request.Header.Set("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
+	c.Request.Header.Set("tracestate", "k=v")
+	c.Request.Header.Set("baggage", "userId=19")
+
+	req := httptest.NewRequest(http.MethodPost, "http://gateway/v1/chat/completions", nil)
+	applyProxyUpstreamHeaders(c, req, "req-abc-123")
+
+	assert.Equal(t, "req-abc-123", req.Header.Get("X-Request-ID"))
+	assert.Equal(t, "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", req.Header.Get("traceparent"))
+	assert.Equal(t, "k=v", req.Header.Get("tracestate"))
+	assert.Equal(t, "userId=19", req.Header.Get("baggage"))
+}
