@@ -1,0 +1,41 @@
+{
+  "openai": {
+    "litellm_model_template": "openai/{model_id}",
+    "api_key_env": "OPENAI_API_KEY"
+  },
+  "anthropic": {
+    "litellm_model_template": "anthropic/{model_id}",
+    "api_key_env": "ANTHROPIC_API_KEY"
+  },
+  "deepseek": {
+    "litellm_model_template": "deepseek/{model_id}",
+    "api_key_env": "DEEPSEEK_API_KEY"
+  },
+  "zhipu": {
+    "litellm_model_template": "zai/{model_id}",
+    "api_key_env": "ZAI_API_KEY",
+    "notes": "平台 model_providers.code=zhipu；LiteLLM 走智谱 Z.AI（zai/），与 DB 直连 bigmodel URL 不同"
+  },
+  "alibaba": {
+    "litellm_model_template": "dashscope/{model_id}",
+    "api_key_env": "DASHSCOPE_API_KEY"
+  },
+  "moonshot": {
+    "litellm_model_template": "moonshot/{model_id}",
+    "api_key_env": "MOONSHOT_API_KEY"
+  },
+  "minimax": {
+    "litellm_model_template": "minimax/{model_id}",
+    "api_key_env": "MINIMAX_API_KEY"
+  },
+  "google": {
+    "litellm_model_template": "gemini/{model_id}",
+    "api_key_env": "GOOGLE_API_KEY"
+  },
+  "stepfun": {
+    "litellm_model_template": "openai/{model_id}",
+    "api_base": "https://api.stepfun.com/v1",
+    "api_key_env": "STEPFUN_API_KEY",
+    "notes": "阶跃为 OpenAI 兼容接口；litellm_params.model 用 openai/ 前缀 + api_base"
+  }
+}

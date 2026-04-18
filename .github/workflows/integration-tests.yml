@@ -80,7 +80,7 @@ jobs:
         run: |
           go run ./cmd/litellm-catalog-sync -verify -soft \
             -config ../deploy/litellm/litellm_proxy_config.yaml \
-            -map ../deploy/litellm/catalog_provider_map.json
+            -map ../deploy/litellm/provider_gateway_map.json
 
       - name: Run integration tests
         working-directory: ./backend

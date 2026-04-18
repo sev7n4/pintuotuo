@@ -2,8 +2,8 @@
 //
 // 用法:
 //
-//	go run ./cmd/litellm-catalog-sync -verify -config ../../deploy/litellm/litellm_proxy_config.yaml -map ../../deploy/litellm/catalog_provider_map.json
-//	go run ./cmd/litellm-catalog-sync -generate -map ../../deploy/litellm/catalog_provider_map.json -out generated.yaml
+//	go run ./cmd/litellm-catalog-sync -verify -config ../../deploy/litellm/litellm_proxy_config.yaml -map ../../deploy/litellm/provider_gateway_map.json
+//	go run ./cmd/litellm-catalog-sync -generate -map ../../deploy/litellm/provider_gateway_map.json -out generated.yaml
 //
 // 环境变量: DATABASE_URL（verify / generate 必填）
 package main
@@ -22,9 +22,25 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// providerMapEntry 对应 deploy/litellm/provider_gateway_map.json（单一配置入口）。
+// litellm_model_template 优先：可含占位符 {model_id}；否则回退 litellm_prefix + "/" + model_id（兼容旧字段）。
 type providerMapEntry struct {
-	LitellmPrefix string `json:"litellm_prefix"`
-	APIKeyEnv     string `json:"api_key_env"`
+	LitellmPrefix        string `json:"litellm_prefix,omitempty"`
+	LitellmModelTemplate string `json:"litellm_model_template,omitempty"`
+	APIKeyEnv            string `json:"api_key_env"`
+	APIBase              string `json:"api_base,omitempty"`
+	Notes                string `json:"notes,omitempty"`
+}
+
+func (e providerMapEntry) upstreamLitellmModel(modelID string) string {
+	modelID = strings.TrimSpace(modelID)
+	if t := strings.TrimSpace(e.LitellmModelTemplate); t != "" {
+		return strings.ReplaceAll(t, "{model_id}", modelID)
+	}
+	if p := strings.TrimSpace(e.LitellmPrefix); p != "" {
+		return p + "/" + modelID
+	}
+	return modelID
 }
 
 func main() {
@@ -32,7 +48,7 @@ func main() {
 	generate := flag.Bool("generate", false, "从库生成 model_list 片段 YAML 到 -out")
 	soft := flag.Bool("soft", false, "verify 时仅打印缺失项并以 0 退出（用于迁移期种子库与网关 P0 列表不一致）")
 	configPath := flag.String("config", "", "litellm_proxy_config.yaml 路径")
-	mapPath := flag.String("map", "", "catalog_provider_map.json 路径")
+	mapPath := flag.String("map", "", "provider_gateway_map.json 路径（平台厂商→LiteLLM 上游与 api_key 环境变量）")
 	outPath := flag.String("out", "", "generate 输出文件路径（默认 stdout）")
 	flag.Parse()
 
@@ -224,7 +240,7 @@ func runVerify(configPath string, mapping map[string]providerMapEntry, soft bool
 			continue
 		}
 		if _, ok := mapping[code]; !ok {
-			fmt.Fprintf(os.Stderr, "verify: skip provider %q (not in catalog_provider_map.json — 请补充映射或从校验范围排除)\n", code)
+			fmt.Fprintf(os.Stderr, "verify: skip provider %q (not in provider_gateway_map.json — 请补充映射或从校验范围排除)\n", code)
 			continue
 		}
 		canonical := strings.ToLower(code + "/" + modelID)
@@ -309,13 +325,15 @@ func runGenerate(mapping map[string]providerMapEntry, outPath string) error {
 			fmt.Fprintf(os.Stderr, "generate: skip provider %q (not in map)\n", code)
 			continue
 		}
-		prefix := ent.LitellmPrefix
-		litellmModel := prefix + "/" + modelID
+		litellmModel := ent.upstreamLitellmModel(modelID)
 		shortName := modelID
 		sb.WriteString(fmt.Sprintf("  - model_name: %s\n", shortName))
 		sb.WriteString("    litellm_params:\n")
 		sb.WriteString(fmt.Sprintf("      model: %s\n", litellmModel))
 		sb.WriteString(fmt.Sprintf("      api_key: os.environ/%s\n", ent.APIKeyEnv))
+		if b := strings.TrimSpace(ent.APIBase); b != "" {
+			sb.WriteString(fmt.Sprintf("      api_base: %s\n", b))
+		}
 		sb.WriteString("\n")
 	}
 	if err := rows.Err(); err != nil {
