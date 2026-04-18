@@ -15,8 +15,8 @@ func TestListOpenAIModelsFromCatalog(t *testing.T) {
 	defer db.Close()
 
 	ts := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	rows := sqlmock.NewRows([]string{"code", "model_id", "ts"}).
-		AddRow("deepseek", "deepseek-chat", ts)
+	rows := sqlmock.NewRows([]string{"code", "model_id", "ts", "provider_input_rate", "provider_output_rate"}).
+		AddRow("deepseek", "deepseek-chat", ts, 0.001, 0.002)
 	mock.ExpectQuery(`SELECT\s+mp\.code`).WillReturnRows(rows)
 
 	resp, err := ListOpenAIModelsFromCatalog(context.Background(), db)
@@ -25,5 +25,9 @@ func TestListOpenAIModelsFromCatalog(t *testing.T) {
 	require.Equal(t, "deepseek/deepseek-chat", resp.Data[0].ID)
 	require.Equal(t, "deepseek", resp.Data[0].OwnedBy)
 	require.Equal(t, ts.Unix(), resp.Data[0].Created)
+	require.NotNil(t, resp.Data[0].Pricing)
+	require.Equal(t, 0.001, resp.Data[0].Pricing.InputPer1KTokens)
+	require.Equal(t, 0.002, resp.Data[0].Pricing.OutputPer1KTokens)
+	require.Equal(t, "CNY", resp.Data[0].Pricing.Currency)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

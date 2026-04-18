@@ -39,3 +39,13 @@ groups:
         annotations:
           summary: "Backend 实例不可达"
           description: "Prometheus 无法抓取 backend:8080/metrics"
+
+      - alert: LiteLLMGatewayDown
+        expr: up{job="litellm"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          service: litellm
+        annotations:
+          summary: "LiteLLM 聚合网关不可达"
+          description: "Prometheus 无法抓取 litellm:4000/metrics（检查 --profile llm-gateway 与容器状态）"
