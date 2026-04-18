@@ -3,20 +3,24 @@ package models
 import "time"
 
 type ModelProvider struct {
-	ID             int            `json:"id"`
-	Code           string         `json:"code"`
-	Name           string         `json:"name"`
-	APIBaseURL     string         `json:"api_base_url,omitempty"`
-	APIFormat      string         `json:"api_format"`
-	BillingType    string         `json:"billing_type,omitempty"`
-	CompatPrefixes []string       `json:"compat_prefixes,omitempty"`
-	SegmentConfig  map[string]any `json:"segment_config,omitempty"`
-	CacheEnabled   bool           `json:"cache_enabled"`
-	CacheDiscount  float64        `json:"cache_discount_rate,omitempty"`
-	Status         string         `json:"status"`
-	SortOrder      int            `json:"sort_order"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID          int    `json:"id"`
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	APIBaseURL  string `json:"api_base_url,omitempty"`
+	APIFormat   string `json:"api_format"`
+	BillingType string `json:"billing_type,omitempty"`
+	// LiteLLM 网关：与 litellm-catalog-sync / 部署侧 os.environ 对齐（DB 为主 SSOT）
+	LitellmModelTemplate    string         `json:"litellm_model_template,omitempty"`
+	LitellmGatewayAPIKeyEnv string         `json:"litellm_gateway_api_key_env,omitempty"`
+	LitellmGatewayAPIBase   string         `json:"litellm_gateway_api_base,omitempty"`
+	CompatPrefixes          []string       `json:"compat_prefixes,omitempty"`
+	SegmentConfig           map[string]any `json:"segment_config,omitempty"`
+	CacheEnabled            bool           `json:"cache_enabled"`
+	CacheDiscount           float64        `json:"cache_discount_rate,omitempty"`
+	Status                  string         `json:"status"`
+	SortOrder               int            `json:"sort_order"`
+	CreatedAt               time.Time      `json:"created_at"`
+	UpdatedAt               time.Time      `json:"updated_at"`
 }
 
 type SPU struct {

@@ -79,8 +79,7 @@ jobs:
           DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
         run: |
           go run ./cmd/litellm-catalog-sync -verify -soft \
-            -config ../deploy/litellm/litellm_proxy_config.yaml \
-            -map ../deploy/litellm/provider_gateway_map.json
+            -config ../deploy/litellm/litellm_proxy_config.yaml
 
       - name: Run integration tests
         working-directory: ./backend

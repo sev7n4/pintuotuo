@@ -74,7 +74,9 @@ func loadActiveModelProviders() ([]models.ModelProvider, error) {
 	}
 	rows, err := db.Query(
 		`SELECT id, code, name, api_base_url, api_format, billing_type, cache_enabled, COALESCE(cache_discount_rate, 0),
-			compat_prefixes, status, sort_order, created_at, updated_at
+			compat_prefixes,
+			litellm_model_template, litellm_gateway_api_key_env, litellm_gateway_api_base,
+			status, sort_order, created_at, updated_at
 		 FROM model_providers WHERE status = 'active' ORDER BY sort_order ASC`,
 	)
 	if err != nil {
@@ -86,9 +88,10 @@ func loadActiveModelProviders() ([]models.ModelProvider, error) {
 	for rows.Next() {
 		var p models.ModelProvider
 		var apiBaseURL, billingType sql.NullString
+		var litellmTpl, litellmKey, litellmBase sql.NullString
 		var compatPfx pq.StringArray
 		err := rows.Scan(&p.ID, &p.Code, &p.Name, &apiBaseURL, &p.APIFormat, &billingType, &p.CacheEnabled, &p.CacheDiscount,
-			&compatPfx, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+			&compatPfx, &litellmTpl, &litellmKey, &litellmBase, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -97,6 +100,15 @@ func loadActiveModelProviders() ([]models.ModelProvider, error) {
 		}
 		if billingType.Valid {
 			p.BillingType = billingType.String
+		}
+		if litellmTpl.Valid {
+			p.LitellmModelTemplate = litellmTpl.String
+		}
+		if litellmKey.Valid {
+			p.LitellmGatewayAPIKeyEnv = litellmKey.String
+		}
+		if litellmBase.Valid {
+			p.LitellmGatewayAPIBase = litellmBase.String
 		}
 		if len(compatPfx) > 0 {
 			p.CompatPrefixes = []string(compatPfx)
@@ -1386,7 +1398,9 @@ func ListAllModelProviders(c *gin.Context) {
 
 	rows, err := db.Query(
 		`SELECT id, code, name, api_base_url, api_format, billing_type, cache_enabled, COALESCE(cache_discount_rate, 0),
-			compat_prefixes, status, sort_order, created_at, updated_at
+			compat_prefixes,
+			litellm_model_template, litellm_gateway_api_key_env, litellm_gateway_api_base,
+			status, sort_order, created_at, updated_at
 		 FROM model_providers ORDER BY sort_order ASC, id ASC`,
 	)
 	if err != nil {
@@ -1399,9 +1413,10 @@ func ListAllModelProviders(c *gin.Context) {
 	for rows.Next() {
 		var p models.ModelProvider
 		var apiBaseURL, billingType sql.NullString
+		var litellmTpl, litellmKey, litellmBase sql.NullString
 		var compatPfx pq.StringArray
 		err := rows.Scan(&p.ID, &p.Code, &p.Name, &apiBaseURL, &p.APIFormat, &billingType, &p.CacheEnabled, &p.CacheDiscount,
-			&compatPfx, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+			&compatPfx, &litellmTpl, &litellmKey, &litellmBase, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -1411,6 +1426,15 @@ func ListAllModelProviders(c *gin.Context) {
 		}
 		if billingType.Valid {
 			p.BillingType = billingType.String
+		}
+		if litellmTpl.Valid {
+			p.LitellmModelTemplate = litellmTpl.String
+		}
+		if litellmKey.Valid {
+			p.LitellmGatewayAPIKeyEnv = litellmKey.String
+		}
+		if litellmBase.Valid {
+			p.LitellmGatewayAPIBase = litellmBase.String
 		}
 		if len(compatPfx) > 0 {
 			p.CompatPrefixes = []string(compatPfx)
@@ -1430,14 +1454,17 @@ func CreateModelProvider(c *gin.Context) {
 	}
 
 	var req struct {
-		Code           string   `json:"code" binding:"required"`
-		Name           string   `json:"name" binding:"required"`
-		APIBaseURL     string   `json:"api_base_url"`
-		APIFormat      string   `json:"api_format"`
-		BillingType    string   `json:"billing_type"`
-		Status         string   `json:"status"`
-		SortOrder      int      `json:"sort_order"`
-		CompatPrefixes []string `json:"compat_prefixes"`
+		Code                    string   `json:"code" binding:"required"`
+		Name                    string   `json:"name" binding:"required"`
+		APIBaseURL              string   `json:"api_base_url"`
+		APIFormat               string   `json:"api_format"`
+		BillingType             string   `json:"billing_type"`
+		Status                  string   `json:"status"`
+		SortOrder               int      `json:"sort_order"`
+		CompatPrefixes          []string `json:"compat_prefixes"`
+		LitellmModelTemplate    string   `json:"litellm_model_template"`
+		LitellmGatewayAPIKeyEnv string   `json:"litellm_gateway_api_key_env"`
+		LitellmGatewayAPIBase   string   `json:"litellm_gateway_api_base"`
 	}
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
@@ -1479,6 +1506,22 @@ func CreateModelProvider(c *gin.Context) {
 		apiBaseArg = apiBase
 	}
 
+	litellmTpl := strings.TrimSpace(req.LitellmModelTemplate)
+	var litellmTplArg interface{}
+	if litellmTpl != "" {
+		litellmTplArg = litellmTpl
+	}
+	litellmKey := strings.TrimSpace(req.LitellmGatewayAPIKeyEnv)
+	var litellmKeyArg interface{}
+	if litellmKey != "" {
+		litellmKeyArg = litellmKey
+	}
+	litellmBase := strings.TrimSpace(req.LitellmGatewayAPIBase)
+	var litellmBaseArg interface{}
+	if litellmBase != "" {
+		litellmBaseArg = litellmBase
+	}
+
 	normalizedPrefixes, nErr := services.NormalizeCompatPrefixes(req.CompatPrefixes)
 	if nErr != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -1500,11 +1543,15 @@ func CreateModelProvider(c *gin.Context) {
 	var p models.ModelProvider
 	var compatScan pq.StringArray
 	err := db.QueryRow(
-		`INSERT INTO model_providers (code, name, api_base_url, api_format, billing_type, status, sort_order, compat_prefixes)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		 RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), compat_prefixes, status, sort_order, created_at, updated_at`,
-		code, name, apiBaseArg, apiFormat, billingType, status, req.SortOrder, compatArg,
-	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &compatScan, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+		`INSERT INTO model_providers (code, name, api_base_url, api_format, billing_type, status, sort_order, compat_prefixes,
+			litellm_model_template, litellm_gateway_api_key_env, litellm_gateway_api_base)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		 RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), compat_prefixes,
+			COALESCE(litellm_model_template, ''), COALESCE(litellm_gateway_api_key_env, ''), COALESCE(litellm_gateway_api_base, ''),
+			status, sort_order, created_at, updated_at`,
+		code, name, apiBaseArg, apiFormat, billingType, status, req.SortOrder, compatArg, litellmTplArg, litellmKeyArg, litellmBaseArg,
+	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &compatScan,
+		&p.LitellmModelTemplate, &p.LitellmGatewayAPIKeyEnv, &p.LitellmGatewayAPIBase, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
@@ -1540,13 +1587,16 @@ func PatchModelProvider(c *gin.Context) {
 	}
 
 	var req struct {
-		Name           *string   `json:"name"`
-		APIBaseURL     *string   `json:"api_base_url"`
-		APIFormat      *string   `json:"api_format"`
-		BillingType    *string   `json:"billing_type"`
-		Status         *string   `json:"status"`
-		SortOrder      *int      `json:"sort_order"`
-		CompatPrefixes *[]string `json:"compat_prefixes"`
+		Name                    *string   `json:"name"`
+		APIBaseURL              *string   `json:"api_base_url"`
+		APIFormat               *string   `json:"api_format"`
+		BillingType             *string   `json:"billing_type"`
+		Status                  *string   `json:"status"`
+		SortOrder               *int      `json:"sort_order"`
+		CompatPrefixes          *[]string `json:"compat_prefixes"`
+		LitellmModelTemplate    *string   `json:"litellm_model_template"`
+		LitellmGatewayAPIKeyEnv *string   `json:"litellm_gateway_api_key_env"`
+		LitellmGatewayAPIBase   *string   `json:"litellm_gateway_api_base"`
 	}
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
@@ -1594,11 +1644,18 @@ func PatchModelProvider(c *gin.Context) {
 			status = COALESCE($5, status),
 			sort_order = COALESCE($6, sort_order),
 			compat_prefixes = CASE WHEN $7::boolean THEN COALESCE($8, '{}'::text[]) ELSE compat_prefixes END,
+			litellm_model_template = COALESCE($9, litellm_model_template),
+			litellm_gateway_api_key_env = COALESCE($10, litellm_gateway_api_key_env),
+			litellm_gateway_api_base = COALESCE($11, litellm_gateway_api_base),
 			updated_at = CURRENT_TIMESTAMP
-		WHERE id = $9
-		RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), compat_prefixes, status, sort_order, created_at, updated_at`,
-		req.Name, req.APIBaseURL, req.APIFormat, req.BillingType, req.Status, req.SortOrder, compatSet, compatArg, id,
-	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &compatScan, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+		WHERE id = $12
+		RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), compat_prefixes,
+			COALESCE(litellm_model_template, ''), COALESCE(litellm_gateway_api_key_env, ''), COALESCE(litellm_gateway_api_base, ''),
+			status, sort_order, created_at, updated_at`,
+		req.Name, req.APIBaseURL, req.APIFormat, req.BillingType, req.Status, req.SortOrder, compatSet, compatArg,
+		req.LitellmModelTemplate, req.LitellmGatewayAPIKeyEnv, req.LitellmGatewayAPIBase, id,
+	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &compatScan,
+		&p.LitellmModelTemplate, &p.LitellmGatewayAPIKeyEnv, &p.LitellmGatewayAPIBase, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MODEL_PROVIDER_NOT_FOUND",

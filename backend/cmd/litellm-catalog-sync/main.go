@@ -1,9 +1,13 @@
 // Command litellm-catalog-sync: 以 DB 商品目录为单一事实来源，生成或校验 LiteLLM model_list 与 litellm_proxy_config.yaml 一致。
 //
+// 厂商→LiteLLM 上游与密钥环境变量：主 SSOT 为 PostgreSQL model_providers（litellm_model_template 等列）；
+// 可选 deploy/litellm/provider_gateway_map.json 通过 -map 与 DB 合并（同名 code 以文件为准，用于应急/本地）。
+//
 // 用法:
 //
+//	go run ./cmd/litellm-catalog-sync -verify -config ../../deploy/litellm/litellm_proxy_config.yaml
+//	go run ./cmd/litellm-catalog-sync -generate -out generated.yaml
 //	go run ./cmd/litellm-catalog-sync -verify -config ../../deploy/litellm/litellm_proxy_config.yaml -map ../../deploy/litellm/provider_gateway_map.json
-//	go run ./cmd/litellm-catalog-sync -generate -map ../../deploy/litellm/provider_gateway_map.json -out generated.yaml
 //
 // 环境变量: DATABASE_URL（verify / generate 必填）
 package main
@@ -22,8 +26,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// providerMapEntry 对应 deploy/litellm/provider_gateway_map.json（单一配置入口）。
-// litellm_model_template 优先：可含占位符 {model_id}；否则回退 litellm_prefix + "/" + model_id（兼容旧字段）。
+// providerMapEntry：DB 行或 JSON 文件条目（-map 合并时结构相同）。
+// litellm_model_template 优先：可含占位符 {model_id}；否则回退 litellm_prefix + "/" + model_id（兼容旧 JSON）。
 type providerMapEntry struct {
 	LitellmPrefix        string `json:"litellm_prefix,omitempty"`
 	LitellmModelTemplate string `json:"litellm_model_template,omitempty"`
@@ -48,7 +52,7 @@ func main() {
 	generate := flag.Bool("generate", false, "从库生成 model_list 片段 YAML 到 -out")
 	soft := flag.Bool("soft", false, "verify 时仅打印缺失项并以 0 退出（用于迁移期种子库与网关 P0 列表不一致）")
 	configPath := flag.String("config", "", "litellm_proxy_config.yaml 路径")
-	mapPath := flag.String("map", "", "provider_gateway_map.json 路径（平台厂商→LiteLLM 上游与 api_key 环境变量）")
+	mapPath := flag.String("map", "", "可选：provider_gateway_map.json，与 DB 合并（同名 code 以文件为准）")
 	outPath := flag.String("out", "", "generate 输出文件路径（默认 stdout）")
 	flag.Parse()
 
@@ -61,9 +65,22 @@ func main() {
 		os.Exit(2)
 	}
 
-	mapping, err := loadProviderMap(*mapPath)
+	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if dsn == "" {
+		fmt.Fprintln(os.Stderr, "DATABASE_URL is required")
+		os.Exit(2)
+	}
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "map: %v\n", err)
+		fmt.Fprintf(os.Stderr, "db: %v\n", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	mapping, err := resolveGatewayMappings(ctx, db, strings.TrimSpace(*mapPath))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "gateway mapping: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -72,7 +89,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "-config required for -verify")
 			os.Exit(2)
 		}
-		ok, err := runVerify(*configPath, mapping, *soft)
+		ok, err := runVerify(db, *configPath, mapping, *soft)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
@@ -85,16 +102,13 @@ func main() {
 		return
 	}
 
-	if err := runGenerate(mapping, *outPath); err != nil {
+	if err := runGenerate(db, mapping, *outPath); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
 
-func loadProviderMap(path string) (map[string]providerMapEntry, error) {
-	if path == "" {
-		return nil, fmt.Errorf("-map required")
-	}
+func loadProviderMapFile(path string) (map[string]providerMapEntry, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -104,6 +118,75 @@ func loadProviderMap(path string) (map[string]providerMapEntry, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+func loadGatewayMappingsFromDB(ctx context.Context, db *sql.DB) (map[string]providerMapEntry, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT code,
+			NULLIF(TRIM(litellm_model_template), ''),
+			NULLIF(TRIM(litellm_gateway_api_key_env), ''),
+			NULLIF(TRIM(litellm_gateway_api_base), '')
+		FROM model_providers
+		WHERE status = 'active'
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string]providerMapEntry)
+	for rows.Next() {
+		var code string
+		var tpl, keyEnv, apiBase sql.NullString
+		if err := rows.Scan(&code, &tpl, &keyEnv, &apiBase); err != nil {
+			return nil, err
+		}
+		if !tpl.Valid || !keyEnv.Valid {
+			fmt.Fprintf(os.Stderr, "gateway: skip provider %q (litellm_model_template 与 litellm_gateway_api_key_env 均需非空)\n", code)
+			continue
+		}
+		ent := providerMapEntry{
+			LitellmModelTemplate: tpl.String,
+			APIKeyEnv:            keyEnv.String,
+		}
+		if apiBase.Valid {
+			ent.APIBase = apiBase.String
+		}
+		out[strings.TrimSpace(code)] = ent
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func mergeProviderMappings(base, override map[string]providerMapEntry) map[string]providerMapEntry {
+	out := make(map[string]providerMapEntry, len(base)+len(override))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range override {
+		out[k] = v
+	}
+	return out
+}
+
+func resolveGatewayMappings(ctx context.Context, db *sql.DB, mapPath string) (map[string]providerMapEntry, error) {
+	dbMap, err := loadGatewayMappingsFromDB(ctx, db)
+	if err != nil {
+		return nil, fmt.Errorf("load from model_providers: %w", err)
+	}
+	if mapPath == "" {
+		if len(dbMap) == 0 {
+			return nil, fmt.Errorf("no LiteLLM gateway mappings in model_providers (run migration 057 or use -map)")
+		}
+		return dbMap, nil
+	}
+	fm, err := loadProviderMapFile(mapPath)
+	if err != nil {
+		return nil, fmt.Errorf("-map file: %w", err)
+	}
+	return mergeProviderMappings(dbMap, fm), nil
 }
 
 var modelNameLine = regexp.MustCompile(`(?m)^\s*-\s*model_name:\s*(.+?)\s*$`)
@@ -187,17 +270,7 @@ func addFallbackToken(token string, modelNames map[string]struct{}, seen map[str
 }
 
 // runVerify 返回 ok=true 表示目录与 yaml 完全一致；soft 模式下有缺失时 ok=false 且 err=nil。
-func runVerify(configPath string, mapping map[string]providerMapEntry, soft bool) (ok bool, err error) {
-	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	if dsn == "" {
-		return false, fmt.Errorf("DATABASE_URL is required for -verify")
-	}
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		return false, err
-	}
-	defer db.Close()
-
+func runVerify(db *sql.DB, configPath string, mapping map[string]providerMapEntry, soft bool) (ok bool, err error) {
 	b, err := os.ReadFile(configPath)
 	if err != nil {
 		return false, err
@@ -240,7 +313,7 @@ func runVerify(configPath string, mapping map[string]providerMapEntry, soft bool
 			continue
 		}
 		if _, ok := mapping[code]; !ok {
-			fmt.Fprintf(os.Stderr, "verify: skip provider %q (not in provider_gateway_map.json — 请补充映射或从校验范围排除)\n", code)
+			fmt.Fprintf(os.Stderr, "verify: skip provider %q (无 LiteLLM 网关映射：请在 model_providers 填写或 -map 覆盖)\n", code)
 			continue
 		}
 		canonical := strings.ToLower(code + "/" + modelID)
@@ -282,17 +355,7 @@ func nameSetContainsCI(names map[string]struct{}, want string) bool {
 	return false
 }
 
-func runGenerate(mapping map[string]providerMapEntry, outPath string) error {
-	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	if dsn == "" {
-		return fmt.Errorf("DATABASE_URL is required for -generate")
-	}
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
+func runGenerate(db *sql.DB, mapping map[string]providerMapEntry, outPath string) error {
 	ctx := context.Background()
 	rows, err := db.QueryContext(ctx, `
 		SELECT mp.code,
