@@ -102,6 +102,74 @@ func extractModelNamesFromYAML(content string) map[string]struct{} {
 	return out
 }
 
+var fallbackBraceRE = regexp.MustCompile(`\{\s*"?([a-zA-Z0-9_.-]+)"?\s*:\s*\[([^\]]+)\]`)
+
+func routerSettingsSection(content string) string {
+	const start = "router_settings:"
+	i := strings.Index(content, start)
+	if i < 0 {
+		return ""
+	}
+	rest := content[i:]
+	j := strings.Index(rest, "\nlitellm_settings:")
+	if j < 0 {
+		return rest
+	}
+	return rest[:j]
+}
+
+// verifyFallbackModelNamesInList 检查 router_settings 内 fallbacks / context_window_fallbacks / content_policy_fallbacks
+// 中出现的 model_name 是否均在 model_list 的 model_name 集合中（大小写不敏感）。
+func stripCommentLines(s string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(s, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func verifyFallbackModelNamesInList(content string, modelNames map[string]struct{}) []string {
+	sec := stripCommentLines(routerSettingsSection(content))
+	if sec == "" {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var missing []string
+	for _, m := range fallbackBraceRE.FindAllStringSubmatch(sec, -1) {
+		if len(m) < 3 {
+			continue
+		}
+		addFallbackToken(strings.TrimSpace(m[1]), modelNames, seen, &missing)
+		for _, part := range strings.Split(m[2], ",") {
+			t := strings.Trim(strings.TrimSpace(part), `"'`)
+			addFallbackToken(t, modelNames, seen, &missing)
+		}
+	}
+	return missing
+}
+
+func addFallbackToken(token string, modelNames map[string]struct{}, seen map[string]struct{}, missing *[]string) {
+	if token == "" {
+		return
+	}
+	if _, ok := seen[token]; ok {
+		return
+	}
+	seen[token] = struct{}{}
+	if _, ok := modelNames[token]; ok {
+		return
+	}
+	if nameSetContainsCI(modelNames, token) {
+		return
+	}
+	*missing = append(*missing, token)
+}
+
 // runVerify 返回 ok=true 表示目录与 yaml 完全一致；soft 模式下有缺失时 ok=false 且 err=nil。
 func runVerify(configPath string, mapping map[string]providerMapEntry, soft bool) (ok bool, err error) {
 	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
@@ -118,7 +186,18 @@ func runVerify(configPath string, mapping map[string]providerMapEntry, soft bool
 	if err != nil {
 		return false, err
 	}
-	names := extractModelNamesFromYAML(string(b))
+	content := string(b)
+	names := extractModelNamesFromYAML(content)
+
+	if fbMissing := verifyFallbackModelNamesInList(content, names); len(fbMissing) > 0 {
+		msg := fmt.Sprintf("verify: router_settings 中 fallbacks 引用的 model_name 未在 model_list 中找到:\n  - %s",
+			strings.Join(fbMissing, "\n  - "))
+		if soft {
+			fmt.Fprintln(os.Stderr, msg)
+		} else {
+			return false, fmt.Errorf("%s", msg)
+		}
+	}
 
 	ctx := context.Background()
 	rows, err := db.QueryContext(ctx, `

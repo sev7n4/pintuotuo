@@ -1,21 +1,58 @@
-# LiteLLM 聚合网关配置
+# LiteLLM 与本项目对齐说明
 
-- 主配置：[litellm_proxy_config.yaml](./litellm_proxy_config.yaml)（`model_list` + `router_settings` + `litellm_settings`）。
-- **目录单一事实来源**：商品以库表 `spus` + `model_providers` 为准；与网关路由对齐请使用：
+本文档落地「网关能力分层」：LiteLLM 负责多厂商统一出口与可配置路由/容错；业务侧负责账户、权益、预扣费与目录（SSOT）。
 
-```bash
-# 需 DATABASE_URL 指向含迁移后的库
-cd backend
-go run ./cmd/litellm-catalog-sync -verify \
-  -config ../deploy/litellm/litellm_proxy_config.yaml \
-  -map ../deploy/litellm/catalog_provider_map.json
-```
+## 运行时环境
 
-- 种子库与「P0 全量模型」yaml 可能暂时不一致时，可使用 `-soft`（仅打印缺失，退出码 0）。
-- 从目录**生成**可合并的 `model_list` 片段：
+- Docker：`docker-compose.prod.yml` 中 `litellm` 服务；配置挂载 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml)。
+- 后端：`LLM_GATEWAY_ACTIVE=litellm`、`LLM_GATEWAY_LITELLM_URL`（指向网关 `/v1` 根）、`LITELLM_MASTER_KEY`（与网关一致）。见 [`backend/handlers/api_proxy.go`](../../backend/handlers/api_proxy.go) 中 `applyGatewayOverride` / `resolveGatewayAuthToken`。
+- **`API_PROXY_LITELLM_MAX_RETRIES`**（默认 `1`）：在启用 LiteLLM 网关时限制业务层 `api_proxy` 的 HTTP `MaxRetries`，避免与网关 `router_settings.num_retries` 叠加导致重试风暴。见 `applyLitellmGatewayRetryCap`。
 
-```bash
-go run ./cmd/litellm-catalog-sync -generate -map ../deploy/litellm/catalog_provider_map.json -out /tmp/catalog_models.yaml
-```
+## 目录与 model_list（SSOT）
 
-- 厂商 code → LiteLLM 前缀与 API Key 环境变量见 [catalog_provider_map.json](./catalog_provider_map.json)；新增厂商时请同步更新。
+- 校验/生成：见 [`backend/cmd/litellm-catalog-sync/main.go`](../../backend/cmd/litellm-catalog-sync/main.go) 顶部用法（`go run ./cmd/litellm-catalog-sync -verify ...`）。
+- CI：`.github/workflows/integration-tests.yml` 中对配置与 `catalog_provider_map.json` 的校验。
+- **Fallback 引用**：`router_settings` 内 `fallbacks` / `context_window_fallbacks` / `content_policy_fallbacks` 中出现的 `model_name` 必须已在 `model_list` 中定义（`litellm-catalog-sync -verify` 会校验；`#` 注释行不参与解析）。
+
+## 请求关联（可观测性）
+
+- 后端在转发至上游（含 LiteLLM）时设置 **`X-Request-ID`**，并透传 **`traceparent` / `tracestate` / `baggage`**（若入口已带），便于将应用日志、网关日志与 Prometheus 指标按同一次调用对齐。
+- Prometheus 对 `litellm:4000` 的抓取为**聚合序列**；单次请求与后端日志对齐依赖上述头。见 [`deploy/prometheus/prometheus.yml`](../../deploy/prometheus/prometheus.yml) 中 `litellm` job 注释。
+
+## 错误与重试：分层职责（R1）
+
+| 现象 | 优先排查层 | 说明 |
+|------|------------|------|
+| 429 / 上游 5xx / 连接失败 | LiteLLM 网关日志、`num_retries`、fallback 是否触发 | 网关对厂商侧重试与降级 |
+| 业务层再次重试同一 URL | 后端 `executeProviderRequestWithRetry` + `API_PROXY_LITELLM_MAX_RETRIES` | 与网关叠加时注意总延迟 |
+| 无可用商户 Key / 403 / 未验证 | **SmartRouter**、商户 Key 健康与配额 | 与厂商路由独立 |
+| 余额不足、权益拒绝 | 平台计费与 `Entitlement` | 网关不知情 |
+| 响应 `model` 与请求不一致 | 网关 **fallback** 或厂商别名 | 后端会打 `upstream response model differs from request` 日志（非流式）；对账时留意 |
+
+## Router / Fallback 模板（F1）
+
+- `router_settings` 与可选 `fallbacks` / `context_window_fallbacks` / `content_policy_fallbacks` 见 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml) 内注释及 [Reliability](https://docs.litellm.ai/docs/proxy/reliability)。
+- 启用前：运行 `litellm-catalog-sync -verify`；确认链路上所有 `model_name` 已在 `model_list` 且与商品/价目一致。
+
+## 流式（S0–S3）
+
+- **范围（S0）**：当前 **`POST .../openai/v1/chat/completions`**（OpenAI 兼容）在 **`stream: true`** 时走 SSE 透传；仅 **OpenAI 兼容**提供商（`api_format=openai`）。Anthropic `/messages` 等仍返回「仅支持 OpenAI 兼容流式」类错误。
+- **协议（S1）**：上游 `Accept: text/event-stream`；响应头 `X-Accel-Buffering: no` 便于 Nginx 不缓冲 SSE。
+- **计费（S2）**：优先解析流内 **`usage`** 块；若无则按**流字节粗估** output，可能与实际账单有偏差，适合可接受近似场景。
+- **入口与 Nginx（S3）**：若经 Nginx 反代，建议对该 location 配置 `proxy_buffering off`、`proxy_read_timeout` 足够长（如 15m 级），与后端流式超时一致。
+
+## 跨模型 fallback 与计费（R3）
+
+- 若启用跨模型 **fallback**，上游返回的 **`model` 字段可能与请求不一致**；平台按**请求的 `model` 与价目**扣费，对账时请结合网关日志与上述 **model 差异** 日志。
+- 需要「按实际服务模型计费」时须单独产品设计（本迭代未改价目解析逻辑）。
+
+## 不建议在网关重复建设的能力
+
+- 多租户计费和订单级价目版本：保持现有后端与数据库模型。
+- 若启用 LiteLLM Virtual Keys / 团队预算，需单独设计与本系统 API Key、商户配额的双向映射，避免两套真相。
+
+## 部署回滚（F3）
+
+1. 修改 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml)（例如注释掉 `fallbacks` 块或恢复上一版）。
+2. 在部署主机：`cd` 至项目目录，`docker compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway up -d`（与 CI 一致）。
+3. 确认 `pintuotuo-litellm` 与 `pintuotuo-backend` 健康；必要时查看网关容器日志中 model 路由与报错。

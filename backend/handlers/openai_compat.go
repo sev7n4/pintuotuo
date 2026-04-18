@@ -26,6 +26,7 @@ func respondOpenAIError(c *gin.Context, status int, message string) {
 }
 
 // OpenAIChatCompletions accepts an OpenAI-compatible JSON body and reuses the platform proxy pipeline.
+// Supports stream:true (SSE) for OpenAI-compatible providers; see deploy/litellm/README.md.
 // Clients should set base URL to {API_ORIGIN}/api/v1/openai/v1 (OpenAI SDK: baseURL + "/chat/completions").
 // Authentication: Bearer platform API key (ptd_* / ptt_*) or existing JWT (same as /proxy/chat).
 func OpenAIChatCompletions(c *gin.Context) {
@@ -66,11 +67,6 @@ func OpenAIChatCompletions(c *gin.Context) {
 	if streamVal, streamOk := raw["stream"].(bool); streamOk {
 		stream = streamVal
 	}
-	if stream {
-		respondOpenAIError(c, http.StatusBadRequest, "Streaming is not supported yet; set stream to false")
-		return
-	}
-
 	delete(raw, "model")
 	delete(raw, "messages")
 	delete(raw, "stream")
@@ -95,7 +91,7 @@ func OpenAIChatCompletions(c *gin.Context) {
 		Provider: provider,
 		Model:    modelName,
 		Messages: messages,
-		Stream:   false,
+		Stream:   stream,
 		Options:  options,
 	}
 

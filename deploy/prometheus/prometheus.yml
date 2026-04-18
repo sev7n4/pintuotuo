@@ -33,6 +33,7 @@ scrape_configs:
     static_configs:
       - targets: ['node-exporter:9100']
 
+  # 聚合指标；单次请求与后端日志对齐请用 deploy/litellm/README.md 中的 X-Request-ID / trace 透传
   - job_name: 'litellm'
     static_configs:
       - targets: ['litellm:4000']
