@@ -108,6 +108,15 @@ kubectl create secret generic pintuotuo-secrets \
 | `REDIS_URL` | 全部 | Redis 连接 | redis://localhost:6379 |
 | `KAFKA_BROKERS` | 全部 | Kafka 代理 | localhost:9092 |
 
+### PgBouncer 与连接池（可选）
+
+后端使用 `database/sql` + `lib/pq`，`DATABASE_URL` 指向 **PostgreSQL 直连**（或 **PgBouncer**）均可。应用侧已通过 `SetMaxOpenConns` / `SetMaxIdleConns` 限制连接数。
+
+若前置 **PgBouncer** 以减轻数据库连接数、提升伸缩性，请注意：
+
+- **推荐 `pool_mode=session`**：与 `database/sql` 的常见用法（同一连接上多语句、预编译语句）兼容性最好。
+- **`transaction` 池化** 下，部分客户端对 prepared statement 较敏感；若出现异常协议类错误，需查阅 PgBouncer 与驱动文档（例如是否需禁用服务端预编译或改用兼容模式），**不要**仅通过加大连接数掩盖同一事务内「结果集未关闭又发新语句」这类应用层错误——此类问题应在业务 SQL 代码中修复。
+
 ### 腾讯云 Docker Compose：邮箱魔法链接（Mock，不发信）
 
 适用于 `docker-compose.prod.yml` 部署：在服务器项目目录（如 `/opt/pintuotuo`）的 **`.env`** 中增加或修改为：

@@ -207,7 +207,12 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			"estimated_usage": estimatedUsage,
 			"request_id":      requestID,
 		})
-		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
+		// PreDeductBalance wraps many failures; only true short-balance cases should map to 409.
+		if strings.Contains(preDeductErr.Error(), "insufficient balance") {
+			middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
+		} else {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		}
 		return
 	}
 
