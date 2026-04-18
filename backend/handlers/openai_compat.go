@@ -112,13 +112,30 @@ func OpenAIChatCompletions(c *gin.Context) {
 }
 
 // OpenAIListModels exposes GET /v1/models for OpenAI SDK discovery (same base URL as chat/completions).
+// When ENTITLEMENT_ENFORCEMENT=strict, the list is filtered to models the caller is entitled to (same scope as chat).
 func OpenAIListModels(c *gin.Context) {
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	resp, listErr := services.ListOpenAIModelsFromCatalog(context.Background(), db)
+	var resp *services.OpenAIModelsListResponse
+	var listErr error
+	if services.EntitlementEnforcementStrict() {
+		userID, exists := c.Get("user_id")
+		if !exists {
+			middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+			return
+		}
+		userIDInt, ok := userID.(int)
+		if !ok {
+			middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+			return
+		}
+		resp, listErr = services.ListOpenAIModelsEntitledForUser(context.Background(), db, userIDInt)
+	} else {
+		resp, listErr = services.ListOpenAIModelsFromCatalog(context.Background(), db)
+	}
 	if listErr != nil {
 		respondOpenAIError(c, http.StatusInternalServerError, "Failed to list models")
 		return
