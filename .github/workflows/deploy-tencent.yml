@@ -89,12 +89,7 @@ jobs:
             docker ps -a
             exit 1
           fi
-          if ! docker ps --format '{{.Names}}' | grep -q '^pintuotuo-oneapi$'; then
-            echo "ERROR: pintuotuo-oneapi not in running containers"
-            docker ps -a
-            exit 1
-          fi
-          echo "Gateway containers OK (litellm + oneapi)."
+          echo "Gateway container OK (litellm)."
           echo "Seeding database..."
           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('admin@example.com', 'Admin', 'd5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05', 'admin', 'active') ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;"
           echo "Seed user password update completed"

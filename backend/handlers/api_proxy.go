@@ -517,10 +517,6 @@ func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
 		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
 			cfg.APIBaseURL = strings.TrimRight(base, "/") + "/v1"
 		}
-	case "oneapi":
-		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_ONEAPI_URL")); base != "" {
-			cfg.APIBaseURL = strings.TrimRight(base, "/") + "/v1"
-		}
 	}
 	return cfg
 }
@@ -533,10 +529,6 @@ func resolveGatewayAuthToken(cfg providerRuntimeConfig, fallbackToken string) st
 	switch active {
 	case "litellm":
 		if token := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY")); token != "" {
-			return token
-		}
-	case "oneapi":
-		if token := strings.TrimSpace(os.Getenv("ONEAPI_ACCESS_TOKEN")); token != "" {
 			return token
 		}
 	}
