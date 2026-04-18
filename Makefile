@@ -93,12 +93,18 @@ litellm-catalog-verify: ## 校验 litellm_proxy_config.yaml 覆盖库内 active 
 	@echo "$(BLUE)Verifying LiteLLM model_list vs catalog...$(NC)"
 	cd backend && go run ./cmd/litellm-catalog-sync -verify \
 		-config ../deploy/litellm/litellm_proxy_config.yaml \
-		-map ../deploy/litellm/catalog_provider_map.json
+		-map ../deploy/litellm/provider_gateway_map.json
 
 litellm-catalog-verify-soft: ## 同上，-soft 仅警告（种子库与 P0 全量列表不一致时）
 	cd backend && go run ./cmd/litellm-catalog-sync -verify -soft \
 		-config ../deploy/litellm/litellm_proxy_config.yaml \
-		-map ../deploy/litellm/catalog_provider_map.json
+		-map ../deploy/litellm/provider_gateway_map.json
+
+litellm-catalog-generate: ## 由 DB+provider_gateway_map 生成 model_list 片段 YAML（需 DATABASE_URL）
+	@echo "$(BLUE)Generating LiteLLM model_list fragment from DB...$(NC)"
+	cd backend && go run ./cmd/litellm-catalog-sync -generate \
+		-map ../deploy/litellm/provider_gateway_map.json \
+		-out ../deploy/litellm/generated_model_list.fragment.yaml
 
 migrate-create: ## Create new migration file (usage: make migrate-create name=migration_name)
 	@if [ -z "$(name)" ]; then echo "Usage: make migrate-create name=migration_name"; exit 1; fi

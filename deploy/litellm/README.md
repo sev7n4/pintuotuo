@@ -2,6 +2,8 @@
 
 本文档落地「网关能力分层」：LiteLLM 负责多厂商统一出口与可配置路由/容错；业务侧负责账户、权益、预扣费与目录（SSOT）。
 
+**维护入口（厂商 / 模型 / 密钥从哪来）**：先读 [**SSOT_ROUTING.md**](./SSOT_ROUTING.md)，再改 [`provider_gateway_map.json`](./provider_gateway_map.json)，最后用 `make litellm-catalog-verify` / `make litellm-catalog-generate` 对齐 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml)。
+
 ## 运行时环境
 
 - Docker：`docker-compose.prod.yml` 中 `litellm` 服务；配置挂载 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml)。
@@ -10,8 +12,8 @@
 
 ## 目录与 model_list（SSOT）
 
-- 校验/生成：见 [`backend/cmd/litellm-catalog-sync/main.go`](../../backend/cmd/litellm-catalog-sync/main.go) 顶部用法（`go run ./cmd/litellm-catalog-sync -verify ...`）。
-- CI：`.github/workflows/integration-tests.yml` 中对配置与 `catalog_provider_map.json` 的校验。
+- 校验/生成：见 [`backend/cmd/litellm-catalog-sync/main.go`](../../backend/cmd/litellm-catalog-sync/main.go) 顶部用法；Makefile 目标 `litellm-catalog-verify`、`litellm-catalog-generate`。
+- CI：`.github/workflows/integration-tests.yml` 中对 `provider_gateway_map.json` + `litellm_proxy_config.yaml` 的 soft verify。
 - **Fallback 引用**：`router_settings` 内 `fallbacks` / `context_window_fallbacks` / `content_policy_fallbacks` 中出现的 `model_name` 必须已在 `model_list` 中定义（`litellm-catalog-sync -verify` 会校验；`#` 注释行不参与解析）。
 
 ## 请求关联（可观测性）
@@ -29,10 +31,28 @@
 | 余额不足、权益拒绝 | 平台计费与 `Entitlement` | 网关不知情 |
 | 响应 `model` 与请求不一致 | 网关 **fallback** 或厂商别名 | 后端会打 `upstream response model differs from request` 日志（非流式）；对账时留意 |
 
+## 网关与厂商侧排查（400 / `no healthy deployments` / Invalid model）
+
+业务侧 `api_proxy` 在 `LLM_GATEWAY_ACTIVE=litellm` 时把请求转到 **LiteLLM**，请求体里的 `model` 为「目录短名」（例如 `glm-5`、`step-1-8k`），须与 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml) 中 **`model_name`** 一致；上游真实路由由 `litellm_params.model` + 各厂商 `api_key` 决定。
+
+| 现象 | 含义 | 运维动作 |
+|------|------|----------|
+| `Invalid model name ... model=step-1-8k` | 网关 **model_list 未注册** 该短名，或名称与目录不一致 | 在 yaml 增加对应 `model_name` 与 `litellm_params`；`litellm-catalog-sync -verify` 校验目录与 yaml；重建 `pintuotuo-litellm` 使配置生效 |
+| `no healthy deployments for glm-5` / `glm-5.1` | LiteLLM 认为该 deployment **不健康**（常见：缺 Key、Key 无效、上游不可达、健康探测失败） | 在宿主机 `.env` 配置 **`ZAI_API_KEY`**（与 yaml 中 `zai/glm-*` 一致），`docker compose ... up -d litellm` 注入环境；查容器日志与 `GET http://litellm:4000/health`（需 master key） |
+| 智谱 **直连** vs **网关** | DB `model_providers.zhipu` 的默认 `api_base_url` 指向 BigModel 旧网关；**LiteLLM 条目使用 `zai/glm-*` + `ZAI_API_KEY`** | 走 LiteLLM 时以 **yaml + ZAI_API_KEY** 为准，勿与直连 URL 混用 |
+| StepFun `step-1-8k` | 需 **`STEPFUN_API_KEY`** + 上表 yaml 中 `openai/step-1-8k` 与 `api_base: https://api.stepfun.com/v1` | 若厂商已下线/改名该 model id，需同步改 **SPU `provider_model_id`** 与网关 `model_name` |
+
+验证（生产主机，勿在日志中打印完整 Key）：
+
+```bash
+docker exec pintuotuo-litellm sh -c 'test -n "$ZAI_API_KEY" && echo ZAI_API_KEY=set || echo ZAI_API_KEY=missing'
+docker exec pintuotuo-litellm sh -c 'test -n "$STEPFUN_API_KEY" && echo STEPFUN_API_KEY=set || echo STEPFUN_API_KEY=missing'
+```
+
 ## Router / Fallback 模板（F1）
 
 - `router_settings` 与可选 `fallbacks` / `context_window_fallbacks` / `content_policy_fallbacks` 见 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml) 内注释及 [Reliability](https://docs.litellm.ai/docs/proxy/reliability)。
-- 启用前：运行 `litellm-catalog-sync -verify`；确认链路上所有 `model_name` 已在 `model_list` 且与商品/价目一致。
+- 启用前：运行 `make litellm-catalog-verify`；确认链路上所有 `model_name` 已在 `model_list` 且与 [`provider_gateway_map.json`](./provider_gateway_map.json) 一致。
 
 ## 流式（S0–S3）
 

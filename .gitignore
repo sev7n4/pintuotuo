@@ -169,3 +169,6 @@ app_public_key.pem
 scripts/00_01_workflow_state.json
 scripts/05_01_test_cases_state.json
 scripts/workflow_state.json
+
+# LiteLLM：本地由 make litellm-catalog-generate 生成的片段（勿提交）
+deploy/litellm/generated_model_list.fragment.yaml

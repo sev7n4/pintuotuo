@@ -241,6 +241,7 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - ZAI_API_KEY=${ZAI_API_KEY:-}
+      - STEPFUN_API_KEY=${STEPFUN_API_KEY:-}
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
     volumes:
       - ./deploy/litellm/litellm_proxy_config.yaml:/app/litellm_proxy_config.yaml:ro

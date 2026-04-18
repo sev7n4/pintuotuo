@@ -159,6 +159,16 @@ model_list:
       api_key: os.environ/DEEPSEEK_API_KEY
 
   # ===========================================================================
+  # P1 — 阶跃星辰 StepFun（OpenAI 兼容；与 model_providers stepfun 默认 base 一致）
+  # 业务侧请求体 model 为「目录短名」step-1-8k（见 api_proxy 对 zhipu/stepfun 的拆分）。
+  # ===========================================================================
+  - model_name: step-1-8k
+    litellm_params:
+      model: openai/step-1-8k
+      api_base: https://api.stepfun.com/v1
+      api_key: os.environ/STEPFUN_API_KEY
+
+  # ===========================================================================
   # P1 — 智谱 Z.A.I（官方 model 字段：glm-5、glm-5.1；LiteLLM 前缀 zai/）
   # ===========================================================================
   - model_name: glm-5
