@@ -1,6 +1,25 @@
 package main
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
+
+func TestMergeProviderMappings_overrideWins(t *testing.T) {
+	base := map[string]providerMapEntry{
+		"openai": {LitellmModelTemplate: "openai/{model_id}", APIKeyEnv: "OPENAI_API_KEY"},
+	}
+	ov := map[string]providerMapEntry{
+		"openai": {LitellmModelTemplate: "custom/{model_id}", APIKeyEnv: "CUSTOM_KEY"},
+	}
+	got := mergeProviderMappings(base, ov)
+	want := map[string]providerMapEntry{
+		"openai": {LitellmModelTemplate: "custom/{model_id}", APIKeyEnv: "CUSTOM_KEY"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("mergeProviderMappings() = %#v, want %#v", got, want)
+	}
+}
 
 func TestProviderMapEntry_upstreamLitellmModel(t *testing.T) {
 	tests := []struct {

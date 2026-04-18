@@ -2,7 +2,7 @@
 
 本文档落地「网关能力分层」：LiteLLM 负责多厂商统一出口与可配置路由/容错；业务侧负责账户、权益、预扣费与目录（SSOT）。
 
-**维护入口（厂商 / 模型 / 密钥从哪来）**：先读 [**SSOT_ROUTING.md**](./SSOT_ROUTING.md)，再改 [`provider_gateway_map.json`](./provider_gateway_map.json)，最后用 `make litellm-catalog-verify` / `make litellm-catalog-generate` 对齐 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml)。
+**维护入口（厂商 / 模型 / 密钥从哪来）**：先读 [**SSOT_ROUTING.md**](./SSOT_ROUTING.md)；**LiteLLM 网关映射**以 DB **`model_providers.litellm_*`** 为主，可选 [`provider_gateway_map.json`](./provider_gateway_map.json) 作 `-map` 覆盖；再用 `make litellm-catalog-verify` / `make litellm-catalog-generate` 对齐 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml)。
 
 ## 运行时环境
 
@@ -13,7 +13,7 @@
 ## 目录与 model_list（SSOT）
 
 - 校验/生成：见 [`backend/cmd/litellm-catalog-sync/main.go`](../../backend/cmd/litellm-catalog-sync/main.go) 顶部用法；Makefile 目标 `litellm-catalog-verify`、`litellm-catalog-generate`。
-- CI：`.github/workflows/integration-tests.yml` 中对 `provider_gateway_map.json` + `litellm_proxy_config.yaml` 的 soft verify。
+- CI：`.github/workflows/integration-tests.yml` 中对 `litellm_proxy_config.yaml` 的 soft verify（映射来自已迁移的 `model_providers`）。
 - **Fallback 引用**：`router_settings` 内 `fallbacks` / `context_window_fallbacks` / `content_policy_fallbacks` 中出现的 `model_name` 必须已在 `model_list` 中定义（`litellm-catalog-sync -verify` 会校验；`#` 注释行不参与解析）。
 
 ## 请求关联（可观测性）
@@ -52,7 +52,7 @@ docker exec pintuotuo-litellm sh -c 'test -n "$STEPFUN_API_KEY" && echo STEPFUN_
 ## Router / Fallback 模板（F1）
 
 - `router_settings` 与可选 `fallbacks` / `context_window_fallbacks` / `content_policy_fallbacks` 见 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml) 内注释及 [Reliability](https://docs.litellm.ai/docs/proxy/reliability)。
-- 启用前：运行 `make litellm-catalog-verify`；确认链路上所有 `model_name` 已在 `model_list` 且与 [`provider_gateway_map.json`](./provider_gateway_map.json) 一致。
+- 启用前：运行 `make litellm-catalog-verify`；确认链路上所有 `model_name` 已在 `model_list` 且与 **`model_providers` 中 LiteLLM 映射**（及可选 `-map` 文件）一致。
 
 ## 流式（S0–S3）
 

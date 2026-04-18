@@ -89,21 +89,18 @@ reconcile-check: ## Full-database usage ledger check (api_usage_logs vs token_tr
 	@echo "$(BLUE)Running usage reconciliation...$(NC)"
 	cd backend && go run ./cmd/reconcile
 
-litellm-catalog-verify: ## 校验 litellm_proxy_config.yaml 覆盖库内 active SPU（需 DATABASE_URL）
+litellm-catalog-verify: ## 校验 litellm_proxy_config.yaml 覆盖库内 active SPU（需 DATABASE_URL；映射来自 model_providers）
 	@echo "$(BLUE)Verifying LiteLLM model_list vs catalog...$(NC)"
 	cd backend && go run ./cmd/litellm-catalog-sync -verify \
-		-config ../deploy/litellm/litellm_proxy_config.yaml \
-		-map ../deploy/litellm/provider_gateway_map.json
+		-config ../deploy/litellm/litellm_proxy_config.yaml
 
 litellm-catalog-verify-soft: ## 同上，-soft 仅警告（种子库与 P0 全量列表不一致时）
 	cd backend && go run ./cmd/litellm-catalog-sync -verify -soft \
-		-config ../deploy/litellm/litellm_proxy_config.yaml \
-		-map ../deploy/litellm/provider_gateway_map.json
+		-config ../deploy/litellm/litellm_proxy_config.yaml
 
-litellm-catalog-generate: ## 由 DB+provider_gateway_map 生成 model_list 片段 YAML（需 DATABASE_URL）
+litellm-catalog-generate: ## 由 DB 生成 model_list 片段 YAML（需 DATABASE_URL；可选 -map 覆盖见 SSOT_ROUTING）
 	@echo "$(BLUE)Generating LiteLLM model_list fragment from DB...$(NC)"
 	cd backend && go run ./cmd/litellm-catalog-sync -generate \
-		-map ../deploy/litellm/provider_gateway_map.json \
 		-out ../deploy/litellm/generated_model_list.fragment.yaml
 
 migrate-create: ## Create new migration file (usage: make migrate-create name=migration_name)
