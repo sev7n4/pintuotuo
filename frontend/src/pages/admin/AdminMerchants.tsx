@@ -51,6 +51,7 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
   approve: '通过',
   reject: '拒绝',
   meta_update: '信息维护',
+  lifecycle_update: '生命周期',
 };
 
 const statusTag = (status: string) => {
@@ -371,15 +372,48 @@ const AdminMerchants = () => {
     },
   ];
 
+  const lifecycleTag = (ls?: string) => {
+    const v = ls || 'trial';
+    const colorMap: Record<string, string> = {
+      trial: 'default',
+      active: 'green',
+      suspended: 'red',
+    };
+    const textMap: Record<string, string> = {
+      trial: '试用',
+      active: '正式',
+      suspended: '已暂停',
+    };
+    return <Tag color={colorMap[v] || 'default'}>{textMap[v] || v}</Tag>;
+  };
+
+  const setLifecycle = async (record: PendingMerchant, next: 'active' | 'suspended') => {
+    try {
+      await adminMerchantService.patchMerchantLifecycle(record.id, next);
+      message.success(next === 'suspended' ? '已暂停租户服务' : '已恢复租户服务');
+      fetchAllMerchants(allPagination.current);
+      fetchAuditLogs(auditPagination.current);
+    } catch {
+      message.error('更新生命周期失败');
+    }
+  };
+
   const allColumns: ColumnsType<PendingMerchant> = [
     ...pendingColumns.slice(0, -1),
     {
+      title: '生命周期',
+      dataIndex: 'lifecycle_status',
+      key: 'lifecycle_status',
+      width: 110,
+      render: (_: unknown, r: PendingMerchant) => lifecycleTag(r.lifecycle_status),
+    },
+    {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 220,
       fixed: 'right',
       render: (_: unknown, record: PendingMerchant) => (
-        <Space>
+        <Space wrap size="small">
           <Button
             type="link"
             size="small"
@@ -391,6 +425,27 @@ const AdminMerchants = () => {
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
             维护
           </Button>
+          {(record.lifecycle_status === 'active' || record.lifecycle_status === 'trial') && (
+            <Button
+              danger
+              type="link"
+              size="small"
+              onClick={() => {
+                Modal.confirm({
+                  title: '暂停租户服务？',
+                  content: '暂停后该商户将无法调用 API 代理、无法新增或修改密钥与在售 SKU。',
+                  onOk: () => setLifecycle(record, 'suspended'),
+                });
+              }}
+            >
+              暂停
+            </Button>
+          )}
+          {record.lifecycle_status === 'suspended' && (
+            <Button type="link" size="small" onClick={() => setLifecycle(record, 'active')}>
+              恢复
+            </Button>
+          )}
         </Space>
       ),
     },

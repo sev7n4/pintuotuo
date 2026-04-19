@@ -53,15 +53,8 @@ func CreateMerchantAPIKey(c *gin.Context) {
 		return
 	}
 
-	var merchantID int
-	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1 AND status = 'active'", userIDInt).Scan(&merchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"Merchant not found or not active",
-			http.StatusNotFound,
-			err,
-		))
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
 		return
 	}
 
@@ -264,15 +257,8 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		return
 	}
 
-	var merchantID int
-	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"Merchant not found",
-			http.StatusNotFound,
-			err,
-		))
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
 		return
 	}
 
@@ -344,15 +330,8 @@ func DeleteMerchantAPIKey(c *gin.Context) {
 		return
 	}
 
-	var merchantID int
-	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"Merchant not found",
-			http.StatusNotFound,
-			err,
-		))
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
 		return
 	}
 
@@ -467,15 +446,8 @@ func RequestSettlement(c *gin.Context) {
 		return
 	}
 
-	var merchantID int
-	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1 AND status = 'active'", userIDInt).Scan(&merchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"Merchant not found or not active",
-			http.StatusNotFound,
-			err,
-		))
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
 		return
 	}
 
@@ -506,7 +478,7 @@ func RequestSettlement(c *gin.Context) {
 
 	now := time.Now()
 	var settlement models.MerchantSettlement
-	err = db.QueryRow(
+	err := db.QueryRow(
 		`INSERT INTO merchant_settlements (merchant_id, period_start, period_end, total_sales, platform_fee, settlement_amount, status) 
 		 VALUES ($1, $2, $3, $4, $5, $6, 'pending') 
 		 RETURNING id, merchant_id, period_start, period_end, total_sales, platform_fee, settlement_amount, status, created_at, updated_at`,
@@ -618,15 +590,8 @@ func VerifyMerchantAPIKey(c *gin.Context) {
 		return
 	}
 
-	var merchantID int
-	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"Merchant not found",
-			http.StatusNotFound,
-			err,
-		))
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
 		return
 	}
 
@@ -707,15 +672,8 @@ func GetMerchantAPIKeyVerification(c *gin.Context) {
 		return
 	}
 
-	var merchantID int
-	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"Merchant not found",
-			http.StatusNotFound,
-			err,
-		))
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
 		return
 	}
 

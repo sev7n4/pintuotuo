@@ -104,7 +104,7 @@ func (s *SettlementService) GenerateMonthlySettlements(periodStart, periodEnd ti
 		WHERE aul.created_at >= $1 
 			AND aul.created_at <= $2
 			AND aul.status_code = 200
-			AND m.status = 'approved'
+			AND m.status IN ('active', 'approved')
 		GROUP BY mak.merchant_id
 		HAVING COUNT(aul.id) > 0
 	`

@@ -177,6 +177,7 @@ type Merchant struct {
 	BusinessCategory   *string    `json:"business_category,omitempty"` // 经营类目
 	AdminNotes         *string    `json:"admin_notes,omitempty"`       // 管理员内部备注
 	Status             string     `json:"status"`                      // pending, reviewing, active, suspended, rejected
+	LifecycleStatus    string     `json:"lifecycle_status,omitempty"`  // trial | active | suspended (ops lifecycle)
 	ReviewedAt         *time.Time `json:"reviewed_at,omitempty"`
 	ReviewNote         *string    `json:"review_note,omitempty"`
 	RejectionReason    *string    `json:"rejection_reason,omitempty"`

@@ -380,20 +380,13 @@ func CreateMerchantSKU(c *gin.Context) {
 		return
 	}
 
-	var merchantID int
-	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1 AND status = 'active'", userIDInt).Scan(&merchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"商户不存在或未激活",
-			http.StatusNotFound,
-			err,
-		))
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
 		return
 	}
 
 	var skuExists bool
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM skus WHERE id = $1 AND status = 'active')", req.SKUID).Scan(&skuExists)
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM skus WHERE id = $1 AND status = 'active')", req.SKUID).Scan(&skuExists)
 	if err != nil || !skuExists {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SKU_NOT_FOUND",
@@ -613,15 +606,8 @@ func UpdateMerchantSKU(c *gin.Context) {
 		return
 	}
 
-	var merchantID int
-	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"商户不存在",
-			http.StatusNotFound,
-			err,
-		))
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
 		return
 	}
 
@@ -772,15 +758,8 @@ func DeleteMerchantSKU(c *gin.Context) {
 		return
 	}
 
-	var merchantID int
-	err = db.QueryRow("SELECT id FROM merchants WHERE user_id = $1", userIDInt).Scan(&merchantID)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"MERCHANT_NOT_FOUND",
-			"商户不存在",
-			http.StatusNotFound,
-			err,
-		))
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
 		return
 	}
 

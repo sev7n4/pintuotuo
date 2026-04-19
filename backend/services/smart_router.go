@@ -126,6 +126,9 @@ func (r *SmartRouter) GetCandidates(ctx context.Context, model string, providerF
 				100
 			) as success_rate
 		FROM merchant_api_keys mak
+		INNER JOIN merchants m ON m.id = mak.merchant_id
+			AND m.status IN ('active', 'approved')
+			AND m.lifecycle_status <> 'suspended'
 		LEFT JOIN api_key_health_history h ON mak.id = h.api_key_id
 		LEFT JOIN merchant_skus ms ON ms.api_key_id = mak.id AND ms.status = 'active'
 		LEFT JOIN skus s ON s.id = ms.sku_id

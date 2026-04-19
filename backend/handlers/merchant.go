@@ -27,6 +27,55 @@ const (
 	merchantStatusSuspended = "suspended"
 )
 
+// merchantLifecycleSuspended blocks proxy and merchant-side mutations when set on merchants.lifecycle_status.
+const merchantLifecycleSuspended = "suspended"
+
+// sqlMerchantOperational matches merchants cleared for API keys / SKUs / proxy.
+// ApproveMerchant sets active; legacy rows may use approved (see migration 055).
+const sqlMerchantOperational = "status IN ('active', 'approved') AND lifecycle_status <> 'suspended'"
+
+// gateMerchantOperational ensures the tenant is approved and not lifecycle-suspended. Writes HTTP error on failure.
+func gateMerchantOperational(c *gin.Context, db *sql.DB, userID int) (merchantID int, ok bool) {
+	var mid int
+	var st, ls string
+	err := db.QueryRow(
+		`SELECT id, status, lifecycle_status FROM merchants WHERE user_id = $1`,
+		userID,
+	).Scan(&mid, &st, &ls)
+	if err == sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"Merchant not found or not active",
+			http.StatusNotFound,
+			err,
+		))
+		return 0, false
+	}
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return 0, false
+	}
+	if ls == merchantLifecycleSuspended {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_SUSPENDED",
+			"商户已暂停服务，无法进行此操作",
+			http.StatusForbidden,
+			nil,
+		))
+		return 0, false
+	}
+	if st != merchantStatusActive && st != "approved" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"Merchant not found or not active",
+			http.StatusNotFound,
+			nil,
+		))
+		return 0, false
+	}
+	return mid, true
+}
+
 func RegisterMerchant(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -137,12 +186,12 @@ func GetMerchantProfile(c *gin.Context) {
 	var merchant models.Merchant
 	var verifiedAt sql.NullTime
 	err := db.QueryRow(
-		`SELECT id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, logo_url, status, reviewed_at, created_at, updated_at 
+		`SELECT id, user_id, company_name, business_license, contact_name, contact_phone, contact_email, address, description, logo_url, status, COALESCE(lifecycle_status, 'trial'), reviewed_at, created_at, updated_at 
 		 FROM merchants WHERE user_id = $1`,
 		userIDInt,
 	).Scan(&merchant.ID, &merchant.UserID, &merchant.CompanyName, &merchant.BusinessLicense, &merchant.ContactName,
 		&merchant.ContactPhone, &merchant.ContactEmail, &merchant.Address, &merchant.Description, &merchant.LogoURL,
-		&merchant.Status, &verifiedAt, &merchant.CreatedAt, &merchant.UpdatedAt)
+		&merchant.Status, &merchant.LifecycleStatus, &verifiedAt, &merchant.CreatedAt, &merchant.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		log.Printf("GetMerchantProfile: Merchant not found for user_id %d", userIDInt)

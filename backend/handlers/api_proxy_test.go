@@ -355,12 +355,15 @@ func TestSelectAPIKeyForRequest_NonMerchantWithAPIKeyID(t *testing.T) {
 		"id", "merchant_id", "provider", "api_key_encrypted", "api_secret_encrypted", "quota_limit", "quota_used", "status",
 	}).AddRow(22, 4, "stepfun", "enc_key", "enc_secret", nil, 0.0, "active")
 
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
-			 FROM merchant_api_keys
-			 WHERE id = $1 AND provider = $2 AND status = 'active'
-			   AND (verified_at IS NOT NULL OR verification_result = 'verified')
-			   AND (quota_limit IS NULL OR quota_used < quota_limit) LIMIT 1`)).
-		WithArgs(22, "stepfun").
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
+			 FROM merchant_api_keys mak
+			 INNER JOIN merchants m ON m.id = mak.merchant_id
+			 WHERE mak.id = $1 AND mak.provider = $2 AND mak.status = 'active'
+			   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')
+			   AND (mak.quota_limit IS NULL OR mak.quota_used < mak.quota_limit)
+			   AND m.status IN ('active', 'approved')
+			   AND m.lifecycle_status <> 'suspended' AND m.user_id = $3 LIMIT 1`)).
+		WithArgs(22, "stepfun", 13).
 		WillReturnRows(rows)
 
 	var apiKey models.MerchantAPIKey
@@ -385,11 +388,14 @@ func TestSelectAPIKeyForRequest_MerchantWithAPIKeyIDBoundedByMerchant(t *testing
 		APIKeyID: func() *int { v := 22; return &v }(),
 	}
 
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
-			 FROM merchant_api_keys
-			 WHERE id = $1 AND provider = $2 AND status = 'active'
-			   AND (verified_at IS NOT NULL OR verification_result = 'verified')
-			   AND (quota_limit IS NULL OR quota_used < quota_limit) AND merchant_id = $3 LIMIT 1`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
+			 FROM merchant_api_keys mak
+			 INNER JOIN merchants m ON m.id = mak.merchant_id
+			 WHERE mak.id = $1 AND mak.provider = $2 AND mak.status = 'active'
+			   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')
+			   AND (mak.quota_limit IS NULL OR mak.quota_used < mak.quota_limit)
+			   AND m.status IN ('active', 'approved')
+			   AND m.lifecycle_status <> 'suspended' AND mak.merchant_id = $3 LIMIT 1`)).
 		WithArgs(22, "stepfun", 99).
 		WillReturnError(sql.ErrNoRows)
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status

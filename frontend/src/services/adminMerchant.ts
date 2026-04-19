@@ -17,6 +17,8 @@ export interface PendingMerchant {
   admin_notes?: string;
   reviewed_at?: string;
   status: string;
+  /** 运营生命周期 trial | active | suspended */
+  lifecycle_status?: string;
   rejection_reason?: string;
   created_at: string;
   updated_at: string;
@@ -111,6 +113,15 @@ export const adminMerchantService = {
     api.patch<{ code: number; message: string; data: PendingMerchant }>(
       `/admin/merchants/${merchantId}`,
       body
+    ),
+
+  patchMerchantLifecycle: (
+    merchantId: number,
+    lifecycle_status: 'trial' | 'active' | 'suspended'
+  ) =>
+    api.patch<{ code: number; message: string; data: { merchant_id: number; lifecycle_status: string } }>(
+      `/admin/merchants/${merchantId}/lifecycle`,
+      { lifecycle_status }
     ),
 
   listMerchantInvites: (params?: { status?: string; keyword?: string; limit?: number }) =>
