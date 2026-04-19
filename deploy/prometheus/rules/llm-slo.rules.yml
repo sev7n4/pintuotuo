@@ -4,9 +4,9 @@ groups:
       - alert: BackendHighErrorRate
         expr: |
           (
-            sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            sum(rate(http_requests_total{job="pintuotuo-backend",status=~"5.."}[5m]))
             /
-            clamp_min(sum(rate(http_requests_total[5m])), 1)
+            clamp_min(sum(rate(http_requests_total{job="pintuotuo-backend"}[5m])), 1)
           ) > 0.05
         for: 10m
         labels:
@@ -20,7 +20,7 @@ groups:
         expr: |
           histogram_quantile(
             0.95,
-            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint)
+            sum(rate(http_request_duration_seconds_bucket{job="pintuotuo-backend"}[5m])) by (le, endpoint)
           ) > 3
         for: 10m
         labels:
