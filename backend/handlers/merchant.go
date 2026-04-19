@@ -28,7 +28,10 @@ const (
 )
 
 // merchantLifecycleSuspended blocks proxy and merchant-side mutations when set on merchants.lifecycle_status.
-const merchantLifecycleSuspended = "suspended"
+const (
+	merchantLifecycleTrial     = "trial"
+	merchantLifecycleSuspended = "suspended"
+)
 
 // sqlMerchantOperational matches merchants cleared for API keys / SKUs / proxy.
 // ApproveMerchant sets active; legacy rows may use approved (see migration 055).

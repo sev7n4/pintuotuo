@@ -746,7 +746,6 @@ func buildMerchantAdminWhere(c *gin.Context) (where string, args []interface{}) 
 	if ls := strings.TrimSpace(c.Query("lifecycle_status")); ls != "" {
 		where += fmt.Sprintf(" AND lifecycle_status = $%d", n)
 		args = append(args, ls)
-		n++
 	}
 	return where, args
 }
@@ -774,12 +773,12 @@ func PatchAdminMerchantLifecycle(c *gin.Context) {
 	var req struct {
 		LifecycleStatus string `json:"lifecycle_status" binding:"required"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 	ls := strings.ToLower(strings.TrimSpace(req.LifecycleStatus))
-	if ls != "trial" && ls != "active" && ls != merchantLifecycleSuspended {
+	if ls != merchantLifecycleTrial && ls != merchantStatusActive && ls != merchantLifecycleSuspended {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"INVALID_REQUEST",
 			"lifecycle_status must be trial, active or suspended",

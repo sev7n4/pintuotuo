@@ -226,17 +226,17 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 	}
 
 	var name, status string
-	if raw, ok := patch["name"]; ok {
+	if raw, has := patch["name"]; has {
 		_ = json.Unmarshal(raw, &name)
 	}
-	if raw, ok := patch["status"]; ok {
+	if raw, has := patch["status"]; has {
 		_ = json.Unmarshal(raw, &status)
 	}
 
 	patchQuota := false
 	unlimitedQuota := false
 	quotaVal := 0.0
-	if raw, ok := patch["quota_limit"]; ok {
+	if raw, has := patch["quota_limit"]; has {
 		patchQuota = true
 		if strings.TrimSpace(string(raw)) == "null" {
 			unlimitedQuota = true
