@@ -103,6 +103,9 @@ litellm-catalog-generate: ## 由 DB 生成 model_list 片段 YAML（需 DATABASE
 	cd backend && go run ./cmd/litellm-catalog-sync -generate \
 		-out ../deploy/litellm/generated_model_list.fragment.yaml
 
+probe-litellm: ## 读取 litellm_proxy_config.yaml 并探测网关 POST /v1/chat/completions（需 LITELLM_MASTER_KEY；可选 LITELLM_URL）
+	@python3 scripts/probe_litellm_all_models.py --url "$${LITELLM_URL:-http://127.0.0.1:4000}"
+
 migrate-create: ## Create new migration file (usage: make migrate-create name=migration_name)
 	@if [ -z "$(name)" ]; then echo "Usage: make migrate-create name=migration_name"; exit 1; fi
 	@echo "Creating migration: $(name)"
