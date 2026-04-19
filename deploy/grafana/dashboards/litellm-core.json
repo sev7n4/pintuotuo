@@ -1,0 +1,199 @@
+{
+  "id": null,
+  "uid": "ptt-litellm-core",
+  "title": "LiteLLM Core / 可观测核心",
+  "tags": ["litellm", "pintuotuo", "prometheus"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "说明（建议 1 + 4）",
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "### 后端 HTTP 指标标签\n- 本项目 `http_requests_total` 使用标签 **`status`**（如 `200`、`500`），**不是** `status_code`。\n\n### 单次请求对齐（业务 ↔ 网关 ↔ 指标）\n- 后端出站已透传 **`X-Request-ID`** / **`traceparent`** 等，见 `deploy/litellm/README.md`。\n- Prometheus 为**聚合序列**：排障时在**同一时间窗**内对照 **应用日志 request_id** 与 **LiteLLM 容器日志**。\n\n### LiteLLM 指标说明\n- Counter 类在 Prometheus 中一般为 `*_total`；若面板无数据，请在 Prometheus **Graph** 中 `grep` 实际指标名或确认网关 `callbacks: [prometheus]` 与 `llm-gateway` profile 已启用。\n- **流式 / TTFT**：`litellm_llm_api_time_to_first_token_metric_*` 主要在**流式**请求上有意义；可在 `litellm_settings` 中按需开启 **`prometheus_emit_stream_label`**（会改变 `litellm_proxy_total_requests_metric` 的 label 形态，升级前评估）。"
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Backend — HTTP RPS（pintuotuo-backend）",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 5 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"pintuotuo-backend\"}[1m]))",
+          "legendFormat": "rps",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Backend — 5xx 占比（label=status）",
+      "description": "使用 status=~\"5..\"，与 backend/metrics 中 Counter 标签一致",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 5 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"pintuotuo-backend\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_requests_total{job=\"pintuotuo-backend\"}[5m])), 1)",
+          "legendFormat": "5xx_ratio",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Backend — P95 延迟 by endpoint",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 5 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"pintuotuo-backend\"}[5m])) by (le, endpoint))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "LiteLLM — 代理总请求速率（proxy_total）",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum(rate(litellm_proxy_total_requests_metric_total{job=\"litellm\"}[5m]))",
+          "legendFormat": "req/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "LiteLLM — 代理失败速率（proxy_failed）",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum(rate(litellm_proxy_failed_requests_metric_total{job=\"litellm\"}[5m]))",
+          "legendFormat": "fail/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "LiteLLM — Deployment 失败速率 by requested_model",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum(rate(litellm_deployment_failure_responses_total{job=\"litellm\"}[5m])) by (requested_model)",
+          "legendFormat": "{{requested_model}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "LiteLLM — Deployment 成功速率 by requested_model",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum(rate(litellm_deployment_success_responses_total{job=\"litellm\"}[5m])) by (requested_model)",
+          "legendFormat": "{{requested_model}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "LiteLLM — deployment_state（0=健康,1=部分,2=全挂）",
+      "description": "官方 Gauge；按 model_id / provider 多条线",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "targets": [
+        {
+          "expr": "max by (litellm_model_name, model_id, api_provider) (litellm_deployment_state{job=\"litellm\"})",
+          "legendFormat": "{{litellm_model_name}} / {{api_provider}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "LiteLLM — Token 吞吐（total_tokens /s by model）",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+      "targets": [
+        {
+          "expr": "sum(rate(litellm_total_tokens_metric_total{job=\"litellm\"}[5m])) by (model)",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "LiteLLM — spend 速率（若启用计费标签）",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+      "targets": [
+        {
+          "expr": "sum(rate(litellm_spend_metric_total{job=\"litellm\"}[5m])) by (model)",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "LiteLLM — TTFT P95（流式，histogram）",
+      "description": "无流式流量时可能无数据；标签以实际 /metrics 为准",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(litellm_llm_api_time_to_first_token_metric_bucket{job=\"litellm\"}[5m])) by (le, model))",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "LiteLLM — in-flight 请求（若版本暴露）",
+      "description": "官方文档中的队列深度；旧版本可能无此 series",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+      "targets": [
+        {
+          "expr": "litellm_in_flight_requests{job=\"litellm\"}",
+          "legendFormat": "in_flight",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "基础设施 — scrape targets up（建议 5）",
+      "description": "若未部署 postgres/redis/node exporter，对应 job 恒为 0 或缺失",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 52 },
+      "targets": [
+        { "expr": "up{job=\"pintuotuo-backend\"}", "legendFormat": "backend", "refId": "A" },
+        { "expr": "up{job=\"litellm\"}", "legendFormat": "litellm", "refId": "B" },
+        { "expr": "up{job=\"postgres\"}", "legendFormat": "postgres-exporter", "refId": "C" },
+        { "expr": "up{job=\"redis\"}", "legendFormat": "redis-exporter", "refId": "D" },
+        { "expr": "up{job=\"node\"}", "legendFormat": "node-exporter", "refId": "E" }
+      ]
+    }
+  ]
+}
