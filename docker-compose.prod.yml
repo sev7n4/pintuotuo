@@ -195,6 +195,8 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
       - GF_USERS_ALLOW_SIGN_UP=false
+      # 与 ROOT_URL 中带 /grafana/ 子路径配套；未开启时浏览器访问会出现 /grafana/login 无限重定向
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana/
     volumes:
       - grafana_data:/var/lib/grafana
