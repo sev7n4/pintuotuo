@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	stdlog "log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
@@ -683,7 +686,7 @@ func GetAdminMerchants(c *gin.Context) {
 	q := fmt.Sprintf(
 		`SELECT id, user_id, company_name, business_license, business_license_url, id_card_front_url, id_card_back_url,
 		 contact_name, contact_phone, contact_email, address, description, status, review_note AS rejection_reason,
-		 business_category, admin_notes, reviewed_at, created_at, updated_at
+		 business_category, admin_notes, COALESCE(lifecycle_status, 'trial'), reviewed_at, created_at, updated_at
 		 FROM merchants WHERE %s ORDER BY created_at DESC LIMIT %s OFFSET %s`,
 		where, limitPh, offsetPh,
 	)
@@ -701,7 +704,7 @@ func GetAdminMerchants(c *gin.Context) {
 		if err := rows.Scan(&m.ID, &m.UserID, &m.CompanyName, &m.BusinessLicense, &m.BusinessLicenseURL,
 			&m.IDCardFrontURL, &m.IDCardBackURL, &m.ContactName,
 			&m.ContactPhone, &m.ContactEmail, &m.Address, &m.Description, &m.Status, &m.RejectionReason,
-			&m.BusinessCategory, &m.AdminNotes, &m.ReviewedAt, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			&m.BusinessCategory, &m.AdminNotes, &m.LifecycleStatus, &m.ReviewedAt, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			continue
 		}
 		merchants = append(merchants, m)
@@ -738,8 +741,101 @@ func buildMerchantAdminWhere(c *gin.Context) (where string, args []interface{}) 
 		where += fmt.Sprintf(" AND (company_name ILIKE $%d OR contact_email ILIKE $%d OR contact_phone ILIKE $%d)", n, n+1, n+2)
 		like := "%" + kw + "%"
 		args = append(args, like, like, like)
+		n += 3
+	}
+	if ls := strings.TrimSpace(c.Query("lifecycle_status")); ls != "" {
+		where += fmt.Sprintf(" AND lifecycle_status = $%d", n)
+		args = append(args, ls)
 	}
 	return where, args
+}
+
+// PatchAdminMerchantLifecycle sets merchants.lifecycle_status (trial | active | suspended).
+func PatchAdminMerchantLifecycle(c *gin.Context) {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != roleAdmin {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Admin access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return
+	}
+
+	idStr := strings.TrimSpace(c.Param("id"))
+	mid, err := strconv.Atoi(idStr)
+	if err != nil || mid <= 0 {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	var req struct {
+		LifecycleStatus string `json:"lifecycle_status" binding:"required"`
+	}
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+	ls := strings.ToLower(strings.TrimSpace(req.LifecycleStatus))
+	if ls != merchantLifecycleTrial && ls != merchantStatusActive && ls != merchantLifecycleSuspended {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_REQUEST",
+			"lifecycle_status must be trial, active or suspended",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var userID int
+	var companyName string
+	err = db.QueryRow(
+		`UPDATE merchants SET lifecycle_status = $1, updated_at = CURRENT_TIMESTAMP
+		 WHERE id = $2
+		 RETURNING user_id, company_name`,
+		ls, mid,
+	).Scan(&userID, &companyName)
+	if err == sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MERCHANT_NOT_FOUND",
+			"Merchant not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	ctx := context.Background()
+	cache.Delete(ctx, cache.MerchantKey(userID))
+
+	adminID, _ := adminActorID(c)
+	lsCopy := ls
+	if err := insertMerchantAuditLog(db, mid, adminID, "lifecycle_update", companyName, &lsCopy); err != nil {
+		stdlog.Printf("merchant audit log (lifecycle_update): %v", err)
+	}
+	if err := services.InsertPlatformAuditLog(db, "merchant", mid, "lifecycle_update", adminID, c, map[string]interface{}{"lifecycle_status": ls}); err != nil {
+		stdlog.Printf("platform audit log (lifecycle_update): %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"merchant_id":      mid,
+			"lifecycle_status": ls,
+		},
+	})
 }
 
 // PatchAdminMerchant updates admin-maintained merchant fields (category, internal notes).

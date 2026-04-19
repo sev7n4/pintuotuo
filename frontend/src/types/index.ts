@@ -326,6 +326,8 @@ export interface Merchant {
   description?: string;
   logo_url?: string;
   status: 'pending' | 'reviewing' | 'active' | 'suspended' | 'rejected';
+  /** 运营生命周期：trial | active | suspended */
+  lifecycle_status?: 'trial' | 'active' | 'suspended';
   reviewed_at?: string;
   review_note?: string;
   created_at: string;
