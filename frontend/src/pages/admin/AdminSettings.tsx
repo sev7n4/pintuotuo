@@ -88,8 +88,8 @@ const AdminSettings = () => {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="路由成本（主动健康探测）"
-        description="开启后，按下方间隔与批量对商户 API Key 做定时探测（如 /v1/models），并写入健康历史。关闭后不再发起主动探测；真实对话产生的被动健康更新仍生效。"
+        message="主动健康探测调度"
+        description="开启后，按下方间隔与批量对商户 API Key 做定时健康探测并写入健康历史。该设置仅影响健康状态调度，不替代商户侧“验证密钥”流程；真实对话仍会触发被动健康更新。"
       />
 
       <Card title="健康调度" loading={loading}>

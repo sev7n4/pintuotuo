@@ -135,47 +135,43 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 		return
 	}
 
-	connectionOK, latency, providerErrCode, providerErrMsg, err := v.testConnection(providerConfig, decryptedKey)
-	if err != nil {
+	baseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
+	modelsURL := baseURL + "/models"
+	probe, probeErr := ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, decryptedKey)
+	if probeErr != nil || probe == nil || !probe.Success {
 		if retryCount < v.maxRetries {
 			metrics.VerificationRetries.WithLabelValues(provider, fmt.Sprintf("%d", retryCount+1)).Inc()
 			time.Sleep(v.retryDelay * time.Duration(1<<retryCount))
 			go v.performVerificationWithRetry(apiKeyID, provider, encryptedKey, verificationType, retryCount+1)
 			return
 		}
-		msg := err.Error()
-		if providerErrMsg != "" {
-			msg = fmt.Sprintf("%s | provider: %s", msg, providerErrMsg)
+		msg := "connection test failed"
+		if probeErr != nil {
+			msg = probeErr.Error()
 		}
 		code := "CONNECTION_FAILED"
-		if providerErrCode != "" {
-			code = providerErrCode
+		if probe != nil && strings.TrimSpace(probe.ErrorCode) != "" {
+			code = probe.ErrorCode
+		}
+		if probe != nil && strings.TrimSpace(probe.ErrorMsg) != "" {
+			msg = firstNonEmpty(msg, probe.ErrorMsg)
 		}
 		v.handleVerificationError(ctx, verificationID, apiKeyID, code, msg, startTime)
 		return
 	}
-	result.ConnectionTest = connectionOK
-	result.ConnectionLatency = latency
-	metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(latency))
-
-	models, err := v.fetchModels(providerConfig, decryptedKey)
-	if err != nil {
-		logger.LogError(ctx, "api_key_validator", "Failed to fetch models", err, map[string]interface{}{
-			"api_key_id": apiKeyID,
-			"provider":   provider,
-		})
-	} else {
-		result.ModelsFound = models
-		result.ModelsCount = len(models)
-		metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(models)))
-	}
+	result.ConnectionTest = true
+	result.ConnectionLatency = probe.LatencyMs
+	metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(probe.LatencyMs))
+	result.ModelsFound = probe.Models
+	result.ModelsCount = len(probe.Models)
+	metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(probe.Models)))
 
 	if isDeepVerification(verificationType) {
 		apiFmt := strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
 		probeSupported := apiFmt == modelProviderOpenAI
 		result.PricingVerified = probeSupported
 		if probeSupported {
-			quotaOK, quotaCode, quotaMsg := v.probeQuota(providerConfig, provider, decryptedKey, models)
+			quotaOK, quotaCode, quotaMsg := v.probeQuota(providerConfig, provider, decryptedKey, result.ModelsFound)
 			if !quotaOK {
 				v.handleVerificationError(ctx, verificationID, apiKeyID, quotaCode, quotaMsg, startTime)
 				return
@@ -238,89 +234,6 @@ func (v *APIKeyValidator) ValidateAsync(apiKeyID int, provider, encryptedKey, ve
 	go v.performVerificationWithRetry(apiKeyID, provider, encryptedKey, verificationType, 0)
 
 	return nil
-}
-
-func (v *APIKeyValidator) testConnection(providerConfig map[string]string, apiKey string) (bool, int, string, string, error) {
-	startTime := time.Now()
-
-	baseURL := providerConfig["api_base_url"]
-	if baseURL == "" {
-		return false, 0, "", "", fmt.Errorf("API base URL not configured")
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	req, err := http.NewRequest("GET", baseURL+"/models", nil)
-	if err != nil {
-		return false, 0, "", "", err
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return false, 0, "", "", err
-	}
-	defer resp.Body.Close()
-
-	latency := int(time.Since(startTime).Milliseconds())
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return true, latency, "", "", nil
-	}
-
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
-	pCode, pMsg := extractProviderError(body)
-	if pCode == "" {
-		pCode = fmt.Sprintf("HTTP_%d", resp.StatusCode)
-	}
-	if pMsg == "" {
-		pMsg = string(body)
-	}
-	return false, latency, pCode, pMsg, fmt.Errorf("connection test failed with status code %d", resp.StatusCode)
-}
-
-func (v *APIKeyValidator) fetchModels(providerConfig map[string]string, apiKey string) ([]string, error) {
-	baseURL := providerConfig["api_base_url"]
-	if baseURL == "" {
-		return nil, fmt.Errorf("API base URL not configured")
-	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	req, err := http.NewRequest("GET", baseURL+"/models", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch models: status code %d", resp.StatusCode)
-	}
-
-	var modelsResp struct {
-		Data []struct {
-			ID string `json:"id"`
-		} `json:"data"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&modelsResp); err != nil {
-		return nil, err
-	}
-
-	models := make([]string, 0, len(modelsResp.Data))
-	for _, m := range modelsResp.Data {
-		models = append(models, m.ID)
-	}
-
-	return models, nil
 }
 
 func (v *APIKeyValidator) IsVerified(apiKeyID int) (bool, error) {

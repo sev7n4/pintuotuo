@@ -646,6 +646,69 @@ func VerifyMerchantAPIKey(c *gin.Context) {
 	})
 }
 
+// TriggerMerchantAPIKeyHealthCheck forces one immediate health probe for merchant-owned key.
+func TriggerMerchantAPIKeyHealthCheck(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	keyIDStr := c.Param("id")
+	keyID, err := strconv.Atoi(keyIDStr)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
+		return
+	}
+
+	var existsKey bool
+	err = db.QueryRow(
+		`SELECT EXISTS(
+			SELECT 1 FROM merchant_api_keys
+			WHERE id = $1 AND merchant_id = $2 AND status = 'active'
+		)`,
+		keyID, merchantID,
+	).Scan(&existsKey)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	if !existsKey {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"API key not found",
+			http.StatusNotFound,
+			nil,
+		))
+		return
+	}
+
+	go func() {
+		_ = services.GetHealthScheduler().TriggerImmediateCheck(keyID)
+	}()
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":    "Immediate health check triggered",
+		"api_key_id": keyID,
+	})
+}
+
 func GetMerchantAPIKeyVerification(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {

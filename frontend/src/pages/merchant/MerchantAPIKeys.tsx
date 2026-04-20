@@ -282,6 +282,16 @@ const MerchantAPIKeys = () => {
     }
   };
 
+  const handleImmediateHealthCheck = async (id: number) => {
+    try {
+      await api.post(`/merchants/api-keys/${id}/health-check`);
+      message.success('已触发立即健康探测，请稍后刷新查看状态');
+      fetchAPIKeys();
+    } catch {
+      message.error('触发健康探测失败');
+    }
+  };
+
   const pollVerificationResult = async (id: number) => {
     const maxAttempts = 30;
     const interval = 2000;
@@ -487,6 +497,11 @@ const MerchantAPIKeys = () => {
               深度验证
             </Button>
           </Tooltip>
+          <Tooltip title="立即健康探测（绕过周期节流，按该 Key 的探测策略执行一次）">
+            <Button type="link" size="small" onClick={() => handleImmediateHealthCheck(record.id)}>
+              立即探测
+            </Button>
+          </Tooltip>
           <Button
             type="link"
             size="small"
@@ -614,11 +629,11 @@ const MerchantAPIKeys = () => {
             }
           </Form.Item>
 
-          <Form.Item name="health_check_level" label="健康检查级别">
-            <Select placeholder="选择健康检查频率">
-              <Select.Option value="high">高频（每5分钟）</Select.Option>
-              <Select.Option value="medium">中频（每15分钟）</Select.Option>
-              <Select.Option value="low">低频（每30分钟）</Select.Option>
+          <Form.Item name="health_check_level" label="主动探测频率">
+            <Select placeholder="选择主动探测频率（影响调度器与非强制探测）">
+              <Select.Option value="high">高频（约每1分钟）</Select.Option>
+              <Select.Option value="medium">中频（约每5分钟）</Select.Option>
+              <Select.Option value="low">低频（约每30分钟）</Select.Option>
               <Select.Option value="daily">每日一次</Select.Option>
             </Select>
           </Form.Item>

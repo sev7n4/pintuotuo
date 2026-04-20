@@ -106,6 +106,17 @@ func GetAllProvidersHealth(c *gin.Context) {
 }
 
 func TriggerHealthCheck(c *gin.Context) {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != roleAdmin {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Admin access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return
+	}
+
 	keyIDStr := c.Param("id")
 	keyID, err := strconv.Atoi(keyIDStr)
 	if err != nil {
@@ -119,14 +130,14 @@ func TriggerHealthCheck(c *gin.Context) {
 		return
 	}
 
-	var exists bool
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM merchant_api_keys WHERE id = $1)", keyID).Scan(&exists)
+	var keyExists bool
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM merchant_api_keys WHERE id = $1)", keyID).Scan(&keyExists)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 
-	if !exists {
+	if !keyExists {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"PROVIDER_NOT_FOUND",
 			"Provider not found",
@@ -136,10 +147,12 @@ func TriggerHealthCheck(c *gin.Context) {
 		return
 	}
 
-	go services.PerformHealthCheckAsync(keyID)
+	go func() {
+		_ = services.GetHealthScheduler().TriggerImmediateCheck(keyID)
+	}()
 
 	c.JSON(http.StatusAccepted, gin.H{
-		"message":    "Health check triggered",
+		"message":    "Immediate health check triggered",
 		"api_key_id": keyID,
 	})
 }

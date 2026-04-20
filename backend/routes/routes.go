@@ -28,7 +28,7 @@ func RegisterHealthRoutes(router *gin.RouterGroup) {
 	{
 		providers.GET("", handlers.GetAllProvidersHealth)
 		providers.GET("/:id", handlers.GetProviderHealth)
-		providers.POST("/:id/check", handlers.TriggerHealthCheck)
+		providers.POST("/:id/check", middleware.AuthMiddleware(), handlers.TriggerHealthCheck)
 		providers.GET("/:id/history", handlers.GetHealthCheckHistory)
 	}
 }
@@ -249,6 +249,7 @@ func RegisterMerchantRoutes(router *gin.RouterGroup) {
 			apiKeys.DELETE("/:id", handlers.DeleteMerchantAPIKey)
 			apiKeys.GET("/usage", handlers.GetMerchantAPIKeyUsage)
 			apiKeys.POST("/:id/verify", handlers.VerifyMerchantAPIKey)
+			apiKeys.POST("/:id/health-check", handlers.TriggerMerchantAPIKeyHealthCheck)
 			apiKeys.GET("/:id/verification", handlers.GetMerchantAPIKeyVerification)
 		}
 
