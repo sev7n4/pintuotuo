@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/db"
@@ -17,6 +19,7 @@ import (
 	"github.com/pintuotuo/backend/routes"
 	"github.com/pintuotuo/backend/scheduler"
 	"github.com/pintuotuo/backend/services"
+	"github.com/pintuotuo/backend/tracing"
 	"github.com/pintuotuo/backend/utils"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	swaggerFiles "github.com/swaggo/files"
@@ -84,12 +87,29 @@ func main() {
 	services.GetHealthScheduler().Start()
 	defer services.GetHealthScheduler().Stop()
 
-	router := gin.Default()
+	shutdownTracing, err := tracing.Init(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to init tracing: %v", err)
+	}
+	defer func() {
+		if err := shutdownTracing(context.Background()); err != nil {
+			log.Printf("tracing shutdown: %v", err)
+		}
+	}()
 
+	serviceName := os.Getenv("OTEL_SERVICE_NAME")
+	if serviceName == "" {
+		serviceName = "pintuotuo-backend"
+	}
+
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(otelgin.Middleware(serviceName))
 	router.Use(middleware.CORSMiddleware())
 	router.Use(middleware.ErrorHandlingMiddleware())
 	router.Use(middleware.LoggingMiddleware())
 	router.Use(middleware.MetricsMiddleware())
+	router.Use(middleware.TracingResponseHeaders())
 
 	router.Static("/uploads", "./uploads")
 

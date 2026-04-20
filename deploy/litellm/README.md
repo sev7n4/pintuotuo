@@ -19,6 +19,7 @@
 ## 请求关联（可观测性）
 
 - 后端在转发至上游（含 LiteLLM）时设置 **`X-Request-ID`**，并透传 **`traceparent` / `tracestate` / `baggage`**（若入口已带），便于将应用日志、网关日志与 Prometheus 指标按同一次调用对齐。
+- **分布式追踪（Tempo + OpenTelemetry）**：后端启用 `OTEL_EXPORTER_OTLP_ENDPOINT` 时导出 OTLP；HTTP 响应头 **`X-Trace-ID`**（W3C trace id hex）可在 **Grafana → Explore → Tempo** 中检索；鉴权用户维度在 span 属性 **`enduser.id`**（勿在 Prometheus 指标上打 `user_id` 高基数标签）。
 - Prometheus 对 `litellm:4000` 的抓取为**聚合序列**；单次请求与后端日志对齐依赖上述头。见 [`deploy/prometheus/prometheus.yml`](../../deploy/prometheus/prometheus.yml) 中 `litellm` job 注释。
 
 ## 错误与重试：分层职责（R1）

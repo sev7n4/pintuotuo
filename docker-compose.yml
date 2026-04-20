@@ -19,6 +19,12 @@ services:
       - DB_MAX_IDLE_CONNS=10
       - DB_CONN_MAX_LIFETIME=30m
       - DB_CONN_MAX_IDLE_TIME=10m
+      # OpenTelemetry → Grafana Tempo（OTLP gRPC）；未设置 endpoint 时后端为 noop；OTEL_SDK_DISABLED=true 关闭导出
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-tempo:4317}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-pintuotuo-backend}
+      - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-}
+      - OTEL_TRACES_SAMPLER=${OTEL_TRACES_SAMPLER:-}
+      - OTEL_TRACES_SAMPLER_ARG=${OTEL_TRACES_SAMPLER_ARG:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -123,6 +129,21 @@ services:
     networks:
       - pintuotuo-network
 
+  tempo:
+    image: grafana/tempo:2.3.1
+    container_name: pintuotuo-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - pintuotuo-network
+
   grafana:
     image: grafana/grafana:10.2.0
     container_name: pintuotuo-grafana
@@ -139,6 +160,7 @@ services:
       - "3001:3000"
     depends_on:
       - prometheus
+      - tempo
     networks:
       - pintuotuo-network
 
@@ -152,3 +174,4 @@ volumes:
   prometheus_data:
   grafana_data:
   alertmanager_data:
+  tempo_data:
