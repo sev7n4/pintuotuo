@@ -135,47 +135,43 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 		return
 	}
 
-	connectionOK, latency, providerErrCode, providerErrMsg, err := v.testConnection(providerConfig, decryptedKey)
-	if err != nil {
+	baseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
+	modelsURL := baseURL + "/models"
+	probe, probeErr := ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, decryptedKey)
+	if probeErr != nil || probe == nil || !probe.Success {
 		if retryCount < v.maxRetries {
 			metrics.VerificationRetries.WithLabelValues(provider, fmt.Sprintf("%d", retryCount+1)).Inc()
 			time.Sleep(v.retryDelay * time.Duration(1<<retryCount))
 			go v.performVerificationWithRetry(apiKeyID, provider, encryptedKey, verificationType, retryCount+1)
 			return
 		}
-		msg := err.Error()
-		if providerErrMsg != "" {
-			msg = fmt.Sprintf("%s | provider: %s", msg, providerErrMsg)
+		msg := "connection test failed"
+		if probeErr != nil {
+			msg = probeErr.Error()
 		}
 		code := "CONNECTION_FAILED"
-		if providerErrCode != "" {
-			code = providerErrCode
+		if probe != nil && strings.TrimSpace(probe.ErrorCode) != "" {
+			code = probe.ErrorCode
+		}
+		if probe != nil && strings.TrimSpace(probe.ErrorMsg) != "" {
+			msg = firstNonEmpty(msg, probe.ErrorMsg)
 		}
 		v.handleVerificationError(ctx, verificationID, apiKeyID, code, msg, startTime)
 		return
 	}
-	result.ConnectionTest = connectionOK
-	result.ConnectionLatency = latency
-	metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(latency))
-
-	models, err := v.fetchModels(providerConfig, decryptedKey)
-	if err != nil {
-		logger.LogError(ctx, "api_key_validator", "Failed to fetch models", err, map[string]interface{}{
-			"api_key_id": apiKeyID,
-			"provider":   provider,
-		})
-	} else {
-		result.ModelsFound = models
-		result.ModelsCount = len(models)
-		metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(models)))
-	}
+	result.ConnectionTest = true
+	result.ConnectionLatency = probe.LatencyMs
+	metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(probe.LatencyMs))
+	result.ModelsFound = probe.Models
+	result.ModelsCount = len(probe.Models)
+	metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(probe.Models)))
 
 	if isDeepVerification(verificationType) {
 		apiFmt := strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
 		probeSupported := apiFmt == modelProviderOpenAI
 		result.PricingVerified = probeSupported
 		if probeSupported {
-			quotaOK, quotaCode, quotaMsg := v.probeQuota(providerConfig, provider, decryptedKey, models)
+			quotaOK, quotaCode, quotaMsg := v.probeQuota(providerConfig, provider, decryptedKey, result.ModelsFound)
 			if !quotaOK {
 				v.handleVerificationError(ctx, verificationID, apiKeyID, quotaCode, quotaMsg, startTime)
 				return

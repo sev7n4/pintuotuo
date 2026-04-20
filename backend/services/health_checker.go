@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pintuotuo/backend/billing"
@@ -142,75 +143,37 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 		endpoint = s.getDefaultEndpoint(apiKey.Provider)
 	}
 
-	modelsEndpoint := endpoint + "/v1/models"
-
-	req, err := http.NewRequestWithContext(ctx, "GET", modelsEndpoint, nil)
+	modelsEndpoint := strings.TrimRight(endpoint, "/") + "/v1/models"
+	probe, err := ProbeProviderModels(ctx, s.httpClient, modelsEndpoint, s.getDecryptedAPIKey(apiKey))
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
 			Status:       HealthStatusUnhealthy,
-			ErrorMessage: fmt.Sprintf("failed to create request: %v", err),
-			CheckType:    "full",
-		}, nil
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.getDecryptedAPIKey(apiKey)))
-	req.Header.Set("Content-Type", "application/json")
-
-	start := time.Now()
-	resp, err := s.httpClient.Do(req)
-	latencyMs := int(time.Since(start).Milliseconds())
-
-	if err != nil {
-		return &HealthCheckResult{
-			Success:      false,
-			Status:       HealthStatusUnhealthy,
-			LatencyMs:    latencyMs,
+			LatencyMs:    probeLatency(probe),
 			ErrorMessage: fmt.Sprintf("connection failed: %v", err),
 			CheckType:    "full",
 		}, nil
 	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		var modelsResp struct {
-			Data []struct {
-				ID string `json:"id"`
-			} `json:"data"`
-		}
-
-		if err := json.Unmarshal(body, &modelsResp); err != nil {
-			return &HealthCheckResult{
-				Success:      false,
-				Status:       HealthStatusDegraded,
-				LatencyMs:    latencyMs,
-				ErrorMessage: fmt.Sprintf("failed to parse models: %v", err),
-				CheckType:    "full",
-			}, nil
-		}
-
-		models := make([]string, 0, len(modelsResp.Data))
-		for _, m := range modelsResp.Data {
-			models = append(models, m.ID)
-		}
-
+	if probe != nil && probe.Success {
 		return &HealthCheckResult{
 			Success:     true,
 			Status:      HealthStatusHealthy,
-			LatencyMs:   latencyMs,
-			ModelsFound: models,
+			LatencyMs:   probe.LatencyMs,
+			ModelsFound: probe.Models,
 			PricingInfo: s.extractPricingInfo(apiKey.Provider),
 			CheckType:   "full",
 		}, nil
 	}
 
+	errMsg := "verification failed"
+	if probe != nil && strings.TrimSpace(probe.ErrorMsg) != "" {
+		errMsg = probe.ErrorMsg
+	}
 	return &HealthCheckResult{
 		Success:      false,
 		Status:       HealthStatusUnhealthy,
-		LatencyMs:    latencyMs,
-		ErrorMessage: fmt.Sprintf("verification failed with status: %d, body: %s", resp.StatusCode, string(body)),
+		LatencyMs:    probeLatency(probe),
+		ErrorMessage: errMsg,
 		CheckType:    "full",
 	}, nil
 }
@@ -533,7 +496,7 @@ func (s *HealthChecker) TriggerActiveCheck(ctx context.Context, apiKeyID int) er
 		return err
 	}
 
-	result, err := s.FullVerification(ctx, &key)
+	result, err := s.runByLevel(ctx, &key)
 	if err != nil {
 		return err
 	}
@@ -565,18 +528,26 @@ func PerformHealthCheckAsync(apiKeyID int) {
 		return
 	}
 
-	var result *HealthCheckResult
-	level := HealthCheckLevel(key.HealthCheckLevel)
-
-	if level == HealthCheckLevelHigh {
-		result, _ = checker.LightweightPing(ctx, &key)
-	} else {
-		result, _ = checker.FullVerification(ctx, &key)
-	}
+	result, _ := checker.runByLevel(ctx, &key)
 
 	if result != nil {
 		checker.SaveHealthCheckResult(ctx, apiKeyID, result)
 	}
+}
+
+func (s *HealthChecker) runByLevel(ctx context.Context, apiKey *models.MerchantAPIKey) (*HealthCheckResult, error) {
+	level := HealthCheckLevel(strings.ToLower(strings.TrimSpace(apiKey.HealthCheckLevel)))
+	if level == HealthCheckLevelHigh {
+		return s.LightweightPing(ctx, apiKey)
+	}
+	return s.FullVerification(ctx, apiKey)
+}
+
+func probeLatency(probe *ProbeModelsResult) int {
+	if probe == nil {
+		return 0
+	}
+	return probe.LatencyMs
 }
 
 func IsHealthy(status string) bool {
