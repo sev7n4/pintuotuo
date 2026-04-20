@@ -53,3 +53,63 @@
   line-height: 1.2;
   letter-spacing: 0.02em;
 }
+
+.includeBlock {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.includeTitle {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.includeCombo {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(0, 0, 0, 0.88);
+  word-break: break-word;
+}
+
+.includeHeadline {
+  display: block;
+  margin-bottom: 10px !important;
+  font-size: 13px;
+}
+
+.includeRows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.includeRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.includeIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 15px;
+}
+
+.includeText {
+  min-width: 0;
+  flex: 1;
+}
+
+.includeSpec {
+  display: block;
+  margin-top: 2px !important;
+  font-size: 13px;
+  line-height: 1.5;
+}

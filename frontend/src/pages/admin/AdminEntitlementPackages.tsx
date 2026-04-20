@@ -687,7 +687,7 @@ export default function AdminEntitlementPackages() {
                 组合总价：<Text strong>¥{packageTotalPrice(previewPkg).toFixed(2)}</Text>
               </Paragraph>
               <Paragraph type="secondary" style={{ marginBottom: 4 }}>
-                明细（与前台「一键组合下单」行数一致）
+                明细（与前台「一键购买」行数一致）
               </Paragraph>
               <Space wrap>
                 {(previewPkg.items || []).map((it) => (

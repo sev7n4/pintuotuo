@@ -1,6 +1,12 @@
-import { Collapse, Tag, Typography } from 'antd';
+import { Collapse, Space, Tag, Typography } from 'antd';
+import { UnorderedListOutlined } from '@ant-design/icons';
 import type { EntitlementPackageItem } from '@/types/entitlementPackage';
-import { lineDisplayName, lineValueHint, skuTypeLabel } from './entitlementItemDisplay';
+import {
+  lineDisplayName,
+  lineValueHint,
+  packageItemSpecParts,
+  skuTypeLabel,
+} from './entitlementItemDisplay';
 import styles from './EntitlementPackageCard.module.css';
 
 const { Paragraph, Text } = Typography;
@@ -35,9 +41,12 @@ export function PackageItemsCollapse({ items, mode }: Props) {
         {
           key: 'lines',
           label: (
-            <Text type="secondary">
-              包内明细（{n} 项）<Text strong>点击展开</Text>
-            </Text>
+            <Space size={6}>
+              <UnorderedListOutlined />
+              <Text type="secondary">
+                包内模型明细（{n} 项）<Text strong>点击展开</Text>
+              </Text>
+            </Space>
           ),
           children: (
             <div>
@@ -55,6 +64,9 @@ export function PackageItemsCollapse({ items, mode }: Props) {
                           </>
                         ) : null}
                       </div>
+                      <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 12 }}>
+                        规格要点：{packageItemSpecParts(it).join(' · ')}
+                      </Paragraph>
                     </div>
                     {rightTag(it, mode)}
                   </div>
