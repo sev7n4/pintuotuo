@@ -37,7 +37,7 @@ func SetEntitlementEnforcementForTest(v string) {
 // union of fulfilled paid orders and active subscriptions; pick row with max anchor_time.
 // ok is false when no matching entitlement exists (caller should 403).
 //
-// SSOT：与 ListOpenAIModelsEntitledForUser 使用同一套订单/订阅→SKU→SPU 范围；GET /v1/models 在 strict 下列出的模型须能在此命中。
+// SSOT：与 ListOpenAIModelsEntitledForUser、ResolveEntitlementRoutingContext 使用同一套订单/订阅→SKU→SPU 范围；GET /v1/models 在 strict 下列出的模型须能在此命中。
 func ResolveChosenPricingVersion(db *sql.DB, userID int, provider, model string) (versionID int, anchor time.Time, ok bool, err error) {
 	pv := normalizeProvider(provider)
 	mv := strings.TrimSpace(model)

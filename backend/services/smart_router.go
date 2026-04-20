@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/pintuotuo/backend/config"
 )
 
@@ -60,7 +61,13 @@ func GetSmartRouter() *SmartRouter {
 }
 
 func (r *SmartRouter) SelectProvider(ctx context.Context, model string, provider string, strategy RoutingStrategy) (*RoutingCandidate, error) {
-	candidates, err := r.GetCandidates(ctx, model, provider)
+	return r.SelectProviderWithKeyAllowlist(ctx, model, provider, strategy, nil)
+}
+
+// SelectProviderWithKeyAllowlist runs SmartRouter on a subset of keys when allowedKeyIDs is non-nil.
+// Empty slice means no keys are allowed (returns error after empty candidate list).
+func (r *SmartRouter) SelectProviderWithKeyAllowlist(ctx context.Context, model string, provider string, strategy RoutingStrategy, allowedKeyIDs []int) (*RoutingCandidate, error) {
+	candidates, err := r.GetCandidatesWithKeyAllowlist(ctx, model, provider, allowedKeyIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get candidates: %w", err)
 	}
@@ -93,11 +100,21 @@ func (r *SmartRouter) SelectProvider(ctx context.Context, model string, provider
 // This must align with the resolved request provider (e.g. from model routing); otherwise
 // SmartRouter could inject an api_key_id for a different vendor and the proxy returns 403.
 func (r *SmartRouter) GetCandidates(ctx context.Context, model string, providerFilter string) ([]RoutingCandidate, error) {
+	return r.GetCandidatesWithKeyAllowlist(ctx, model, providerFilter, nil)
+}
+
+// GetCandidatesWithKeyAllowlist is like GetCandidates but restricts to mak.id IN allowedKeyIDs when allowedKeyIDs is non-nil.
+// nil allowedKeyIDs = no restriction (legacy). Empty slice = no candidates.
+func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model string, providerFilter string, allowedKeyIDs []int) ([]RoutingCandidate, error) {
 	if r.db == nil {
 		r.db = config.GetDB()
 	}
 	if r.db == nil {
 		return nil, fmt.Errorf("database not available")
+	}
+
+	if allowedKeyIDs != nil && len(allowedKeyIDs) == 0 {
+		return []RoutingCandidate{}, nil
 	}
 
 	providerFilter = strings.TrimSpace(providerFilter)
@@ -144,10 +161,18 @@ func (r *SmartRouter) GetCandidates(ctx context.Context, model string, providerF
 	`
 	var rows *sql.Rows
 	var err error
-	if providerFilter != "" {
+	hasAllow := allowedKeyIDs != nil
+	switch {
+	case providerFilter != "" && hasAllow:
+		query += ` AND mak.provider = $1 AND mak.id = ANY($2::int[])` + querySuffix
+		rows, err = r.db.QueryContext(ctx, query, providerFilter, pq.Array(allowedKeyIDs))
+	case providerFilter != "":
 		query += ` AND mak.provider = $1` + querySuffix
 		rows, err = r.db.QueryContext(ctx, query, providerFilter)
-	} else {
+	case hasAllow:
+		query += ` AND mak.id = ANY($1::int[])` + querySuffix
+		rows, err = r.db.QueryContext(ctx, query, pq.Array(allowedKeyIDs))
+	default:
 		query += querySuffix
 		rows, err = r.db.QueryContext(ctx, query)
 	}

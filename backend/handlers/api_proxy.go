@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -229,22 +230,69 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
+	var entCtx *services.EntitlementRoutingContext
+	if services.EntitlementEnforcementStrict() {
+		var entErr error
+		entCtx, entErr = services.ResolveEntitlementRoutingContext(db, userIDInt, req.Provider, req.Model)
+		if entErr != nil {
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		if req.APIKeyID != nil && *req.APIKeyID > 0 && !entCtx.AllowsAPIKey(*req.APIKeyID) {
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"API_KEY_NOT_AUTHORIZED",
+				"api_key_id is not allowed for your entitlement",
+				http.StatusForbidden,
+				nil,
+			))
+			return
+		}
+		if req.MerchantSKUID != nil && *req.MerchantSKUID > 0 && !entCtx.AllowsMerchantSKU(*req.MerchantSKUID) {
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"API_KEY_NOT_AUTHORIZED",
+				"merchant_sku_id is not allowed for your entitlement",
+				http.StatusForbidden,
+				nil,
+			))
+			return
+		}
+	}
+
+	keyFilter := entitlementKeyFilterForRouter(services.EntitlementEnforcementStrict(), entCtx)
+
 	selectedStrategy := "legacy_fallback"
 	effectivePolicySource := ""
 	var smartCandidatesJSON []byte
 	decisionStart := time.Now()
 	if req.APIKeyID == nil && req.MerchantSKUID == nil && shouldUseSmartRouting(userIDInt, requestID) {
 		strategyCode, policySrc := routingStrategyWithSource()
-		if smartReq := trySelectAPIKeyWithSmartRouter(req, strategyCode); smartReq.APIKeyID != nil {
+		if smartReq := trySelectAPIKeyWithSmartRouter(req, strategyCode, keyFilter); smartReq.APIKeyID != nil {
 			req.APIKeyID = smartReq.APIKeyID
+			if entCtx != nil {
+				if msid, ok := entCtx.MerchantSKUForAPIKey(*req.APIKeyID); ok && req.MerchantSKUID == nil {
+					req.MerchantSKUID = &msid
+				}
+			}
 			selectedStrategy = strategyCode
 			smartCandidatesJSON = smartReq.CandidatesJSON
 			effectivePolicySource = policySrc
 		}
 	}
+	if req.APIKeyID == nil && req.MerchantSKUID == nil && services.EntitlementEnforcementStrict() && entCtx != nil && len(entCtx.AllowedAPIKeyIDs) > 0 {
+		if pick, msid := pickDeterministicEntitledKey(entCtx); pick > 0 {
+			p := pick
+			req.APIKeyID = &p
+			if req.MerchantSKUID == nil && msid > 0 {
+				req.MerchantSKUID = &msid
+			}
+		}
+	}
 
 	var apiKey models.MerchantAPIKey
-	err = selectAPIKeyForRequest(db, userIDInt, merchantID, req, &apiKey)
+	err = selectAPIKeyForRequest(db, userIDInt, merchantID, req, &apiKey, entCtx)
 	if err != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -675,6 +723,36 @@ func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeC
 	return cfg, err
 }
 
+// entitlementKeyFilterForRouter: nil = no filter (legacy); strict with no keys = empty slice (no SmartRouter pool).
+func entitlementKeyFilterForRouter(strict bool, ent *services.EntitlementRoutingContext) []int {
+	if !strict {
+		return nil
+	}
+	if ent == nil || len(ent.AllowedAPIKeyIDs) == 0 {
+		return []int{}
+	}
+	out := make([]int, 0, len(ent.AllowedAPIKeyIDs))
+	for id := range ent.AllowedAPIKeyIDs {
+		out = append(out, id)
+	}
+	sort.Ints(out)
+	return out
+}
+
+func pickDeterministicEntitledKey(ent *services.EntitlementRoutingContext) (apiKeyID int, merchantSKUID int) {
+	if ent == nil || len(ent.AllowedAPIKeyIDs) == 0 {
+		return 0, 0
+	}
+	minK := 0
+	for k := range ent.AllowedAPIKeyIDs {
+		if minK == 0 || k < minK {
+			minK = k
+		}
+	}
+	msid, _ := ent.MerchantSKUForAPIKey(minK)
+	return minK, msid
+}
+
 func scanMerchantAPIKeyQuotaRow(row *sql.Row, apiKey *models.MerchantAPIKey) error {
 	var qLim sql.NullFloat64
 	if err := row.Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &qLim, &apiKey.QuotaUsed, &apiKey.Status); err != nil {
@@ -684,7 +762,7 @@ func scanMerchantAPIKeyQuotaRow(row *sql.Row, apiKey *models.MerchantAPIKey) err
 	return nil
 }
 
-func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequest, apiKey *models.MerchantAPIKey) error {
+func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequest, apiKey *models.MerchantAPIKey, ent *services.EntitlementRoutingContext) error {
 	if req.APIKeyID != nil && *req.APIKeyID > 0 {
 		keyPick := `SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
 			 FROM merchant_api_keys mak
@@ -695,6 +773,12 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 			   AND m.status IN ('active', 'approved')
 			   AND m.lifecycle_status <> 'suspended'`
 		if merchantID <= 0 {
+			if ent != nil && ent.AllowsAPIKey(*req.APIKeyID) {
+				return scanMerchantAPIKeyQuotaRow(
+					db.QueryRow(keyPick+` LIMIT 1`, *req.APIKeyID, req.Provider),
+					apiKey,
+				)
+			}
 			keyPick += ` AND m.user_id = $3`
 			return scanMerchantAPIKeyQuotaRow(
 				db.QueryRow(keyPick+` LIMIT 1`, *req.APIKeyID, req.Provider, userID),
@@ -716,6 +800,31 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 
 	if req.MerchantSKUID != nil && *req.MerchantSKUID > 0 {
 		if merchantID <= 0 {
+			if ent != nil && ent.AllowsMerchantSKU(*req.MerchantSKUID) {
+				err := scanMerchantAPIKeyQuotaRow(
+					db.QueryRow(
+						`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
+						 FROM merchant_skus ms
+						 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
+						 JOIN merchants m ON m.id = ms.merchant_id
+						 WHERE ms.id = $1 AND ms.status = 'active'
+						   AND mak.provider = $2 AND mak.status = 'active'
+						   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')
+						   AND m.status IN ('active', 'approved')
+						   AND m.lifecycle_status <> 'suspended'
+						   AND (mak.quota_limit IS NULL OR mak.quota_used < mak.quota_limit)
+						 LIMIT 1`,
+						*req.MerchantSKUID, req.Provider,
+					),
+					apiKey,
+				)
+				if err == nil {
+					return nil
+				}
+				if err != sql.ErrNoRows {
+					return err
+				}
+			}
 			return sql.ErrNoRows
 		}
 		err := scanMerchantAPIKeyQuotaRow(
@@ -865,17 +974,20 @@ type traceTopCandidate struct {
 	Score    float64 `json:"score"`
 }
 
-func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string) smartRoutingPick {
+func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string, keyFilter []int) smartRoutingPick {
 	if strings.TrimSpace(req.Provider) == "" {
 		return smartRoutingPick{}
 	}
+	if keyFilter != nil && len(keyFilter) == 0 {
+		return smartRoutingPick{}
+	}
 	router := services.GetSmartRouter()
-	choice, err := router.SelectProvider(context.Background(), req.Model, req.Provider, services.RoutingStrategy(strategyCode))
+	choice, err := router.SelectProviderWithKeyAllowlist(context.Background(), req.Model, req.Provider, services.RoutingStrategy(strategyCode), keyFilter)
 	if err != nil || choice == nil {
 		return smartRoutingPick{}
 	}
 
-	candidates, cErr := router.GetCandidates(context.Background(), req.Model, req.Provider)
+	candidates, cErr := router.GetCandidatesWithKeyAllowlist(context.Background(), req.Model, req.Provider, keyFilter)
 	if cErr == nil {
 		router.CalculateScores(candidates, services.RoutingStrategy(strategyCode))
 	}
