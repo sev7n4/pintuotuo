@@ -367,7 +367,7 @@ func TestSelectAPIKeyForRequest_NonMerchantWithAPIKeyID(t *testing.T) {
 		WillReturnRows(rows)
 
 	var apiKey models.MerchantAPIKey
-	err = selectAPIKeyForRequest(db, 13, 0, req, &apiKey)
+	err = selectAPIKeyForRequest(db, 13, 0, req, &apiKey, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 22, apiKey.ID)
 	assert.Equal(t, 4, apiKey.MerchantID)
@@ -410,7 +410,7 @@ func TestSelectAPIKeyForRequest_MerchantWithAPIKeyIDBoundedByMerchant(t *testing
 		WillReturnError(sql.ErrNoRows)
 
 	var apiKey models.MerchantAPIKey
-	err = selectAPIKeyForRequest(db, 15, 99, req, &apiKey)
+	err = selectAPIKeyForRequest(db, 15, 99, req, &apiKey, nil)
 	require.ErrorIs(t, err, sql.ErrNoRows)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
@@ -419,8 +419,67 @@ func TestTrySelectAPIKeyWithSmartRouter_EmptyProviderSkipsInjection(t *testing.T
 	pick := trySelectAPIKeyWithSmartRouter(APIProxyRequest{
 		Provider: "",
 		Model:    "gpt-4",
-	}, "balanced")
+	}, "balanced", nil)
 	assert.Nil(t, pick.APIKeyID)
+}
+
+func TestEntitlementKeyFilterForRouter(t *testing.T) {
+	assert.Nil(t, entitlementKeyFilterForRouter(false, nil))
+	assert.Len(t, entitlementKeyFilterForRouter(true, nil), 0)
+	ent := &services.EntitlementRoutingContext{
+		AllowedAPIKeyIDs: map[int]struct{}{7: {}, 3: {}},
+	}
+	f := entitlementKeyFilterForRouter(true, ent)
+	assert.Equal(t, []int{3, 7}, f)
+}
+
+func TestPickDeterministicEntitledKey(t *testing.T) {
+	assert.Equal(t, 0, func() int { a, _ := pickDeterministicEntitledKey(nil); return a }())
+	ent := &services.EntitlementRoutingContext{
+		AllowedAPIKeyIDs: map[int]struct{}{10: {}, 5: {}},
+		APIKeyToMerchantSKU: map[int]int{
+			5: 100,
+		},
+	}
+	k, ms := pickDeterministicEntitledKey(ent)
+	assert.Equal(t, 5, k)
+	assert.Equal(t, 100, ms)
+}
+
+func TestSelectAPIKeyForRequest_NonMerchantEntitlementBypassesOwner(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	req := APIProxyRequest{
+		Provider: "openai",
+		Model:    "gpt-4o",
+		APIKeyID: func() *int { v := 42; return &v }(),
+	}
+	ent := &services.EntitlementRoutingContext{
+		AllowedAPIKeyIDs: map[int]struct{}{42: {}},
+	}
+
+	rows := sqlmock.NewRows([]string{
+		"id", "merchant_id", "provider", "api_key_encrypted", "api_secret_encrypted", "quota_limit", "quota_used", "status",
+	}).AddRow(42, 99, "openai", "enc", "", nil, 0.0, "active")
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
+			 FROM merchant_api_keys mak
+			 INNER JOIN merchants m ON m.id = mak.merchant_id
+			 WHERE mak.id = $1 AND mak.provider = $2 AND mak.status = 'active'
+			   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')
+			   AND (mak.quota_limit IS NULL OR mak.quota_used < mak.quota_limit)
+			   AND m.status IN ('active', 'approved')
+			   AND m.lifecycle_status <> 'suspended' LIMIT 1`)).
+		WithArgs(42, "openai").
+		WillReturnRows(rows)
+
+	var apiKey models.MerchantAPIKey
+	err = selectAPIKeyForRequest(db, 200, 0, req, &apiKey, ent)
+	require.NoError(t, err)
+	assert.Equal(t, 42, apiKey.ID)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestApplyLitellmGatewayRetryCap(t *testing.T) {
