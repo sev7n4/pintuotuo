@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"github.com/google/uuid"
 	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/cache"
@@ -30,10 +29,11 @@ import (
 	"github.com/pintuotuo/backend/services"
 	"github.com/pintuotuo/backend/tracing"
 	"github.com/pintuotuo/backend/utils"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 var (
-	proxyHTTPOnce       sync.Once
+	proxyHTTPOnce         sync.Once
 	proxyHTTPRoundTripper http.RoundTripper
 )
 
