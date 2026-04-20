@@ -19,6 +19,7 @@ import {
   Empty,
   Typography,
   Alert,
+  Tooltip,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -105,6 +106,12 @@ const MyToken = () => {
     fetchRechargeOrders();
     fetchTokenLots();
   }, [fetchBalance, fetchTransactions, fetchAPIKeys, fetchRechargeOrders]);
+
+  /** 顶部统计三项同源（GET /tokens/balance）；批次表与余额联动，一并刷新 */
+  const refreshOverviewStats = () => {
+    fetchBalance();
+    fetchTokenLots();
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -391,11 +398,48 @@ const MyToken = () => {
 
   return (
     <div className={styles.myToken}>
-      <h2 className={styles.pageTitle}>我的Token</h2>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginBottom: 8,
+        }}
+      >
+        <h2 className={styles.pageTitle} style={{ marginBottom: 0 }}>
+          我的Token
+        </h2>
+        <Tooltip title="刷新当前余额、累计使用/获得及下方余额批次（与底部「刷新」中的余额部分一致）">
+          <Button
+            type="default"
+            size="middle"
+            icon={<ReloadOutlined />}
+            loading={isLoading}
+            onClick={refreshOverviewStats}
+          >
+            刷新余额
+          </Button>
+        </Tooltip>
+      </div>
 
       <Row gutter={[16, 16]} className={styles.statsRow}>
         <Col xs={24} sm={8}>
-          <Card>
+          <Card
+            extra={
+              <Tooltip title="重新拉取账户统计">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<ReloadOutlined />}
+                  loading={isLoading}
+                  onClick={refreshOverviewStats}
+                  aria-label="刷新当前余额"
+                />
+              </Tooltip>
+            }
+          >
             <Statistic
               title="当前余额"
               value={balance?.balance || 0}
@@ -406,7 +450,20 @@ const MyToken = () => {
           </Card>
         </Col>
         <Col xs={24} sm={8}>
-          <Card>
+          <Card
+            extra={
+              <Tooltip title="重新拉取账户统计">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<ReloadOutlined />}
+                  loading={isLoading}
+                  onClick={refreshOverviewStats}
+                  aria-label="刷新累计使用"
+                />
+              </Tooltip>
+            }
+          >
             <Statistic
               title="累计使用"
               value={balance?.total_used || 0}
@@ -417,7 +474,20 @@ const MyToken = () => {
           </Card>
         </Col>
         <Col xs={24} sm={8}>
-          <Card>
+          <Card
+            extra={
+              <Tooltip title="重新拉取账户统计">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<ReloadOutlined />}
+                  loading={isLoading}
+                  onClick={refreshOverviewStats}
+                  aria-label="刷新累计获得"
+                />
+              </Tooltip>
+            }
+          >
             <Statistic
               title="累计获得"
               value={balance?.total_earned || 0}

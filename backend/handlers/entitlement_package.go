@@ -34,6 +34,10 @@ type EntitlementPackageItem struct {
 	ModelProvider   string  `json:"-"`
 	ModelName       string  `json:"-"`
 	ProviderModelID string  `json:"-"`
+	// 以下字段来自 skus，用于前台展示订阅周期、赠送 Token 等（与「仅组合价」区分）
+	TokenAmount        int64  `json:"token_amount,omitempty"`
+	SubscriptionPeriod string `json:"subscription_period,omitempty"`
+	ValidDays          int    `json:"valid_days,omitempty"`
 }
 
 type EntitlementPackage struct {
@@ -126,7 +130,8 @@ func loadEntitlementPackageItems(db *sql.DB, packageID int) ([]EntitlementPackag
 		`SELECT epi.id, epi.sku_id, s.sku_code, sp.name, s.sku_type, epi.default_quantity, s.retail_price,
 		        COALESCE(epi.display_name, ''), COALESCE(epi.value_note, ''),
 		        s.status, sp.status, s.stock,
-		        COALESCE(sp.model_provider, ''), COALESCE(sp.model_name, ''), COALESCE(sp.provider_model_id, '')
+		        COALESCE(sp.model_provider, ''), COALESCE(sp.model_name, ''), COALESCE(sp.provider_model_id, ''),
+		        COALESCE(s.token_amount, 0), COALESCE(NULLIF(TRIM(s.subscription_period), ''), ''), COALESCE(s.valid_days, 0)
 		 FROM entitlement_package_items epi
 		 JOIN skus s ON epi.sku_id = s.id
 		 JOIN spus sp ON s.spu_id = sp.id
@@ -146,6 +151,7 @@ func loadEntitlementPackageItems(db *sql.DB, packageID int) ([]EntitlementPackag
 			&it.DisplayName, &it.ValueNote,
 			&it.SKUStatus, &it.SPUStatus, &it.Stock,
 			&it.ModelProvider, &it.ModelName, &it.ProviderModelID,
+			&it.TokenAmount, &it.SubscriptionPeriod, &it.ValidDays,
 		); err != nil {
 			return nil, err
 		}
@@ -582,7 +588,10 @@ func GetMyEntitlementPackages(c *gin.Context) {
 			}
 		}
 		p.IsActive = p.TotalItems > 0 && p.CoveredItems == p.TotalItems
-		out = append(out, p)
+		// 仅返回用户已通过订阅或已支付订单覆盖到至少一条明细的套餐包，避免未购买用户看到完整上架目录。
+		if p.CoveredItems > 0 {
+			out = append(out, p)
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"data": out})
 }

@@ -2,6 +2,7 @@ import { Button, Card, Space, Tag, Typography } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
 import type { EntitlementPackage } from '@/types/entitlementPackage';
 import dayjs from 'dayjs';
+import { PackageIncludeSummary } from './PackageIncludeSummary';
 import { PackageItemsCollapse } from './PackageItemsCollapse';
 import styles from './EntitlementPackageCard.module.css';
 
@@ -37,7 +38,7 @@ export function EntitlementPackageCard({ pkg, loading, onBuy, onCopyShareLink }:
           disabled={!canBuy}
           onClick={onBuy}
         >
-          {canBuy ? '一键组合下单' : '暂不可购买'}
+          {canBuy ? '一键购买' : '暂不可购买'}
         </Button>,
       ]}
     >
@@ -60,6 +61,7 @@ export function EntitlementPackageCard({ pkg, loading, onBuy, onCopyShareLink }:
           ) : null}
         </Paragraph>
       )}
+      <PackageIncludeSummary items={pkg.items || []} />
       <div className={styles.totalPriceBlock}>
         <div className={styles.totalPriceLabel}>组合总价</div>
         <div className={styles.totalPriceValue}>¥{pkg.totalPrice.toFixed(2)}</div>

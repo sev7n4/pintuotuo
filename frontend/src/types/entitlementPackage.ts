@@ -17,6 +17,10 @@ export interface EntitlementPackageItem {
   line_issue?: string;
   /** 仅「我的权益」接口：当前账号是否已具备该明细 */
   line_covered?: boolean;
+  /** 来自 skus，与后台套餐明细接口一致 */
+  token_amount?: number;
+  subscription_period?: string;
+  valid_days?: number;
 }
 
 export interface EntitlementPackage {

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, Col, Empty, List, Row, Space, Skeleton, Spin, Statistic, Tag, Typography } from 'antd';
 import { WalletOutlined, ApiOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
@@ -8,13 +9,12 @@ import type { APIUsageGuideResponse } from '@/types';
 import type { UserSubscriptionWithSKU } from '@/types/sku';
 import type { EntitlementPackageUserView } from '@/types/entitlementPackage';
 import { PackageItemsCollapse } from '@/components/entitlement/PackageItemsCollapse';
+import { EntitlementModelVerifyCard } from '@/components/entitlement/EntitlementModelVerifyCard';
 
 const { Title, Text, Paragraph } = Typography;
 
 type TokenBalanceResp = {
   balance: number;
-  total_earned: number;
-  total_used: number;
 };
 
 export default function MyEntitlementsPage() {
@@ -65,8 +65,6 @@ export default function MyEntitlementsPage() {
           setUsageGuide(guideRes.data.data || null);
           setBalance({
             balance: Number(balRes.data?.balance || 0),
-            total_earned: Number(balRes.data?.total_earned || 0),
-            total_used: Number(balRes.data?.total_used || 0),
           });
         }
       } catch {
@@ -83,6 +81,17 @@ export default function MyEntitlementsPage() {
     };
   }, []);
 
+  const refreshBalance = useCallback(async () => {
+    try {
+      const balRes = await tokenService.getBalance();
+      setBalance({
+        balance: Number(balRes.data?.balance || 0),
+      });
+    } catch {
+      /* 保持原余额 */
+    }
+  }, []);
+
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: 16 }}>
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -96,7 +105,7 @@ export default function MyEntitlementsPage() {
         </div>
 
         <Row gutter={[16, 16]}>
-          <Col xs={24} md={8}>
+          <Col xs={24} md={12}>
             <Card>
               <Skeleton loading={loadingExtras} active paragraph={{ rows: 1 }}>
                 <Statistic
@@ -106,19 +115,13 @@ export default function MyEntitlementsPage() {
                   prefix={<WalletOutlined />}
                 />
                 <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
-                  支付成功后，若套餐含赠送 Token，将并入此处余额。
+                  支付成功后，若套餐含赠送 Token，将并入此处余额。累计获得等明细请见{' '}
+                  <Link to="/my-tokens">我的 Token</Link>。
                 </Paragraph>
               </Skeleton>
             </Card>
           </Col>
-          <Col xs={24} md={8}>
-            <Card>
-              <Skeleton loading={loadingExtras} active paragraph={{ rows: 1 }}>
-                <Statistic title="累计获得" value={balance?.total_earned ?? 0} suffix="Token" />
-              </Skeleton>
-            </Card>
-          </Col>
-          <Col xs={24} md={8}>
+          <Col xs={24} md={12}>
             <Card>
               <Spin spinning={loadingMain}>
                 <Statistic
@@ -135,7 +138,7 @@ export default function MyEntitlementsPage() {
         <Spin spinning={loadingMain}>
           <Card title="套餐包状态">
             {packages.length === 0 ? (
-              <Empty description="暂无套餐包配置" />
+              <Empty description="暂无已购套餐包；购买套餐包并履约后，此处将展示各包内明细的覆盖进度。" />
             ) : (
               <List
                 dataSource={packages}
@@ -214,6 +217,14 @@ export default function MyEntitlementsPage() {
               )}
             </Skeleton>
           </Card>
+
+          <EntitlementModelVerifyCard
+            usageGuide={usageGuide}
+            loadingGuide={loadingExtras}
+            tokenBalance={balance?.balance ?? null}
+            balanceLoading={loadingExtras}
+            onRefreshBalance={refreshBalance}
+          />
         </Spin>
       </Space>
     </div>
