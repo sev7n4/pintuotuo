@@ -75,6 +75,12 @@ services:
       - LANGFUSE_HOST=${LANGFUSE_HOST:-}
       # 勿在此注入 HTTP(S)_PROXY 空值：会导致 Go 出站行为与未设置时不一致。
       # 若大陆机房必须走代理访问 github.com，请使用 docker-compose.proxy.override.yml.example 合并启动。
+      # OpenTelemetry → Grafana Tempo（OTLP gRPC）；不配 endpoint 时后端为 noop
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-tempo:4317}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-pintuotuo-backend}
+      - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-}
+      - OTEL_TRACES_SAMPLER=${OTEL_TRACES_SAMPLER:-}
+      - OTEL_TRACES_SAMPLER_ARG=${OTEL_TRACES_SAMPLER_ARG:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -206,12 +212,33 @@ services:
       - "3001:3000"
     depends_on:
       - prometheus
+      - tempo
     networks:
       - pintuotuo-network
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
+        max-file: "3"
+
+  tempo:
+    image: grafana/tempo:2.3.1
+    container_name: pintuotuo-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - pintuotuo-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
         max-file: "3"
 
   alertmanager:
@@ -246,6 +273,9 @@ services:
       - ZAI_API_KEY=${ZAI_API_KEY:-}
       - STEPFUN_API_KEY=${STEPFUN_API_KEY:-}
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+      # OpenTelemetry：LiteLLM 若进程内启用 OTel，通常走 OTLP HTTP → Tempo 4318（与 Go 后端 gRPC 4317 区分）
+      - OTEL_SERVICE_NAME=${LITELLM_OTEL_SERVICE_NAME:-litellm-proxy}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${LITELLM_OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318}
     volumes:
       - ./deploy/litellm/litellm_proxy_config.yaml:/app/litellm_proxy_config.yaml:ro
     command:
@@ -273,3 +303,4 @@ volumes:
   prometheus_data:
   grafana_data:
   alertmanager_data:
+  tempo_data:

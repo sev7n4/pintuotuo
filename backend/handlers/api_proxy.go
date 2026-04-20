@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -26,8 +27,22 @@ import (
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
+	"github.com/pintuotuo/backend/tracing"
 	"github.com/pintuotuo/backend/utils"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
+
+var (
+	proxyHTTPOnce         sync.Once
+	proxyHTTPRoundTripper http.RoundTripper
+)
+
+func proxyHTTPClient(timeout time.Duration) *http.Client {
+	proxyHTTPOnce.Do(func() {
+		proxyHTTPRoundTripper = otelhttp.NewTransport(http.DefaultTransport)
+	})
+	return &http.Client{Transport: proxyHTTPRoundTripper, Timeout: timeout}
+}
 
 const (
 	providerAnthropic = "anthropic"
@@ -153,7 +168,6 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 	c.Header("X-Request-ID", requestID)
-	c.Header("X-Trace-ID", requestID)
 	traceSpan := services.StartLLMTrace(requestID, userIDInt)
 	defer traceSpan.Finish(c.Request.Context())
 
@@ -399,7 +413,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
-	httpReq, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBody))
+	httpReq, err := http.NewRequestWithContext(c.Request.Context(), "POST", endpoint, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -441,14 +455,14 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			return
 		}
 		httpReq.Header.Set("Accept", "text/event-stream")
-		streamClient := &http.Client{Timeout: 15 * time.Minute}
+		streamClient := proxyHTTPClient(15 * time.Minute)
 		executeProxyChatCompletionStream(c, streamClient, httpReq, requestID, userIDInt, req, requestPath, startTime, db,
 			billingEngine, apiKey, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
 			decisionStart, traceSpan, strategySnapshot)
 		return
 	}
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := proxyHTTPClient(60 * time.Second)
 	retryPolicy := buildRetryPolicy(strategySnapshot)
 	retryPolicy = applyLitellmGatewayRetryCap(retryPolicy)
 	resp, retryCount, err := executeProviderRequestWithRetry(client, httpReq, retryPolicy)
@@ -621,7 +635,15 @@ func applyProxyUpstreamHeaders(c *gin.Context, httpReq *http.Request, requestID 
 	if strings.TrimSpace(requestID) != "" {
 		httpReq.Header.Set("X-Request-ID", requestID)
 	}
-	// W3C Trace Context + baggage（若入口或客户端已注入则透传）
+	// W3C：启用 OTLP 时由 otelhttp 注入 traceparent；未启用时透传入口头以保持旧行为。
+	if tracing.Enabled() {
+		for _, h := range []string{"tracestate", "baggage"} {
+			if v := strings.TrimSpace(c.GetHeader(h)); v != "" {
+				httpReq.Header.Set(h, v)
+			}
+		}
+		return
+	}
 	for _, h := range []string{"traceparent", "tracestate", "baggage"} {
 		if v := strings.TrimSpace(c.GetHeader(h)); v != "" {
 			httpReq.Header.Set(h, v)

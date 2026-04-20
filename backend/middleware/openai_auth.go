@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/tracing"
 	"github.com/pintuotuo/backend/utils"
 )
 
@@ -99,6 +100,7 @@ func APIKeyOrJWTAuthMiddleware() gin.HandlerFunc {
 			}
 			userID := int(userIDFloat)
 			c.Set("user_id", userID)
+			tracing.SetEndUserID(c.Request.Context(), userID)
 
 			if email, ok := claims["email"].(string); ok {
 				c.Set("email", email)
