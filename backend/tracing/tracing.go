@@ -63,6 +63,7 @@ func Init(ctx context.Context) (shutdown func(context.Context) error, err error)
 
 	opts := []otlptracegrpc.Option{
 		otlptracegrpc.WithEndpoint(endpoint),
+		otlptracegrpc.WithInsecure(),
 		otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 	}
 	exp, err := otlptracegrpc.New(ctx, opts...)
