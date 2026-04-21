@@ -54,4 +54,3 @@ func TestValidateEntitlementPackageBundlePolicy_FuelPackOnly(t *testing.T) {
 	assert.Contains(t, err.Error(), "加油包不可单独购买")
 	require.NoError(t, mock.ExpectationsWereMet())
 }
-

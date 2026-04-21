@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useOrderStore } from '@/stores/orderStore';
 import { entitlementPackageService } from '@/services/entitlementPackage';
 import type { EntitlementPackage } from '@/types/entitlementPackage';
+import type { PackageSocialStats } from '@/components/entitlement/PackageSocialBar';
 import { ENTITLEMENT_PACKAGE_FILTER_OPTIONS } from '@/types/entitlementPackage';
 import { EntitlementPackageCard } from '@/components/entitlement/EntitlementPackageCard';
 import { getApiErrorMessage } from '@/utils/apiError';
@@ -18,6 +19,7 @@ export default function EntitlementPackagesPage() {
   const [loading, setLoading] = useState(true);
   const [submittingID, setSubmittingID] = useState<string>('');
   const [packages, setPackages] = useState<EntitlementPackage[]>([]);
+  const [socialById, setSocialById] = useState<Record<number, PackageSocialStats>>({});
   const [category, setCategory] = useState<string>('all');
 
   useEffect(() => {
@@ -37,6 +39,37 @@ export default function EntitlementPackagesPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (packages.length === 0) return;
+    let cancelled = false;
+    const ids = packages.map((p) => p.id);
+    (async () => {
+      try {
+        const res = await entitlementPackageService.batchStats(ids);
+        const rows = res.data?.data || [];
+        if (cancelled) return;
+        const next: Record<number, PackageSocialStats> = {};
+        for (const r of rows) {
+          next[r.package_id] = {
+            favoriteCount: r.favorite_count,
+            likeCount: r.like_count,
+            salesCount: r.sales_count,
+            reviewCount: r.review_count,
+            userFavorited: r.user_favorited,
+            userLiked: r.user_liked,
+            userReviewed: r.user_reviewed,
+          };
+        }
+        setSocialById(next);
+      } catch {
+        if (!cancelled) setSocialById({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [packages]);
 
   const highlightCode = searchParams.get('pkg') || searchParams.get('highlight') || '';
 
@@ -81,7 +114,7 @@ export default function EntitlementPackagesPage() {
     }
     setSubmittingID(pkgID);
     try {
-      const orderID = await createOrder(items);
+      const orderID = await createOrder(items, { entitlement_package_id: pkg.id });
       if (!orderID) {
         message.success('套餐订单已创建');
         navigate('/orders');
@@ -139,6 +172,13 @@ export default function EntitlementPackagesPage() {
                     loading={submittingID === String(pkg.id)}
                     onBuy={() => handleOneClickOrder(String(pkg.id), pkg)}
                     onCopyShareLink={() => copyShareLink(pkg.package_code)}
+                    socialStats={socialById[pkg.id]}
+                    onSocialPatch={(patch) =>
+                      setSocialById((prev) => ({
+                        ...prev,
+                        [pkg.id]: { ...prev[pkg.id], ...patch },
+                      }))
+                    }
                   />
                 </div>
               </List.Item>

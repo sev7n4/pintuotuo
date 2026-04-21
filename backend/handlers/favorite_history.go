@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/models"
 )
@@ -39,9 +41,12 @@ func GetFavorites(c *gin.Context) {
 	}
 	offset := (page - 1) * pageSize
 
-	countQuery := `SELECT COUNT(*) FROM favorites WHERE user_id = $1`
 	var total int
-	err := db.QueryRow(countQuery, userID).Scan(&total)
+	err := db.QueryRow(
+		`SELECT (SELECT COUNT(*)::int FROM favorites WHERE user_id = $1)
+		       + (SELECT COUNT(*)::int FROM entitlement_package_favorites WHERE user_id = $1)`,
+		userID,
+	).Scan(&total)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "DATABASE_ERROR",
@@ -50,21 +55,20 @@ func GetFavorites(c *gin.Context) {
 		return
 	}
 
-	query := `
-		SELECT f.id, f.sku_id, f.created_at,
-			   s.id, COALESCE(s.merchant_id, 0), s.spu_id, sp.name || ' · ' || s.sku_code, COALESCE(sp.description, ''),
-			   s.retail_price, COALESCE(s.original_price, s.retail_price),
-			   CASE WHEN s.stock = -1 THEN 999999 ELSE s.stock END, COALESCE(s.sales_count, 0), COALESCE(sp.model_tier, ''),
-			   s.status, s.created_at, s.updated_at
-		FROM favorites f
-		JOIN skus s ON f.sku_id = s.id
-		JOIN spus sp ON s.spu_id = sp.id
-		WHERE f.user_id = $1
-		ORDER BY f.created_at DESC
-		LIMIT $2 OFFSET $3
-	`
-
-	rows, err := db.Query(query, userID, pageSize, offset)
+	mergedRows, err := db.Query(
+		`SELECT id, item_type, created_at FROM (
+			SELECT f.id, 'sku'::text AS item_type, f.created_at
+			  FROM favorites f
+			 WHERE f.user_id = $1
+			UNION ALL
+			SELECT epf.id, 'entitlement_package'::text, epf.created_at
+			  FROM entitlement_package_favorites epf
+			 WHERE epf.user_id = $1
+		) u
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3`,
+		userID, pageSize, offset,
+	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "DATABASE_ERROR",
@@ -72,33 +76,140 @@ func GetFavorites(c *gin.Context) {
 		})
 		return
 	}
-	defer rows.Close()
+	defer mergedRows.Close()
 
-	var items []models.FavoriteResponse
-	for rows.Next() {
-		var item models.FavoriteResponse
-		var product models.Product
-		var createdAt sql.NullTime
-
-		err := rows.Scan(
-			&item.ID, &item.SKUID, &createdAt,
-			&product.ID, &product.MerchantID, &product.SpuID, &product.Name, &product.Description,
-			&product.Price, &product.OriginalPrice, &product.Stock, &product.SoldCount,
-			&product.Category, &product.Status, &product.CreatedAt, &product.UpdatedAt,
-		)
-		if err != nil {
+	type merged struct {
+		id        int
+		itemType  string
+		createdAt time.Time
+	}
+	order := make([]merged, 0)
+	var skuFavIDs []int
+	var epFavIDs []int
+	for mergedRows.Next() {
+		var m merged
+		if scanErr := mergedRows.Scan(&m.id, &m.itemType, &m.createdAt); scanErr != nil {
 			continue
 		}
-
-		if createdAt.Valid {
-			item.CreatedAt = createdAt.Time.Format("2006-01-02T15:04:05Z07:00")
+		order = append(order, m)
+		switch m.itemType {
+		case "sku":
+			skuFavIDs = append(skuFavIDs, m.id)
+		case "entitlement_package":
+			epFavIDs = append(epFavIDs, m.id)
 		}
-		item.Product = product
-		items = append(items, item)
+	}
+	if err := mergedRows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    "DATABASE_ERROR",
+			"message": "Failed to fetch favorites",
+		})
+		return
 	}
 
-	if items == nil {
-		items = []models.FavoriteResponse{}
+	skuByFavID := map[int]models.UnifiedFavoriteResponse{}
+	if len(skuFavIDs) > 0 {
+		q := `
+			SELECT f.id, f.sku_id, f.created_at,
+				   s.id, COALESCE(s.merchant_id, 0), s.spu_id, sp.name || ' · ' || s.sku_code, COALESCE(sp.description, ''),
+				   s.retail_price, COALESCE(s.original_price, s.retail_price),
+				   CASE WHEN s.stock = -1 THEN 999999 ELSE s.stock END, COALESCE(s.sales_count, 0), COALESCE(sp.model_tier, ''),
+				   s.status, s.created_at, s.updated_at
+			  FROM favorites f
+			  JOIN skus s ON f.sku_id = s.id
+			  JOIN spus sp ON s.spu_id = sp.id
+			 WHERE f.user_id = $1 AND f.id = ANY($2)
+		`
+		srows, qerr := db.Query(q, userID, pq.Array(skuFavIDs))
+		if qerr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    "DATABASE_ERROR",
+				"message": "Failed to fetch favorites",
+			})
+			return
+		}
+		for srows.Next() {
+			var favID, skuID int
+			var product models.Product
+			var createdAt sql.NullTime
+			if scanErr := srows.Scan(
+				&favID, &skuID, &createdAt,
+				&product.ID, &product.MerchantID, &product.SpuID, &product.Name, &product.Description,
+				&product.Price, &product.OriginalPrice, &product.Stock, &product.SoldCount,
+				&product.Category, &product.Status, &product.CreatedAt, &product.UpdatedAt,
+			); scanErr != nil {
+				continue
+			}
+			u := models.UnifiedFavoriteResponse{
+				ItemType: "sku",
+				ID:       favID,
+				SKUID:    &skuID,
+				Product:  &product,
+			}
+			if createdAt.Valid {
+				u.CreatedAt = createdAt.Time.Format("2006-01-02T15:04:05Z07:00")
+			}
+			skuByFavID[favID] = u
+		}
+		_ = srows.Close()
+	}
+
+	epByFavID := map[int]models.UnifiedFavoriteResponse{}
+	if len(epFavIDs) > 0 {
+		q := `
+			SELECT epf.id, epf.created_at, ep.id, ep.package_code, ep.name,
+			       COALESCE(ep.marketing_line, ''), ep.status
+			  FROM entitlement_package_favorites epf
+			  JOIN entitlement_packages ep ON ep.id = epf.package_id
+			 WHERE epf.user_id = $1 AND epf.id = ANY($2)
+		`
+		erows, qerr := db.Query(q, userID, pq.Array(epFavIDs))
+		if qerr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    "DATABASE_ERROR",
+				"message": "Failed to fetch favorites",
+			})
+			return
+		}
+		for erows.Next() {
+			var favID int
+			var createdAt sql.NullTime
+			var epBrief models.EntitlementPackageFavoriteBrief
+			if scanErr := erows.Scan(
+				&favID, &createdAt,
+				&epBrief.ID, &epBrief.PackageCode, &epBrief.Name, &epBrief.MarketingLine, &epBrief.Status,
+			); scanErr != nil {
+				continue
+			}
+			epid := epBrief.ID
+			u := models.UnifiedFavoriteResponse{
+				ItemType:             "entitlement_package",
+				ID:                   favID,
+				EntitlementPackageID: &epid,
+				EntitlementPackage:   &epBrief,
+			}
+			if createdAt.Valid {
+				u.CreatedAt = createdAt.Time.Format("2006-01-02T15:04:05Z07:00")
+			}
+			epByFavID[favID] = u
+		}
+		_ = erows.Close()
+	}
+
+	items := make([]models.UnifiedFavoriteResponse, 0, len(order))
+	for _, row := range order {
+		switch row.itemType {
+		case "sku":
+			if u, ok := skuByFavID[row.id]; ok {
+				items = append(items, u)
+			}
+		case "entitlement_package":
+			if u, ok := epByFavID[row.id]; ok {
+				items = append(items, u)
+			}
+		default:
+			// ignore unknown
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

@@ -51,9 +51,11 @@ type Order struct {
 	Status      string      `json:"status"` // pending, paid, completed, failed
 	Items       []OrderItem `json:"items,omitempty"`
 	// PricingVersionID binds retail usage pricing to order time; nil = legacy / not set (migration 045).
-	PricingVersionID *int      `json:"pricing_version_id,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	PricingVersionID *int `json:"pricing_version_id,omitempty"`
+	// EntitlementPackageID set when order was created from a bundle checkout (migration 058).
+	EntitlementPackageID *int      `json:"entitlement_package_id,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 // OrderItem represents one SKU line within an order.
@@ -309,6 +311,28 @@ type FavoriteResponse struct {
 	SKUID     int     `json:"sku_id"`
 	Product   Product `json:"product"`
 	CreatedAt string  `json:"created_at"`
+}
+
+// EntitlementPackageFavoriteBrief is a minimal package card for 我的收藏.
+type EntitlementPackageFavoriteBrief struct {
+	ID            int    `json:"id"`
+	PackageCode   string `json:"package_code"`
+	Name          string `json:"name"`
+	MarketingLine string `json:"marketing_line,omitempty"`
+	Status        string `json:"status"`
+}
+
+// UnifiedFavoriteResponse merges SKU favorites and entitlement package favorites (sorted by收藏时间).
+type UnifiedFavoriteResponse struct {
+	ItemType string `json:"item_type"` // "sku" | "entitlement_package"
+	ID       int    `json:"id"`        // favorites.id 或 entitlement_package_favorites.id
+	// SKU branch
+	SKUID   *int     `json:"sku_id,omitempty"`
+	Product *Product `json:"product,omitempty"`
+	// Entitlement package branch
+	EntitlementPackageID *int                             `json:"entitlement_package_id,omitempty"`
+	EntitlementPackage   *EntitlementPackageFavoriteBrief `json:"entitlement_package,omitempty"`
+	CreatedAt            string                           `json:"created_at"`
 }
 
 // BrowseHistory represents a user's browse history

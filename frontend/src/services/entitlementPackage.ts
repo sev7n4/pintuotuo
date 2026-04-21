@@ -1,5 +1,9 @@
 import api from './api';
-import type { EntitlementPackage, EntitlementPackageUserView } from '@/types/entitlementPackage';
+import type {
+  EntitlementPackage,
+  EntitlementPackageStatRow,
+  EntitlementPackageUserView,
+} from '@/types/entitlementPackage';
 
 export type EntitlementPackageUpsertPayload = {
   package_code?: string;
@@ -25,6 +29,25 @@ export type EntitlementPackageUpsertPayload = {
 };
 
 export const entitlementPackageService = {
+  /** 批量社交与销量统计；未登录也可调用（无 user_* 字段） */
+  batchStats: (ids: number[]) =>
+    api.get<{ data: EntitlementPackageStatRow[] }>('/entitlement-packages/stats', {
+      params: { ids: ids.join(',') },
+    }),
+  addFavorite: (packageId: number) =>
+    api.post<{ data: { favorited: boolean; favorite_count: number } }>(
+      `/entitlement-packages/${packageId}/favorite`
+    ),
+  removeFavorite: (packageId: number) =>
+    api.delete<{ data: { favorited: boolean; favorite_count: number } }>(
+      `/entitlement-packages/${packageId}/favorite`
+    ),
+  toggleLike: (packageId: number) =>
+    api.post<{ data: { liked: boolean; like_count: number } }>(
+      `/entitlement-packages/${packageId}/like`
+    ),
+  upsertReview: (packageId: number, body: { rating: number; comment?: string }) =>
+    api.post<{ data: { review_count: number } }>(`/entitlement-packages/${packageId}/reviews`, body),
   listAdmin: () => api.get<{ data: EntitlementPackage[] }>('/admin/entitlement-packages'),
   createAdmin: (data: EntitlementPackageUpsertPayload) =>
     api.post('/admin/entitlement-packages', data),
