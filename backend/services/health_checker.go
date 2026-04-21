@@ -57,13 +57,19 @@ type ProviderHealth struct {
 }
 
 type HealthCheckResult struct {
-	Success      bool
-	Status       string
-	LatencyMs    int
-	ErrorMessage string
-	ModelsFound  []string
-	PricingInfo  map[string]interface{}
-	CheckType    string
+	Success           bool
+	Status            string
+	LatencyMs         int
+	ErrorMessage      string
+	ErrorCategory     string
+	ProviderErrorCode string
+	ProviderRequestID string
+	EndpointUsed      string
+	StatusCode        int
+	RawErrorExcerpt   string
+	ModelsFound       []string
+	PricingInfo       map[string]interface{}
+	CheckType         string
 }
 
 type HealthChecker struct {
@@ -169,12 +175,13 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 	}
 	if probe != nil && probe.Success {
 		return &HealthCheckResult{
-			Success:     true,
-			Status:      HealthStatusHealthy,
-			LatencyMs:   probe.LatencyMs,
-			ModelsFound: probe.Models,
-			PricingInfo: s.extractPricingInfo(apiKey.Provider),
-			CheckType:   "full",
+			Success:      true,
+			Status:       HealthStatusHealthy,
+			LatencyMs:    probe.LatencyMs,
+			ModelsFound:  probe.Models,
+			PricingInfo:  s.extractPricingInfo(apiKey.Provider),
+			EndpointUsed: modelsEndpoint,
+			CheckType:    "full",
 		}, nil
 	}
 
@@ -183,11 +190,17 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 		errMsg = probe.ErrorMsg
 	}
 	return &HealthCheckResult{
-		Success:      false,
-		Status:       HealthStatusUnhealthy,
-		LatencyMs:    probeLatency(probe),
-		ErrorMessage: errMsg,
-		CheckType:    "full",
+		Success:           false,
+		Status:            HealthStatusUnhealthy,
+		LatencyMs:         probeLatency(probe),
+		ErrorMessage:      errMsg,
+		ErrorCategory:     safeProbeValue(probe, func(p *ProbeModelsResult) string { return p.ErrorCategory }),
+		ProviderErrorCode: safeProbeValue(probe, func(p *ProbeModelsResult) string { return p.ErrorCode }),
+		ProviderRequestID: safeProbeValue(probe, func(p *ProbeModelsResult) string { return p.ProviderRequestID }),
+		StatusCode:        safeProbeInt(probe, func(p *ProbeModelsResult) int { return p.StatusCode }),
+		RawErrorExcerpt:   safeProbeValue(probe, func(p *ProbeModelsResult) string { return p.RawErrorExcerpt }),
+		EndpointUsed:      modelsEndpoint,
+		CheckType:         "full",
 	}, nil
 }
 
@@ -381,10 +394,11 @@ func (s *HealthChecker) SaveHealthCheckResult(ctx context.Context, apiKeyID int,
 
 	_, err := db.ExecContext(ctx, `
 		INSERT INTO api_key_health_history 
-		(api_key_id, check_type, status, latency_ms, error_message, models_available, pricing_info)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		(api_key_id, check_type, status, latency_ms, error_message, models_available, pricing_info,
+		 status_code, provider_error_code, provider_request_id, endpoint_used, error_category, raw_error_excerpt)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF(TRIM($9), ''), NULLIF(TRIM($10), ''), NULLIF(TRIM($11), ''), NULLIF(TRIM($12), ''), NULLIF(TRIM($13), ''))`,
 		apiKeyID, result.CheckType, result.Status, result.LatencyMs, result.ErrorMessage,
-		modelsJSON, pricingJSON,
+		modelsJSON, pricingJSON, result.StatusCode, result.ProviderErrorCode, result.ProviderRequestID, result.EndpointUsed, result.ErrorCategory, result.RawErrorExcerpt,
 	)
 	if err != nil {
 		return err
@@ -592,6 +606,20 @@ func probeLatency(probe *ProbeModelsResult) int {
 	return probe.LatencyMs
 }
 
+func safeProbeValue(probe *ProbeModelsResult, getter func(*ProbeModelsResult) string) string {
+	if probe == nil {
+		return ""
+	}
+	return getter(probe)
+}
+
+func safeProbeInt(probe *ProbeModelsResult, getter func(*ProbeModelsResult) int) int {
+	if probe == nil {
+		return 0
+	}
+	return getter(probe)
+}
+
 func IsHealthy(status string) bool {
 	return status == HealthStatusHealthy
 }
@@ -656,12 +684,14 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 	latencyMs := int(time.Since(start).Milliseconds())
 
 	if err != nil {
+		errInfo := MapProviderError(0, "", fmt.Sprintf("connection failed: %v", err), nil, err, "")
 		return &HealthCheckResult{
-			Success:      false,
-			Status:       HealthStatusUnhealthy,
-			LatencyMs:    latencyMs,
-			ErrorMessage: fmt.Sprintf("connection failed: %v", err),
-			CheckType:    "chat_test",
+			Success:       false,
+			Status:        HealthStatusUnhealthy,
+			LatencyMs:     latencyMs,
+			ErrorMessage:  errInfo.ProviderMessage,
+			ErrorCategory: errInfo.Category,
+			CheckType:     "chat_test",
 		}, nil
 	}
 	defer resp.Body.Close()
@@ -676,11 +706,22 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 	}
 
 	respBody, _ := io.ReadAll(resp.Body)
+	code, msg := extractProviderError(respBody)
+	if msg == "" {
+		msg = strings.TrimSpace(string(respBody))
+	}
+	errInfo := MapProviderError(resp.StatusCode, code, msg, resp.Header, nil, string(respBody))
 	return &HealthCheckResult{
-		Success:      false,
-		Status:       HealthStatusDegraded,
-		LatencyMs:    latencyMs,
-		ErrorMessage: fmt.Sprintf("status: %d, body: %s", resp.StatusCode, string(respBody)),
-		CheckType:    "chat_test",
+		Success:           false,
+		Status:            HealthStatusDegraded,
+		LatencyMs:         latencyMs,
+		ErrorMessage:      firstNonEmpty(errInfo.ProviderMessage, fmt.Sprintf("status: %d", resp.StatusCode)),
+		ErrorCategory:     errInfo.Category,
+		ProviderErrorCode: firstNonEmpty(code, errInfo.ProviderCode),
+		ProviderRequestID: errInfo.ProviderRequestID,
+		StatusCode:        resp.StatusCode,
+		RawErrorExcerpt:   errInfo.RawErrorExcerpt,
+		EndpointUsed:      chatEndpoint,
+		CheckType:         "chat_test",
 	}, nil
 }

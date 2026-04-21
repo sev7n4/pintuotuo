@@ -219,6 +219,9 @@ type MerchantAPIKey struct {
 	EndpointURL         string     `json:"endpoint_url,omitempty"`
 	HealthStatus        string     `json:"health_status,omitempty"`
 	HealthErrorMessage  string     `json:"health_error_message,omitempty"`
+	HealthErrorCategory string     `json:"health_error_category,omitempty"`
+	HealthErrorCode     string     `json:"health_error_code,omitempty"`
+	HealthRequestID     string     `json:"health_provider_request_id,omitempty"`
 	LastHealthCheckAt   *time.Time `json:"last_health_check_at,omitempty"`
 	ConsecutiveFailures int        `json:"consecutive_failures,omitempty"`
 

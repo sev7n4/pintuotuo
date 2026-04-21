@@ -12,12 +12,15 @@ import (
 
 // ProbeModelsResult is a shared probe output for validator and health checker.
 type ProbeModelsResult struct {
-	Success    bool
-	StatusCode int
-	LatencyMs  int
-	Models     []string
-	ErrorCode  string
-	ErrorMsg   string
+	Success           bool
+	StatusCode        int
+	LatencyMs         int
+	Models            []string
+	ErrorCode         string
+	ErrorMsg          string
+	ErrorCategory     string
+	ProviderRequestID string
+	RawErrorExcerpt   string
 }
 
 // ProbeProviderModels performs one GET <modelsURL> probe and parses OpenAI-style model list payload.
@@ -33,10 +36,12 @@ func ProbeProviderModels(ctx context.Context, client *http.Client, modelsURL str
 	resp, err := client.Do(req)
 	latencyMs := int(time.Since(start).Milliseconds())
 	if err != nil {
+		errInfo := MapProviderError(0, "", fmt.Sprintf("connection failed: %v", err), nil, err, "")
 		return &ProbeModelsResult{
-			Success:   false,
-			LatencyMs: latencyMs,
-			ErrorMsg:  fmt.Sprintf("connection failed: %v", err),
+			Success:       false,
+			LatencyMs:     latencyMs,
+			ErrorMsg:      errInfo.ProviderMessage,
+			ErrorCategory: errInfo.Category,
 		}, err
 	}
 	defer resp.Body.Close()
@@ -55,8 +60,12 @@ func ProbeProviderModels(ctx context.Context, client *http.Client, modelsURL str
 		if msg == "" {
 			msg = strings.TrimSpace(string(body))
 		}
+		errInfo := MapProviderError(resp.StatusCode, code, msg, resp.Header, nil, string(body))
 		result.ErrorCode = code
 		result.ErrorMsg = msg
+		result.ErrorCategory = errInfo.Category
+		result.ProviderRequestID = errInfo.ProviderRequestID
+		result.RawErrorExcerpt = errInfo.RawErrorExcerpt
 		return result, nil
 	}
 
