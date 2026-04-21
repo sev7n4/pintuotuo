@@ -67,7 +67,7 @@ func TestNormalizeVerificationDBStatus(t *testing.T) {
 }
 
 func TestExtractProviderError(t *testing.T) {
-	code, msg := extractProviderError([]byte(`{"error":{"code":"insufficient_quota","message":"余额不足"}}`))
+	code, msg := ExtractProviderError([]byte(`{"error":{"code":"insufficient_quota","message":"余额不足"}}`))
 	if code != "insufficient_quota" {
 		t.Fatalf("code = %s, want insufficient_quota", code)
 	}

@@ -553,7 +553,7 @@ func (v *APIKeyValidator) probeQuota(providerConfig map[string]string, provider,
 	}
 
 	rawBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
-	code, msg := extractProviderError(rawBody)
+	code, msg := ExtractProviderError(rawBody)
 	if code == "" {
 		code = fmt.Sprintf("HTTP_%d", resp.StatusCode)
 	}
@@ -579,49 +579,4 @@ func selectProbeModel(provider string, models []string) string {
 	default:
 		return ""
 	}
-}
-
-func extractProviderError(body []byte) (string, string) {
-	trimmed := strings.TrimSpace(string(body))
-	if trimmed == "" {
-		return "", ""
-	}
-	var payload map[string]interface{}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return "", trimmed
-	}
-
-	if errNode, ok := payload["error"].(map[string]interface{}); ok {
-		return getString(errNode, "code"), firstNonEmpty(
-			getString(errNode, "message"),
-			getString(errNode, "msg"),
-		)
-	}
-	return getString(payload, "code"), firstNonEmpty(
-		getString(payload, "message"),
-		getString(payload, "msg"),
-		trimmed,
-	)
-}
-
-func getString(m map[string]interface{}, key string) string {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return ""
-	}
-	switch s := v.(type) {
-	case string:
-		return s
-	default:
-		return fmt.Sprintf("%v", s)
-	}
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, v := range values {
-		if strings.TrimSpace(v) != "" {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
 }

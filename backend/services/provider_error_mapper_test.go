@@ -53,6 +53,22 @@ func TestMapProviderError(t *testing.T) {
 			headers:    http.Header{"X-Request-Id": []string{"req-123"}},
 			wantCat:    errorCategoryUpstreamBadRequest,
 		},
+		{
+			name:       "502 bad gateway retryable",
+			statusCode: http.StatusBadGateway,
+			code:       "",
+			msg:        "",
+			wantCat:    errorCategoryServiceUnavailable,
+			retryable:  true,
+		},
+		{
+			name:       "500 internal retryable",
+			statusCode: http.StatusInternalServerError,
+			code:       "",
+			msg:        "",
+			wantCat:    errorCategoryServiceUnavailable,
+			retryable:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -68,5 +84,17 @@ func TestMapProviderError(t *testing.T) {
 				t.Fatalf("request_id=%s want=req-123", got.ProviderRequestID)
 			}
 		})
+	}
+}
+
+func TestHTTPUpstreamRetryable(t *testing.T) {
+	if !HTTPUpstreamRetryable(http.StatusTooManyRequests, []byte(`{}`), nil) {
+		t.Fatal("429 should be retryable")
+	}
+	if !HTTPUpstreamRetryable(http.StatusBadGateway, []byte(`{}`), nil) {
+		t.Fatal("502 should be retryable")
+	}
+	if HTTPUpstreamRetryable(http.StatusUnauthorized, []byte(`{"error":{"code":"invalid_api_key"}}`), nil) {
+		t.Fatal("401 invalid key should not retry")
 	}
 }

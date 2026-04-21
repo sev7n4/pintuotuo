@@ -53,7 +53,7 @@ func ProbeProviderModels(ctx context.Context, client *http.Client, modelsURL str
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		code, msg := extractProviderError(body)
+		code, msg := ExtractProviderError(body)
 		if code == "" {
 			code = fmt.Sprintf("HTTP_%d", resp.StatusCode)
 		}
