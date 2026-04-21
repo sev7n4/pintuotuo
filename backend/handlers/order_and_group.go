@@ -25,6 +25,57 @@ import (
 const orderStatusPending = "pending"
 const groupStatusActive = "active"
 
+type createOrderLineItem struct {
+	SKUID    int `json:"sku_id" binding:"required,gt=0"`
+	Quantity int `json:"quantity" binding:"required,gt=0"`
+}
+
+func validateEntitlementPackageOrderLines(tx *sql.Tx, packageID int, reqItems []createOrderLineItem) *apperrors.AppError {
+	var st string
+	err := tx.QueryRow(`SELECT status FROM entitlement_packages WHERE id = $1`, packageID).Scan(&st)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return apperrors.NewAppError("ENTITLEMENT_PACKAGE_NOT_FOUND", "套餐不存在", http.StatusBadRequest, nil)
+		}
+		return apperrors.ErrDatabaseError
+	}
+	if st != "active" {
+		return apperrors.NewAppError("ENTITLEMENT_PACKAGE_INACTIVE", "套餐已下架", http.StatusBadRequest, nil)
+	}
+	rows, err := tx.Query(`SELECT sku_id, default_quantity FROM entitlement_package_items WHERE package_id = $1`, packageID)
+	if err != nil {
+		return apperrors.ErrDatabaseError
+	}
+	defer rows.Close()
+	expected := make(map[int]int)
+	for rows.Next() {
+		var sk, dq int
+		if scanErr := rows.Scan(&sk, &dq); scanErr != nil {
+			return apperrors.ErrDatabaseError
+		}
+		expected[sk] = dq
+	}
+	if err := rows.Err(); err != nil {
+		return apperrors.ErrDatabaseError
+	}
+	if len(expected) == 0 {
+		return apperrors.NewAppError("ENTITLEMENT_PACKAGE_EMPTY", "套餐未配置商品", http.StatusBadRequest, nil)
+	}
+	actual := make(map[int]int)
+	for _, it := range reqItems {
+		actual[it.SKUID] += it.Quantity
+	}
+	if len(actual) != len(expected) {
+		return apperrors.NewAppError("ENTITLEMENT_PACKAGE_LINE_MISMATCH", "下单明细与套餐不一致，请刷新后重试", http.StatusBadRequest, nil)
+	}
+	for sk, q := range expected {
+		if actual[sk] != q {
+			return apperrors.NewAppError("ENTITLEMENT_PACKAGE_LINE_MISMATCH", "下单明细与套餐不一致，请刷新后重试", http.StatusBadRequest, nil)
+		}
+	}
+	return nil
+}
+
 // CreateOrder creates a new order
 func CreateOrder(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -34,14 +85,16 @@ func CreateOrder(c *gin.Context) {
 	}
 
 	var req struct {
-		Items []struct {
-			SKUID    int `json:"sku_id" binding:"required,gt=0"`
-			Quantity int `json:"quantity" binding:"required,gt=0"`
-		} `json:"items" binding:"required,min=1"`
+		EntitlementPackageID *int                  `json:"entitlement_package_id"`
+		Items                []createOrderLineItem `json:"items" binding:"required,min=1"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+	if req.EntitlementPackageID != nil && *req.EntitlementPackageID <= 0 {
+		middleware.RespondWithError(c, apperrors.NewAppError("INVALID_ENTITLEMENT_PACKAGE", "套餐参数无效", http.StatusBadRequest, nil))
 		return
 	}
 
@@ -62,6 +115,13 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback()
+
+	if req.EntitlementPackageID != nil {
+		if ae := validateEntitlementPackageOrderLines(tx, *req.EntitlementPackageID, req.Items); ae != nil {
+			middleware.RespondWithError(c, ae)
+			return
+		}
+	}
 
 	type pendingItem struct {
 		item        models.OrderItem
@@ -223,12 +283,17 @@ func CreateOrder(c *gin.Context) {
 	var skuID sql.NullInt64
 	var spuID sql.NullInt64
 	var pricingVID sql.NullInt64
+	var epID sql.NullInt64
+	var epArg interface{}
+	if req.EntitlementPackageID != nil {
+		epArg = *req.EntitlementPackageID
+	}
 	err = tx.QueryRow(
-		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		 RETURNING id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id, created_at, updated_at`,
-		userID, nil, nil, nil, nil, totalQty, 0, totalPrice, orderStatusPending, pvArg,
-	).Scan(&order.ID, &order.UserID, &productID, &skuID, &spuID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &pricingVID, &order.CreatedAt, &order.UpdatedAt)
+		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id, entitlement_package_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		 RETURNING id, user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id, entitlement_package_id, created_at, updated_at`,
+		userID, nil, nil, nil, nil, totalQty, 0, totalPrice, orderStatusPending, pvArg, epArg,
+	).Scan(&order.ID, &order.UserID, &productID, &skuID, &spuID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &pricingVID, &epID, &order.CreatedAt, &order.UpdatedAt)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"ORDER_CREATION_FAILED",
@@ -242,6 +307,10 @@ func CreateOrder(c *gin.Context) {
 	if pricingVID.Valid {
 		v := int(pricingVID.Int64)
 		order.PricingVersionID = &v
+	}
+	if epID.Valid {
+		v := int(epID.Int64)
+		order.EntitlementPackageID = &v
 	}
 
 	order.Items = make([]models.OrderItem, 0, len(items))
@@ -409,7 +478,7 @@ func ListOrders(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		`SELECT o.id, o.user_id, o.product_id, o.group_id, o.quantity, o.unit_price, o.total_price, o.status, o.pricing_version_id, o.created_at, o.updated_at,
+		`SELECT o.id, o.user_id, o.product_id, o.group_id, o.quantity, o.unit_price, o.total_price, o.status, o.pricing_version_id, o.entitlement_package_id, o.created_at, o.updated_at,
 		        g.status AS group_status
 		   FROM orders o
 		   LEFT JOIN groups g ON o.group_id = g.id
@@ -429,8 +498,9 @@ func ListOrders(c *gin.Context) {
 		var o models.Order
 		var productID sql.NullInt64
 		var pricingVID sql.NullInt64
+		var epID sql.NullInt64
 		var groupSt sql.NullString
-		err := rows.Scan(&o.ID, &o.UserID, &productID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &pricingVID, &o.CreatedAt, &o.UpdatedAt, &groupSt)
+		err := rows.Scan(&o.ID, &o.UserID, &productID, &o.GroupID, &o.Quantity, &o.UnitPrice, &o.TotalPrice, &o.Status, &pricingVID, &epID, &o.CreatedAt, &o.UpdatedAt, &groupSt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -439,6 +509,10 @@ func ListOrders(c *gin.Context) {
 		if pricingVID.Valid {
 			v := int(pricingVID.Int64)
 			o.PricingVersionID = &v
+		}
+		if epID.Valid {
+			v := int(epID.Int64)
+			o.EntitlementPackageID = &v
 		}
 		if groupSt.Valid {
 			o.GroupStatus = groupSt.String
@@ -506,15 +580,16 @@ func GetOrderByID(c *gin.Context) {
 	var order models.Order
 	var productID sql.NullInt64
 	var pricingVID sql.NullInt64
+	var epID sql.NullInt64
 	var groupSt sql.NullString
 	err := db.QueryRow(
-		`SELECT o.id, o.user_id, o.product_id, o.group_id, o.quantity, o.unit_price, o.total_price, o.status, o.pricing_version_id, o.created_at, o.updated_at,
+		`SELECT o.id, o.user_id, o.product_id, o.group_id, o.quantity, o.unit_price, o.total_price, o.status, o.pricing_version_id, o.entitlement_package_id, o.created_at, o.updated_at,
 		        g.status AS group_status
 		   FROM orders o
 		   LEFT JOIN groups g ON o.group_id = g.id
 		  WHERE o.id = $1 AND o.user_id = $2`,
 		id, userID,
-	).Scan(&order.ID, &order.UserID, &productID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &pricingVID, &order.CreatedAt, &order.UpdatedAt, &groupSt)
+	).Scan(&order.ID, &order.UserID, &productID, &order.GroupID, &order.Quantity, &order.UnitPrice, &order.TotalPrice, &order.Status, &pricingVID, &epID, &order.CreatedAt, &order.UpdatedAt, &groupSt)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrOrderNotFound)
 		return
@@ -524,6 +599,10 @@ func GetOrderByID(c *gin.Context) {
 	if pricingVID.Valid {
 		v := int(pricingVID.Int64)
 		order.PricingVersionID = &v
+	}
+	if epID.Valid {
+		v := int(epID.Int64)
+		order.EntitlementPackageID = &v
 	}
 	if groupSt.Valid {
 		order.GroupStatus = groupSt.String

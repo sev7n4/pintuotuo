@@ -1,16 +1,6 @@
 import type { EntitlementPackageItem } from '@/types/entitlementPackage';
 
-export function subscriptionPeriodLabel(period: string | undefined): string {
-  if (!period?.trim()) return '';
-  const m: Record<string, string> = {
-    monthly: '包月',
-    quarterly: '包季',
-    yearly: '包年',
-  };
-  return m[period] || period;
-}
-
-/** 类型展示：concurrent 对用户展示为「智能路由选线」，不写「并发」 */
+/** 类型展示：concurrent 对用户展示为「智能路由选线」 */
 export function skuTypeLabel(skuType: string): string {
   const m: Record<string, string> = {
     subscription: '订阅',
@@ -36,57 +26,47 @@ export function lineValueHint(it: EntitlementPackageItem): string {
   return `单价 ¥${unit.toFixed(2)} × ${q} = ¥${sub.toFixed(2)}`;
 }
 
-/** 单行 SKU 的规格要点（与后台 skus 配置一致，供「套餐包含」与明细共用） */
-export function packageItemSpecParts(it: EntitlementPackageItem): string[] {
-  const parts: string[] = [];
-  const qty = it.default_quantity || 1;
+/** 「套餐包含」四条要点（第 1 条来自组合内模型名；2～4 条据 SKU 类型与数量生成，缺类时给占位说明） */
+export type PackageIncludeBullet = { key: string; text: string };
 
-  switch (it.sku_type) {
-    case 'subscription': {
-      const p = subscriptionPeriodLabel(it.subscription_period);
-      parts.push(p ? `订阅 · ${p}` : '订阅');
-      break;
-    }
-    case 'token_pack': {
-      const base = Number(it.token_amount ?? 0);
-      const total = base * qty;
-      if (total > 0) {
-        parts.push(`约 ${total.toLocaleString('zh-CN')} Token（SKU 规格 × 数量）`);
-      } else {
-        parts.push('Token 包');
-      }
-      break;
-    }
-    case 'concurrent':
-      parts.push('智能路由选线 · 支持自由切换');
-      break;
-    case 'trial':
-      parts.push('试用');
-      break;
-    default:
-      parts.push(skuTypeLabel(it.sku_type));
-  }
-
-  if (it.valid_days != null && it.valid_days > 0) {
-    parts.push(`有效期：${it.valid_days} 天`);
-  }
-
-  return parts;
-}
-
-/**
- * 「A+B+C」模型组合（仅展示模型/线路名称，不列 SKU 编码；具体对应关系见下方分项明细）。
- */
-export function packageModelComboSummary(items: EntitlementPackageItem[]): string {
+export function buildPackageIncludeBullets(items: EntitlementPackageItem[]): PackageIncludeBullet[] {
   const list = items ?? [];
-  const names = list.map((it) => lineDisplayName(it).trim()).filter((s) => s.length > 0);
-  const inner = names.length > 0 ? names.join('+') : '—';
-  return `「${inner}」模型`;
-}
+  if (list.length === 0) return [];
 
-/** 多项时在组合行之下，提示下方为分项明细 */
-export function packageIncludeHeadline(items: EntitlementPackageItem[]): string | null {
-  const n = items?.length ?? 0;
-  if (n <= 1) return null;
-  return '分项规格如下（与上方「模型组合」逐项对应）：';
+  const names = list.map((it) => lineDisplayName(it).trim()).filter((s) => s.length > 0);
+  const inner = names.length ? names.join('+') : '—';
+
+  const hasSubscription = list.some((it) => it.sku_type === 'subscription');
+  let tokenTotal = 0;
+  for (const it of list) {
+    if (it.sku_type === 'token_pack') {
+      const base = Number(it.token_amount ?? 0);
+      const qty = it.default_quantity || 1;
+      tokenTotal += base * qty;
+    }
+  }
+  const hasConcurrent = list.some((it) => it.sku_type === 'concurrent');
+
+  return [
+    { key: 'combo', text: `「${inner}」` },
+    {
+      key: 'subscription',
+      text: hasSubscription
+        ? '模型调用权益 · 订阅 · 包月（续费规则以订单为准）'
+        : '—（本组合暂无订阅类 SKU，若需此项请选购含订阅项的套餐）',
+    },
+    {
+      key: 'token',
+      text:
+        tokenTotal > 0
+          ? `赠送 Token · 约 ${tokenTotal.toLocaleString('zh-CN')}（按批次入账）`
+          : '—（本组合暂无加油包/Token 包 SKU，或 Token 数为 0）',
+    },
+    {
+      key: 'routing',
+      text: hasConcurrent
+        ? '智能线路选择/模型自由切换'
+        : '—（本组合暂无智能线路/并发类 SKU）',
+    },
+  ];
 }

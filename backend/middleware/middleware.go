@@ -176,6 +176,41 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
+// OptionalJWTUserID returns user_id when a valid Bearer JWT is present; otherwise (0, false).
+// It never writes a response (for public endpoints that enrich data when logged in).
+func OptionalJWTUserID(c *gin.Context) (int, bool) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		return 0, false
+	}
+	const bearerPrefix = "Bearer "
+	if !strings.HasPrefix(authHeader, bearerPrefix) {
+		return 0, false
+	}
+	tokenString := strings.TrimPrefix(authHeader, bearerPrefix)
+	if tokenString == "" {
+		return 0, false
+	}
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		return 0, false
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return 0, false
+	}
+	userIDFloat, ok := claims["user_id"].(float64)
+	if !ok {
+		return 0, false
+	}
+	return int(userIDFloat), true
+}
+
 func getEnv(key, defaultValue string) string {
 	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
 		return value

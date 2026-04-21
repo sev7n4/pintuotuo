@@ -1,80 +1,34 @@
 import { Typography } from 'antd';
-import {
-  AppstoreOutlined,
-  CalendarOutlined,
-  ExperimentOutlined,
-  GiftOutlined,
-  ThunderboltOutlined,
-} from '@ant-design/icons';
-import type { EntitlementPackageItem } from '@/types/entitlementPackage';
-import {
-  lineDisplayName,
-  packageIncludeHeadline,
-  packageItemSpecParts,
-  packageModelComboSummary,
-} from './entitlementItemDisplay';
+import { buildPackageIncludeBullets } from './entitlementItemDisplay';
 import styles from './EntitlementPackageCard.module.css';
 
-const { Text } = Typography;
+import type { EntitlementPackageItem } from '@/types/entitlementPackage';
 
-function iconForSkuType(t: string) {
-  switch (t) {
-    case 'subscription':
-      return <CalendarOutlined />;
-    case 'token_pack':
-      return <GiftOutlined />;
-    case 'concurrent':
-      return <ThunderboltOutlined />;
-    case 'trial':
-      return <ExperimentOutlined />;
-    default:
-      return <AppstoreOutlined />;
-  }
-}
+const { Text } = Typography;
 
 type Props = {
   items: EntitlementPackageItem[];
 };
 
-/** 套餐包含：文案取自包内各 SKU 实际字段（类型、周期、Token、有效期、路由等） */
+/**
+ * 「套餐包含」：仅展示聚合后的四条规格（与下方折叠明细不重复）。
+ */
 export function PackageIncludeSummary({ items }: Props) {
-  const list = items ?? [];
-  if (list.length === 0) return null;
-
-  const headline = packageIncludeHeadline(list);
-  const comboLine = packageModelComboSummary(list);
+  const bullets = buildPackageIncludeBullets(items ?? []);
+  if (bullets.length === 0) return null;
 
   return (
-    <div className={styles.includeBlock}>
+    <div className={styles.includeInner}>
       <Text strong className={styles.includeTitle}>
         套餐包含
       </Text>
-      <Text className={styles.includeCombo}>{comboLine}</Text>
-      {headline ? (
-        <Text type="secondary" className={styles.includeHeadline}>
-          {headline}
-        </Text>
-      ) : null}
-      <div className={styles.includeRows}>
-        {list.map((it) => (
-          <div key={it.id} className={styles.includeRow}>
-            <span className={styles.includeIcon}>{iconForSkuType(it.sku_type)}</span>
-            <div className={styles.includeText}>
-              <div>
-                <Text strong>
-                  模型：{lineDisplayName(it)}
-                </Text>
-                {it.default_quantity > 1 ? (
-                  <Text type="secondary"> ×{it.default_quantity}</Text>
-                ) : null}
-              </div>
-              <Text type="secondary" className={styles.includeSpec}>
-                {packageItemSpecParts(it).join(' · ')}
-              </Text>
-            </div>
-          </div>
+      <ul className={styles.includeBulletList}>
+        {bullets.map((b) => (
+          <li key={b.key} className={styles.includeBulletItem}>
+            <Text>· {b.text}</Text>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }

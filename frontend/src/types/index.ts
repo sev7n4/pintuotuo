@@ -116,6 +116,8 @@ export interface Order {
     | 'cancelled'
     | 'refunding'
     | 'refunded';
+  /** 套餐包一键下单时由后端写入，用于销量统计 */
+  entitlement_package_id?: number | null;
   created_at: string;
   updated_at: string;
 }

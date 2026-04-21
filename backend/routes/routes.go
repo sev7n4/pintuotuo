@@ -372,7 +372,17 @@ func RegisterSKURoutes(router *gin.RouterGroup) {
 		skus.GET("", handlers.ListPublicSKUs)
 		skus.GET("/:id", handlers.GetPublicSKUByID)
 	}
+	router.GET("/entitlement-packages/stats", handlers.BatchGetEntitlementPackageStats)
 	router.GET("/entitlement-packages", handlers.ListPublicEntitlementPackages)
+
+	epSocial := router.Group("/entitlement-packages")
+	epSocial.Use(middleware.AuthMiddleware())
+	{
+		epSocial.POST("/:id/favorite", handlers.AddEntitlementPackageFavorite)
+		epSocial.DELETE("/:id/favorite", handlers.RemoveEntitlementPackageFavorite)
+		epSocial.POST("/:id/like", handlers.ToggleEntitlementPackageLike)
+		epSocial.POST("/:id/reviews", handlers.UpsertEntitlementPackageReview)
+	}
 
 	computePoints := router.Group("/compute-points")
 	computePoints.Use(middleware.AuthMiddleware())

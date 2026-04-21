@@ -11,7 +11,10 @@ interface OrderState {
 
   fetchOrders: (page?: number, per_page?: number) => Promise<void>;
   fetchOrderByID: (id: number) => Promise<void>;
-  createOrder: (items: Array<{ sku_id: number; quantity: number }>) => Promise<number | null>;
+  createOrder: (
+    items: Array<{ sku_id: number; quantity: number }>,
+    opts?: { entitlement_package_id?: number }
+  ) => Promise<number | null>;
   cancelOrder: (id: number, reason?: string) => Promise<void>;
   requestRefund: (id: number, reason: string) => Promise<void>;
   clearError: () => void;
@@ -47,10 +50,15 @@ export const useOrderStore = create<OrderState>((set) => ({
     }
   },
 
-  createOrder: async (items) => {
+  createOrder: async (items, opts) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await orderService.createOrder({ items });
+      const response = await orderService.createOrder({
+        items,
+        ...(opts?.entitlement_package_id != null
+          ? { entitlement_package_id: opts.entitlement_package_id }
+          : {}),
+      });
       const apiResponse = response.data as APIResponse<Order>;
       const newOrder = apiResponse.data;
       if (newOrder) {
