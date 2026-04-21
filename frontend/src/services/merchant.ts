@@ -47,6 +47,8 @@ export const merchantService = {
     api_key: string;
     api_secret?: string;
     quota_limit?: number | null;
+    health_check_level?: MerchantAPIKey['health_check_level'];
+    endpoint_url?: string;
   }) => api.post<MerchantAPIKey>('/merchants/api-keys', data),
 
   updateAPIKey: (id: number, data: Partial<MerchantAPIKey>) =>

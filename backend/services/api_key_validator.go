@@ -54,6 +54,9 @@ const (
 	MaxVerificationRetries     = 3
 	RetryDelayBase             = 2 * time.Second
 	VerificationInterval       = 24 * time.Hour
+	verificationStatusSuccess  = "success"
+	verificationStatusFailed   = "failed"
+	verificationResultVerified = "verified"
 )
 
 var (
@@ -179,12 +182,12 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 		}
 	}
 
-	result.Status = "success"
+	result.Status = verificationStatusSuccess
 	result.CompletedAt = time.Now()
 
 	duration := result.CompletedAt.Sub(startTime).Seconds()
 	metrics.VerificationDuration.WithLabelValues(provider, verificationType).Observe(duration)
-	metrics.VerificationTotal.WithLabelValues(provider, verificationType, "success").Inc()
+	metrics.VerificationTotal.WithLabelValues(provider, verificationType, verificationStatusSuccess).Inc()
 
 	err = v.updateVerificationRecord(verificationID, result)
 	if err != nil {
@@ -252,7 +255,7 @@ func (v *APIKeyValidator) IsVerified(apiKeyID int) (bool, error) {
 		return false, err
 	}
 
-	return verificationResult == "verified", nil
+	return verificationResult == verificationResultVerified, nil
 }
 
 func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]VerificationResult, error) {
@@ -393,9 +396,9 @@ func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result Ve
 	if verifyMsg == "" && result.ErrorCode != "" {
 		verifyMsg = result.ErrorCode
 	}
-	if result.Status == "failed" && result.ErrorCode != "" && result.ErrorMessage != "" {
+	if result.Status == verificationStatusFailed && result.ErrorCode != "" && result.ErrorMessage != "" {
 		verifyMsg = fmt.Sprintf("[%s] %s", result.ErrorCode, result.ErrorMessage)
-	} else if result.Status == "failed" && result.ErrorCode != "" && verifyMsg != "" && verifyMsg != result.ErrorCode {
+	} else if result.Status == verificationStatusFailed && result.ErrorCode != "" && verifyMsg != "" && verifyMsg != result.ErrorCode {
 		verifyMsg = fmt.Sprintf("[%s] %s", result.ErrorCode, verifyMsg)
 	}
 	dbResult := normalizeVerificationDBStatus(result.Status)
@@ -436,7 +439,7 @@ func (v *APIKeyValidator) getProviderConfig(provider string) (map[string]string,
 func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificationID, apiKeyID int, errorCode, errorMessage string, startTime time.Time) {
 	result := VerificationResult{
 		ID:           verificationID,
-		Status:       "failed",
+		Status:       verificationStatusFailed,
 		ErrorCode:    errorCode,
 		ErrorMessage: errorMessage,
 		CompletedAt:  time.Now(),
@@ -453,7 +456,7 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 	if provider != "" {
 		duration := result.CompletedAt.Sub(startTime).Seconds()
 		metrics.VerificationDuration.WithLabelValues(provider, "error").Observe(duration)
-		metrics.VerificationTotal.WithLabelValues(provider, "error", "failed").Inc()
+		metrics.VerificationTotal.WithLabelValues(provider, "error", verificationStatusFailed).Inc()
 	}
 
 	err := v.updateVerificationRecord(verificationID, result)
@@ -478,8 +481,8 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 }
 
 func normalizeVerificationDBStatus(status string) string {
-	if status == "success" {
-		return "verified"
+	if status == verificationStatusSuccess {
+		return verificationResultVerified
 	}
 	return status
 }

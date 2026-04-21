@@ -21,6 +21,8 @@ import (
 	"github.com/pintuotuo/backend/utils"
 )
 
+const defaultHealthCheckLevel = "medium"
+
 func CreateMerchantAPIKey(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -35,11 +37,13 @@ func CreateMerchantAPIKey(c *gin.Context) {
 	}
 
 	var req struct {
-		Name       string   `json:"name" binding:"required"`
-		Provider   string   `json:"provider" binding:"required"`
-		APIKey     string   `json:"api_key" binding:"required"`
-		APISecret  string   `json:"api_secret"`
-		QuotaLimit *float64 `json:"quota_limit"`
+		Name             string   `json:"name" binding:"required"`
+		Provider         string   `json:"provider" binding:"required"`
+		APIKey           string   `json:"api_key" binding:"required"`
+		APISecret        string   `json:"api_secret"`
+		QuotaLimit       *float64 `json:"quota_limit"`
+		HealthCheckLevel *string  `json:"health_check_level"`
+		EndpointURL      *string  `json:"endpoint_url"`
 	}
 
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
@@ -90,14 +94,39 @@ func CreateMerchantAPIKey(c *gin.Context) {
 		quota = nil
 	}
 
+	hcl := defaultHealthCheckLevel
+	if req.HealthCheckLevel != nil && strings.TrimSpace(*req.HealthCheckLevel) != "" {
+		v := strings.ToLower(strings.TrimSpace(*req.HealthCheckLevel))
+		switch v {
+		case "high", "medium", "low", "daily":
+			hcl = v
+		default:
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_HEALTH_CHECK_LEVEL",
+				"health_check_level must be high, medium, low, or daily",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+	}
+
+	epStr := ""
+	if req.EndpointURL != nil {
+		epStr = strings.TrimSpace(*req.EndpointURL)
+	}
+
 	var apiKey models.MerchantAPIKey
 	var quotaReturned sql.NullFloat64
 	err = db.QueryRow(
-		`INSERT INTO merchant_api_keys (merchant_id, name, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status) 
-		 VALUES ($1, $2, $3, $4, $5, $6, 0, 'active') 
-		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, created_at, updated_at`,
-		merchantID, req.Name, req.Provider, apiKeyEncrypted, apiSecretEncrypted, quota,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaReturned, &apiKey.QuotaUsed, &apiKey.Status, &apiKey.CreatedAt, &apiKey.UpdatedAt)
+		`INSERT INTO merchant_api_keys (merchant_id, name, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status, health_check_level, endpoint_url) 
+		 VALUES ($1, $2, $3, $4, $5, $6, 0, 'active', $7, NULLIF(TRIM($8::text), '')::varchar(500)) 
+		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, created_at, updated_at,
+			COALESCE(NULLIF(TRIM(health_check_level), ''), $9),
+			COALESCE(endpoint_url, '')`,
+		merchantID, req.Name, req.Provider, apiKeyEncrypted, apiSecretEncrypted, quota, hcl, epStr, defaultHealthCheckLevel,
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaReturned, &apiKey.QuotaUsed, &apiKey.Status, &apiKey.CreatedAt, &apiKey.UpdatedAt,
+		&apiKey.HealthCheckLevel, &apiKey.EndpointURL)
 	apiKey.QuotaLimit = utils.NullFloat64Ptr(quotaReturned)
 
 	if err != nil {
@@ -159,7 +188,19 @@ func ListMerchantAPIKeys(c *gin.Context) {
 	}
 
 	rows, err := db.Query(
-		`SELECT id, merchant_id, name, provider, quota_limit, quota_used, status, last_used_at, created_at, updated_at 
+		`SELECT id, merchant_id, name, provider, quota_limit, quota_used, status, last_used_at, created_at, updated_at,
+			COALESCE(NULLIF(TRIM(health_check_level), ''), 'medium'),
+			COALESCE(endpoint_url, ''),
+			COALESCE(NULLIF(TRIM(health_status), ''), 'unknown'),
+			last_health_check_at,
+			COALESCE(consecutive_failures, 0),
+			verified_at,
+			COALESCE(NULLIF(TRIM(verification_result), ''), 'pending'),
+			COALESCE(verification_message, ''),
+			models_supported,
+			COALESCE(cost_input_rate, 0),
+			COALESCE(cost_output_rate, 0),
+			COALESCE(profit_margin, 0)
 		 FROM merchant_api_keys WHERE merchant_id = $1 ORDER BY created_at DESC`,
 		merchantID,
 	)
@@ -175,16 +216,39 @@ func ListMerchantAPIKeys(c *gin.Context) {
 		var key models.MerchantAPIKey
 		var lastUsedAt sql.NullTime
 		var qLim sql.NullFloat64
-		err := rows.Scan(&key.ID, &key.MerchantID, &key.Name, &key.Provider, &qLim, &key.QuotaUsed, &key.Status, &lastUsedAt, &key.CreatedAt, &key.UpdatedAt)
+		var lastHealth sql.NullTime
+		var verifiedAt sql.NullTime
+		var modelsJSON []byte
+		scanErr := rows.Scan(
+			&key.ID, &key.MerchantID, &key.Name, &key.Provider, &qLim, &key.QuotaUsed, &key.Status, &lastUsedAt, &key.CreatedAt, &key.UpdatedAt,
+			&key.HealthCheckLevel, &key.EndpointURL, &key.HealthStatus, &lastHealth, &key.ConsecutiveFailures,
+			&verifiedAt, &key.VerificationResult, &key.VerificationMsg, &modelsJSON,
+			&key.CostInputRate, &key.CostOutputRate, &key.ProfitMargin,
+		)
 		key.QuotaLimit = utils.NullFloat64Ptr(qLim)
-		if err != nil {
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 		if lastUsedAt.Valid {
 			key.LastUsedAt = lastUsedAt.Time
 		}
+		if lastHealth.Valid {
+			t := lastHealth.Time
+			key.LastHealthCheckAt = &t
+		}
+		if verifiedAt.Valid {
+			t := verifiedAt.Time
+			key.VerifiedAt = &t
+		}
+		if len(modelsJSON) > 0 {
+			_ = json.Unmarshal(modelsJSON, &key.ModelsSupported)
+		}
 		apiKeys = append(apiKeys, key)
+	}
+	if err = rows.Err(); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
 	}
 
 	if apiKeysJSON, err := json.Marshal(apiKeys); err == nil {
@@ -251,6 +315,91 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		}
 	}
 
+	patchEndpoint := false
+	endpointStr := ""
+	if raw, has := patch["endpoint_url"]; has {
+		patchEndpoint = true
+		_ = json.Unmarshal(raw, &endpointStr)
+	}
+
+	patchHCL := false
+	hclStr := ""
+	if raw, has := patch["health_check_level"]; has {
+		patchHCL = true
+		_ = json.Unmarshal(raw, &hclStr)
+		hclStr = strings.ToLower(strings.TrimSpace(hclStr))
+		if hclStr != "" {
+			switch hclStr {
+			case "high", "medium", "low", "daily":
+			default:
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"INVALID_HEALTH_CHECK_LEVEL",
+					"health_check_level must be high, medium, low, or daily",
+					http.StatusBadRequest,
+					nil,
+				))
+				return
+			}
+		}
+	}
+
+	patchCin := false
+	var cinVal float64
+	if raw, has := patch["cost_input_rate"]; has {
+		patchCin = true
+		if unmarshalErr := json.Unmarshal(raw, &cinVal); unmarshalErr != nil {
+			middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+			return
+		}
+		if cinVal < 0 {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_COST",
+				"cost_input_rate must be >= 0",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+	}
+
+	patchCout := false
+	var coutVal float64
+	if raw, has := patch["cost_output_rate"]; has {
+		patchCout = true
+		if unmarshalErr := json.Unmarshal(raw, &coutVal); unmarshalErr != nil {
+			middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+			return
+		}
+		if coutVal < 0 {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_COST",
+				"cost_output_rate must be >= 0",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+	}
+
+	patchPM := false
+	var pmVal float64
+	if raw, has := patch["profit_margin"]; has {
+		patchPM = true
+		if unmarshalErr := json.Unmarshal(raw, &pmVal); unmarshalErr != nil {
+			middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+			return
+		}
+		if pmVal < 0 || pmVal > 100 {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_PROFIT_MARGIN",
+				"profit_margin must be between 0 and 100",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+	}
+
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -265,6 +414,9 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 	var apiKey models.MerchantAPIKey
 	var lastUsedAt sql.NullTime
 	var quotaAfter sql.NullFloat64
+	var lastHealth sql.NullTime
+	var verifiedAt sql.NullTime
+	var modelsJSON []byte
 	err = db.QueryRow(
 		`UPDATE merchant_api_keys SET 
 		 name = COALESCE(NULLIF($1, ''), name),
@@ -274,11 +426,43 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		   WHEN $4::bool THEN NULL
 		   ELSE $5::numeric
 		 END,
+		 endpoint_url = CASE WHEN $6::bool THEN NULLIF(TRIM($7::text), '')::varchar(500) ELSE endpoint_url END,
+		 health_check_level = CASE
+		   WHEN NOT $8::bool THEN health_check_level
+		   WHEN $9::text = '' THEN COALESCE(NULLIF(TRIM(health_check_level), ''), 'medium')
+		   ELSE $9::varchar(20)
+		 END,
+		 cost_input_rate = CASE WHEN $10::bool THEN $11::numeric ELSE cost_input_rate END,
+		 cost_output_rate = CASE WHEN $12::bool THEN $13::numeric ELSE cost_output_rate END,
+		 profit_margin = CASE WHEN $14::bool THEN $15::numeric ELSE profit_margin END,
 		 updated_at = CURRENT_TIMESTAMP
-		 WHERE id = $6 AND merchant_id = $7
-		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, last_used_at, created_at, updated_at`,
-		name, status, patchQuota, unlimitedQuota, quotaVal, keyID, merchantID,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaAfter, &apiKey.QuotaUsed, &apiKey.Status, &lastUsedAt, &apiKey.CreatedAt, &apiKey.UpdatedAt)
+		 WHERE id = $16 AND merchant_id = $17
+		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, last_used_at, created_at, updated_at,
+			COALESCE(NULLIF(TRIM(health_check_level), ''), 'medium'),
+			COALESCE(endpoint_url, ''),
+			COALESCE(NULLIF(TRIM(health_status), ''), 'unknown'),
+			last_health_check_at,
+			COALESCE(consecutive_failures, 0),
+			verified_at,
+			COALESCE(NULLIF(TRIM(verification_result), ''), 'pending'),
+			COALESCE(verification_message, ''),
+			models_supported,
+			COALESCE(cost_input_rate, 0),
+			COALESCE(cost_output_rate, 0),
+			COALESCE(profit_margin, 0)`,
+		name, status, patchQuota, unlimitedQuota, quotaVal,
+		patchEndpoint, endpointStr,
+		patchHCL, hclStr,
+		patchCin, cinVal,
+		patchCout, coutVal,
+		patchPM, pmVal,
+		keyID, merchantID,
+	).Scan(
+		&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaAfter, &apiKey.QuotaUsed, &apiKey.Status, &lastUsedAt, &apiKey.CreatedAt, &apiKey.UpdatedAt,
+		&apiKey.HealthCheckLevel, &apiKey.EndpointURL, &apiKey.HealthStatus, &lastHealth, &apiKey.ConsecutiveFailures,
+		&verifiedAt, &apiKey.VerificationResult, &apiKey.VerificationMsg, &modelsJSON,
+		&apiKey.CostInputRate, &apiKey.CostOutputRate, &apiKey.ProfitMargin,
+	)
 	apiKey.QuotaLimit = utils.NullFloat64Ptr(quotaAfter)
 
 	if err == sql.ErrNoRows {
@@ -296,6 +480,17 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 
 	if lastUsedAt.Valid {
 		apiKey.LastUsedAt = lastUsedAt.Time
+	}
+	if lastHealth.Valid {
+		t := lastHealth.Time
+		apiKey.LastHealthCheckAt = &t
+	}
+	if verifiedAt.Valid {
+		t := verifiedAt.Time
+		apiKey.VerifiedAt = &t
+	}
+	if len(modelsJSON) > 0 {
+		_ = json.Unmarshal(modelsJSON, &apiKey.ModelsSupported)
 	}
 
 	ctx := context.Background()

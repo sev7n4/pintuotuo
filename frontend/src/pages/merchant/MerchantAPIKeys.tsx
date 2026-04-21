@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Card,
   Table,
   Button,
@@ -14,7 +15,6 @@ import {
   Popconfirm,
   Progress,
   Tooltip,
-  Badge,
   Descriptions,
   Divider,
   Spin,
@@ -24,10 +24,11 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
+  InfoCircleOutlined,
   SyncOutlined,
   ApiOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
 import { MerchantAPIKey, VerificationResult } from '@/types';
@@ -37,6 +38,8 @@ import { merchantService } from '@/services/merchant';
 import { merchantSkuService } from '@/services/merchantSku';
 import styles from './MerchantAPIKeys.module.css';
 import type { MerchantSKUDetail } from '@/types/merchantSku';
+import { isStrictEntitlementEligible } from '@/utils/byokStatus';
+import MerchantBYOKOverviewCard from '@/components/merchant/MerchantBYOKOverviewCard';
 
 /** GET /merchants/api-keys/:id/verification response shape */
 interface VerificationPollResponse {
@@ -90,6 +93,61 @@ function buildVerificationView(
     started_at: new Date().toISOString(),
     retry_count: 0,
   };
+}
+
+function healthDotClass(status?: string): string {
+  const s = (status || 'unknown').toLowerCase();
+  if (s === 'healthy') return styles.statusDotHealthy;
+  if (s === 'degraded') return styles.statusDotDegraded;
+  if (s === 'unhealthy') return styles.statusDotUnhealthy;
+  return styles.statusDotUnknown;
+}
+
+function healthLabel(status?: string): string {
+  const s = (status || 'unknown').toLowerCase();
+  if (s === 'healthy') return '健康';
+  if (s === 'degraded') return '降级';
+  if (s === 'unhealthy') return '不健康';
+  return '未知';
+}
+
+function healthTooltipDesc(status?: string): string {
+  const s = (status || 'unknown').toLowerCase();
+  const base = `当前健康状态：${healthLabel(status)}。`;
+  if (s === 'healthy' || s === 'degraded') {
+    return `${base}在平台开启 strict 权益时，可作为路由候选（与验证条件同时满足）。真实调用成功也可能将「未知」更新为健康（被动健康）。`;
+  }
+  if (s === 'unhealthy') {
+    return `${base}请检查上游 Key、网络或「立即探测」结果；strict 下通常不可进入权益白名单。`;
+  }
+  return `${base}尚未探测或仍为初始值；请使用「立即探测」或等待主动探测，strict 下需为健康或降级才可进白名单。`;
+}
+
+function verificationDotClass(result?: string): string {
+  const r = (result || '').toLowerCase();
+  if (r === 'verified' || r === 'success') return styles.statusDotVerified;
+  if (r === 'failed') return styles.statusDotVerifyFailed;
+  return styles.statusDotVerifyPending;
+}
+
+function verificationLabel(result?: string): string {
+  const r = (result || '').toLowerCase();
+  if (r === 'verified' || r === 'success') return '已验证';
+  if (r === 'failed') return '验证失败';
+  if (r === 'pending' || r === 'in_progress') return '验证中';
+  return '未验证';
+}
+
+function verificationTooltipDesc(k: MerchantAPIKey): string {
+  const r = (k.verification_result || '').toLowerCase();
+  const base = `验证结果：${verificationLabel(k.verification_result)}。`;
+  if (r === 'verified' || r === 'success') {
+    return `${base}已通过上游 OpenAI 兼容 /models（及深度验证时的额外检查）。`;
+  }
+  if (r === 'failed') {
+    return `${base}请修正 Key 或厂商配置后重新「轻量/深度验证」。注意：若仅有验证时间但结果为失败，strict 仍可能因其它条件不通过。`;
+  }
+  return `${base}请完成「轻量验证」或「深度验证」；通过后会写入 verified。`;
 }
 
 const MerchantAPIKeys = () => {
@@ -166,7 +224,7 @@ const MerchantAPIKeys = () => {
   const handleAdd = () => {
     setEditingKey(null);
     form.resetFields();
-    form.setFieldsValue({ unlimited_quota: true });
+    form.setFieldsValue({ unlimited_quota: true, health_check_level: 'medium' });
     setModalVisible(true);
   };
 
@@ -239,6 +297,8 @@ const MerchantAPIKeys = () => {
         api_key: values.api_key as string,
         api_secret: values.api_secret as string | undefined,
         quota_limit: values.unlimited_quota ? null : (values.quota_limit as number),
+        health_check_level: (values.health_check_level as MerchantAPIKey['health_check_level']) || 'medium',
+        endpoint_url: (values.endpoint_url as string | undefined)?.trim() || undefined,
       };
       const success = await createAPIKey(payload);
       if (!success) {
@@ -334,48 +394,6 @@ const MerchantAPIKeys = () => {
     await poll();
   };
 
-  const getHealthStatusTag = (status?: string) => {
-    if (!status) return <Tag>未知</Tag>;
-
-    const statusConfig: Record<string, { color: string; icon: React.ReactNode; text: string }> = {
-      healthy: { color: 'success', icon: <CheckCircleOutlined />, text: '健康' },
-      degraded: { color: 'warning', icon: <ExclamationCircleOutlined />, text: '降级' },
-      unhealthy: { color: 'error', icon: <ExclamationCircleOutlined />, text: '不健康' },
-      unknown: { color: 'default', icon: null, text: '未知' },
-    };
-
-    const config = statusConfig[status] || statusConfig.unknown;
-    return (
-      <Tag color={config.color} icon={config.icon}>
-        {config.text}
-      </Tag>
-    );
-  };
-
-  const getVerificationStatusBadge = (result?: string) => {
-    if (!result) return <Badge status="default" text="未验证" />;
-
-    const statusMap: Record<string, 'success' | 'error' | 'processing' | 'default'> = {
-      verified: 'success',
-      success: 'success',
-      failed: 'error',
-      pending: 'processing',
-    };
-
-    return (
-      <Badge
-        status={statusMap[result] || 'default'}
-        text={
-          result === 'success' || result === 'verified'
-            ? '已验证'
-            : result === 'failed'
-              ? '验证失败'
-              : '待验证'
-        }
-      />
-    );
-  };
-
   const columns = [
     {
       title: '名称',
@@ -424,12 +442,25 @@ const MerchantAPIKeys = () => {
       },
     },
     {
-      title: '健康状态',
+      title: (
+        <span>
+          健康状态{' '}
+          <Tooltip title="绿灯=健康，黄灯=降级，红灯=不健康，灰灯=未知。悬停查看说明。">
+            <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
+          </Tooltip>
+        </span>
+      ),
       dataIndex: 'health_status',
       key: 'health_status',
+      width: 168,
       render: (status: string, record: MerchantAPIKey) => (
-        <Space direction="vertical" size="small">
-          {getHealthStatusTag(status)}
+        <Space direction="vertical" size={4}>
+          <Tooltip title={healthTooltipDesc(status)}>
+            <span className={styles.statusLightRow}>
+              <span className={`${styles.statusDot} ${healthDotClass(status)}`} aria-hidden />
+              <span className={styles.statusLightLabel}>{healthLabel(status)}</span>
+            </span>
+          </Tooltip>
           {record.last_health_check_at && (
             <span style={{ fontSize: '12px', color: '#999' }}>
               {new Date(record.last_health_check_at).toLocaleString('zh-CN')}
@@ -439,19 +470,63 @@ const MerchantAPIKeys = () => {
       ),
     },
     {
-      title: '验证状态',
+      title: (
+        <span>
+          验证状态{' '}
+          <Tooltip title="绿灯=已通过验证，红灯=失败，灰灯=未验证/进行中。与轻量/深度验证结果一致。">
+            <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
+          </Tooltip>
+        </span>
+      ),
       dataIndex: 'verification_result',
       key: 'verification_result',
-      render: (result: string, record: MerchantAPIKey) => (
-        <Space direction="vertical" size="small">
-          {getVerificationStatusBadge(result)}
+      width: 168,
+      render: (_: string, record: MerchantAPIKey) => (
+        <Space direction="vertical" size={4}>
+          <Tooltip title={verificationTooltipDesc(record)}>
+            <span className={styles.statusLightRow}>
+              <span
+                className={`${styles.statusDot} ${verificationDotClass(record.verification_result)}`}
+                aria-hidden
+              />
+              <span className={styles.statusLightLabel}>
+                {verificationLabel(record.verification_result)}
+              </span>
+            </span>
+          </Tooltip>
           {record.verified_at && (
             <span style={{ fontSize: '12px', color: '#999' }}>
-              {new Date(record.verified_at).toLocaleString('zh-CN')}
+              最近验证：{new Date(record.verified_at).toLocaleString('zh-CN')}
             </span>
           )}
         </Space>
       ),
+    },
+    {
+      title: (
+        <span>
+          Strict 权益{' '}
+          <Tooltip title="与后端 strict 路由白名单一致：需「验证条件 + 健康为健康/降级」同时满足。">
+            <InfoCircleOutlined style={{ color: '#8c8c8c' }} />
+          </Tooltip>
+        </span>
+      ),
+      key: 'strict_entitlement',
+      width: 112,
+      render: (_: unknown, record: MerchantAPIKey) => {
+        const ok = isStrictEntitlementEligible(record);
+        return (
+          <Tooltip
+            title={
+              ok
+                ? '当前满足 strict 权益路由对密钥的筛选条件（仍要求 SKU 承接等数据完整）。'
+                : '未同时满足：需 (已有验证记录或 verification=verified) 且 健康为「健康」或「降级」。请完成验证并「立即探测」。'
+            }
+          >
+            <Tag color={ok ? 'success' : 'warning'}>{ok ? '可路由' : '未满足'}</Tag>
+          </Tooltip>
+        );
+      },
     },
     {
       title: '成本来源',
@@ -533,6 +608,27 @@ const MerchantAPIKeys = () => {
           添加密钥
         </Button>
       </div>
+
+      <Alert
+        type="info"
+        showIcon
+        icon={<InfoCircleOutlined />}
+        style={{ marginBottom: 16 }}
+        message="BYOK 与 strict 权益路由"
+        description={
+          <ol style={{ margin: 0, paddingLeft: 20 }}>
+            <li>上传 Key 后请完成「轻量验证」或「深度验证」，使验证灯为绿色（已验证）。</li>
+            <li>
+              点击「立即探测」（或等待主动探测），使健康灯为绿（健康）或黄（降级）；避免长期停留在灰灯（未知）。
+            </li>
+            <li>
+              「Strict 权益」列为「可路由」时，表示与后端白名单条件一致；仍需 SKU 承接等数据完整，最终以接口与日志为准。
+            </li>
+          </ol>
+        }
+      />
+
+      <MerchantBYOKOverviewCard apiKeys={apiKeys} />
 
       <Card>
         <Table

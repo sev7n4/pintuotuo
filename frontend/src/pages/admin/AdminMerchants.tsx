@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Card,
   Table,
@@ -32,8 +32,11 @@ import {
   MerchantAuditLog,
   MERCHANT_BUSINESS_CATEGORY_OPTIONS,
   labelForBusinessCategory,
+  type BYOKSummaryResponse,
+  type BYOKMerchantRollup,
 } from '@/services/adminMerchant';
 import InviteManagementPanel from '@/components/admin/InviteManagementPanel';
+import AdminBYOKSummaryCard from '@/components/admin/AdminBYOKSummaryCard';
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -85,6 +88,9 @@ const AdminMerchants = () => {
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<string>('');
   const [filterKeyword, setFilterKeyword] = useState('');
+
+  const [byokSummary, setByokSummary] = useState<BYOKSummaryResponse | null>(null);
+  const [byokLoading, setByokLoading] = useState(false);
 
   const [auditLogs, setAuditLogs] = useState<MerchantAuditLog[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -145,6 +151,26 @@ const AdminMerchants = () => {
     [allPagination.pageSize, filterStatus, filterCategory, filterKeyword]
   );
 
+  const loadByokSummary = useCallback(async () => {
+    setByokLoading(true);
+    try {
+      const res = await adminMerchantService.getBYOKSummary();
+      setByokSummary(res.data);
+    } catch {
+      message.error('加载 BYOK 概览失败');
+    } finally {
+      setByokLoading(false);
+    }
+  }, []);
+
+  const byokMap = useMemo(() => {
+    const m: Record<number, BYOKMerchantRollup> = {};
+    for (const r of byokSummary?.by_merchant ?? []) {
+      m[r.merchant_id] = r;
+    }
+    return m;
+  }, [byokSummary]);
+
   const fetchAuditLogs = async (page = 1) => {
     setAuditLoading(true);
     try {
@@ -192,8 +218,9 @@ const AdminMerchants = () => {
   useEffect(() => {
     if (activeTab === 'all') {
       fetchAllMerchants(1);
+      loadByokSummary();
     }
-  }, [activeTab, fetchAllMerchants]);
+  }, [activeTab, fetchAllMerchants, loadByokSummary]);
 
   useEffect(() => {
     if (activeTab === 'audit') {
@@ -401,6 +428,34 @@ const AdminMerchants = () => {
   const allColumns: ColumnsType<PendingMerchant> = [
     ...pendingColumns.slice(0, -1),
     {
+      title: 'BYOK',
+      key: 'byok',
+      width: 130,
+      render: (_: unknown, record: PendingMerchant) => {
+        const row = byokMap[record.id];
+        if (!row) {
+          return <Tag>无密钥</Tag>;
+        }
+        if (row.total_key_count > 0 && row.active_key_count === 0) {
+          return <Tag>无启用</Tag>;
+        }
+        const color =
+          row.level === 'green' ? 'success' : row.level === 'yellow' ? 'warning' : 'default';
+        const label =
+          row.level === 'green' ? '可路由' : row.level === 'yellow' ? '异常' : '未就绪';
+        return (
+          <Space direction="vertical" size={2}>
+            <Tag color={color}>{label}</Tag>
+            {row.need_attention_active > 0 && (
+              <Tag color="error" style={{ marginInlineEnd: 0 }}>
+                需关注 {row.need_attention_active}
+              </Tag>
+            )}
+          </Space>
+        );
+      },
+    },
+    {
       title: '生命周期',
       dataIndex: 'lifecycle_status',
       key: 'lifecycle_status',
@@ -506,7 +561,10 @@ const AdminMerchants = () => {
             icon={<ReloadOutlined />}
             onClick={() => {
               if (activeTab === 'pending') fetchMerchants(pagination.current);
-              if (activeTab === 'all') fetchAllMerchants(allPagination.current);
+              if (activeTab === 'all') {
+                fetchAllMerchants(allPagination.current);
+                loadByokSummary();
+              }
               if (activeTab === 'audit') fetchAuditLogs(auditPagination.current);
             }}
           >
@@ -544,6 +602,7 @@ const AdminMerchants = () => {
               label: '全部商户',
               children: (
                 <>
+                  <AdminBYOKSummaryCard data={byokSummary} loading={byokLoading} />
                   <Space wrap style={{ marginBottom: 16 }}>
                     <Select
                       style={{ width: 140 }}
@@ -578,7 +637,7 @@ const AdminMerchants = () => {
                     dataSource={allMerchants}
                     rowKey="id"
                     loading={allLoading}
-                    scroll={{ x: 1100 }}
+                    scroll={{ x: 1230 }}
                     pagination={{
                       ...allPagination,
                       onChange: (page) => fetchAllMerchants(page),
