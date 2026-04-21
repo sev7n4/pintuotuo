@@ -142,15 +142,13 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 	modelsURL := baseURL + "/models"
 	var probe *ProbeModelsResult
 	var probeErr error
-	finalRetryCount := retryCount
 	for attempt := retryCount; ; attempt++ {
 		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, decryptedKey)
 		if probeErr == nil && probe != nil && probe.Success {
-			finalRetryCount = attempt
+			result.RetryCount = attempt
 			break
 		}
 		if attempt >= v.maxRetries || !shouldRetryVerificationAttempt(probe, probeErr) {
-			finalRetryCount = attempt
 			msg := "connection test failed"
 			if probeErr != nil {
 				msg = probeErr.Error()
@@ -168,7 +166,6 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 		metrics.VerificationRetries.WithLabelValues(provider, fmt.Sprintf("%d", attempt+1)).Inc()
 		time.Sleep(v.retryDelay * time.Duration(1<<attempt))
 	}
-	result.RetryCount = finalRetryCount
 	result.ConnectionTest = true
 	result.ConnectionLatency = probe.LatencyMs
 	metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(probe.LatencyMs))
