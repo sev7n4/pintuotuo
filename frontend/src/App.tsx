@@ -57,6 +57,7 @@ import AdminSettings from '@pages/admin/AdminSettings';
 import AdminSPUs from '@pages/admin/AdminSPUs';
 import AdminSKUs from '@pages/admin/AdminSKUs';
 import AdminModelProviders from '@pages/admin/AdminModelProviders';
+import AdminModelFallback from '@pages/admin/AdminModelFallback';
 import AdminFlashSales from '@pages/admin/AdminFlashSales';
 import AdminFuelStation from '@pages/admin/AdminFuelStation';
 import AdminBillings from '@pages/admin/AdminBillings';
@@ -170,6 +171,7 @@ function App() {
             <Route path="spus" element={<AdminSPUs />} />
             <Route path="skus" element={<AdminSKUs />} />
             <Route path="model-providers" element={<AdminModelProviders />} />
+            <Route path="model-fallback" element={<AdminModelFallback />} />
             <Route path="routing-strategies" element={<AdminRoutingStrategies />} />
             <Route path="reconciliation" element={<AdminReconciliation />} />
             <Route path="flash-sales" element={<AdminFlashSales />} />
