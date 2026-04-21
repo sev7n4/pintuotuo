@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pintuotuo/backend/billing"
+	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/utils"
@@ -382,16 +383,23 @@ func (s *HealthChecker) SaveHealthCheckResult(ctx context.Context, apiKeyID int,
 		statusToUpdate = "healthy"
 	}
 
-	_, err = db.ExecContext(ctx, `
+	var merchantID int
+	err = db.QueryRowContext(ctx, `
 		UPDATE merchant_api_keys 
 		SET health_status = $1,
 		    last_health_check_at = CURRENT_TIMESTAMP,
 		    consecutive_failures = CASE WHEN $2 = 'healthy' THEN 0 ELSE consecutive_failures END
-		WHERE id = $3`,
+		WHERE id = $3
+		RETURNING merchant_id`,
 		statusToUpdate, result.Status, apiKeyID,
-	)
+	).Scan(&merchantID)
+	if err != nil {
+		return err
+	}
 
-	return err
+	cache.Delete(context.Background(), cache.MerchantAPIKeysKey(merchantID))
+
+	return nil
 }
 
 func (s *HealthChecker) getDefaultEndpoint(provider string) string {
@@ -487,7 +495,7 @@ func (s *HealthChecker) TriggerActiveCheck(ctx context.Context, apiKeyID int) er
 
 	var key models.MerchantAPIKey
 	err := db.QueryRowContext(ctx, `
-		SELECT id, merchant_id, provider, api_key_encrypted, endpoint_url, health_check_level
+		SELECT id, merchant_id, provider, api_key_encrypted, COALESCE(endpoint_url, ''), health_check_level
 		FROM merchant_api_keys WHERE id = $1`,
 		apiKeyID,
 	).Scan(&key.ID, &key.MerchantID, &key.Provider, &key.APIKeyEncrypted, &key.EndpointURL, &key.HealthCheckLevel)

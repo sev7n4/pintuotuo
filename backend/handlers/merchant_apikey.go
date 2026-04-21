@@ -832,6 +832,9 @@ func VerifyMerchantAPIKey(c *gin.Context) {
 		return
 	}
 
+	// 验证异步开始时先清理列表缓存，避免前端长时间看到旧状态。
+	cache.Delete(context.Background(), cache.MerchantAPIKeysKey(merchantID))
+
 	c.JSON(http.StatusOK, gin.H{
 		"message":            "Verification started",
 		"api_key_id":         apiKey.ID,
@@ -895,7 +898,12 @@ func TriggerMerchantAPIKeyHealthCheck(c *gin.Context) {
 	}
 
 	go func() {
-		_ = services.GetHealthScheduler().TriggerImmediateCheck(keyID)
+		if checkErr := services.GetHealthScheduler().TriggerImmediateCheck(keyID); checkErr != nil {
+			logger.LogError(context.Background(), "merchant_apikey", "Immediate health check failed", checkErr, map[string]interface{}{
+				"api_key_id":  keyID,
+				"merchant_id": merchantID,
+			})
+		}
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{
