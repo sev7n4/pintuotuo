@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -166,6 +167,48 @@ func TestGetVerificationHistory(t *testing.T) {
 				t.Logf("GetVerificationHistory() error = %v (expected for non-existent key)", err)
 			}
 			t.Logf("GetVerificationHistory() returned %d records", len(history))
+		})
+	}
+}
+
+func TestShouldRetryVerificationAttempt(t *testing.T) {
+	tests := []struct {
+		name    string
+		probe   *ProbeModelsResult
+		probeErr error
+		want    bool
+	}{
+		{
+			name: "retry on network timeout",
+			probeErr: errors.New("dial tcp timeout"),
+			want: true,
+		},
+		{
+			name: "retry on 429",
+			probe: &ProbeModelsResult{
+				StatusCode: 429,
+				ErrorCode:  "rate_limit_exceeded",
+				ErrorMsg:   "too many requests",
+			},
+			want: true,
+		},
+		{
+			name: "do not retry on invalid api key",
+			probe: &ProbeModelsResult{
+				StatusCode: 401,
+				ErrorCode:  "invalid_api_key",
+				ErrorMsg:   "invalid api key",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := shouldRetryVerificationAttempt(tt.probe, tt.probeErr)
+			if got != tt.want {
+				t.Fatalf("shouldRetryVerificationAttempt()=%v want=%v", got, tt.want)
+			}
 		})
 	}
 }
