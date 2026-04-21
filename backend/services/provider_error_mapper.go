@@ -1,6 +1,8 @@
 package services
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -84,7 +86,7 @@ func MapProviderError(statusCode int, providerCode, providerMessage string, head
 		info.Category = errorCategoryContextTooLong
 	case statusCode == http.StatusBadRequest:
 		info.Category = errorCategoryUpstreamBadRequest
-	case statusCode >= http.StatusServiceUnavailable:
+	case statusCode >= http.StatusInternalServerError:
 		info.Category = errorCategoryServiceUnavailable
 		info.Retryable = true
 	default:
@@ -110,4 +112,57 @@ func truncateErrorExcerpt(raw string, max int) string {
 		return s
 	}
 	return s[:max]
+}
+
+// HTTPUpstreamRetryable 基于结构化错误映射判断代理层是否应对该 HTTP 响应重试（与验证/探测语义一致）。
+func HTTPUpstreamRetryable(statusCode int, body []byte, headers http.Header) bool {
+	code, msg := ExtractProviderError(body)
+	info := MapProviderError(statusCode, code, msg, headers, nil, string(body))
+	return info.Retryable
+}
+
+// ExtractProviderError 解析常见 OpenAI 风格 error JSON（与验证、探测、健康检查共用）。
+func ExtractProviderError(body []byte) (string, string) {
+	trimmed := strings.TrimSpace(string(body))
+	if trimmed == "" {
+		return "", ""
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return "", trimmed
+	}
+
+	if errNode, ok := payload["error"].(map[string]interface{}); ok {
+		return getString(errNode, "code"), firstNonEmpty(
+			getString(errNode, "message"),
+			getString(errNode, "msg"),
+		)
+	}
+	return getString(payload, "code"), firstNonEmpty(
+		getString(payload, "message"),
+		getString(payload, "msg"),
+		trimmed,
+	)
+}
+
+func getString(m map[string]interface{}, key string) string {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return ""
+	}
+	switch s := v.(type) {
+	case string:
+		return s
+	default:
+		return fmt.Sprintf("%v", s)
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }

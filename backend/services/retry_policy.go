@@ -53,6 +53,11 @@ func (p *RetryPolicy) calculateDelay(attempt int) time.Duration {
 	return delay
 }
 
+// DelayForAttempt 返回第 attempt 次失败后的退避等待（attempt 从 0 起，与 ShouldRetry 一致）。
+func (p *RetryPolicy) DelayForAttempt(attempt int) time.Duration {
+	return p.calculateDelay(attempt)
+}
+
 func contains(s, substr string) bool {
 	if strings.TrimSpace(s) == "" || strings.TrimSpace(substr) == "" {
 		return false

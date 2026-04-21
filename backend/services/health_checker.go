@@ -706,7 +706,7 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 	}
 
 	respBody, _ := io.ReadAll(resp.Body)
-	code, msg := extractProviderError(respBody)
+	code, msg := ExtractProviderError(respBody)
 	if msg == "" {
 		msg = strings.TrimSpace(string(respBody))
 	}

@@ -1100,6 +1100,8 @@ func insertRoutingDecision(db *sql.DB, requestID string, userID int, req APIProx
 	return err
 }
 
+const upstreamErrorBodyPeek = 8192
+
 func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request, policy *services.RetryPolicy) (*http.Response, int, error) {
 	if policy == nil {
 		policy = services.DefaultRetryPolicy
@@ -1120,21 +1122,31 @@ func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request,
 		}
 
 		resp, err = client.Do(req) // #nosec G704 -- upstream URL from admin-configured model_providers.api_base_url, not user-supplied host
-		if err == nil && resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < http.StatusInternalServerError {
+		if err != nil {
+			info := services.MapProviderError(0, "", err.Error(), nil, err, "")
+			if !info.Retryable || i >= policy.MaxRetries {
+				return nil, retryCount, err
+			}
+			retryCount++
+			time.Sleep(policy.DelayForAttempt(i))
+			continue
+		}
+
+		if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < http.StatusInternalServerError {
 			return resp, retryCount, nil
 		}
 
-		if resp != nil && (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= http.StatusInternalServerError) {
-			resp.Body.Close()
-			err = fmt.Errorf("upstream status %d", resp.StatusCode)
-		}
-
-		shouldRetry, delay := policy.ShouldRetry(err, i)
-		if !shouldRetry {
-			return nil, retryCount, err
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, upstreamErrorBodyPeek))
+		_ = resp.Body.Close()
+		status := resp.StatusCode
+		headers := resp.Header
+		retryable := services.HTTPUpstreamRetryable(status, b, headers)
+		if !retryable || i >= policy.MaxRetries {
+			resp.Body = io.NopCloser(bytes.NewReader(b))
+			return resp, retryCount, nil
 		}
 		retryCount++
-		time.Sleep(delay)
+		time.Sleep(policy.DelayForAttempt(i))
 	}
 	return nil, retryCount, err
 }
