@@ -148,27 +148,30 @@ func TestShouldPerformCheck(t *testing.T) {
 	})
 }
 
-func TestGetDefaultEndpoint(t *testing.T) {
+func TestResolveEndpoint(t *testing.T) {
 	checker := NewHealthChecker()
 
-	tests := []struct {
-		provider string
-		expected string
-	}{
-		{"openai", "https://api.openai.com"},
-		{"anthropic", "https://api.anthropic.com"},
-		{"google", "https://generativelanguage.googleapis.com"},
-		{"unknown", "https://api.openai.com"},
-	}
+	t.Run("prefer explicit endpoint_url", func(t *testing.T) {
+		apiKey := &models.MerchantAPIKey{
+			Provider:    "any",
+			EndpointURL: "https://example.com/custom",
+		}
+		got, err := checker.resolveEndpoint(context.Background(), apiKey)
+		if err != nil {
+			t.Fatalf("resolveEndpoint returned error: %v", err)
+		}
+		if got != "https://example.com/custom" {
+			t.Fatalf("resolveEndpoint got %s", got)
+		}
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.provider, func(t *testing.T) {
-			result := checker.getDefaultEndpoint(tt.provider)
-			if result != tt.expected {
-				t.Errorf("getDefaultEndpoint(%s) = %s, want %s", tt.provider, result, tt.expected)
-			}
-		})
-	}
+	t.Run("error when provider and fallback missing", func(t *testing.T) {
+		apiKey := &models.MerchantAPIKey{Provider: "unknown_provider"}
+		_, err := checker.resolveEndpoint(context.Background(), apiKey)
+		if err == nil {
+			t.Fatal("expected resolveEndpoint to return error when endpoint is not configured")
+		}
+	})
 }
 
 func TestHealthCheckResult(t *testing.T) {

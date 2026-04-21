@@ -34,6 +34,8 @@ const (
 	HealthStatusUnknown   = "unknown"
 )
 
+const fallbackProviderCode = "__default__"
+
 var healthCheckIntervalMap = map[HealthCheckLevel]int{
 	HealthCheckLevelHigh:   60,
 	HealthCheckLevelMedium: 300,
@@ -87,9 +89,14 @@ func (s *HealthChecker) GetHealthCheckInterval(level string) int {
 }
 
 func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.MerchantAPIKey) (*HealthCheckResult, error) {
-	endpoint := apiKey.EndpointURL
-	if endpoint == "" {
-		endpoint = s.getDefaultEndpoint(apiKey.Provider)
+	endpoint, resolveErr := s.resolveEndpoint(ctx, apiKey)
+	if resolveErr != nil {
+		return &HealthCheckResult{
+			Success:      false,
+			Status:       HealthStatusUnhealthy,
+			ErrorMessage: resolveErr.Error(),
+			CheckType:    "lightweight",
+		}, nil
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
@@ -139,9 +146,14 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 }
 
 func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.MerchantAPIKey) (*HealthCheckResult, error) {
-	endpoint := apiKey.EndpointURL
-	if endpoint == "" {
-		endpoint = s.getDefaultEndpoint(apiKey.Provider)
+	endpoint, resolveErr := s.resolveEndpoint(ctx, apiKey)
+	if resolveErr != nil {
+		return &HealthCheckResult{
+			Success:      false,
+			Status:       HealthStatusUnhealthy,
+			ErrorMessage: resolveErr.Error(),
+			CheckType:    "full",
+		}, nil
 	}
 
 	modelsEndpoint := strings.TrimRight(endpoint, "/") + "/v1/models"
@@ -402,18 +414,40 @@ func (s *HealthChecker) SaveHealthCheckResult(ctx context.Context, apiKeyID int,
 	return nil
 }
 
-func (s *HealthChecker) getDefaultEndpoint(provider string) string {
-	endpoints := map[string]string{
-		"openai":    "https://api.openai.com",
-		"anthropic": "https://api.anthropic.com",
-		"google":    "https://generativelanguage.googleapis.com",
-		"azure":     "https://{resource}.openai.azure.com",
-		"custom":    "http://localhost:8080",
+func (s *HealthChecker) resolveEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
+	if ep := strings.TrimSpace(apiKey.EndpointURL); ep != "" {
+		return ep, nil
 	}
-	if ep, ok := endpoints[provider]; ok {
-		return ep
+	if ep, ok := s.getProviderBaseURL(ctx, apiKey.Provider); ok {
+		return ep, nil
 	}
-	return endpoints["openai"]
+	if ep, ok := s.getProviderBaseURL(ctx, fallbackProviderCode); ok {
+		return ep, nil
+	}
+	return "", fmt.Errorf("provider endpoint not configured for code=%s and fallback=%s", strings.TrimSpace(apiKey.Provider), fallbackProviderCode)
+}
+
+func (s *HealthChecker) getProviderBaseURL(ctx context.Context, provider string) (string, bool) {
+	db := config.GetDB()
+	if db == nil {
+		return "", false
+	}
+	var baseURL string
+	err := db.QueryRowContext(ctx, `
+		SELECT COALESCE(NULLIF(TRIM(api_base_url), ''), '')
+		FROM model_providers
+		WHERE code = $1 AND status = 'active'
+		ORDER BY updated_at DESC, id DESC
+		LIMIT 1
+	`, strings.TrimSpace(provider)).Scan(&baseURL)
+	if err != nil {
+		return "", false
+	}
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		return "", false
+	}
+	return baseURL, true
 }
 
 func (s *HealthChecker) getDecryptedAPIKey(apiKey *models.MerchantAPIKey) string {
@@ -580,9 +614,14 @@ type TestChatRequest struct {
 }
 
 func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.MerchantAPIKey, model string) (*HealthCheckResult, error) {
-	endpoint := apiKey.EndpointURL
-	if endpoint == "" {
-		endpoint = s.getDefaultEndpoint(apiKey.Provider)
+	endpoint, resolveErr := s.resolveEndpoint(ctx, apiKey)
+	if resolveErr != nil {
+		return &HealthCheckResult{
+			Success:      false,
+			Status:       HealthStatusUnhealthy,
+			ErrorMessage: resolveErr.Error(),
+			CheckType:    "chat_test",
+		}, nil
 	}
 
 	chatEndpoint := endpoint + "/v1/chat/completions"

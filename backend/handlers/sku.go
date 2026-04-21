@@ -28,6 +28,8 @@ const (
 	adminSKUListScopeAll      = "all"
 )
 
+const modelProviderFallbackCode = "__default__"
+
 func ensureAdmin(c *gin.Context) bool {
 	userRole, exists := c.Get("user_role")
 	if !exists || userRole != roleAdmin {
@@ -1482,6 +1484,15 @@ func CreateModelProvider(c *gin.Context) {
 		))
 		return
 	}
+	if code == modelProviderFallbackCode {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MODEL_PROVIDER_RESERVED_CODE",
+			"code __default__ is reserved for fallback provider and cannot be created from this endpoint",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
 
 	apiFormat := strings.TrimSpace(req.APIFormat)
 	if apiFormat == "" {
@@ -1631,6 +1642,41 @@ func PatchModelProvider(c *gin.Context) {
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
+	}
+
+	var existingCode string
+	if err = db.QueryRow(`SELECT code FROM model_providers WHERE id = $1`, id).Scan(&existingCode); err == sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"MODEL_PROVIDER_NOT_FOUND",
+			"Model provider not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	} else if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	if existingCode == modelProviderFallbackCode {
+		allowOnlyStatusToggle := req.Status != nil &&
+			req.Name == nil &&
+			req.APIBaseURL == nil &&
+			req.APIFormat == nil &&
+			req.BillingType == nil &&
+			req.SortOrder == nil &&
+			req.CompatPrefixes == nil &&
+			req.LitellmModelTemplate == nil &&
+			req.LitellmGatewayAPIKeyEnv == nil &&
+			req.LitellmGatewayAPIBase == nil
+		if !allowOnlyStatusToggle {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"MODEL_PROVIDER_READONLY",
+				"fallback provider __default__ only allows status toggle",
+				http.StatusForbidden,
+				nil,
+			))
+			return
+		}
 	}
 
 	var p models.ModelProvider

@@ -365,11 +365,34 @@ const MerchantAPIKeys = () => {
   const handleImmediateHealthCheck = async (id: number) => {
     try {
       await api.post(`/merchants/api-keys/${id}/health-check`);
-      message.success('已触发立即健康探测，请稍后刷新查看状态');
+      message.success('已触发立即健康探测，正在获取结果...');
       fetchAPIKeys();
+      void pollHealthCheckResult(id);
     } catch {
       message.error('触发健康探测失败');
     }
+  };
+
+  const pollHealthCheckResult = async (id: number) => {
+    const maxAttempts = 8;
+    const interval = 2000;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((resolve) => setTimeout(resolve, interval));
+      await fetchAPIKeys();
+      const latest = useMerchantStore.getState().apiKeys.find((k) => k.id === id);
+      if (!latest?.last_health_check_at) continue;
+      const health = (latest.health_status || 'unknown').toLowerCase();
+      if (health === 'healthy' || health === 'degraded') {
+        message.success(`探测完成：当前状态 ${health === 'healthy' ? '健康' : '降级'}`);
+        return;
+      }
+      if (health === 'unhealthy') {
+        const reason = latest.health_error_message?.trim();
+        message.error(reason ? `探测失败：${reason}` : '探测失败：状态不健康');
+        return;
+      }
+    }
+    message.warning('探测已触发，但结果尚未返回，请稍后手动刷新查看');
   };
 
   const pollVerificationResult = async (id: number) => {

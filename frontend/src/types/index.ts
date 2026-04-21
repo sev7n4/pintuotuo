@@ -464,6 +464,7 @@ export interface MerchantAPIKey {
   health_check_level?: 'high' | 'medium' | 'low' | 'daily';
   endpoint_url?: string;
   health_status?: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+  health_error_message?: string;
   last_health_check_at?: string;
   consecutive_failures?: number;
 
