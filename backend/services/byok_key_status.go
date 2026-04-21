@@ -5,22 +5,31 @@ import (
 	"strings"
 )
 
+const (
+	byokVerificationVerified = "verified"
+	byokVerificationSuccess  = "success"
+	byokHealthDegraded       = "degraded"
+	byokHealthUnknown        = "unknown"
+	byokHealthUnhealthy      = "unhealthy"
+	byokVerificationFailed   = "failed"
+)
+
 // KeyMeetsStrictAllowlist 与 entitlement 白名单 SQL 一致：
 // (verified_at IS NOT NULL OR verification_result = 'verified') AND health IN (healthy, degraded)
 func KeyMeetsStrictAllowlist(health, verification string, verifiedAt sql.NullTime) bool {
 	vr := strings.ToLower(strings.TrimSpace(verification))
-	verifiedLine := verifiedAt.Valid || vr == "verified" || vr == "success"
+	verifiedLine := verifiedAt.Valid || vr == byokVerificationVerified || vr == byokVerificationSuccess
 	h := strings.ToLower(strings.TrimSpace(health))
 	if h == "" {
-		h = "unknown"
+		h = byokHealthUnknown
 	}
-	healthOk := h == "healthy" || h == "degraded"
+	healthOk := h == HealthStatusHealthy || h == byokHealthDegraded
 	return verifiedLine && healthOk
 }
 
 // KeyNeedsAttentionActive 与商户端「Strict 权益 / 需立即关注」一致：启用中的 Key 未满足 strict 条件。
 func KeyNeedsAttentionActive(status, health, verification string, verifiedAt sql.NullTime) bool {
-	if strings.ToLower(strings.TrimSpace(status)) != "active" {
+	if strings.ToLower(strings.TrimSpace(status)) != routingStrategyStatusActive {
 		return false
 	}
 	return !KeyMeetsStrictAllowlist(health, verification, verifiedAt)
@@ -46,7 +55,7 @@ type KeyRowLite struct {
 func AggregateMerchantBYOK(keys []KeyRowLite) (level string, hasRoutable bool, needAttentionActive int, activeCount int) {
 	var active []KeyRowLite
 	for _, k := range keys {
-		if strings.ToLower(strings.TrimSpace(k.Status)) == "active" {
+		if strings.ToLower(strings.TrimSpace(k.Status)) == routingStrategyStatusActive {
 			active = append(active, k)
 		}
 	}
@@ -72,7 +81,7 @@ func AggregateMerchantBYOK(keys []KeyRowLite) (level string, hasRoutable bool, n
 	for _, k := range active {
 		h := strings.ToLower(strings.TrimSpace(k.Health))
 		vr := strings.ToLower(strings.TrimSpace(k.Verification))
-		if h == "unhealthy" || vr == "failed" {
+		if h == byokHealthUnhealthy || vr == byokVerificationFailed {
 			return MerchantBYOKLevelYellow, false, needAttentionActive, activeCount
 		}
 	}

@@ -21,6 +21,8 @@ import (
 	"github.com/pintuotuo/backend/utils"
 )
 
+const defaultHealthCheckLevel = "medium"
+
 func CreateMerchantAPIKey(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -92,7 +94,7 @@ func CreateMerchantAPIKey(c *gin.Context) {
 		quota = nil
 	}
 
-	hcl := "medium"
+	hcl := defaultHealthCheckLevel
 	if req.HealthCheckLevel != nil && strings.TrimSpace(*req.HealthCheckLevel) != "" {
 		v := strings.ToLower(strings.TrimSpace(*req.HealthCheckLevel))
 		switch v {
@@ -120,9 +122,9 @@ func CreateMerchantAPIKey(c *gin.Context) {
 		`INSERT INTO merchant_api_keys (merchant_id, name, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status, health_check_level, endpoint_url) 
 		 VALUES ($1, $2, $3, $4, $5, $6, 0, 'active', $7, NULLIF(TRIM($8::text), '')::varchar(500)) 
 		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, created_at, updated_at,
-			COALESCE(NULLIF(TRIM(health_check_level), ''), 'medium'),
+			COALESCE(NULLIF(TRIM(health_check_level), ''), $9),
 			COALESCE(endpoint_url, '')`,
-		merchantID, req.Name, req.Provider, apiKeyEncrypted, apiSecretEncrypted, quota, hcl, epStr,
+		merchantID, req.Name, req.Provider, apiKeyEncrypted, apiSecretEncrypted, quota, hcl, epStr, defaultHealthCheckLevel,
 	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaReturned, &apiKey.QuotaUsed, &apiKey.Status, &apiKey.CreatedAt, &apiKey.UpdatedAt,
 		&apiKey.HealthCheckLevel, &apiKey.EndpointURL)
 	apiKey.QuotaLimit = utils.NullFloat64Ptr(quotaReturned)
@@ -217,14 +219,14 @@ func ListMerchantAPIKeys(c *gin.Context) {
 		var lastHealth sql.NullTime
 		var verifiedAt sql.NullTime
 		var modelsJSON []byte
-		err := rows.Scan(
+		scanErr := rows.Scan(
 			&key.ID, &key.MerchantID, &key.Name, &key.Provider, &qLim, &key.QuotaUsed, &key.Status, &lastUsedAt, &key.CreatedAt, &key.UpdatedAt,
 			&key.HealthCheckLevel, &key.EndpointURL, &key.HealthStatus, &lastHealth, &key.ConsecutiveFailures,
 			&verifiedAt, &key.VerificationResult, &key.VerificationMsg, &modelsJSON,
 			&key.CostInputRate, &key.CostOutputRate, &key.ProfitMargin,
 		)
 		key.QuotaLimit = utils.NullFloat64Ptr(qLim)
-		if err != nil {
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
@@ -345,7 +347,7 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 	var cinVal float64
 	if raw, has := patch["cost_input_rate"]; has {
 		patchCin = true
-		if err := json.Unmarshal(raw, &cinVal); err != nil {
+		if unmarshalErr := json.Unmarshal(raw, &cinVal); unmarshalErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 			return
 		}
@@ -364,7 +366,7 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 	var coutVal float64
 	if raw, has := patch["cost_output_rate"]; has {
 		patchCout = true
-		if err := json.Unmarshal(raw, &coutVal); err != nil {
+		if unmarshalErr := json.Unmarshal(raw, &coutVal); unmarshalErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 			return
 		}
@@ -383,7 +385,7 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 	var pmVal float64
 	if raw, has := patch["profit_margin"]; has {
 		patchPM = true
-		if err := json.Unmarshal(raw, &pmVal); err != nil {
+		if unmarshalErr := json.Unmarshal(raw, &pmVal); unmarshalErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 			return
 		}
