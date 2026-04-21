@@ -46,6 +46,8 @@ interface MerchantState {
     api_key: string;
     api_secret?: string;
     quota_limit?: number | null;
+    health_check_level?: MerchantAPIKey['health_check_level'];
+    endpoint_url?: string;
   }) => Promise<boolean>;
   updateAPIKey: (id: number, data: Partial<MerchantAPIKey>) => Promise<boolean>;
   deleteAPIKey: (id: number) => Promise<boolean>;

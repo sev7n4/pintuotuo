@@ -26,6 +26,54 @@
   display: block;
 }
 
+.statusLightRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06) inset;
+}
+
+.statusDotHealthy {
+  background: #52c41a;
+}
+
+.statusDotDegraded {
+  background: #faad14;
+}
+
+.statusDotUnhealthy {
+  background: #ff4d4f;
+}
+
+.statusDotUnknown {
+  background: #bfbfbf;
+}
+
+.statusDotVerified {
+  background: #52c41a;
+}
+
+.statusDotVerifyFailed {
+  background: #ff4d4f;
+}
+
+.statusDotVerifyPending {
+  background: #bfbfbf;
+}
+
+.statusLightLabel {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.85);
+}
+
 @media (max-width: 768px) {
   .header {
     flex-direction: column;

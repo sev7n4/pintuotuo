@@ -288,6 +288,7 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.GET("/stats", handlers.GetAdminStats)
 		admin.GET("/merchants/pending", handlers.GetPendingMerchants)
 		admin.GET("/merchants/audit-logs", handlers.GetMerchantAuditLogs)
+		admin.GET("/merchants/byok-summary", handlers.GetAdminBYOKSummary)
 		admin.GET("/merchants", handlers.GetAdminMerchants)
 		admin.PATCH("/merchants/:id", handlers.PatchAdminMerchant)
 		admin.PATCH("/merchants/:id/lifecycle", handlers.PatchAdminMerchantLifecycle)

@@ -44,6 +44,28 @@ export interface MerchantAuditLog {
   created_at: string;
 }
 
+/** 管理端 BYOK 按商户聚合（与后端 handlers.BYOKMerchantRollup 一致） */
+export interface BYOKMerchantRollup {
+  merchant_id: number;
+  company_name: string;
+  total_key_count: number;
+  active_key_count: number;
+  has_routable: boolean;
+  need_attention_active: number;
+  level: 'none' | 'gray' | 'yellow' | 'green';
+}
+
+export interface BYOKSummaryResponse {
+  summary: {
+    active_keys_total: number;
+    merchants_with_active_keys: number;
+    merchants_has_routable: number;
+    merchants_need_attention: number;
+    merchants_with_no_keys: number;
+  };
+  by_merchant: BYOKMerchantRollup[];
+}
+
 export interface MerchantInvite {
   id: number;
   code: string;
@@ -93,6 +115,8 @@ export const adminMerchantService = {
     business_category?: string;
     keyword?: string;
   }) => api.get<MerchantListResponse>('/admin/merchants', { params }),
+
+  getBYOKSummary: () => api.get<BYOKSummaryResponse>('/admin/merchants/byok-summary'),
 
   getMerchantAuditLogs: (params: {
     page?: number;
