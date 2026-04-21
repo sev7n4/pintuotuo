@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -309,5 +311,50 @@ func TestTestChatCompletion_InvalidEndpoint(t *testing.T) {
 
 	if result != nil && result.Success {
 		t.Error("TestChatCompletion should fail for invalid endpoint")
+	}
+}
+
+func TestTestChatCompletion_StructuredErrorFields(t *testing.T) {
+	checker := NewHealthChecker()
+	ctx := context.Background()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Request-Id", "chat-req-1")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"code":"invalid_api_key","message":"invalid api key"}}`))
+	}))
+	defer srv.Close()
+
+	apiKey := &models.MerchantAPIKey{
+		ID:          1,
+		Provider:    "openai",
+		EndpointURL: srv.URL,
+	}
+
+	result, err := checker.TestChatCompletion(ctx, apiKey, "gpt-4o-mini")
+	if err != nil {
+		t.Fatalf("TestChatCompletion unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result.Success {
+		t.Fatal("expected failure")
+	}
+	if result.ErrorCategory != errorCategoryAuthInvalidKey {
+		t.Fatalf("category=%s want=%s", result.ErrorCategory, errorCategoryAuthInvalidKey)
+	}
+	if result.ProviderErrorCode != "invalid_api_key" {
+		t.Fatalf("provider_error_code=%s want=invalid_api_key", result.ProviderErrorCode)
+	}
+	if result.ProviderRequestID != "chat-req-1" {
+		t.Fatalf("provider_request_id=%s want=chat-req-1", result.ProviderRequestID)
+	}
+	if result.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status_code=%d want=%d", result.StatusCode, http.StatusUnauthorized)
+	}
+	if result.EndpointUsed == "" {
+		t.Fatal("endpoint_used should not be empty")
 	}
 }

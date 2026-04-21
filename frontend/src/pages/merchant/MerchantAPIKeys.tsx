@@ -152,6 +152,33 @@ function verificationTooltipDesc(k: MerchantAPIKey): string {
   return `${base}请完成「轻量验证」或「深度验证」；通过后会写入 verified。`;
 }
 
+function formatHealthError(record: MerchantAPIKey): string {
+  const parts: string[] = [];
+  if (record.health_error_category) parts.push(`分类: ${toHealthCategoryCN(record.health_error_category)}`);
+  if (record.health_error_code) parts.push(`上游码: ${record.health_error_code}`);
+  if (record.health_provider_request_id) parts.push(`请求ID: ${record.health_provider_request_id}`);
+  if (record.health_error_message) parts.push(`信息: ${record.health_error_message}`);
+  return parts.join(' | ');
+}
+
+function toHealthCategoryCN(category?: string): string {
+  const c = (category || '').toUpperCase();
+  const map: Record<string, string> = {
+    AUTH_INVALID_KEY: '鉴权失败（Key无效）',
+    AUTH_PERMISSION_DENIED: '鉴权失败（权限不足）',
+    QUOTA_INSUFFICIENT: '额度不足',
+    RATE_LIMITED: '触发限流',
+    MODEL_NOT_FOUND: '模型不存在',
+    CONTEXT_WINDOW_EXCEEDED: '上下文超限',
+    SERVICE_UNAVAILABLE: '上游服务不可用',
+    NETWORK_TIMEOUT: '网络超时',
+    NETWORK_DNS: 'DNS/域名解析失败',
+    UPSTREAM_BAD_REQUEST: '请求参数错误',
+    UNKNOWN: '未知错误',
+  };
+  return map[c] || c || '未知错误';
+}
+
 const MerchantAPIKeys = () => {
   const {
     apiKeys,
@@ -387,7 +414,7 @@ const MerchantAPIKeys = () => {
         return;
       }
       if (health === 'unhealthy') {
-        const reason = latest.health_error_message?.trim();
+        const reason = formatHealthError(latest).trim();
         message.error(reason ? `探测失败：${reason}` : '探测失败：状态不健康');
         return;
       }
@@ -508,6 +535,13 @@ const MerchantAPIKeys = () => {
             <span style={{ fontSize: '12px', color: '#999' }}>
               {new Date(record.last_health_check_at).toLocaleString('zh-CN')}
             </span>
+          )}
+          {record.health_status === 'unhealthy' && (
+            <Tooltip title={formatHealthError(record) || '暂无结构化错误信息'}>
+              <Tag color="error" style={{ marginRight: 0 }}>
+                {toHealthCategoryCN(record.health_error_category) || '探测失败'}
+              </Tag>
+            </Tooltip>
           )}
         </Space>
       ),
