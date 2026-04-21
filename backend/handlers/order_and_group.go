@@ -39,7 +39,7 @@ func validateEntitlementPackageOrderLines(tx *sql.Tx, packageID int, reqItems []
 		}
 		return apperrors.ErrDatabaseError
 	}
-	if st != "active" {
+	if st != productStatusActive {
 		return apperrors.NewAppError("ENTITLEMENT_PACKAGE_INACTIVE", "套餐已下架", http.StatusBadRequest, nil)
 	}
 	rows, err := tx.Query(`SELECT sku_id, default_quantity FROM entitlement_package_items WHERE package_id = $1`, packageID)

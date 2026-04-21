@@ -109,7 +109,7 @@ func BatchGetEntitlementPackageStats(c *gin.Context) {
 			defer r1.Close()
 			for r1.Next() {
 				var pid int
-				if err := r1.Scan(&pid); err == nil {
+				if scanErr := r1.Scan(&pid); scanErr == nil {
 					fav[pid] = struct{}{}
 				}
 			}
@@ -123,7 +123,7 @@ func BatchGetEntitlementPackageStats(c *gin.Context) {
 			defer r2.Close()
 			for r2.Next() {
 				var pid int
-				if err := r2.Scan(&pid); err == nil {
+				if scanErr := r2.Scan(&pid); scanErr == nil {
 					likes[pid] = struct{}{}
 				}
 			}
@@ -137,7 +137,7 @@ func BatchGetEntitlementPackageStats(c *gin.Context) {
 			defer r3.Close()
 			for r3.Next() {
 				var pid int
-				if err := r3.Scan(&pid); err == nil {
+				if scanErr := r3.Scan(&pid); scanErr == nil {
 					rev[pid] = struct{}{}
 				}
 			}
@@ -297,7 +297,7 @@ func UpsertEntitlementPackageReview(c *gin.Context) {
 		return
 	}
 	var req entitlementPackageReviewReq
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
