@@ -123,7 +123,7 @@ func PatchModelFallbackRule(c *gin.Context) {
 		return
 	}
 	var req modelFallbackWriteBody
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
