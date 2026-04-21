@@ -140,28 +140,35 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 
 	baseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
 	modelsURL := baseURL + "/models"
-	probe, probeErr := ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, decryptedKey)
-	if probeErr != nil || probe == nil || !probe.Success {
-		if retryCount < v.maxRetries {
-			metrics.VerificationRetries.WithLabelValues(provider, fmt.Sprintf("%d", retryCount+1)).Inc()
-			time.Sleep(v.retryDelay * time.Duration(1<<retryCount))
-			go v.performVerificationWithRetry(apiKeyID, provider, encryptedKey, verificationType, retryCount+1)
+	var probe *ProbeModelsResult
+	var probeErr error
+	finalRetryCount := retryCount
+	for attempt := retryCount; ; attempt++ {
+		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, decryptedKey)
+		if probeErr == nil && probe != nil && probe.Success {
+			finalRetryCount = attempt
+			break
+		}
+		if attempt >= v.maxRetries || !shouldRetryVerificationAttempt(probe, probeErr) {
+			finalRetryCount = attempt
+			msg := "connection test failed"
+			if probeErr != nil {
+				msg = probeErr.Error()
+			}
+			code := "CONNECTION_FAILED"
+			if probe != nil && strings.TrimSpace(probe.ErrorCode) != "" {
+				code = probe.ErrorCode
+			}
+			if probe != nil && strings.TrimSpace(probe.ErrorMsg) != "" {
+				msg = firstNonEmpty(msg, probe.ErrorMsg)
+			}
+			v.handleVerificationError(ctx, verificationID, apiKeyID, code, msg, startTime)
 			return
 		}
-		msg := "connection test failed"
-		if probeErr != nil {
-			msg = probeErr.Error()
-		}
-		code := "CONNECTION_FAILED"
-		if probe != nil && strings.TrimSpace(probe.ErrorCode) != "" {
-			code = probe.ErrorCode
-		}
-		if probe != nil && strings.TrimSpace(probe.ErrorMsg) != "" {
-			msg = firstNonEmpty(msg, probe.ErrorMsg)
-		}
-		v.handleVerificationError(ctx, verificationID, apiKeyID, code, msg, startTime)
-		return
+		metrics.VerificationRetries.WithLabelValues(provider, fmt.Sprintf("%d", attempt+1)).Inc()
+		time.Sleep(v.retryDelay * time.Duration(1<<attempt))
 	}
+	result.RetryCount = finalRetryCount
 	result.ConnectionTest = true
 	result.ConnectionLatency = probe.LatencyMs
 	metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(probe.LatencyMs))
@@ -219,8 +226,20 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 		"connection_test":    result.ConnectionTest,
 		"models_count":       result.ModelsCount,
 		"connection_latency": result.ConnectionLatency,
-		"retry_count":        retryCount,
+		"retry_count":        result.RetryCount,
 	})
+}
+
+func shouldRetryVerificationAttempt(probe *ProbeModelsResult, probeErr error) bool {
+	if probeErr != nil {
+		errInfo := MapProviderError(0, "", probeErr.Error(), nil, probeErr, "")
+		return errInfo.Retryable
+	}
+	if probe == nil {
+		return false
+	}
+	errInfo := MapProviderError(probe.StatusCode, probe.ErrorCode, probe.ErrorMsg, nil, nil, probe.RawErrorExcerpt)
+	return errInfo.Retryable
 }
 
 func (v *APIKeyValidator) ValidateAsync(apiKeyID int, provider, encryptedKey, verificationType string) error {
