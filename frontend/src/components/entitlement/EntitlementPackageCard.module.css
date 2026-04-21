@@ -32,12 +32,23 @@
   padding-bottom: 4px !important;
 }
 
-.totalPriceBlock {
-  margin-bottom: 12px;
-  padding: 12px 14px;
+/* 组合价 + 套餐包含 + 互动条：同一视觉卡片 */
+.unifiedSpecCard {
+  margin-bottom: 14px;
+  padding: 14px 16px;
   border-radius: 10px;
-  background: linear-gradient(135deg, rgba(22, 119, 255, 0.1) 0%, rgba(22, 119, 255, 0.02) 100%);
-  border: 1px solid rgba(22, 119, 255, 0.18);
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.priceBlockInner {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, rgba(22, 119, 255, 0.06) 0%, transparent 100%);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: -4px -4px 12px -4px;
 }
 
 .totalPriceLabel {
@@ -54,12 +65,8 @@
   letter-spacing: 0.02em;
 }
 
-.includeBlock {
-  margin-bottom: 14px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+.includeInner {
+  margin-bottom: 12px;
 }
 
 .includeTitle {
@@ -68,48 +75,36 @@
   font-size: 15px;
 }
 
-.includeCombo {
-  display: block;
-  margin-bottom: 10px;
+.includeBulletList {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.includeBulletItem {
+  margin-bottom: 6px;
   font-size: 14px;
   line-height: 1.55;
   color: rgba(0, 0, 0, 0.88);
   word-break: break-word;
 }
 
-.includeHeadline {
-  display: block;
-  margin-bottom: 10px !important;
+.includeBulletItem:last-child {
+  margin-bottom: 0;
+}
+
+.socialBar {
+  padding-top: 4px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.socialBtn {
+  padding-inline: 4px;
+}
+
+.socialItem {
   font-size: 13px;
-}
-
-.includeRows {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.includeRow {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-
-.includeIcon {
-  flex-shrink: 0;
-  margin-top: 2px;
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 15px;
-}
-
-.includeText {
-  min-width: 0;
-  flex: 1;
-}
-
-.includeSpec {
-  display: block;
-  margin-top: 2px !important;
-  font-size: 13px;
-  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.65);
+  cursor: default;
 }

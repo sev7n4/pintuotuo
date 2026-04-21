@@ -53,6 +53,18 @@ export interface EntitlementPackageUserView extends EntitlementPackage {
   is_active: boolean;
 }
 
+/** GET /entitlement-packages/stats 单条（登录时可能含 user_*） */
+export interface EntitlementPackageStatRow {
+  package_id: number;
+  favorite_count: number;
+  like_count: number;
+  sales_count: number;
+  review_count: number;
+  user_favorited?: boolean;
+  user_liked?: boolean;
+  user_reviewed?: boolean;
+}
+
 /** 前台 /packages 分类筛选（不含 general，「通用」类套餐仅在「全部」下展示） */
 export const ENTITLEMENT_PACKAGE_FILTER_OPTIONS: { value: string; label: string }[] = [
   { value: 'all', label: '全部' },

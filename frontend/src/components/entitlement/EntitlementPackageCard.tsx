@@ -4,6 +4,7 @@ import type { EntitlementPackage } from '@/types/entitlementPackage';
 import dayjs from 'dayjs';
 import { PackageIncludeSummary } from './PackageIncludeSummary';
 import { PackageItemsCollapse } from './PackageItemsCollapse';
+import { PackageSocialBar, type PackageSocialStats } from './PackageSocialBar';
 import styles from './EntitlementPackageCard.module.css';
 
 const { Paragraph, Text } = Typography;
@@ -13,9 +14,20 @@ type Props = {
   loading?: boolean;
   onBuy: () => void;
   onCopyShareLink?: () => void;
+  /** 收藏/点赞/销量/评价（来自 batchStats + 交互回写） */
+  socialStats?: PackageSocialStats;
+  /** 子组件更新单项展示（收藏/点赞/评价计数） */
+  onSocialPatch?: (patch: Partial<PackageSocialStats>) => void;
 };
 
-export function EntitlementPackageCard({ pkg, loading, onBuy, onCopyShareLink }: Props) {
+export function EntitlementPackageCard({
+  pkg,
+  loading,
+  onBuy,
+  onCopyShareLink,
+  socialStats,
+  onSocialPatch,
+}: Props) {
   const canBuy = pkg.purchasable !== false;
 
   return (
@@ -61,11 +73,21 @@ export function EntitlementPackageCard({ pkg, loading, onBuy, onCopyShareLink }:
           ) : null}
         </Paragraph>
       )}
-      <PackageIncludeSummary items={pkg.items || []} />
-      <div className={styles.totalPriceBlock}>
-        <div className={styles.totalPriceLabel}>组合总价</div>
-        <div className={styles.totalPriceValue}>¥{pkg.totalPrice.toFixed(2)}</div>
+
+      <div className={styles.unifiedSpecCard}>
+        <div className={styles.priceBlockInner}>
+          <div className={styles.totalPriceLabel}>组合总价</div>
+          <div className={styles.totalPriceValue}>¥{pkg.totalPrice.toFixed(2)}</div>
+        </div>
+        <PackageIncludeSummary items={pkg.items || []} />
+        <PackageSocialBar
+          packageId={pkg.id}
+          packageCode={pkg.package_code}
+          stats={socialStats}
+          onSocialPatch={onSocialPatch}
+        />
       </div>
+
       {!canBuy && pkg.unavailable_reason ? (
         <Paragraph type="danger" style={{ marginBottom: 8 }}>
           {pkg.unavailable_reason}

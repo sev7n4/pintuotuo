@@ -1,15 +1,37 @@
 import api from './api';
 import { APIResponse, Product } from '@/types';
 
-export interface FavoriteItem {
+/** 单品收藏（与历史接口字段兼容） */
+export interface FavoriteSKUItem {
+  item_type: 'sku';
   id: number;
   sku_id: number;
   product: Product;
   created_at: string;
 }
 
+/** 套餐包收藏（与套餐页 / entitlement-package 收藏 API 同源） */
+export interface FavoriteEntitlementPackageItem {
+  item_type: 'entitlement_package';
+  id: number;
+  entitlement_package_id: number;
+  entitlement_package: {
+    id: number;
+    package_code: string;
+    name: string;
+    marketing_line?: string;
+    status: string;
+  };
+  created_at: string;
+}
+
+export type FavoriteListItem = FavoriteSKUItem | FavoriteEntitlementPackageItem;
+
+/** @deprecated 请用 FavoriteListItem；保留别名以免旧引用报错 */
+export type FavoriteItem = FavoriteSKUItem;
+
 export interface FavoriteListResponse {
-  items: FavoriteItem[];
+  items: FavoriteListItem[];
   total: number;
   page: number;
   page_size: number;
