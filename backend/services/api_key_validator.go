@@ -403,14 +403,22 @@ func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result Ve
 	}
 	dbResult := normalizeVerificationDBStatus(result.Status)
 
-	_, err := db.Exec(
+	var merchantID int
+	err := db.QueryRow(
 		`UPDATE merchant_api_keys 
 		 SET verification_result = $1, verified_at = $2, models_supported = $3, verification_message = $4, updated_at = NOW()
-		 WHERE id = $5`,
+		 WHERE id = $5
+		 RETURNING merchant_id`,
 		dbResult, result.CompletedAt, modelsJSON, verifyMsg, apiKeyID,
-	)
+	).Scan(&merchantID)
+	if err != nil {
+		return err
+	}
 
-	return err
+	// 验证结果落库后必须清理商户 API Key 列表缓存，否则前端会看到旧 verification_result。
+	cache.Delete(context.Background(), cache.MerchantAPIKeysKey(merchantID))
+
+	return nil
 }
 
 func (v *APIKeyValidator) getProviderConfig(provider string) (map[string]string, error) {

@@ -74,6 +74,33 @@
   color: rgba(0, 0, 0, 0.85);
 }
 
+.byokOverviewCard {
+  border: 1px solid #e6f4ff;
+  background: linear-gradient(180deg, #fcfdff 0%, #f7fbff 100%);
+}
+
+.byokHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.byokTitle {
+  font-weight: 600;
+}
+
+.byokStatBox {
+  border: 1px solid #edf2ff;
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px;
+  min-height: 102px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
 @media (max-width: 768px) {
   .header {
     flex-direction: column;

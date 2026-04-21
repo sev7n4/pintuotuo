@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Card,
@@ -11,6 +11,8 @@ import {
   Input,
   InputNumber,
   Select,
+  Segmented,
+  Switch,
   message,
   Popconfirm,
   Progress,
@@ -170,11 +172,29 @@ const MerchantAPIKeys = () => {
   const [modelProviders, setModelProviders] = useState<ModelProvider[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [merchantSKUs, setMerchantSKUs] = useState<MerchantSKUDetail[]>([]);
+  const [keyword, setKeyword] = useState('');
+  const [providerFilter, setProviderFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [healthFilter, setHealthFilter] = useState<string>('all');
+  const [verifyFilter, setVerifyFilter] = useState<string>('all');
+  const [strictFilter, setStrictFilter] = useState<string>('all');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'recent' | 'attention' | 'verifying'>('all');
+  const [recentMinutes, setRecentMinutes] = useState<number>(10);
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   useEffect(() => {
     fetchAPIKeys();
     fetchAPIKeyUsage();
   }, [fetchAPIKeys, fetchAPIKeyUsage]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const timer = window.setInterval(() => {
+      fetchAPIKeys();
+      fetchAPIKeyUsage();
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [autoRefresh, fetchAPIKeys, fetchAPIKeyUsage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -600,6 +620,82 @@ const MerchantAPIKeys = () => {
     },
   ];
 
+  const providerOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const k of apiKeys) {
+      if (k.provider) set.add(k.provider.toLowerCase());
+    }
+    return Array.from(set).sort();
+  }, [apiKeys]);
+
+  const filteredApiKeys = useMemo(() => {
+    const kw = keyword.trim().toLowerCase();
+    return apiKeys.filter((k) => {
+      if (providerFilter !== 'all' && (k.provider || '').toLowerCase() !== providerFilter) {
+        return false;
+      }
+      if (statusFilter !== 'all' && (k.status || '') !== statusFilter) {
+        return false;
+      }
+      const health = (k.health_status || 'unknown').toLowerCase();
+      if (healthFilter !== 'all' && health !== healthFilter) {
+        return false;
+      }
+      const vr = normalizeVerificationStatus(k.verification_result);
+      if (verifyFilter !== 'all' && vr !== verifyFilter) {
+        return false;
+      }
+      const strictOk = isStrictEntitlementEligible(k);
+      if (strictFilter === 'routable' && !strictOk) {
+        return false;
+      }
+      if (strictFilter === 'unmet' && strictOk) {
+        return false;
+      }
+      if (kw) {
+        const hay = `${k.name || ''} ${(k.provider || '').toLowerCase()} ${k.endpoint_url || ''}`.toLowerCase();
+        if (!hay.includes(kw)) {
+          return false;
+        }
+      }
+
+      if (quickFilter === 'attention') {
+        if (!((k.status || '') === 'active' && !isStrictEntitlementEligible(k))) return false;
+      }
+      if (quickFilter === 'verifying') {
+        if (normalizeVerificationStatus(k.verification_result) !== 'in_progress') return false;
+      }
+      if (quickFilter === 'recent') {
+        if (!k.updated_at) return false;
+        const updated = new Date(k.updated_at).getTime();
+        if (Number.isNaN(updated)) return false;
+        if (Date.now() - updated > recentMinutes * 60 * 1000) return false;
+      }
+      return true;
+    });
+  }, [
+    apiKeys,
+    healthFilter,
+    keyword,
+    providerFilter,
+    quickFilter,
+    recentMinutes,
+    statusFilter,
+    strictFilter,
+    verifyFilter,
+  ]);
+
+  const resetFilters = () => {
+    setKeyword('');
+    setProviderFilter('all');
+    setStatusFilter('all');
+    setHealthFilter('all');
+    setVerifyFilter('all');
+    setStrictFilter('all');
+    setQuickFilter('all');
+    setRecentMinutes(10);
+  };
+
   return (
     <div className={styles.apiKeys}>
       <div className={styles.header}>
@@ -631,9 +727,99 @@ const MerchantAPIKeys = () => {
       <MerchantBYOKOverviewCard apiKeys={apiKeys} />
 
       <Card>
+        <Space wrap size={12} style={{ marginBottom: 12 }}>
+          <Segmented
+            value={quickFilter}
+            onChange={(v) => setQuickFilter(v as typeof quickFilter)}
+            options={[
+              { label: '全部', value: 'all' },
+              { label: '最近变化', value: 'recent' },
+              { label: '待处理', value: 'attention' },
+              { label: '验证中', value: 'verifying' },
+            ]}
+          />
+          <Select
+            style={{ width: 150 }}
+            value={recentMinutes}
+            onChange={(v) => setRecentMinutes(Number(v))}
+            disabled={quickFilter !== 'recent'}
+            options={[
+              { value: 5, label: '最近5分钟' },
+              { value: 10, label: '最近10分钟' },
+              { value: 30, label: '最近30分钟' },
+            ]}
+          />
+          <Space>
+            <span style={{ fontSize: 12, color: '#666' }}>自动刷新</span>
+            <Switch checked={autoRefresh} onChange={setAutoRefresh} />
+          </Space>
+        </Space>
+        <Space wrap size={12} style={{ marginBottom: 12 }}>
+          <Input
+            allowClear
+            style={{ width: 240 }}
+            placeholder="搜索名称/供应商/端点"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+          />
+          <Select
+            style={{ width: 140 }}
+            value={providerFilter}
+            onChange={setProviderFilter}
+            options={[
+              { value: 'all', label: '供应商：全部' },
+              ...providerOptions.map((p) => ({ value: p, label: `供应商：${p.toUpperCase()}` })),
+            ]}
+          />
+          <Select
+            style={{ width: 120 }}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: 'all', label: '状态：全部' },
+              { value: 'active', label: '状态：启用' },
+              { value: 'inactive', label: '状态：禁用' },
+            ]}
+          />
+          <Select
+            style={{ width: 140 }}
+            value={healthFilter}
+            onChange={setHealthFilter}
+            options={[
+              { value: 'all', label: '健康灯：全部' },
+              { value: 'healthy', label: '健康灯：健康' },
+              { value: 'degraded', label: '健康灯：降级' },
+              { value: 'unhealthy', label: '健康灯：不健康' },
+              { value: 'unknown', label: '健康灯：未知' },
+            ]}
+          />
+          <Select
+            style={{ width: 160 }}
+            value={verifyFilter}
+            onChange={setVerifyFilter}
+            options={[
+              { value: 'all', label: '验证状态：全部' },
+              { value: 'success', label: '验证状态：已验证' },
+              { value: 'failed', label: '验证状态：失败' },
+              { value: 'in_progress', label: '验证状态：进行中' },
+              { value: 'pending', label: '验证状态：未验证' },
+            ]}
+          />
+          <Select
+            style={{ width: 150 }}
+            value={strictFilter}
+            onChange={setStrictFilter}
+            options={[
+              { value: 'all', label: 'Strict：全部' },
+              { value: 'routable', label: 'Strict：可路由' },
+              { value: 'unmet', label: 'Strict：未满足' },
+            ]}
+          />
+          <Button onClick={resetFilters}>重置筛选</Button>
+        </Space>
         <Table
           columns={columns}
-          dataSource={apiKeys}
+          dataSource={filteredApiKeys}
           rowKey="id"
           loading={isLoading}
           pagination={false}
