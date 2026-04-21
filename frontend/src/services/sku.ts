@@ -4,6 +4,7 @@ import type {
   SKU,
   SKUWithSPU,
   ModelProvider,
+  ModelFallbackRule,
   ComputePointTransaction,
   UserSubscriptionWithSKU,
   SPUCreateRequest,
@@ -104,6 +105,30 @@ export const skuService = {
       compat_prefixes: string[];
     }>
   ) => api.patch<{ data: ModelProvider }>(`/admin/model-providers/${id}`, data),
+
+  getModelCatalogKeys: () => api.get<{ data: string[] }>('/admin/model-catalog-keys'),
+
+  listModelFallbackRules: () =>
+    api.get<{ data: ModelFallbackRule[] }>('/admin/model-fallback-rules'),
+
+  createModelFallbackRule: (data: {
+    source_model: string;
+    fallback_models: string[];
+    enabled?: boolean;
+    notes?: string;
+  }) => api.post<{ data: { id: number } }>('/admin/model-fallback-rules', data),
+
+  patchModelFallbackRule: (
+    id: number,
+    data: {
+      source_model: string;
+      fallback_models: string[];
+      enabled?: boolean;
+      notes?: string;
+    }
+  ) => api.patch<{ message: string }>(`/admin/model-fallback-rules/${id}`, data),
+
+  deleteModelFallbackRule: (id: number) => api.delete(`/admin/model-fallback-rules/${id}`),
 
   getComputePointBalance: () =>
     api.get<{

@@ -1,3 +1,14 @@
+/** 模型级 fallback 规则（管理端），主键与备用均为目录中的 provider/model */
+export interface ModelFallbackRule {
+  id: number;
+  source_model: string;
+  fallback_models: string[];
+  enabled: boolean;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ModelProvider {
   id: number;
   code: string;

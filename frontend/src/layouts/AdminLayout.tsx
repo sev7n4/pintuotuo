@@ -20,6 +20,7 @@ import {
   BranchesOutlined,
   AccountBookOutlined,
   GiftOutlined,
+  ClusterOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -66,6 +67,11 @@ const menuItems = [
     key: '/admin/model-providers',
     icon: <ApiOutlined />,
     label: '模型厂商',
+  },
+  {
+    key: '/admin/model-fallback',
+    icon: <ClusterOutlined />,
+    label: '模型 Fallback',
   },
   {
     key: '/admin/routing-strategies',
