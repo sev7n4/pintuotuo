@@ -4,6 +4,7 @@ import {
   Table,
   Button,
   Tag,
+  Alert,
   Modal,
   Form,
   Input,
@@ -19,12 +20,14 @@ import type { ModelProvider } from '@/types/sku';
 type ModalMode = 'create' | 'edit';
 
 const AdminModelProviders = () => {
+  const fallbackCode = '__default__';
   const [rows, setRows] = useState<ModelProvider[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>('edit');
   const [editing, setEditing] = useState<ModelProvider | null>(null);
   const [form] = Form.useForm();
+  const isFallbackEditing = modalMode === 'edit' && editing?.code === fallbackCode;
 
   const fetchList = async () => {
     setLoading(true);
@@ -119,6 +122,15 @@ const AdminModelProviders = () => {
       key: 'code',
       width: 120,
       fixed: 'left' as const,
+      render: (code: string) =>
+        code === fallbackCode ? (
+          <Space size={6}>
+            <span>{code}</span>
+            <Tag color="purple">兜底</Tag>
+          </Space>
+        ) : (
+          code
+        ),
     },
     {
       title: '名称',
@@ -174,7 +186,12 @@ const AdminModelProviders = () => {
       width: 88,
       fixed: 'right' as const,
       render: (_: unknown, record: ModelProvider) => (
-        <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+        <Button
+          type="link"
+          size="small"
+          icon={<EditOutlined />}
+          onClick={() => handleEdit(record)}
+        >
           编辑
         </Button>
       ),
@@ -200,6 +217,13 @@ const AdminModelProviders = () => {
           </Space>
         }
       >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="Endpoint 决策说明"
+          description="运行时优先使用商户自定义 endpoint_url，其次读取 model_providers 对应 code 的 api_base_url，再次读取 __default__ 兜底提供商。__default__ 仅允许启停，其他字段只读。"
+        />
         <Table
           rowKey="id"
           loading={loading}
@@ -232,6 +256,13 @@ const AdminModelProviders = () => {
                   pattern: /^[a-z][a-z0-9_]{0,48}$/,
                   message: '须以小写字母开头，仅 a-z、0-9、下划线，最长 50 字符',
                 },
+                {
+                  validator: async (_rule, value) => {
+                    if (String(value || '').trim().toLowerCase() === fallbackCode) {
+                      throw new Error('__default__ 为系统保留兜底代码，请勿新建');
+                    }
+                  },
+                },
               ]}
             >
               <Input placeholder="例如 minimax" autoComplete="off" />
@@ -244,13 +275,13 @@ const AdminModelProviders = () => {
             )
           )}
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-            <Input />
+            <Input disabled={isFallbackEditing} />
           </Form.Item>
           <Form.Item name="api_base_url" label="API Base URL">
-            <Input placeholder="例如 https://api.openai.com/v1" />
+            <Input placeholder="例如 https://api.openai.com/v1" disabled={isFallbackEditing} />
           </Form.Item>
           <Form.Item name="api_format" label="API 格式" rules={[{ required: true }]}>
-            <Select options={apiFormatOptions} placeholder="选择格式" />
+            <Select options={apiFormatOptions} placeholder="选择格式" disabled={isFallbackEditing} />
           </Form.Item>
           <Form.Item
             name="compat_prefixes"
@@ -261,10 +292,11 @@ const AdminModelProviders = () => {
               mode="tags"
               placeholder="输入后回车添加，如 deepseek、glm-"
               tokenSeparators={[',']}
+              disabled={isFallbackEditing}
             />
           </Form.Item>
           <Form.Item name="billing_type" label="计费类型">
-            <Input placeholder="可选，默认 flat" />
+            <Input placeholder="可选，默认 flat" disabled={isFallbackEditing} />
           </Form.Item>
           <Form.Item name="status" label="状态" rules={[{ required: true }]}>
             <Select
@@ -275,7 +307,7 @@ const AdminModelProviders = () => {
             />
           </Form.Item>
           <Form.Item name="sort_order" label="排序" rules={[{ required: true }]}>
-            <InputNumber min={0} style={{ width: '100%' }} />
+            <InputNumber min={0} style={{ width: '100%' }} disabled={isFallbackEditing} />
           </Form.Item>
         </Form>
       </Modal>

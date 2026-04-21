@@ -192,6 +192,13 @@ func ListMerchantAPIKeys(c *gin.Context) {
 			COALESCE(NULLIF(TRIM(health_check_level), ''), 'medium'),
 			COALESCE(endpoint_url, ''),
 			COALESCE(NULLIF(TRIM(health_status), ''), 'unknown'),
+			COALESCE((
+				SELECT h.error_message
+				FROM api_key_health_history h
+				WHERE h.api_key_id = merchant_api_keys.id
+				ORDER BY h.created_at DESC
+				LIMIT 1
+			), ''),
 			last_health_check_at,
 			COALESCE(consecutive_failures, 0),
 			verified_at,
@@ -221,7 +228,7 @@ func ListMerchantAPIKeys(c *gin.Context) {
 		var modelsJSON []byte
 		scanErr := rows.Scan(
 			&key.ID, &key.MerchantID, &key.Name, &key.Provider, &qLim, &key.QuotaUsed, &key.Status, &lastUsedAt, &key.CreatedAt, &key.UpdatedAt,
-			&key.HealthCheckLevel, &key.EndpointURL, &key.HealthStatus, &lastHealth, &key.ConsecutiveFailures,
+			&key.HealthCheckLevel, &key.EndpointURL, &key.HealthStatus, &key.HealthErrorMessage, &lastHealth, &key.ConsecutiveFailures,
 			&verifiedAt, &key.VerificationResult, &key.VerificationMsg, &modelsJSON,
 			&key.CostInputRate, &key.CostOutputRate, &key.ProfitMargin,
 		)
