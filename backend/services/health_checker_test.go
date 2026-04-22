@@ -280,6 +280,12 @@ func TestOpenAICompatProbeURLs(t *testing.T) {
 			wantChat: "https://api.stepfun.com/v1/chat/completions",
 		},
 		{
+			name:     "zhipu_paas_v4_not_v1",
+			base:     "https://open.bigmodel.cn/api/paas/v4",
+			wantM:    "https://open.bigmodel.cn/api/paas/v4/models",
+			wantChat: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+		},
+		{
 			name:     "base_v1_with_trailing_slash",
 			base:     "https://api.openai.com/v1/",
 			wantM:    "https://api.openai.com/v1/models",
