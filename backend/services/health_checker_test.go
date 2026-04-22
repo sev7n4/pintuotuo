@@ -254,6 +254,56 @@ func TestExtractPricingInfo(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatProbeURLs(t *testing.T) {
+	tests := []struct {
+		name    string
+		base    string
+		wantM   string
+		wantChat string
+	}{
+		{
+			name:     "base_without_v1",
+			base:     "https://api.deepseek.com",
+			wantM:    "https://api.deepseek.com/v1/models",
+			wantChat: "https://api.deepseek.com/v1/chat/completions",
+		},
+		{
+			name:     "base_with_trailing_slash_no_v1",
+			base:     "https://api.siliconflow.cn/",
+			wantM:    "https://api.siliconflow.cn/v1/models",
+			wantChat: "https://api.siliconflow.cn/v1/chat/completions",
+		},
+		{
+			name:     "base_already_openai_v1_root",
+			base:     "https://api.stepfun.com/v1",
+			wantM:    "https://api.stepfun.com/v1/models",
+			wantChat: "https://api.stepfun.com/v1/chat/completions",
+		},
+		{
+			name:     "base_v1_with_trailing_slash",
+			base:     "https://api.openai.com/v1/",
+			wantM:    "https://api.openai.com/v1/models",
+			wantChat: "https://api.openai.com/v1/chat/completions",
+		},
+		{
+			name:     "dashscope_compatible_mode_v1",
+			base:     "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			wantM:    "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
+			wantChat: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if g := openAICompatModelsProbeURL(tt.base); g != tt.wantM {
+				t.Errorf("models URL = %q, want %q", g, tt.wantM)
+			}
+			if g := openAICompatChatCompletionsURL(tt.base); g != tt.wantChat {
+				t.Errorf("chat URL = %q, want %q", g, tt.wantChat)
+			}
+		})
+	}
+}
+
 func TestLightweightPing_InvalidEndpoint(t *testing.T) {
 	checker := NewHealthChecker()
 	ctx := context.Background()

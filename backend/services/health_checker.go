@@ -36,6 +36,36 @@ const (
 
 const fallbackProviderCode = "__default__"
 
+// normalizeOpenAICompatBase trims the resolved provider/merchant base URL for path joining.
+func normalizeOpenAICompatBase(endpoint string) string {
+	return strings.TrimRight(strings.TrimSpace(endpoint), "/")
+}
+
+// openAICompatModelsProbeURL returns the GET URL for OpenAI-compatible model listing.
+// When model_providers.api_base_url (or merchant endpoint_url) already ends with "/v1",
+// append "/models" only — matching api_key_validator (base + "/models") and avoiding "/v1/v1/models".
+func openAICompatModelsProbeURL(endpoint string) string {
+	b := normalizeOpenAICompatBase(endpoint)
+	if hasOpenAICompatV1PathSuffix(b) {
+		return b + "/models"
+	}
+	return b + "/v1/models"
+}
+
+// openAICompatChatCompletionsURL returns the POST URL for OpenAI-compatible chat completions.
+func openAICompatChatCompletionsURL(endpoint string) string {
+	b := normalizeOpenAICompatBase(endpoint)
+	if hasOpenAICompatV1PathSuffix(b) {
+		return b + "/chat/completions"
+	}
+	return b + "/v1/chat/completions"
+}
+
+func hasOpenAICompatV1PathSuffix(base string) bool {
+	// Case-fold so https://host/V1 still matches; path-only providers are lowercase in practice.
+	return strings.HasSuffix(strings.ToLower(base), "/v1")
+}
+
 var healthCheckIntervalMap = map[HealthCheckLevel]int{
 	HealthCheckLevelHigh:   60,
 	HealthCheckLevelMedium: 300,
@@ -162,7 +192,7 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 		}, nil
 	}
 
-	modelsEndpoint := strings.TrimRight(endpoint, "/") + "/v1/models"
+	modelsEndpoint := openAICompatModelsProbeURL(endpoint)
 	probe, err := ProbeProviderModels(ctx, s.httpClient, modelsEndpoint, s.getDecryptedAPIKey(apiKey))
 	if err != nil {
 		return &HealthCheckResult{
@@ -652,7 +682,7 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 		}, nil
 	}
 
-	chatEndpoint := endpoint + "/v1/chat/completions"
+	chatEndpoint := openAICompatChatCompletionsURL(endpoint)
 
 	testReq := TestChatRequest{
 		Model: model,
