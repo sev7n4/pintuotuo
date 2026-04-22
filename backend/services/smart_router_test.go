@@ -237,3 +237,119 @@ func TestRecordRequestResult(t *testing.T) {
 		t.Error("Circuit breaker should not be open after 1 failure")
 	}
 }
+
+func TestFilterByRouteDecision(t *testing.T) {
+	router := GetSmartRouter()
+
+	candidates := []RoutingCandidate{
+		{APIKeyID: 1, Provider: "openai", HealthStatus: "healthy", Verified: true},
+		{APIKeyID: 2, Provider: "anthropic", HealthStatus: "healthy", Verified: true},
+		{APIKeyID: 3, Provider: "google", HealthStatus: "healthy", Verified: true},
+	}
+
+	tests := []struct {
+		name     string
+		decision *RouteDecision
+		expected int
+	}{
+		{
+			name:     "nil decision returns all candidates",
+			decision: nil,
+			expected: 3,
+		},
+		{
+			name: "direct mode decision",
+			decision: &RouteDecision{
+				Mode:     "direct",
+				Endpoint: "https://api.openai.com/v1",
+				Reason:   "auto: direct connection",
+			},
+			expected: 3,
+		},
+		{
+			name: "litellm mode decision",
+			decision: &RouteDecision{
+				Mode:     "litellm",
+				Endpoint: "http://litellm-overseas:4000/v1",
+				Reason:   "auto: domestic user accessing overseas provider",
+			},
+			expected: 3,
+		},
+		{
+			name: "proxy mode decision with fallback",
+			decision: &RouteDecision{
+				Mode:             "litellm",
+				Endpoint:         "http://litellm-overseas:4000/v1",
+				FallbackMode:     "proxy",
+				FallbackEndpoint: "https://gaap.example.com",
+				Reason:           "configured route",
+			},
+			expected: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filtered := router.FilterByRouteDecision(candidates, tt.decision)
+			if len(filtered) != tt.expected {
+				t.Errorf("Expected %d candidates, got %d", tt.expected, len(filtered))
+			}
+		})
+	}
+}
+
+func TestMatchesRouteDecision(t *testing.T) {
+	router := GetSmartRouter()
+
+	candidate := RoutingCandidate{
+		APIKeyID:     1,
+		Provider:     "openai",
+		HealthStatus: "healthy",
+		Verified:     true,
+	}
+
+	tests := []struct {
+		name     string
+		decision *RouteDecision
+		expected bool
+	}{
+		{
+			name:     "nil decision matches",
+			decision: nil,
+			expected: true,
+		},
+		{
+			name: "direct mode matches",
+			decision: &RouteDecision{
+				Mode:     "direct",
+				Endpoint: "https://api.openai.com/v1",
+			},
+			expected: true,
+		},
+		{
+			name: "litellm mode matches",
+			decision: &RouteDecision{
+				Mode:     "litellm",
+				Endpoint: "http://litellm-overseas:4000/v1",
+			},
+			expected: true,
+		},
+		{
+			name: "proxy mode matches",
+			decision: &RouteDecision{
+				Mode:     "proxy",
+				Endpoint: "https://gaap.example.com",
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := router.matchesRouteDecision(candidate, tt.decision)
+			if result != tt.expected {
+				t.Errorf("Expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}

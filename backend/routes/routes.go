@@ -317,6 +317,13 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.POST("/model-providers", handlers.CreateModelProvider)
 		admin.PATCH("/model-providers/:id", handlers.PatchModelProvider)
 
+		admin.GET("/route-configs/providers", handlers.GetProviderRouteConfigs)
+		admin.GET("/route-configs/providers/:code", handlers.GetProviderRouteConfig)
+		admin.PUT("/route-configs/providers/:code", handlers.UpdateProviderRouteConfig)
+		admin.GET("/route-configs/merchants", handlers.GetMerchantRouteConfigs)
+		admin.PUT("/route-configs/merchants/:id", handlers.UpdateMerchantRouteConfig)
+		admin.POST("/route-configs/test", handlers.TestRouteDecision)
+
 		admin.GET("/model-catalog-keys", handlers.GetAdminCatalogModelKeys)
 		admin.GET("/model-fallback-rules", handlers.ListModelFallbackRules)
 		admin.POST("/model-fallback-rules", handlers.CreateModelFallbackRule)
