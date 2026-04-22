@@ -8,10 +8,10 @@ import (
 )
 
 var (
-	ErrInvalidJSON        = errors.New("invalid JSON format")
-	ErrInvalidMode        = errors.New("invalid route mode")
-	ErrInvalidURL         = errors.New("invalid endpoint URL")
-	ErrInvalidProxyMode   = errors.New("proxy mode requires proxy_endpoint")
+	ErrInvalidJSON      = errors.New("invalid JSON format")
+	ErrInvalidMode      = errors.New("invalid route mode")
+	ErrInvalidURL       = errors.New("invalid endpoint URL")
+	ErrInvalidProxyMode = errors.New("proxy mode requires proxy_endpoint")
 )
 
 var validModes = map[string]bool{
