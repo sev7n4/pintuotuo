@@ -638,7 +638,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			break
 		}
 
-		info := providerInfoFromUpstreamFailure(r.StatusCode, bRead, r.Header)
+		info := providerInfoFromUpstreamFailure(r.StatusCode, bRead, r.Header, nil)
 		services.GetSmartRouter().RecordRequestResult(pk.ID, false)
 		recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
 		if attemptIdx < len(attempts)-1 && services.SuggestModelFallbackAfterFailure(info) {
