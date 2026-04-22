@@ -3,10 +3,7 @@ import {
   Card,
   Table,
   Button,
-  Modal,
-  Form,
-  Input,
-  Select,
+  Space,
   message,
   Tag,
   Tabs,
@@ -16,15 +13,30 @@ import {
   Alert,
   Tooltip,
   InputNumber,
+  Input,
+  Typography,
+  Statistic,
 } from 'antd';
-import { EditOutlined, ApiOutlined, GlobalOutlined, ExperimentOutlined } from '@ant-design/icons';
+import {
+  EditOutlined,
+  ApiOutlined,
+  GlobalOutlined,
+  ExperimentOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  CrownOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons';
 import routeConfigService, {
   ProviderRouteConfig,
   MerchantRouteConfig,
   RouteTestResult,
 } from '@services/routeConfig';
+import ProviderConfigForm from '@components/admin/ProviderConfigForm';
+import MerchantConfigForm from '@components/admin/MerchantConfigForm';
 
 const { TabPane } = Tabs;
+const { Text } = Typography;
 
 const AdminRouteConfigs: React.FC = () => {
   const [providers, setProviders] = useState<ProviderRouteConfig[]>([]);
@@ -35,9 +47,9 @@ const AdminRouteConfigs: React.FC = () => {
   const [editingProvider, setEditingProvider] = useState<ProviderRouteConfig | null>(null);
   const [editingMerchant, setEditingMerchant] = useState<MerchantRouteConfig | null>(null);
   const [testResult, setTestResult] = useState<RouteTestResult | null>(null);
-  const [providerForm] = Form.useForm();
-  const [merchantForm] = Form.useForm();
-  const [testForm] = Form.useForm();
+  const [testLoading, setTestLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [testForm, setTestForm] = useState({ provider_code: '', merchant_id: 1 });
 
   useEffect(() => {
     fetchProviders();
@@ -67,73 +79,60 @@ const AdminRouteConfigs: React.FC = () => {
 
   const handleEditProvider = (record: ProviderRouteConfig) => {
     setEditingProvider(record);
-    providerForm.setFieldsValue({
-      provider_region: record.provider_region,
-      route_strategy: JSON.stringify(record.route_strategy || {}, null, 2),
-      endpoints: JSON.stringify(record.endpoints || {}, null, 2),
-    });
     setProviderModalVisible(true);
   };
 
-  const handleSaveProvider = async () => {
+  const handleSaveProvider = async (values: any) => {
     if (!editingProvider) return;
+    setSaveLoading(true);
     try {
-      const values = await providerForm.validateFields();
-      const routeStrategy = JSON.parse(values.route_strategy || '{}');
-      const endpoints = JSON.parse(values.endpoints || '{}');
-
-      await routeConfigService.updateProviderRouteConfig(editingProvider.code, {
-        provider_region: values.provider_region,
-        route_strategy: routeStrategy,
-        endpoints: endpoints,
-      });
+      await routeConfigService.updateProviderRouteConfig(editingProvider.code, values);
       message.success('更新成功');
       setProviderModalVisible(false);
       fetchProviders();
     } catch (error) {
-      message.error('更新失败，请检查 JSON 格式');
+      message.error('更新失败');
+    } finally {
+      setSaveLoading(false);
     }
   };
 
   const handleEditMerchant = (record: MerchantRouteConfig) => {
     setEditingMerchant(record);
-    merchantForm.setFieldsValue({
-      merchant_type: record.merchant_type,
-      region: record.region,
-      route_preference: JSON.stringify(record.route_preference || {}, null, 2),
-    });
     setMerchantModalVisible(true);
   };
 
-  const handleSaveMerchant = async () => {
+  const handleSaveMerchant = async (values: any) => {
     if (!editingMerchant) return;
+    setSaveLoading(true);
     try {
-      const values = await merchantForm.validateFields();
-      const routePreference = JSON.parse(values.route_preference || '{}');
-
-      await routeConfigService.updateMerchantRouteConfig(editingMerchant.id, {
-        merchant_type: values.merchant_type,
-        region: values.region,
-        route_preference: routePreference,
-      });
+      await routeConfigService.updateMerchantRouteConfig(editingMerchant.id, values);
       message.success('更新成功');
       setMerchantModalVisible(false);
       fetchMerchants();
     } catch (error) {
-      message.error('更新失败，请检查 JSON 格式');
+      message.error('更新失败');
+    } finally {
+      setSaveLoading(false);
     }
   };
 
   const handleTestRoute = async () => {
+    if (!testForm.provider_code || !testForm.merchant_id) {
+      message.warning('请填写厂商代码和商户ID');
+      return;
+    }
+    setTestLoading(true);
     try {
-      const values = await testForm.validateFields();
       const result = await routeConfigService.testRouteDecision(
-        values.provider_code,
-        values.merchant_id
+        testForm.provider_code,
+        testForm.merchant_id
       );
       setTestResult(result);
     } catch (error) {
-      message.error('测试失败');
+      message.error('测试失败，请检查输入是否正确');
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -143,11 +142,13 @@ const AdminRouteConfigs: React.FC = () => {
       dataIndex: 'id',
       key: 'id',
       width: 60,
+      responsive: ['md'] as any,
     },
     {
       title: '厂商代码',
       dataIndex: 'code',
       key: 'code',
+      render: (code: string) => <Tag color="blue">{code}</Tag>,
     },
     {
       title: '厂商名称',
@@ -169,7 +170,10 @@ const AdminRouteConfigs: React.FC = () => {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Tag color={status === 'active' ? 'green' : 'default'}>
+        <Tag
+          color={status === 'active' ? 'success' : 'default'}
+          icon={status === 'active' ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+        >
           {status === 'active' ? '启用' : '禁用'}
         </Tag>
       ),
@@ -177,10 +181,15 @@ const AdminRouteConfigs: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 100,
       render: (_: any, record: ProviderRouteConfig) => (
-        <Button type="link" icon={<EditOutlined />} onClick={() => handleEditProvider(record)}>
-          编辑
+        <Button
+          type="link"
+          icon={<EditOutlined />}
+          onClick={() => handleEditProvider(record)}
+          size="small"
+        >
+          配置
         </Button>
       ),
     },
@@ -203,7 +212,10 @@ const AdminRouteConfigs: React.FC = () => {
       dataIndex: 'merchant_type',
       key: 'merchant_type',
       render: (type: string) => (
-        <Tag color={type === 'enterprise' ? 'gold' : 'default'}>
+        <Tag
+          color={type === 'enterprise' ? 'gold' : 'default'}
+          icon={type === 'enterprise' ? <CrownOutlined /> : undefined}
+        >
           {type === 'enterprise' ? '企业' : '标准'}
         </Tag>
       ),
@@ -223,7 +235,10 @@ const AdminRouteConfigs: React.FC = () => {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <Tag color={status === 'active' ? 'green' : 'default'}>
+        <Tag
+          color={status === 'active' ? 'success' : 'default'}
+          icon={status === 'active' ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+        >
           {status === 'active' ? '启用' : '禁用'}
         </Tag>
       ),
@@ -231,228 +246,314 @@ const AdminRouteConfigs: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 100,
       render: (_: any, record: MerchantRouteConfig) => (
-        <Button type="link" icon={<EditOutlined />} onClick={() => handleEditMerchant(record)}>
-          编辑
+        <Button
+          type="link"
+          icon={<EditOutlined />}
+          onClick={() => handleEditMerchant(record)}
+          size="small"
+        >
+          配置
         </Button>
       ),
     },
   ];
 
+  const domesticProviders = providers.filter((p) => p.provider_region === 'domestic');
+  const overseasProviders = providers.filter((p) => p.provider_region === 'overseas');
+  const domesticMerchants = merchants.filter((m) => m.region === 'domestic');
+  const overseasMerchants = merchants.filter((m) => m.region === 'overseas');
+
   return (
-    <Card title="统一路由配置管理">
-      <Alert
-        message="统一路由配置说明"
-        description="通过配置厂商区域、路由策略和端点信息，实现基于商户类型和区域的智能路由决策。系统会自动选择最优路由模式（直连/LiteLLM/代理）。"
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-      />
+    <div style={{ padding: '0 0 24px 0' }}>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} md={6}>
+          <Card size="small">
+            <Statistic
+              title="厂商总数"
+              value={providers.length}
+              prefix={<ApiOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card size="small">
+            <Statistic
+              title="海外厂商"
+              value={overseasProviders.length}
+              prefix={<GlobalOutlined />}
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card size="small">
+            <Statistic
+              title="商户总数"
+              value={merchants.length}
+              prefix={<ApiOutlined />}
+              valueStyle={{ color: '#722ed1' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card size="small">
+            <Statistic
+              title="企业商户"
+              value={merchants.filter((m) => m.merchant_type === 'enterprise').length}
+              prefix={<CrownOutlined />}
+              valueStyle={{ color: '#faad14' }}
+            />
+          </Card>
+        </Col>
+      </Row>
 
-      <Tabs defaultActiveKey="providers">
-        <TabPane tab="厂商配置" key="providers">
-          <Table
-            columns={providerColumns}
-            dataSource={providers}
-            rowKey="id"
-            loading={loading}
-            pagination={{ pageSize: 20 }}
-          />
-        </TabPane>
-
-        <TabPane tab="商户配置" key="merchants">
-          <Table
-            columns={merchantColumns}
-            dataSource={merchants}
-            rowKey="id"
-            loading={loading}
-            pagination={{ pageSize: 20 }}
-          />
-        </TabPane>
-
-        <TabPane
-          tab={
-            <span>
-              <ExperimentOutlined />
-              路由测试
-            </span>
+      <Card style={{ marginTop: 16 }}>
+        <Alert
+          message={
+            <Space>
+              <span>统一路由配置管理</span>
+              <Tooltip title="通过配置厂商区域、路由策略和端点信息，实现基于商户类型和区域的智能路由决策">
+                <InfoCircleOutlined style={{ color: '#1890ff' }} />
+              </Tooltip>
+            </Space>
           }
-          key="test"
-        >
-          <Card>
-            <Form form={testForm} layout="inline">
-              <Form.Item
-                name="provider_code"
-                label="厂商代码"
-                rules={[{ required: true, message: '请输入厂商代码' }]}
-              >
-                <Input placeholder="如: openai" style={{ width: 150 }} />
-              </Form.Item>
-              <Form.Item
-                name="merchant_id"
-                label="商户ID"
-                rules={[{ required: true, message: '请输入商户ID' }]}
-              >
-                <InputNumber placeholder="商户ID" style={{ width: 150 }} />
-              </Form.Item>
-              <Form.Item>
-                <Button type="primary" onClick={handleTestRoute}>
-                  测试路由
-                </Button>
-              </Form.Item>
-            </Form>
+          description="系统会根据商户类型和区域自动选择最优路由模式（直连/LiteLLM/代理），无需手动干预。"
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
 
-            {testResult && (
-              <div style={{ marginTop: 24 }}>
-                <Divider>测试结果</Divider>
-                <Row gutter={[16, 16]}>
-                  <Col span={12}>
-                    <Card size="small" title="路由决策">
-                      <p>
-                        <strong>路由模式:</strong> <Tag color="blue">{testResult.mode}</Tag>
-                      </p>
-                      <p>
-                        <strong>端点:</strong> {testResult.endpoint || '-'}
-                      </p>
-                      <p>
-                        <strong>降级模式:</strong> {testResult.fallback_mode || '-'}
-                      </p>
-                      <p>
-                        <strong>降级端点:</strong> {testResult.fallback_endpoint || '-'}
-                      </p>
-                      <p>
-                        <strong>决策原因:</strong> {testResult.reason}
-                      </p>
-                    </Card>
+        <Tabs defaultActiveKey="providers">
+          <TabPane
+            tab={
+              <Space>
+                <ApiOutlined />
+                <span>厂商配置</span>
+                <Tag color="blue">{providers.length}</Tag>
+              </Space>
+            }
+            key="providers"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Card
+                size="small"
+                title={
+                  <Space>
+                    <GlobalOutlined style={{ color: '#52c41a' }} />
+                    国内厂商
+                  </Space>
+                }
+              >
+                <Table
+                  columns={providerColumns}
+                  dataSource={domesticProviders}
+                  rowKey="id"
+                  loading={loading}
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 600 }}
+                />
+              </Card>
+
+              <Card
+                size="small"
+                title={
+                  <Space>
+                    <GlobalOutlined style={{ color: '#1890ff' }} />
+                    海外厂商
+                  </Space>
+                }
+              >
+                <Table
+                  columns={providerColumns}
+                  dataSource={overseasProviders}
+                  rowKey="id"
+                  loading={loading}
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 600 }}
+                />
+              </Card>
+            </Space>
+          </TabPane>
+
+          <TabPane
+            tab={
+              <Space>
+                <ApiOutlined />
+                <span>商户配置</span>
+                <Tag color="purple">{merchants.length}</Tag>
+              </Space>
+            }
+            key="merchants"
+          >
+            <Space direction="vertical" style={{ width: '100%' }} size="middle">
+              <Card
+                size="small"
+                title={
+                  <Space>
+                    <GlobalOutlined style={{ color: '#52c41a' }} />
+                    国内商户
+                  </Space>
+                }
+              >
+                <Table
+                  columns={merchantColumns}
+                  dataSource={domesticMerchants}
+                  rowKey="id"
+                  loading={loading}
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 600 }}
+                />
+              </Card>
+
+              <Card
+                size="small"
+                title={
+                  <Space>
+                    <GlobalOutlined style={{ color: '#1890ff' }} />
+                    海外商户
+                  </Space>
+                }
+              >
+                <Table
+                  columns={merchantColumns}
+                  dataSource={overseasMerchants}
+                  rowKey="id"
+                  loading={loading}
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 600 }}
+                />
+              </Card>
+            </Space>
+          </TabPane>
+
+          <TabPane
+            tab={
+              <Space>
+                <ExperimentOutlined />
+                <span>路由测试</span>
+              </Space>
+            }
+            key="test"
+          >
+            <Card>
+              <Space direction="vertical" style={{ width: '100%' }} size="large">
+                <Row gutter={16}>
+                  <Col xs={24} sm={12} md={8}>
+                    <Input
+                      placeholder="厂商代码（如: openai）"
+                      value={testForm.provider_code}
+                      onChange={(e) => setTestForm({ ...testForm, provider_code: e.target.value })}
+                      prefix={<ApiOutlined />}
+                    />
                   </Col>
-                  <Col span={12}>
-                    <Card size="small" title="厂商配置">
-                      <pre style={{ fontSize: 12, maxHeight: 200, overflow: 'auto' }}>
-                        {JSON.stringify(testResult.provider_config, null, 2)}
-                      </pre>
-                    </Card>
+                  <Col xs={24} sm={12} md={8}>
+                    <InputNumber
+                      placeholder="商户ID"
+                      value={testForm.merchant_id}
+                      onChange={(v) => setTestForm({ ...testForm, merchant_id: v || 1 })}
+                      style={{ width: '100%' }}
+                      min={1}
+                    />
                   </Col>
-                  <Col span={24}>
-                    <Card size="small" title="商户配置">
-                      <pre style={{ fontSize: 12, maxHeight: 200, overflow: 'auto' }}>
-                        {JSON.stringify(testResult.merchant_config, null, 2)}
-                      </pre>
-                    </Card>
+                  <Col xs={24} sm={24} md={8}>
+                    <Button
+                      type="primary"
+                      onClick={handleTestRoute}
+                      loading={testLoading}
+                      icon={<ExperimentOutlined />}
+                      block
+                    >
+                      测试路由
+                    </Button>
                   </Col>
                 </Row>
-              </div>
-            )}
-          </Card>
-        </TabPane>
-      </Tabs>
 
-      <Modal
-        title={`编辑厂商配置 - ${editingProvider?.name}`}
-        open={providerModalVisible}
-        onOk={handleSaveProvider}
+                {testResult && (
+                  <>
+                    <Divider>测试结果</Divider>
+                    <Row gutter={[16, 16]}>
+                      <Col xs={24} md={12}>
+                        <Card
+                          size="small"
+                          title="路由决策"
+                          style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f' }}
+                        >
+                          <Space direction="vertical" style={{ width: '100%' }}>
+                            <div>
+                              <Text strong>路由模式: </Text>
+                              <Tag color="blue">{testResult.mode}</Tag>
+                            </div>
+                            <div>
+                              <Text strong>端点: </Text>
+                              <Text copyable>{testResult.endpoint || '-'}</Text>
+                            </div>
+                            <div>
+                              <Text strong>降级模式: </Text>
+                              <Tag color="orange">{testResult.fallback_mode || '无'}</Tag>
+                            </div>
+                            <div>
+                              <Text strong>降级端点: </Text>
+                              <Text copyable>{testResult.fallback_endpoint || '-'}</Text>
+                            </div>
+                            <div>
+                              <Text strong>决策原因: </Text>
+                              <Text type="secondary">{testResult.reason}</Text>
+                            </div>
+                          </Space>
+                        </Card>
+                      </Col>
+
+                      <Col xs={24} md={12}>
+                        <Card size="small" title="厂商配置">
+                          <pre
+                            style={{ fontSize: 11, maxHeight: 200, overflow: 'auto', margin: 0 }}
+                          >
+                            {JSON.stringify(testResult.provider_config, null, 2)}
+                          </pre>
+                        </Card>
+                      </Col>
+
+                      <Col xs={24}>
+                        <Card size="small" title="商户配置">
+                          <pre
+                            style={{ fontSize: 11, maxHeight: 200, overflow: 'auto', margin: 0 }}
+                          >
+                            {JSON.stringify(testResult.merchant_config, null, 2)}
+                          </pre>
+                        </Card>
+                      </Col>
+                    </Row>
+                  </>
+                )}
+              </Space>
+            </Card>
+          </TabPane>
+        </Tabs>
+      </Card>
+
+      <ProviderConfigForm
+        visible={providerModalVisible}
+        provider={editingProvider}
         onCancel={() => setProviderModalVisible(false)}
-        width={800}
-      >
-        <Form form={providerForm} layout="vertical">
-          <Form.Item
-            name="provider_region"
-            label="厂商区域"
-            rules={[{ required: true, message: '请选择区域' }]}
-          >
-            <Select
-              options={[
-                { value: 'domestic', label: '国内' },
-                { value: 'overseas', label: '海外' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item
-            name="route_strategy"
-            label={
-              <span>
-                路由策略 (JSON)
-                <Tooltip title='配置不同用户类型的路由策略，如: {"domestic_users": {"mode": "litellm"}}'>
-                  <ApiOutlined style={{ marginLeft: 8, color: '#999' }} />
-                </Tooltip>
-              </span>
-            }
-          >
-            <Input.TextArea rows={8} placeholder='{"domestic_users": {"mode": "litellm"}}' />
-          </Form.Item>
-          <Form.Item
-            name="endpoints"
-            label={
-              <span>
-                端点配置 (JSON)
-                <Tooltip title="配置不同路由模式的端点URL">
-                  <ApiOutlined style={{ marginLeft: 8, color: '#999' }} />
-                </Tooltip>
-              </span>
-            }
-          >
-            <Input.TextArea
-              rows={8}
-              placeholder='{"litellm": {"domestic": "http://litellm:4000/v1"}}'
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
+        onOk={handleSaveProvider}
+        loading={saveLoading}
+      />
 
-      <Modal
-        title={`编辑商户配置 - ${editingMerchant?.name}`}
-        open={merchantModalVisible}
-        onOk={handleSaveMerchant}
+      <MerchantConfigForm
+        visible={merchantModalVisible}
+        merchant={editingMerchant}
         onCancel={() => setMerchantModalVisible(false)}
-        width={800}
-      >
-        <Form form={merchantForm} layout="vertical">
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="merchant_type"
-                label="商户类型"
-                rules={[{ required: true, message: '请选择类型' }]}
-              >
-                <Select
-                  options={[
-                    { value: 'standard', label: '标准' },
-                    { value: 'enterprise', label: '企业' },
-                  ]}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="region"
-                label="商户区域"
-                rules={[{ required: true, message: '请选择区域' }]}
-              >
-                <Select
-                  options={[
-                    { value: 'domestic', label: '国内' },
-                    { value: 'overseas', label: '海外' },
-                  ]}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item
-            name="route_preference"
-            label={
-              <span>
-                路由偏好 (JSON)
-                <Tooltip title="配置商户的路由偏好设置">
-                  <ApiOutlined style={{ marginLeft: 8, color: '#999' }} />
-                </Tooltip>
-              </span>
-            }
-          >
-            <Input.TextArea rows={6} placeholder='{"preferred_mode": "litellm"}' />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </Card>
+        onOk={handleSaveMerchant}
+        loading={saveLoading}
+      />
+    </div>
   );
 };
 
