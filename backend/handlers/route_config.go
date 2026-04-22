@@ -61,7 +61,6 @@ func GetProviderRouteConfigs(c *gin.Context) {
 	if status != "" {
 		query += " AND status = $" + strconv.Itoa(argPos)
 		args = append(args, status)
-		argPos++
 	}
 
 	query += " ORDER BY id ASC"
@@ -329,7 +328,6 @@ func GetMerchantRouteConfigs(c *gin.Context) {
 	if status != "" {
 		query += " AND status = $" + strconv.Itoa(argPos)
 		args = append(args, status)
-		argPos++
 	}
 
 	query += " ORDER BY id DESC LIMIT 100"
@@ -404,7 +402,7 @@ func UpdateMerchantRouteConfig(c *gin.Context) {
 	}
 
 	var req UpdateMerchantRouteConfigRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err = c.ShouldBindJSON(&req); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
@@ -551,7 +549,7 @@ func TestRouteDecision(c *gin.Context) {
 	json.Unmarshal(routePrefJSON, &routePref)
 
 	router := services.NewUnifiedRouter(nil)
-	decision, err := router.DecideRoute(nil,
+	decision, err := router.DecideRoute(c.Request.Context(),
 		&services.ProviderConfig{
 			Code:           req.ProviderCode,
 			ProviderRegion: providerRegion,
