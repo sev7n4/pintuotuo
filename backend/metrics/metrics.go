@@ -485,3 +485,93 @@ func RecordPricingCacheReload(source string) {
 func SetPricingCacheSize(size int) {
 	PricingCacheSize.WithLabelValues().Set(float64(size))
 }
+
+// Routing Decision Metrics
+var (
+	RoutingDecisionTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "routing_decision_total",
+			Help: "Total number of routing decisions made",
+		},
+		[]string{"provider", "merchant_region", "merchant_type", "mode"},
+	)
+
+	RoutingDecisionDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "routing_decision_duration_seconds",
+			Help:    "Routing decision duration in seconds",
+			Buckets: []float64{.00001, .00005, .0001, .0005, .001, .005, .01},
+		},
+		[]string{"provider"},
+	)
+
+	RoutingFallbackTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "routing_fallback_total",
+			Help: "Total number of routing fallbacks triggered",
+		},
+		[]string{"provider", "original_mode", "fallback_mode", "reason"},
+	)
+
+	RoutingFallbackActive = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "routing_fallback_active",
+			Help: "Number of active routing fallbacks",
+		},
+		[]string{"provider"},
+	)
+
+	EndpointRequestDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "endpoint_request_duration_seconds",
+			Help:    "Endpoint request duration in seconds",
+			Buckets: []float64{.01, .05, .1, .25, .5, 1, 2.5, 5, 10, 30},
+		},
+		[]string{"provider", "endpoint_type"},
+	)
+
+	EndpointRequestErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "endpoint_request_errors_total",
+			Help: "Total number of endpoint request errors",
+		},
+		[]string{"provider", "endpoint_type", "error_type"},
+	)
+
+	EndpointHealthStatus = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "endpoint_health_status",
+			Help: "Endpoint health status (1=healthy, 0.5=degraded, 0=unhealthy)",
+		},
+		[]string{"provider", "endpoint_type"},
+	)
+)
+
+// RecordRoutingDecision records a routing decision
+func RecordRoutingDecision(provider, merchantRegion, merchantType, mode string, durationSeconds float64) {
+	RoutingDecisionTotal.WithLabelValues(provider, merchantRegion, merchantType, mode).Inc()
+	RoutingDecisionDuration.WithLabelValues(provider).Observe(durationSeconds)
+}
+
+// RecordRoutingFallback records a routing fallback event
+func RecordRoutingFallback(provider, originalMode, fallbackMode, reason string) {
+	RoutingFallbackTotal.WithLabelValues(provider, originalMode, fallbackMode, reason).Inc()
+}
+
+// SetRoutingFallbackActive sets the number of active fallbacks for a provider
+func SetRoutingFallbackActive(provider string, count int) {
+	RoutingFallbackActive.WithLabelValues(provider).Set(float64(count))
+}
+
+// RecordEndpointRequest records an endpoint request
+func RecordEndpointRequest(provider, endpointType string, durationSeconds float64, isError bool, errorType string) {
+	EndpointRequestDuration.WithLabelValues(provider, endpointType).Observe(durationSeconds)
+	if isError {
+		EndpointRequestErrors.WithLabelValues(provider, endpointType, errorType).Inc()
+	}
+}
+
+// SetEndpointHealthStatus sets the health status of an endpoint
+func SetEndpointHealthStatus(provider, endpointType string, status float64) {
+	EndpointHealthStatus.WithLabelValues(provider, endpointType).Set(status)
+}

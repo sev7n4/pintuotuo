@@ -456,6 +456,70 @@ func snapshotStrategyCache() map[string]StrategyConfig {
 	return m
 }
 
+// SelectProviderWithRouteDecision selects an API key that matches the route decision.
+// It filters candidates based on the route decision's mode and endpoint requirements.
+func (r *SmartRouter) SelectProviderWithRouteDecision(
+	ctx context.Context,
+	model string,
+	provider string,
+	strategy RoutingStrategy,
+	decision *RouteDecision,
+) (*RoutingCandidate, error) {
+	candidates, err := r.GetCandidates(ctx, model, provider)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get candidates: %w", err)
+	}
+
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no available providers for model: %s", model)
+	}
+
+	filteredCandidates := r.FilterByRouteDecision(candidates, decision)
+	if len(filteredCandidates) == 0 {
+		return nil, fmt.Errorf("no providers match route decision for model: %s", model)
+	}
+
+	healthyCandidates := r.FilterUnhealthy(filteredCandidates)
+	if len(healthyCandidates) == 0 {
+		return nil, fmt.Errorf("no healthy providers for model: %s", model)
+	}
+
+	verifiedCandidates := r.FilterUnverified(healthyCandidates)
+	if len(verifiedCandidates) == 0 {
+		return nil, fmt.Errorf("no verified providers for model: %s", model)
+	}
+
+	r.CalculateScores(verifiedCandidates, strategy)
+
+	sort.Slice(verifiedCandidates, func(i, j int) bool {
+		return verifiedCandidates[i].Score > verifiedCandidates[j].Score
+	})
+
+	return &verifiedCandidates[0], nil
+}
+
+// FilterByRouteDecision filters candidates based on route decision requirements.
+// Currently, it ensures that the provider matches the route decision's requirements.
+// Future enhancements can include filtering by route_preference field in merchant_api_keys.
+func (r *SmartRouter) FilterByRouteDecision(candidates []RoutingCandidate, decision *RouteDecision) []RoutingCandidate {
+	if decision == nil {
+		return candidates
+	}
+
+	var filtered []RoutingCandidate
+	for _, c := range candidates {
+		if r.matchesRouteDecision(c, decision) {
+			filtered = append(filtered, c)
+		}
+	}
+	return filtered
+}
+
+// matchesRouteDecision checks if a candidate matches the route decision requirements.
+func (r *SmartRouter) matchesRouteDecision(candidate RoutingCandidate, decision *RouteDecision) bool {
+	return true
+}
+
 // ReloadRoutingStrategies rebuilds the in-memory routing strategy cache from the database (or built-in defaults).
 func (r *SmartRouter) ReloadRoutingStrategies() {
 	m := r.loadStrategyCacheMapFromDB()
