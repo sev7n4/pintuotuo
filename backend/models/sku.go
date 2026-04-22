@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type ModelProvider struct {
 	ID          int    `json:"id"`
@@ -17,10 +20,14 @@ type ModelProvider struct {
 	SegmentConfig           map[string]any `json:"segment_config,omitempty"`
 	CacheEnabled            bool           `json:"cache_enabled"`
 	CacheDiscount           float64        `json:"cache_discount_rate,omitempty"`
-	Status                  string         `json:"status"`
-	SortOrder               int            `json:"sort_order"`
-	CreatedAt               time.Time      `json:"created_at"`
-	UpdatedAt               time.Time      `json:"updated_at"`
+	// 统一配置化路由系统字段
+	ProviderRegion string          `json:"provider_region,omitempty"` // domestic, overseas
+	RouteStrategy  json.RawMessage `json:"route_strategy,omitempty"`  // JSONB: route strategy config
+	Endpoints      json.RawMessage `json:"endpoints,omitempty"`       // JSONB: endpoints config
+	Status         string          `json:"status"`
+	SortOrder      int             `json:"sort_order"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
 type SPU struct {
