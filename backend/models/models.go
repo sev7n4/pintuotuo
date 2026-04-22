@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // User represents a user in the system
 type User struct {
@@ -180,6 +183,8 @@ type Merchant struct {
 	AdminNotes         *string    `json:"admin_notes,omitempty"`       // 管理员内部备注
 	Status             string     `json:"status"`                      // pending, reviewing, active, suspended, rejected
 	LifecycleStatus    string     `json:"lifecycle_status,omitempty"`  // trial | active | suspended (ops lifecycle)
+	MerchantType       string     `json:"merchant_type,omitempty"`     // standard, enterprise, premium
+	Region             string     `json:"region,omitempty"`            // domestic, overseas
 	ReviewedAt         *time.Time `json:"reviewed_at,omitempty"`
 	ReviewNote         *string    `json:"review_note,omitempty"`
 	RejectionReason    *string    `json:"rejection_reason,omitempty"`
@@ -214,16 +219,18 @@ type MerchantAPIKey struct {
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 
-	HealthCheckInterval int        `json:"health_check_interval,omitempty"`
-	HealthCheckLevel    string     `json:"health_check_level,omitempty"`
-	EndpointURL         string     `json:"endpoint_url,omitempty"`
-	HealthStatus        string     `json:"health_status,omitempty"`
-	HealthErrorMessage  string     `json:"health_error_message,omitempty"`
-	HealthErrorCategory string     `json:"health_error_category,omitempty"`
-	HealthErrorCode     string     `json:"health_error_code,omitempty"`
-	HealthRequestID     string     `json:"health_provider_request_id,omitempty"`
-	LastHealthCheckAt   *time.Time `json:"last_health_check_at,omitempty"`
-	ConsecutiveFailures int        `json:"consecutive_failures,omitempty"`
+	MerchantRegion      string          `json:"merchant_region,omitempty"`  // domestic, overseas
+	RoutePreference     json.RawMessage `json:"route_preference,omitempty"` // JSONB: route preference config
+	HealthCheckInterval int             `json:"health_check_interval,omitempty"`
+	HealthCheckLevel    string          `json:"health_check_level,omitempty"`
+	EndpointURL         string          `json:"endpoint_url,omitempty"`
+	HealthStatus        string          `json:"health_status,omitempty"`
+	HealthErrorMessage  string          `json:"health_error_message,omitempty"`
+	HealthErrorCategory string          `json:"health_error_category,omitempty"`
+	HealthErrorCode     string          `json:"health_error_code,omitempty"`
+	HealthRequestID     string          `json:"health_provider_request_id,omitempty"`
+	LastHealthCheckAt   *time.Time      `json:"last_health_check_at,omitempty"`
+	ConsecutiveFailures int             `json:"consecutive_failures,omitempty"`
 
 	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
 	VerificationResult string     `json:"verification_result,omitempty"`

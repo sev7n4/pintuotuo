@@ -1,25 +1,38 @@
 {
-  "current_step": "Step 0: 初始化检查",
-  "branch_name": "feature/settlement-enhancements-part2",
-  "issue_description": "完善Phase 7和Phase 8剩余功能：1. 商户结算页面账单明细查看；2. 边界条件测试；3. 对账功能完善；4. 性能优化和文档完善",
+  "workflow_id": "unified-routing-system-001",
+  "created_at": "2026-04-22T00:00:00Z",
+  "current_step": 8,
+  "branch": "feature/unified-routing-001",
+  "pr_number": null,
   "current_fix_cases": [
-    "TC-MERCHANT-BILLING-DETAIL-001: 测试商户账单明细查看",
-    "TC-BOUNDARY-TEST-001: 测试边界条件",
-    "TC-RECONCILE-ENHANCE-001: 测试对账功能增强"
+    "test_migration_062",
+    "test_provider_config_parsing",
+    "test_merchant_config_parsing",
+    "test_route_strategy_validation",
+    "test_endpoints_validation"
   ],
-  "problem_type": "功能开发 - 需要实现新功能",
-  "requires_tdd": true,
-  "ci_status": {
-    "cicd": "pending",
-    "integration": "pending",
-    "e2e": "pending",
-    "deploy": "pending"
-  },
   "retry_count": 0,
   "error_history": [],
-  "local_validation": "pending",
-  "pr_number": null,
+  "ci_status": {
+    "cicd": null,
+    "integration": null,
+    "e2e": null,
+    "deploy": null
+  },
+  "local_validation": "passed",
   "merged": false,
-  "created_at": "2026-04-06T00:00:00Z",
-  "updated_at": "2026-04-06T00:00:00Z"
+  "issue": {
+    "type": "feature",
+    "title": "统一配置化路由系统 - 阶段一：数据模型扩展",
+    "description": "实现统一配置化路由系统的数据模型扩展，包括 model_providers、merchant_api_keys、merchants 表的字段扩展",
+    "tasks": [
+      "创建迁移脚本 062_unified_routing_config.sql",
+      "扩展 model_providers 表字段",
+      "扩展 merchant_api_keys 表字段",
+      "扩展 merchants 表字段",
+      "更新 Go 数据模型",
+      "创建配置解析工具",
+      "编写单元测试"
+    ]
+  }
 }
