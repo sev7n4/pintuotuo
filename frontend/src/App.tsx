@@ -64,6 +64,7 @@ import AdminBillings from '@pages/admin/AdminBillings';
 import AdminUserBillings from '@pages/admin/AdminUserBillings';
 import AdminSettlements from '@pages/admin/AdminSettlements';
 import AdminRoutingStrategies from '@pages/admin/AdminRoutingStrategies';
+import AdminRouteConfigs from '@pages/admin/AdminRouteConfigs';
 import AdminReconciliation from '@pages/admin/AdminReconciliation';
 import AdminEntitlementPackages from '@pages/admin/AdminEntitlementPackages';
 
@@ -173,6 +174,7 @@ function App() {
             <Route path="model-providers" element={<AdminModelProviders />} />
             <Route path="model-fallback" element={<AdminModelFallback />} />
             <Route path="routing-strategies" element={<AdminRoutingStrategies />} />
+            <Route path="route-configs" element={<AdminRouteConfigs />} />
             <Route path="reconciliation" element={<AdminReconciliation />} />
             <Route path="flash-sales" element={<AdminFlashSales />} />
             <Route path="fuel-station" element={<AdminFuelStation />} />
