@@ -179,6 +179,47 @@ func ValidateFallbackRule(ctx context.Context, db *sql.DB, excludeID int, source
 	return source, chain, nil
 }
 
+// GetEnabledFallbackChain 返回主模型（规范化后的 catalog key）对应的启用备用链，无规则时 nil。
+func GetEnabledFallbackChain(ctx context.Context, db *sql.DB, sourceCanonical string) ([]string, error) {
+	if db == nil || strings.TrimSpace(sourceCanonical) == "" {
+		return nil, nil
+	}
+	var fbs pq.StringArray
+	err := db.QueryRowContext(ctx,
+		`SELECT fallback_models FROM model_fallback_rules WHERE enabled = true AND source_model = $1`,
+		strings.TrimSpace(sourceCanonical),
+	).Scan(&fbs)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, x := range fbs {
+		x = strings.TrimSpace(x)
+		if x != "" {
+			out = append(out, x)
+		}
+	}
+	return DedupeFallbackChainUnique(out), nil
+}
+
+// SplitCatalogModelKey 解析目录键 provider/model（小写 provider code）。
+func SplitCatalogModelKey(key string) (provider string, modelName string, err error) {
+	key = strings.TrimSpace(key)
+	idx := strings.Index(key, "/")
+	if idx <= 0 || idx == len(key)-1 {
+		return "", "", fmt.Errorf("invalid catalog model key")
+	}
+	p := strings.ToLower(strings.TrimSpace(key[:idx]))
+	m := strings.TrimSpace(key[idx+1:])
+	if p == "" || m == "" {
+		return "", "", fmt.Errorf("invalid catalog model key")
+	}
+	return p, m, nil
+}
+
 // ListCatalogModelKeys 返回当前上架目录中全部 OpenAI 兼容模型 id（provider/model）。
 func ListCatalogModelKeys(ctx context.Context, db *sql.DB) ([]string, error) {
 	rows, err := db.QueryContext(ctx, `

@@ -10,6 +10,16 @@ func TestDedupeFallbackChainUnique(t *testing.T) {
 	}
 }
 
+func TestSplitCatalogModelKey(t *testing.T) {
+	p, m, err := SplitCatalogModelKey(" OpenAI/gpt-4o-mini ")
+	if err != nil || p != "openai" || m != "gpt-4o-mini" {
+		t.Fatalf("got %q %q err=%v", p, m, err)
+	}
+	if _, _, err := SplitCatalogModelKey("nope"); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestFallbackGraphHasCycle(t *testing.T) {
 	if !FallbackGraphHasCycle(map[string][]string{
 		"a": {"b"},
