@@ -79,6 +79,11 @@ const menuItems = [
     label: '路由策略',
   },
   {
+    key: '/admin/route-configs',
+    icon: <ApiOutlined />,
+    label: '路由配置',
+  },
+  {
     key: '/admin/flash-sales',
     icon: <ThunderboltOutlined />,
     label: '秒杀配置',
