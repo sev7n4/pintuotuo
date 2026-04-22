@@ -403,43 +403,26 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		for attemptIdx, att := range streamAttempts {
 			traceSpan.SetRoute(att.provider, att.model)
 
-			var pk models.MerchantAPIKey
-			var dk string
-			var pcfg providerRuntimeConfig
-			if attemptIdx == 0 {
-				pk = apiKey
-				dk = decryptedKey
-				pcfg = providerCfg
-			} else if att.provider == req.Provider {
-				pk = apiKey
-				dk = decryptedKey
-				pcfg = providerCfg
-			} else {
-				modReq := req
-				modReq.Provider = att.provider
-				modReq.Model = att.model
-				if selErr := selectAPIKeyForRequest(db, userIDInt, merchantID, modReq, &pk, entCtx); selErr != nil {
-					logger.LogWarn(c.Request.Context(), "api_proxy", "stream model fallback key selection skipped", map[string]interface{}{
-						"request_id": requestID, "provider": att.provider, "model": att.model, "error": selErr.Error(),
-					})
-					continue
-				}
-				var decErr error
-				dk, decErr = utils.Decrypt(pk.APIKeyEncrypted)
-				if decErr != nil {
-					continue
-				}
-				var cfgErr error
-				pcfg, cfgErr = getProviderRuntimeConfig(db, att.provider)
-				if cfgErr != nil {
-					if errors.Is(cfgErr, sql.ErrNoRows) {
-						continue
-					}
-					billingEngine.CancelPreDeduct(userIDInt, requestID)
-					middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-					return
-				}
-				pcfg = applyGatewayOverride(pcfg)
+			pk, dk, pcfg, skip, fatalErr := resolveProxyAttemptRuntime(
+				c.Request.Context(),
+				db,
+				userIDInt,
+				merchantID,
+				req,
+				att,
+				apiKey,
+				decryptedKey,
+				providerCfg,
+				entCtx,
+				requestID,
+			)
+			if fatalErr != nil {
+				billingEngine.CancelPreDeduct(userIDInt, requestID)
+				middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+				return
+			}
+			if skip {
+				continue
 			}
 
 			if pcfg.APIFormat != apiFormatOpenAI {
@@ -594,43 +577,26 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	for attemptIdx, att := range attempts {
 		traceSpan.SetRoute(att.provider, att.model)
 
-		var pk models.MerchantAPIKey
-		var dk string
-		var pcfg providerRuntimeConfig
-		if attemptIdx == 0 {
-			pk = apiKey
-			dk = decryptedKey
-			pcfg = providerCfg
-		} else if att.provider == req.Provider {
-			pk = apiKey
-			dk = decryptedKey
-			pcfg = providerCfg
-		} else {
-			modReq := req
-			modReq.Provider = att.provider
-			modReq.Model = att.model
-			if selErr := selectAPIKeyForRequest(db, userIDInt, merchantID, modReq, &pk, entCtx); selErr != nil {
-				logger.LogWarn(c.Request.Context(), "api_proxy", "model fallback key selection skipped", map[string]interface{}{
-					"request_id": requestID, "provider": att.provider, "model": att.model, "error": selErr.Error(),
-				})
-				continue
-			}
-			var decErr error
-			dk, decErr = utils.Decrypt(pk.APIKeyEncrypted)
-			if decErr != nil {
-				continue
-			}
-			var cfgErr error
-			pcfg, cfgErr = getProviderRuntimeConfig(db, att.provider)
-			if cfgErr != nil {
-				if errors.Is(cfgErr, sql.ErrNoRows) {
-					continue
-				}
-				billingEngine.CancelPreDeduct(userIDInt, requestID)
-				middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-				return
-			}
-			pcfg = applyGatewayOverride(pcfg)
+		pk, dk, pcfg, skip, fatalErr := resolveProxyAttemptRuntime(
+			c.Request.Context(),
+			db,
+			userIDInt,
+			merchantID,
+			req,
+			att,
+			apiKey,
+			decryptedKey,
+			providerCfg,
+			entCtx,
+			requestID,
+		)
+		if fatalErr != nil {
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		if skip {
+			continue
 		}
 
 		base := strings.TrimRight(pcfg.APIBaseURL, "/")
