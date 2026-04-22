@@ -42,11 +42,11 @@ func normalizeOpenAICompatBase(endpoint string) string {
 }
 
 // openAICompatModelsProbeURL returns the GET URL for OpenAI-compatible model listing.
-// When model_providers.api_base_url (or merchant endpoint_url) already ends with "/v1",
-// append "/models" only — matching api_key_validator (base + "/models") and avoiding "/v1/v1/models".
+// When the base is already a versioned OpenAI-compat root (…/v1, …/v4, 智谱 paas/v4, 阿里 compatible-mode/v1, etc.),
+// append "/models" only — matching api_key_validator (base + "/models") and avoiding paths like "…/v4/v1/models".
 func openAICompatModelsProbeURL(endpoint string) string {
 	b := normalizeOpenAICompatBase(endpoint)
-	if hasOpenAICompatV1PathSuffix(b) {
+	if hasOpenAICompatVersionedRootSuffix(b) {
 		return b + "/models"
 	}
 	return b + "/v1/models"
@@ -55,15 +55,24 @@ func openAICompatModelsProbeURL(endpoint string) string {
 // openAICompatChatCompletionsURL returns the POST URL for OpenAI-compatible chat completions.
 func openAICompatChatCompletionsURL(endpoint string) string {
 	b := normalizeOpenAICompatBase(endpoint)
-	if hasOpenAICompatV1PathSuffix(b) {
+	if hasOpenAICompatVersionedRootSuffix(b) {
 		return b + "/chat/completions"
 	}
 	return b + "/v1/chat/completions"
 }
 
-func hasOpenAICompatV1PathSuffix(base string) bool {
-	// Case-fold so https://host/V1 still matches; path-only providers are lowercase in practice.
-	return strings.HasSuffix(strings.ToLower(base), "/v1")
+// hasOpenAICompatVersionedRootSuffix reports whether the path already ends with a typical
+// OpenAI-style API version segment. Order matters: check longer tokens before "/v1" to avoid
+// false positives on hostnames like *ev1* (we only match a slash before the version).
+func hasOpenAICompatVersionedRootSuffix(base string) bool {
+	b := strings.ToLower(base)
+	// v4: 智谱 `…/api/paas/v4`; v1: 多数厂商、DashScope compatible-mode/v1、MiniMax 国际版 等
+	for _, suf := range []string{"/v4", "/v3", "/v2", "/v1"} {
+		if strings.HasSuffix(b, suf) {
+			return true
+		}
+	}
+	return false
 }
 
 var healthCheckIntervalMap = map[HealthCheckLevel]int{
