@@ -381,65 +381,6 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
-	endpoint := fmt.Sprintf("%s/chat/completions", baseURL)
-	if providerCfg.APIFormat == providerAnthropic {
-		endpoint = fmt.Sprintf("%s/messages", baseURL)
-	}
-
-	requestBody := map[string]interface{}{
-		"model":    req.Model,
-		"messages": req.Messages,
-		"stream":   req.Stream,
-	}
-
-	if req.Options != nil {
-		var options map[string]interface{}
-		if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
-			for k, v := range options {
-				requestBody[k] = v
-			}
-		}
-	}
-
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"REQUEST_BUILD_FAILED",
-			"Failed to build request body",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-
-	httpReq, err := http.NewRequestWithContext(c.Request.Context(), "POST", endpoint, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"REQUEST_CREATE_FAILED",
-			"Failed to create request",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
-	httpReq.GetBody = func() (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(jsonBody)), nil
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	switch providerCfg.APIFormat {
-	case providerAnthropic:
-		httpReq.Header.Set("x-api-key", decryptedKey)
-		httpReq.Header.Set("anthropic-version", "2023-06-01")
-	default:
-		authToken := resolveGatewayAuthToken(providerCfg, decryptedKey)
-		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
-	}
-
-	applyProxyUpstreamHeaders(c, httpReq, requestID)
-
 	strategySnapshot := buildStrategyRuntimeSnapshot(selectedStrategy)
 	applyCircuitBreakerConfig(apiKey.ID, strategySnapshot)
 
@@ -454,11 +395,185 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			))
 			return
 		}
-		httpReq.Header.Set("Accept", "text/event-stream")
 		streamClient := proxyHTTPClient(15 * time.Minute)
-		executeProxyChatCompletionStream(c, streamClient, httpReq, requestID, userIDInt, req, requestPath, startTime, db,
-			billingEngine, apiKey, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
-			decisionStart, traceSpan, strategySnapshot)
+		retryPolicyStream := buildRetryPolicy(strategySnapshot)
+		retryPolicyStream = applyLitellmGatewayRetryCap(retryPolicyStream)
+		streamAttempts := buildProxyCatalogAttempts(c.Request.Context(), db, req)
+		var retryCountStream int
+		for attemptIdx, att := range streamAttempts {
+			traceSpan.SetRoute(att.provider, att.model)
+
+			var pk models.MerchantAPIKey
+			var dk string
+			var pcfg providerRuntimeConfig
+			if attemptIdx == 0 {
+				pk = apiKey
+				dk = decryptedKey
+				pcfg = providerCfg
+			} else if att.provider == req.Provider {
+				pk = apiKey
+				dk = decryptedKey
+				pcfg = providerCfg
+			} else {
+				modReq := req
+				modReq.Provider = att.provider
+				modReq.Model = att.model
+				if selErr := selectAPIKeyForRequest(db, userIDInt, merchantID, modReq, &pk, entCtx); selErr != nil {
+					logger.LogWarn(c.Request.Context(), "api_proxy", "stream model fallback key selection skipped", map[string]interface{}{
+						"request_id": requestID, "provider": att.provider, "model": att.model, "error": selErr.Error(),
+					})
+					continue
+				}
+				var decErr error
+				dk, decErr = utils.Decrypt(pk.APIKeyEncrypted)
+				if decErr != nil {
+					continue
+				}
+				var cfgErr error
+				pcfg, cfgErr = getProviderRuntimeConfig(db, att.provider)
+				if cfgErr != nil {
+					if errors.Is(cfgErr, sql.ErrNoRows) {
+						continue
+					}
+					billingEngine.CancelPreDeduct(userIDInt, requestID)
+					middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+					return
+				}
+				pcfg = applyGatewayOverride(pcfg)
+			}
+
+			if pcfg.APIFormat != apiFormatOpenAI {
+				if attemptIdx < len(streamAttempts)-1 {
+					continue
+				}
+				billingEngine.CancelPreDeduct(userIDInt, requestID)
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"STREAMING_NOT_SUPPORTED",
+					"Streaming is only supported for OpenAI-compatible providers",
+					http.StatusBadRequest,
+					nil,
+				))
+				return
+			}
+
+			base := strings.TrimRight(pcfg.APIBaseURL, "/")
+			if base == "" {
+				if attemptIdx < len(streamAttempts)-1 {
+					continue
+				}
+				billingEngine.CancelPreDeduct(userIDInt, requestID)
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"UNSUPPORTED_PROVIDER",
+					fmt.Sprintf("Provider %s is missing api_base_url", att.provider),
+					http.StatusBadRequest,
+					nil,
+				))
+				return
+			}
+
+			ep := fmt.Sprintf("%s/chat/completions", base)
+			rb := map[string]interface{}{
+				"model":    att.model,
+				"messages": req.Messages,
+				"stream":   true,
+			}
+			if req.Options != nil {
+				var options map[string]interface{}
+				if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
+					for k, v := range options {
+						rb[k] = v
+					}
+				}
+			}
+			jb, mErr := json.Marshal(rb)
+			if mErr != nil {
+				billingEngine.CancelPreDeduct(userIDInt, requestID)
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"REQUEST_BUILD_FAILED",
+					"Failed to build request body",
+					http.StatusInternalServerError,
+					mErr,
+				))
+				return
+			}
+			hreq, hErr := http.NewRequestWithContext(c.Request.Context(), "POST", ep, bytes.NewBuffer(jb))
+			if hErr != nil {
+				billingEngine.CancelPreDeduct(userIDInt, requestID)
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"REQUEST_CREATE_FAILED",
+					"Failed to create request",
+					http.StatusInternalServerError,
+					hErr,
+				))
+				return
+			}
+			hreq.GetBody = func() (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewReader(jb)), nil
+			}
+			hreq.Header.Set("Content-Type", "application/json")
+			authToken := resolveGatewayAuthToken(pcfg, dk)
+			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+			hreq.Header.Set("Accept", "text/event-stream")
+			applyProxyUpstreamHeaders(c, hreq, requestID)
+
+			r, rc, execErr := executeProviderRequestWithRetry(streamClient, hreq, retryPolicyStream)
+			retryCountStream += rc
+
+			if execErr != nil {
+				info := providerInfoFromUpstreamFailure(0, nil, nil, execErr)
+				services.GetSmartRouter().RecordRequestResult(pk.ID, false)
+				recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
+				if attemptIdx < len(streamAttempts)-1 && services.SuggestModelFallbackAfterFailure(info) {
+					logger.LogInfo(c.Request.Context(), "api_proxy", "stream model fallback after transport error", map[string]interface{}{
+						"request_id": requestID, "attempt": att.provider + "/" + att.model,
+					})
+					continue
+				}
+				traceSpan.SetStatusCode(http.StatusBadGateway)
+				traceSpan.SetErrorCode("API_STREAM_REQUEST_FAILED")
+				billingEngine.CancelPreDeduct(userIDInt, requestID)
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"API_REQUEST_FAILED",
+					"Failed to send streaming request to provider",
+					http.StatusBadGateway,
+					execErr,
+				))
+				return
+			}
+
+			if r.StatusCode != http.StatusOK {
+				bRead, _ := io.ReadAll(io.LimitReader(r.Body, upstreamErrorBodyPeek))
+				_ = r.Body.Close()
+				info := providerInfoFromUpstreamFailure(r.StatusCode, bRead, r.Header, nil)
+				services.GetSmartRouter().RecordRequestResult(pk.ID, false)
+				recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
+				if attemptIdx < len(streamAttempts)-1 && services.SuggestModelFallbackAfterFailure(info) {
+					logger.LogInfo(c.Request.Context(), "api_proxy", "stream model fallback after upstream HTTP error", map[string]interface{}{
+						"request_id": requestID, "status": r.StatusCode, "attempt": att.provider + "/" + att.model,
+					})
+					continue
+				}
+				traceSpan.SetStatusCode(r.StatusCode)
+				billingEngine.CancelPreDeduct(userIDInt, requestID)
+				c.Data(r.StatusCode, "application/json", bRead)
+				return
+			}
+
+			executeProxyChatCompletionStreamFromUpstream(c, r, requestID, userIDInt, req, att.provider, att.model, requestPath, startTime, db,
+				billingEngine, pk, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
+				decisionStart, traceSpan, strategySnapshot, retryCountStream)
+			return
+		}
+
+		traceSpan.SetStatusCode(http.StatusBadGateway)
+		traceSpan.SetErrorCode("API_REQUEST_FAILED")
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_REQUEST_FAILED",
+			"Failed to complete streaming request via model fallback chain",
+			http.StatusBadGateway,
+			nil,
+		))
 		return
 	}
 

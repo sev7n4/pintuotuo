@@ -13,28 +13,28 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/cache"
-	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/logger"
 	"github.com/pintuotuo/backend/metrics"
-	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
 )
 
-// executeProxyChatCompletionStream 将上游 SSE 透传给客户端，并在结束时按 usage 或字节粗估结算预扣费。
+// executeProxyChatCompletionStreamFromUpstream 在已拿到上游 HTTP 200 与 SSE body 时，将事件透传给客户端并结算。
+// billProv/billModel 为实际计费用的 provider/model（可与 req 中原始请求不同，例如命中备用链时）。
 // 仅用于 OpenAI 兼容路径（/chat/completions）。
-func executeProxyChatCompletionStream(
+func executeProxyChatCompletionStreamFromUpstream(
 	c *gin.Context,
-	client *http.Client,
-	httpReq *http.Request,
+	upstream *http.Response,
 	requestID string,
 	userIDInt int,
 	req APIProxyRequest,
+	billProv string,
+	billModel string,
 	requestPath string,
 	startTime time.Time,
 	db *sql.DB,
 	billingEngine *billing.BillingEngine,
-	apiKey models.MerchantAPIKey,
+	winningKey models.MerchantAPIKey,
 	merchantID int,
 	strictPricingVID *int,
 	selectedStrategy string,
@@ -43,35 +43,11 @@ func executeProxyChatCompletionStream(
 	decisionStart time.Time,
 	traceSpan *services.LLMTraceSpan,
 	strategySnapshot strategyRuntimeSnapshot,
+	retryCountTotal int,
 ) {
-	resp, err := client.Do(httpReq) // #nosec G704 -- upstream from admin-configured base URL
-	if err != nil {
-		traceSpan.SetStatusCode(http.StatusBadGateway)
-		traceSpan.SetErrorCode("API_STREAM_REQUEST_FAILED")
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		services.GetSmartRouter().RecordRequestResult(apiKey.ID, false)
-		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"API_REQUEST_FAILED",
-			"Failed to send streaming request to provider",
-			http.StatusBadGateway,
-			err,
-		))
-		return
-	}
-	defer resp.Body.Close()
+	defer upstream.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		traceSpan.SetStatusCode(resp.StatusCode)
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		services.GetSmartRouter().RecordRequestResult(apiKey.ID, false)
-		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
-		c.Data(resp.StatusCode, "application/json", body)
-		return
-	}
-
-	if ct := resp.Header.Get("Content-Type"); ct != "" {
+	if ct := upstream.Header.Get("Content-Type"); ct != "" {
 		c.Writer.Header().Set("Content-Type", ct)
 	} else {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -83,7 +59,7 @@ func executeProxyChatCompletionStream(
 	c.Writer.WriteHeader(http.StatusOK)
 	flusher, okFlush := c.Writer.(http.Flusher)
 
-	br := bufio.NewReader(resp.Body)
+	br := bufio.NewReader(upstream.Body)
 	var streamedBytes int
 	var lastUsage *APIUsage
 
@@ -125,8 +101,8 @@ func executeProxyChatCompletionStream(
 	}
 
 	latency := int(time.Since(startTime).Milliseconds())
-	services.GetSmartRouter().RecordRequestResult(apiKey.ID, true)
-	recordHealthCheckerProxyOutcome(c, apiKey.ID, true, startTime)
+	services.GetSmartRouter().RecordRequestResult(winningKey.ID, true)
+	recordHealthCheckerProxyOutcome(c, winningKey.ID, true, startTime)
 	traceSpan.SetStatusCode(http.StatusOK)
 
 	inputTokens := estimateInputTokens(req.Messages)
@@ -140,11 +116,11 @@ func executeProxyChatCompletionStream(
 	}
 
 	tokenUsage := billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
-	cost, cerr := calculateTokenCost(db, userIDInt, req.Provider, req.Model, inputTokens, outputTokens, strictPricingVID)
+	cost, cerr := calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
 	if cerr != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		logger.LogError(context.Background(), "api_proxy", "stream token cost resolution failed", cerr, map[string]interface{}{
-			"user_id": userIDInt, "provider": req.Provider, "model": req.Model, "request_id": requestID,
+			"user_id": userIDInt, "provider": billProv, "model": billModel, "request_id": requestID,
 		})
 		return
 	}
@@ -160,18 +136,21 @@ func executeProxyChatCompletionStream(
 	}
 
 	if cost > 0 {
-		logMerchantSKUID, logProcurementCNY := resolveMerchantSKUProcurementForLog(db, req, apiKey.ID, merchantID, inputTokens, outputTokens)
+		billReq := req
+		billReq.Provider = billProv
+		billReq.Model = billModel
+		logMerchantSKUID, logProcurementCNY := resolveMerchantSKUProcurementForLog(db, billReq, winningKey.ID, merchantID, inputTokens, outputTokens)
 		tx, err := db.Begin()
 		if err == nil {
 			_, updateErr := tx.Exec(
 				"UPDATE merchant_api_keys SET quota_used = quota_used + $1, last_used_at = $2 WHERE id = $3",
-				cost, time.Now(), apiKey.ID,
+				cost, time.Now(), winningKey.ID,
 			)
 			err = updateErr
 			if err == nil {
 				_, err = tx.Exec(
 					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, token_usage, merchant_sku_id, procurement_cost_cny) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
-					userIDInt, apiKey.ID, requestID, req.Provider, req.Model, "POST", requestPath, http.StatusOK, latency, inputTokens, outputTokens, cost, tokenUsage, nullInt64Arg(logMerchantSKUID), nullFloat64Arg(logProcurementCNY),
+					userIDInt, winningKey.ID, requestID, billProv, billModel, "POST", requestPath, http.StatusOK, latency, inputTokens, outputTokens, cost, tokenUsage, nullInt64Arg(logMerchantSKUID), nullFloat64Arg(logProcurementCNY),
 				)
 			}
 			if err != nil {
@@ -182,7 +161,7 @@ func executeProxyChatCompletionStream(
 			} else {
 				tx.Commit()
 				logger.LogInfo(context.Background(), "api_proxy", "stream request completed", map[string]interface{}{
-					"user_id": userIDInt, "provider": req.Provider, "model": req.Model,
+					"user_id": userIDInt, "provider": billProv, "model": billModel,
 					"input_tokens": inputTokens, "output_tokens": outputTokens, "cost": cost,
 					"latency_ms": latency, "request_id": requestID, "usage_from_stream": lastUsage != nil,
 				})
@@ -195,7 +174,7 @@ func executeProxyChatCompletionStream(
 	}
 
 	decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
-	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, apiKey.ID, int(time.Since(decisionStart).Milliseconds()), 0)
+	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, winningKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCountTotal)
 }
 
 func extractUsageFromStreamChunk(chunk map[string]interface{}) *APIUsage {
