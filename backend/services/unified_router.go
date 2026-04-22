@@ -4,13 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sync"
 )
 
 type UnifiedRouter struct {
 	db    *sql.DB
 	cache map[string]*RouteDecision
-	mu    sync.RWMutex
 }
 
 type RouteDecision struct {
