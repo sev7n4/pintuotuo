@@ -465,38 +465,209 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	client := proxyHTTPClient(60 * time.Second)
 	retryPolicy := buildRetryPolicy(strategySnapshot)
 	retryPolicy = applyLitellmGatewayRetryCap(retryPolicy)
-	resp, retryCount, err := executeProviderRequestWithRetry(client, httpReq, retryPolicy)
-	if err != nil {
+	attempts := buildProxyCatalogAttempts(c.Request.Context(), db, req)
+
+	var (
+		resp            *http.Response
+		body            []byte
+		retryCountTotal int
+		billProv        string
+		billModel       string
+		winningKey      models.MerchantAPIKey
+	)
+
+	for attemptIdx, att := range attempts {
+		traceSpan.SetRoute(att.provider, att.model)
+
+		var pk models.MerchantAPIKey
+		var dk string
+		var pcfg providerRuntimeConfig
+		if attemptIdx == 0 {
+			pk = apiKey
+			dk = decryptedKey
+			pcfg = providerCfg
+		} else if att.provider == req.Provider {
+			pk = apiKey
+			dk = decryptedKey
+			pcfg = providerCfg
+		} else {
+			modReq := req
+			modReq.Provider = att.provider
+			modReq.Model = att.model
+			if selErr := selectAPIKeyForRequest(db, userIDInt, merchantID, modReq, &pk, entCtx); selErr != nil {
+				logger.LogWarn(c.Request.Context(), "api_proxy", "model fallback key selection skipped", map[string]interface{}{
+					"request_id": requestID, "provider": att.provider, "model": att.model, "error": selErr.Error(),
+				})
+				continue
+			}
+			var decErr error
+			dk, decErr = utils.Decrypt(pk.APIKeyEncrypted)
+			if decErr != nil {
+				continue
+			}
+			var cfgErr error
+			pcfg, cfgErr = getProviderRuntimeConfig(db, att.provider)
+			if cfgErr != nil {
+				if errors.Is(cfgErr, sql.ErrNoRows) {
+					continue
+				}
+				billingEngine.CancelPreDeduct(userIDInt, requestID)
+				middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+				return
+			}
+			pcfg = applyGatewayOverride(pcfg)
+		}
+
+		base := strings.TrimRight(pcfg.APIBaseURL, "/")
+		if base == "" {
+			if attemptIdx < len(attempts)-1 {
+				continue
+			}
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"UNSUPPORTED_PROVIDER",
+				fmt.Sprintf("Provider %s is missing api_base_url", att.provider),
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+
+		ep := fmt.Sprintf("%s/chat/completions", base)
+		if pcfg.APIFormat == providerAnthropic {
+			ep = fmt.Sprintf("%s/messages", base)
+		}
+
+		rb := map[string]interface{}{
+			"model":    att.model,
+			"messages": req.Messages,
+			"stream":   req.Stream,
+		}
+		if req.Options != nil {
+			var options map[string]interface{}
+			if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
+				for k, v := range options {
+					rb[k] = v
+				}
+			}
+		}
+		jb, mErr := json.Marshal(rb)
+		if mErr != nil {
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"REQUEST_BUILD_FAILED",
+				"Failed to build request body",
+				http.StatusInternalServerError,
+				mErr,
+			))
+			return
+		}
+		hreq, hErr := http.NewRequestWithContext(c.Request.Context(), "POST", ep, bytes.NewBuffer(jb))
+		if hErr != nil {
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"REQUEST_CREATE_FAILED",
+				"Failed to create request",
+				http.StatusInternalServerError,
+				hErr,
+			))
+			return
+		}
+		hreq.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(jb)), nil
+		}
+		hreq.Header.Set("Content-Type", "application/json")
+		switch pcfg.APIFormat {
+		case providerAnthropic:
+			hreq.Header.Set("x-api-key", dk)
+			hreq.Header.Set("anthropic-version", "2023-06-01")
+		default:
+			authToken := resolveGatewayAuthToken(pcfg, dk)
+			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+		}
+		applyProxyUpstreamHeaders(c, hreq, requestID)
+
+		r, rc, execErr := executeProviderRequestWithRetry(client, hreq, retryPolicy)
+		retryCountTotal += rc
+
+		if execErr != nil {
+			info := providerInfoFromUpstreamFailure(0, nil, nil, execErr)
+			services.GetSmartRouter().RecordRequestResult(pk.ID, false)
+			recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
+			if attemptIdx < len(attempts)-1 && services.SuggestModelFallbackAfterFailure(info) {
+				logger.LogInfo(c.Request.Context(), "api_proxy", "model fallback after transport error", map[string]interface{}{
+					"request_id": requestID, "attempt": att.provider + "/" + att.model,
+				})
+				continue
+			}
+			traceSpan.SetStatusCode(http.StatusBadGateway)
+			traceSpan.SetErrorCode("API_REQUEST_FAILED")
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"API_REQUEST_FAILED",
+				"Failed to send request to provider",
+				http.StatusBadGateway,
+				execErr,
+			))
+			return
+		}
+
+		bRead, readErr := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		if readErr != nil {
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+			recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"RESPONSE_READ_FAILED",
+				"Failed to read response",
+				http.StatusInternalServerError,
+				readErr,
+			))
+			return
+		}
+
+		if chatCompletionJSONIndicatesProxySuccess(r.StatusCode, bRead) {
+			resp = r
+			body = bRead
+			billProv = att.provider
+			billModel = att.model
+			winningKey = pk
+			proxyTransportOK := r.StatusCode < http.StatusInternalServerError && r.StatusCode != http.StatusTooManyRequests
+			services.GetSmartRouter().RecordRequestResult(pk.ID, proxyTransportOK)
+			recordHealthCheckerProxyOutcome(c, pk.ID, true, startTime)
+			break
+		}
+
+		info := providerInfoFromUpstreamFailure(r.StatusCode, bRead, r.Header)
+		services.GetSmartRouter().RecordRequestResult(pk.ID, false)
+		recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
+		if attemptIdx < len(attempts)-1 && services.SuggestModelFallbackAfterFailure(info) {
+			logger.LogInfo(c.Request.Context(), "api_proxy", "model fallback after upstream HTTP error", map[string]interface{}{
+				"request_id": requestID, "status": r.StatusCode, "attempt": att.provider + "/" + att.model,
+			})
+			continue
+		}
+
+		traceSpan.SetStatusCode(r.StatusCode)
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
+		c.Data(r.StatusCode, "application/json", bRead)
+		return
+	}
+
+	if resp == nil || body == nil {
 		traceSpan.SetStatusCode(http.StatusBadGateway)
 		traceSpan.SetErrorCode("API_REQUEST_FAILED")
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		services.GetSmartRouter().RecordRequestResult(apiKey.ID, false)
-		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"API_REQUEST_FAILED",
-			"Failed to send request to provider",
+			"Failed to complete request via model fallback chain",
 			http.StatusBadGateway,
-			err,
+			nil,
 		))
 		return
 	}
-	defer resp.Body.Close()
-	proxyTransportOK := resp.StatusCode < http.StatusInternalServerError && resp.StatusCode != http.StatusTooManyRequests
-	services.GetSmartRouter().RecordRequestResult(apiKey.ID, proxyTransportOK)
-	recordHealthCheckerProxyOutcome(c, apiKey.ID, proxyTransportOK, startTime)
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"RESPONSE_READ_FAILED",
-			"Failed to read response",
-			http.StatusInternalServerError,
-			err,
-		))
-		return
-	}
+	retryCount := retryCountTotal
 
 	var apiResp APIProxyResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
@@ -507,9 +678,9 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
-	if sm := strings.TrimSpace(apiResp.Model); sm != "" && sm != strings.TrimSpace(req.Model) {
+	if sm := strings.TrimSpace(apiResp.Model); sm != "" && sm != strings.TrimSpace(billModel) {
 		logger.LogInfo(c.Request.Context(), "api_proxy", "upstream response model differs from request (e.g. gateway fallback)", map[string]interface{}{
-			"request_id": requestID, "requested_model": req.Model, "response_model": sm,
+			"request_id": requestID, "requested_model": billModel, "response_model": sm,
 		})
 	}
 
@@ -524,11 +695,11 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		outputTokens = apiResp.Usage.CompletionTokens
 		tokenUsage = billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
 		var cerr error
-		cost, cerr = calculateTokenCost(db, userIDInt, req.Provider, req.Model, inputTokens, outputTokens, strictPricingVID)
+		cost, cerr = calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
 		if cerr != nil {
 			billingEngine.CancelPreDeduct(userIDInt, requestID)
 			logger.LogError(context.Background(), "api_proxy", "Token cost resolution failed", cerr, map[string]interface{}{
-				"user_id": userIDInt, "provider": req.Provider, "model": req.Model, "request_id": requestID,
+				"user_id": userIDInt, "provider": billProv, "model": billModel, "request_id": requestID,
 			})
 			middleware.RespondWithError(c, apperrors.ErrPricingSnapshotMiss)
 			return
@@ -549,18 +720,21 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	}
 
 	if cost > 0 {
-		logMerchantSKUID, logProcurementCNY := resolveMerchantSKUProcurementForLog(db, req, apiKey.ID, merchantID, inputTokens, outputTokens)
+		billReq := req
+		billReq.Provider = billProv
+		billReq.Model = billModel
+		logMerchantSKUID, logProcurementCNY := resolveMerchantSKUProcurementForLog(db, billReq, winningKey.ID, merchantID, inputTokens, outputTokens)
 		tx, err := db.Begin()
 		if err == nil {
 			_, updateErr := tx.Exec(
 				"UPDATE merchant_api_keys SET quota_used = quota_used + $1, last_used_at = $2 WHERE id = $3",
-				cost, time.Now(), apiKey.ID,
+				cost, time.Now(), winningKey.ID,
 			)
 			err = updateErr
 			if err == nil {
 				_, err = tx.Exec(
 					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, token_usage, merchant_sku_id, procurement_cost_cny) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
-					userIDInt, apiKey.ID, requestID, req.Provider, req.Model, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost, tokenUsage, nullInt64Arg(logMerchantSKUID), nullFloat64Arg(logProcurementCNY),
+					userIDInt, winningKey.ID, requestID, billProv, billModel, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost, tokenUsage, nullInt64Arg(logMerchantSKUID), nullFloat64Arg(logProcurementCNY),
 				)
 			}
 
@@ -568,8 +742,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				tx.Rollback()
 				logger.LogError(context.Background(), "api_proxy", "Transaction rollback", err, map[string]interface{}{
 					"user_id":     userIDInt,
-					"provider":    req.Provider,
-					"model":       req.Model,
+					"provider":    billProv,
+					"model":       billModel,
 					"cost":        cost,
 					"token_usage": tokenUsage,
 					"request_id":  requestID,
@@ -578,8 +752,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				tx.Commit()
 				logger.LogInfo(context.Background(), "api_proxy", "API request completed", map[string]interface{}{
 					"user_id":       userIDInt,
-					"provider":      req.Provider,
-					"model":         req.Model,
+					"provider":      billProv,
+					"model":         billModel,
 					"input_tokens":  inputTokens,
 					"output_tokens": outputTokens,
 					"token_usage":   tokenUsage,
@@ -599,7 +773,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	}
 
 	decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
-	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, apiKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCount)
+	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, winningKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCount)
 
 	traceSpan.SetStatusCode(resp.StatusCode)
 	c.Data(resp.StatusCode, "application/json", body)

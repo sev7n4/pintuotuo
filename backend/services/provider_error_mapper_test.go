@@ -87,6 +87,18 @@ func TestMapProviderError(t *testing.T) {
 	}
 }
 
+func TestSuggestModelFallbackAfterFailure(t *testing.T) {
+	if !SuggestModelFallbackAfterFailure(MapProviderError(http.StatusNotFound, "model_not_found", "x", nil, nil, "")) {
+		t.Fatal("model not found should suggest fallback")
+	}
+	if SuggestModelFallbackAfterFailure(MapProviderError(http.StatusUnauthorized, "invalid_api_key", "x", nil, nil, "")) {
+		t.Fatal("invalid key should not suggest fallback")
+	}
+	if !SuggestModelFallbackAfterFailure(MapProviderError(http.StatusTooManyRequests, "rate", "limit", nil, nil, "")) {
+		t.Fatal("429 should suggest fallback")
+	}
+}
+
 func TestHTTPUpstreamRetryable(t *testing.T) {
 	if !HTTPUpstreamRetryable(http.StatusTooManyRequests, []byte(`{}`), nil) {
 		t.Fatal("429 should be retryable")

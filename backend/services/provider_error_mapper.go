@@ -96,6 +96,28 @@ func MapProviderError(statusCode int, providerCode, providerMessage string, head
 	return info
 }
 
+// SuggestModelFallbackAfterFailure 判断上游失败后是否应尝试配置中的下一备用模型（鉴权/配额等不应切换模型）。
+func SuggestModelFallbackAfterFailure(info ProviderErrorInfo) bool {
+	switch info.Category {
+	case errorCategoryAuthInvalidKey, errorCategoryAuthPermissionDenied, errorCategoryQuotaInsufficient:
+		return false
+	case errorCategoryContextTooLong, errorCategoryUpstreamBadRequest:
+		return false
+	}
+	if info.Retryable {
+		return true
+	}
+	switch info.Category {
+	case errorCategoryModelNotFound, errorCategoryRateLimited, errorCategoryServiceUnavailable,
+		errorCategoryNetworkTimeout, errorCategoryNetworkDNS:
+		return true
+	case errorCategoryUnknown:
+		return info.HTTPStatusCode == http.StatusTooManyRequests || info.HTTPStatusCode >= http.StatusInternalServerError
+	default:
+		return false
+	}
+}
+
 func headerValue(h http.Header, key string) string {
 	if h == nil {
 		return ""
