@@ -346,7 +346,7 @@ func TestMatchesRouteDecision(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := router.matchesRouteDecision(candidate, tt.decision)
+			result := router.MatchesRouteDecision(candidate, tt.decision)
 			if result != tt.expected {
 				t.Errorf("Expected %v, got %v", tt.expected, result)
 			}

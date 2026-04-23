@@ -127,6 +127,16 @@ func (r *SmartRouter) SelectProviderWithStrategyOutput(ctx context.Context, mode
 	return &filteredCandidates[0], nil
 }
 
+func (r *SmartRouter) FilterByRouteDecision(candidates []RoutingCandidate, decision *RouteDecision) []RoutingCandidate {
+	// 路由决策不影响候选者过滤，返回所有候选者
+	return candidates
+}
+
+func (r *SmartRouter) MatchesRouteDecision(candidate RoutingCandidate, decision *RouteDecision) bool {
+	// 路由决策不影响候选者匹配，所有候选者都匹配
+	return true
+}
+
 func (r *SmartRouter) FilterByConstraints(candidates []RoutingCandidate, constraints StrategyConstraints) []RoutingCandidate {
 	if constraints.MinSuccessRate == 0 && len(constraints.RequiredRegions) == 0 &&
 		len(constraints.ExcludedProviders) == 0 && constraints.MinSecurityLevel == "" &&
@@ -266,7 +276,7 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 func (r *SmartRouter) FilterUnhealthy(candidates []RoutingCandidate) []RoutingCandidate {
 	var healthy []RoutingCandidate
 	for _, c := range candidates {
-		if c.HealthStatus == "healthy" {
+		if c.HealthStatus == "healthy" || c.HealthStatus == "degraded" {
 			healthy = append(healthy, c)
 		}
 	}
@@ -294,7 +304,7 @@ func (r *SmartRouter) CalculateScores(candidates []RoutingCandidate, strategy Ro
 	for i := range candidates {
 		priceScore := r.calculatePriceScore(candidates[i], minPrice, maxPrice)
 		latencyScore := r.calculateLatencyScore(candidates[i], minLatency, maxLatency)
-		successScore := candidates[i].SuccessRate
+		successScore := candidates[i].SuccessRate / 100.0
 
 		candidates[i].PriceScore = priceScore
 		candidates[i].LatencyScore = latencyScore
@@ -315,7 +325,7 @@ func (r *SmartRouter) CalculateScoresWithWeights(candidates []RoutingCandidate, 
 	for i := range candidates {
 		priceScore := r.calculatePriceScore(candidates[i], minPrice, maxPrice)
 		latencyScore := r.calculateLatencyScore(candidates[i], minLatency, maxLatency)
-		successScore := candidates[i].SuccessRate
+		successScore := candidates[i].SuccessRate / 100.0
 
 		candidates[i].PriceScore = priceScore
 		candidates[i].LatencyScore = latencyScore
@@ -406,18 +416,23 @@ func (r *SmartRouter) IsCircuitBreakerOpen(apiKeyID int) bool {
 
 func (r *SmartRouter) GetStrategyConfig(strategyCode string) (*StrategyConfig, bool) {
 	strategy := RoutingStrategy(strategyCode)
-	weights := r.getStrategyWeights(strategy)
-	return &StrategyConfig{
-		Strategy:               strategyCode,
-		MaxRetryCount:          3,
-		RetryBackoffBase:       100,
-		CircuitBreakerThreshold: 5,
-		CircuitBreakerTimeout:  60,
-		PriceWeight:            weights.Price,
-		LatencyWeight:          weights.Latency,
-		SuccessWeight:          weights.Success,
-		ReliabilityWeight:      weights.Success,
-	}, true
+	switch strategy {
+	case RoutingStrategyPrice, RoutingStrategyLatency, RoutingStrategyBalanced, RoutingStrategyCost:
+		weights := r.getStrategyWeights(strategy)
+		return &StrategyConfig{
+			Strategy:               strategyCode,
+			MaxRetryCount:          3,
+			RetryBackoffBase:       100,
+			CircuitBreakerThreshold: 5,
+			CircuitBreakerTimeout:  60,
+			PriceWeight:            weights.Price,
+			LatencyWeight:          weights.Latency,
+			SuccessWeight:          weights.Success,
+			ReliabilityWeight:      weights.Success,
+		}, true
+	default:
+		return nil, false
+	}
 }
 
 
