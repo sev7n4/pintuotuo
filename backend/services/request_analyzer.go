@@ -7,50 +7,50 @@ import (
 type RequestIntent string
 
 const (
-	IntentChat        RequestIntent = "chat"
-	IntentCompletion  RequestIntent = "completion"
-	IntentEmbedding   RequestIntent = "embedding"
-	IntentImage       RequestIntent = "image"
-	IntentAudio       RequestIntent = "audio"
-	IntentModeration  RequestIntent = "moderation"
-	IntentUnknown     RequestIntent = "unknown"
+	IntentChat       RequestIntent = "chat"
+	IntentCompletion RequestIntent = "completion"
+	IntentEmbedding  RequestIntent = "embedding"
+	IntentImage      RequestIntent = "image"
+	IntentAudio      RequestIntent = "audio"
+	IntentModeration RequestIntent = "moderation"
+	IntentUnknown    RequestIntent = "unknown"
 )
 
 type RequestComplexity string
 
 const (
-	ComplexitySimple   RequestComplexity = "simple"
-	ComplexityMedium   RequestComplexity = "medium"
-	ComplexityComplex  RequestComplexity = "complex"
+	ComplexitySimple  RequestComplexity = "simple"
+	ComplexityMedium  RequestComplexity = "medium"
+	ComplexityComplex RequestComplexity = "complex"
 )
 
 type RequestAnalysis struct {
-	Intent            RequestIntent     `json:"intent"`
-	Complexity        RequestComplexity `json:"complexity"`
-	EstimatedTokens   int               `json:"estimated_tokens"`
-	ActualTokens      int               `json:"actual_tokens,omitempty"`
-	Model             string            `json:"model,omitempty"`
-	Provider          string            `json:"provider,omitempty"`
-	PromptLength      int               `json:"prompt_length"`
-	ResponseLength    int               `json:"response_length,omitempty"`
-	Stream            bool              `json:"stream"`
-	Temperature       *float64          `json:"temperature,omitempty"`
-	MaxTokens         *int              `json:"max_tokens,omitempty"`
-	UserPreferences   map[string]interface{} `json:"user_preferences,omitempty"`
-	CostBudget        *float64          `json:"cost_budget,omitempty"`
-	ComplianceReqs    []string          `json:"compliance_requirements,omitempty"`
-	Timestamp         time.Time         `json:"timestamp"`
+	Intent          RequestIntent          `json:"intent"`
+	Complexity      RequestComplexity      `json:"complexity"`
+	EstimatedTokens int                    `json:"estimated_tokens"`
+	ActualTokens    int                    `json:"actual_tokens,omitempty"`
+	Model           string                 `json:"model,omitempty"`
+	Provider        string                 `json:"provider,omitempty"`
+	PromptLength    int                    `json:"prompt_length"`
+	ResponseLength  int                    `json:"response_length,omitempty"`
+	Stream          bool                   `json:"stream"`
+	Temperature     *float64               `json:"temperature,omitempty"`
+	MaxTokens       *int                   `json:"max_tokens,omitempty"`
+	UserPreferences map[string]interface{} `json:"user_preferences,omitempty"`
+	CostBudget      *float64               `json:"cost_budget,omitempty"`
+	ComplianceReqs  []string               `json:"compliance_requirements,omitempty"`
+	Timestamp       time.Time              `json:"timestamp"`
 }
 
 type StrategyGoal string
 
 const (
-	GoalPerformanceFirst   StrategyGoal = "performance_first"
-	GoalPriceFirst         StrategyGoal = "price_first"
-	GoalReliabilityFirst   StrategyGoal = "reliability_first"
-	GoalBalanced           StrategyGoal = "balanced"
-	GoalSecurityFirst      StrategyGoal = "security_first"
-	GoalAuto               StrategyGoal = "auto"
+	GoalPerformanceFirst StrategyGoal = "performance_first"
+	GoalPriceFirst       StrategyGoal = "price_first"
+	GoalReliabilityFirst StrategyGoal = "reliability_first"
+	GoalBalanced         StrategyGoal = "balanced"
+	GoalSecurityFirst    StrategyGoal = "security_first"
+	GoalAuto             StrategyGoal = "auto"
 )
 
 type StrategyWeightsV2 struct {

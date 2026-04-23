@@ -175,8 +175,8 @@ func TestRoutingStrategyEngine_DefineGoal(t *testing.T) {
 	t.Run("should define performance_first strategy for stream request", func(t *testing.T) {
 		reqCtx := &RequestContext{
 			RequestAnalysis: &RequestAnalysis{
-				Intent:   IntentChat,
-				Stream:   true,
+				Intent:          IntentChat,
+				Stream:          true,
 				EstimatedTokens: 1000,
 			},
 		}
