@@ -1,20 +1,20 @@
 {
   "workflow_id": "intelligent-routing-phase1-001",
   "created_at": "2026-04-23T00:00:00Z",
-  "current_step": 8,
+  "current_step": 14,
   "branch": "feature/intelligent-routing-phase1-001",
-  "pr_number": null,
+  "pr_number": 332,
   "current_fix_cases": [],
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "",
-    "integration": "",
-    "e2e": "",
-    "deploy": ""
+    "cicd": "success",
+    "integration": "success",
+    "e2e": "success",
+    "deploy": "success"
   },
   "local_validation": "passed",
-  "merged": false,
+  "merged": true,
   "issue": {
     "type": "feature",
     "title": "智能路由 Phase 1 - 数据库迁移脚本",
