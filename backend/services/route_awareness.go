@@ -70,17 +70,17 @@ func (s *RouteAwarenessService) GetRealtimeStatus(ctx context.Context, apiKeyID 
 
 func (s *RouteAwarenessService) createDefaultStatus(ctx context.Context, apiKeyID int) (*models.APIKeyRealtimeStatus, error) {
 	status := &models.APIKeyRealtimeStatus{
-		APIKeyID:            apiKeyID,
-		LatencyP50:          0,
-		LatencyP95:          0,
-		LatencyP99:          0,
-		ErrorRate:           0.0,
-		SuccessRate:         1.0,
-		ConnectionPoolSize:  10,
+		APIKeyID:             apiKeyID,
+		LatencyP50:           0,
+		LatencyP95:           0,
+		LatencyP99:           0,
+		ErrorRate:            0.0,
+		SuccessRate:          1.0,
+		ConnectionPoolSize:   10,
 		ConnectionPoolActive: 0,
-		RateLimitRemaining:  0,
-		LoadBalanceWeight:   1.0,
-		UpdatedAt:           time.Now(),
+		RateLimitRemaining:   0,
+		LoadBalanceWeight:    1.0,
+		UpdatedAt:            time.Now(),
 	}
 
 	query := `

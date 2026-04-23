@@ -1,6 +1,8 @@
 package services
 
 import (
+	"strconv"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -102,7 +104,7 @@ func (m *MetricsRecorder) UpdateAPIKeyErrorRate(apiKeyID int, provider string, e
 
 func (m *MetricsRecorder) UpdateAPIKeySuccessRate(apiKeyID int, provider string, successRate float64) {
 	APIKeySuccessRate.WithLabelValues(
-		string(rune(apiKeyID)),
+		strconv.Itoa(apiKeyID),
 		provider,
 	).Set(successRate)
 }
@@ -123,7 +125,7 @@ func (m *MetricsRecorder) UpdateConnectionPool(apiKeyID int, active, size float6
 
 func (m *MetricsRecorder) RecordRouteAwarenessUpdate(apiKeyID int, status string) {
 	RouteAwarenessUpdateTotal.WithLabelValues(
-		string(rune(apiKeyID)),
+		strconv.Itoa(apiKeyID),
 		status,
 	).Inc()
 }

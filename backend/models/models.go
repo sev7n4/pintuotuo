@@ -246,37 +246,37 @@ type MerchantAPIKey struct {
 
 // APIKeyRealtimeStatus represents real-time status of an API Key
 type APIKeyRealtimeStatus struct {
-	APIKeyID            int       `json:"api_key_id"`
-	LatencyP50          int       `json:"latency_p50"`
-	LatencyP95          int       `json:"latency_p95"`
-	LatencyP99          int       `json:"latency_p99"`
-	ErrorRate           float64   `json:"error_rate"`
-	SuccessRate         float64   `json:"success_rate"`
-	ConnectionPoolSize  int       `json:"connection_pool_size"`
-	ConnectionPoolActive int      `json:"connection_pool_active"`
-	RateLimitRemaining  int       `json:"rate_limit_remaining"`
-	RateLimitResetAt    *time.Time `json:"rate_limit_reset_at,omitempty"`
-	LoadBalanceWeight   float64   `json:"load_balance_weight"`
-	LastRequestAt       *time.Time `json:"last_request_at,omitempty"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	APIKeyID             int        `json:"api_key_id"`
+	LatencyP50           int        `json:"latency_p50"`
+	LatencyP95           int        `json:"latency_p95"`
+	LatencyP99           int        `json:"latency_p99"`
+	ErrorRate            float64    `json:"error_rate"`
+	SuccessRate          float64    `json:"success_rate"`
+	ConnectionPoolSize   int        `json:"connection_pool_size"`
+	ConnectionPoolActive int        `json:"connection_pool_active"`
+	RateLimitRemaining   int        `json:"rate_limit_remaining"`
+	RateLimitResetAt     *time.Time `json:"rate_limit_reset_at,omitempty"`
+	LoadBalanceWeight    float64    `json:"load_balance_weight"`
+	LastRequestAt        *time.Time `json:"last_request_at,omitempty"`
+	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
 // RoutingDecisionLog represents a routing decision log entry
 type RoutingDecisionLog struct {
-	ID                     int             `json:"id"`
-	RequestID              string          `json:"request_id"`
-	MerchantID             int             `json:"merchant_id"`
-	APIKeyID               *int            `json:"api_key_id,omitempty"`
-	StrategyLayerGoal      string          `json:"strategy_layer_goal"`
-	StrategyLayerInput     json.RawMessage `json:"strategy_layer_input,omitempty"`
-	StrategyLayerOutput    json.RawMessage `json:"strategy_layer_output,omitempty"`
+	ID                      int             `json:"id"`
+	RequestID               string          `json:"request_id"`
+	MerchantID              int             `json:"merchant_id"`
+	APIKeyID                *int            `json:"api_key_id,omitempty"`
+	StrategyLayerGoal       string          `json:"strategy_layer_goal"`
+	StrategyLayerInput      json.RawMessage `json:"strategy_layer_input,omitempty"`
+	StrategyLayerOutput     json.RawMessage `json:"strategy_layer_output,omitempty"`
 	DecisionLayerCandidates json.RawMessage `json:"decision_layer_candidates,omitempty"`
-	DecisionLayerOutput    json.RawMessage `json:"decision_layer_output,omitempty"`
-	ExecutionLayerResult   json.RawMessage `json:"execution_layer_result,omitempty"`
-	DecisionDurationMs     int             `json:"decision_duration_ms"`
-	DecisionResult         string          `json:"decision_result"`
-	ErrorMessage           string          `json:"error_message,omitempty"`
-	CreatedAt              time.Time       `json:"created_at"`
+	DecisionLayerOutput     json.RawMessage `json:"decision_layer_output,omitempty"`
+	ExecutionLayerResult    json.RawMessage `json:"execution_layer_result,omitempty"`
+	DecisionDurationMs      int             `json:"decision_duration_ms"`
+	DecisionResult          string          `json:"decision_result"`
+	ErrorMessage            string          `json:"error_message,omitempty"`
+	CreatedAt               time.Time       `json:"created_at"`
 }
 
 // MerchantSettlement represents a merchant's settlement record
