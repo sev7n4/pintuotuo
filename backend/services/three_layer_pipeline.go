@@ -10,7 +10,6 @@ import (
 type ThreeLayerRoutingPipeline struct {
 	strategyEngine IStrategyEngine
 	decisionEngine IUnifiedRoutingEngine
-	awareness      IRouteAwareness
 }
 
 func NewThreeLayerRoutingPipeline() *ThreeLayerRoutingPipeline {

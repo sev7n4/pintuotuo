@@ -32,7 +32,6 @@ type UnifiedRoutingEngine struct {
 	strategyEngine  *RoutingStrategyEngine
 	requestAnalyzer *RequestAnalyzer
 	smartRouter     *SmartRouter
-	awareness       IRouteAwareness
 }
 
 func NewUnifiedRoutingEngine() *UnifiedRoutingEngine {

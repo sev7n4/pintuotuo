@@ -445,7 +445,7 @@ func (s *HealthChecker) SaveHealthCheckResult(ctx context.Context, apiKeyID int,
 
 	statusToUpdate := result.Status
 	if result.Status == HealthStatusHealthy && result.CheckType == "passive" {
-		statusToUpdate = "healthy"
+		statusToUpdate = HealthStatusHealthy
 	}
 
 	var merchantID int
@@ -453,10 +453,10 @@ func (s *HealthChecker) SaveHealthCheckResult(ctx context.Context, apiKeyID int,
 		UPDATE merchant_api_keys 
 		SET health_status = $1,
 		    last_health_check_at = CURRENT_TIMESTAMP,
-		    consecutive_failures = CASE WHEN $2 = 'healthy' THEN 0 ELSE consecutive_failures END
+		    consecutive_failures = CASE WHEN $2 = $4 THEN 0 ELSE consecutive_failures END
 		WHERE id = $3
 		RETURNING merchant_id`,
-		statusToUpdate, result.Status, apiKeyID,
+		statusToUpdate, result.Status, apiKeyID, HealthStatusHealthy,
 	).Scan(&merchantID)
 	if err != nil {
 		return err

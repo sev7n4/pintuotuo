@@ -42,7 +42,6 @@ type RoutingCandidate struct {
 type SmartRouter struct {
 	db             *sql.DB
 	circuitBreaker map[int]*CircuitBreaker
-	cbMutex        sync.RWMutex
 }
 
 var (
