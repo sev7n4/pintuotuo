@@ -506,8 +506,8 @@ const AdminAPIKeyStatus: React.FC = () => {
                 <LineChart data={selectedStatus.errorRateHistory}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="timestamp" tickFormatter={(time) => new Date(time).toLocaleTimeString()} />
-                  <YAxis tickFormatter={(value) => `${(value * 100).toFixed(0)}%`} />
-                  <Tooltip formatter={(value) => [`${(value * 100).toFixed(2)}%`, '']} />
+                  <YAxis tickFormatter={(value: number) => `${(value * 100).toFixed(0)}%`} />
+                  <Tooltip formatter={(value) => [`${((value as number) * 100).toFixed(2)}%`, '']} />
                   <Legend />
                   <Line type="monotone" dataKey="errorRate" name="错误率" stroke="#f5222d" />
                   <Line type="monotone" dataKey="successRate" name="成功率" stroke="#52c41a" />
