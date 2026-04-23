@@ -23,10 +23,10 @@ import (
 
 const (
 	defaultHealthCheckLevel = "medium"
-	regionDomestic = "domestic"
-	regionOverseas = "overseas"
-	securityLevelStandard = "standard"
-	securityLevelHigh = "high"
+	regionDomestic          = "domestic"
+	regionOverseas          = "overseas"
+	securityLevelStandard   = "standard"
+	securityLevelHigh       = "high"
 )
 
 func CreateMerchantAPIKey(c *gin.Context) {
@@ -445,7 +445,7 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		regionStr = strings.ToLower(strings.TrimSpace(regionStr))
 		if regionStr != "" {
 			switch regionStr {
-				case regionDomestic, regionOverseas:
+			case regionDomestic, regionOverseas:
 			default:
 				middleware.RespondWithError(c, apperrors.NewAppError(
 					"INVALID_REGION",
@@ -466,7 +466,7 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		securityLevelStr = strings.ToLower(strings.TrimSpace(securityLevelStr))
 		if securityLevelStr != "" {
 			switch securityLevelStr {
-				case securityLevelStandard, securityLevelHigh:
+			case securityLevelStandard, securityLevelHigh:
 			default:
 				middleware.RespondWithError(c, apperrors.NewAppError(
 					"INVALID_SECURITY_LEVEL",
