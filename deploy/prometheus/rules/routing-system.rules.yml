@@ -1,0 +1,118 @@
+groups:
+  - name: routing_system_alerts
+    rules:
+      # 路由决策延迟监控
+      - alert: RoutingDecisionHighLatency
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(routing_decision_duration_seconds_bucket[5m])) by (le)
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          service: routing
+        annotations:
+          summary: "路由决策延迟过高"
+          description: "路由决策 P99 延迟超过 10ms"
+
+      # API Key 健康状态告警
+      - alert: APIKeyUnhealthy
+        expr: api_key_health_status{status="unhealthy"} > 0
+        for: 5m
+        labels:
+          severity: critical
+          service: routing
+        annotations:
+          summary: "API Key 健康状态异常"
+          description: "API Key {{ $labels.api_key_id }} 状态为不健康"
+
+      # 路由错误率监控
+      - alert: RoutingHighErrorRate
+        expr: |
+          (sum(rate(routing_errors_total[5m])) / clamp_min(sum(rate(routing_requests_total[5m])), 1)) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: routing
+        annotations:
+          summary: "路由错误率过高"
+          description: "过去 5 分钟路由错误率超过 10%"
+
+      # 限流触发告警
+      - alert: RateLimitExceeded
+        expr: rate(rate_limit_exceeded_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: routing
+        annotations:
+          summary: "限流触发"
+          description: "检测到限流触发事件"
+
+      # 连接池使用过高告警
+      - alert: ConnectionPoolHighUsage
+        expr: |
+          (sum(api_key_connection_pool_active) by (api_key_id) / sum(api_key_connection_pool_size) by (api_key_id)) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: routing
+        annotations:
+          summary: "连接池使用过高"
+          description: "API Key {{ $labels.api_key_id }} 连接池使用率超过 80%"
+
+      # 路由策略执行失败告警
+      - alert: StrategyExecutionFailed
+        expr: rate(strategy_execution_failed_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          service: routing
+        annotations:
+          summary: "策略执行失败"
+          description: "路由策略执行失败事件"
+
+      # API Key 状态更新失败告警
+      - alert: APIKeyStatusUpdateFailed
+        expr: rate(api_key_status_update_failed_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: routing
+        annotations:
+          summary: "API Key 状态更新失败"
+          description: "API Key 状态更新失败事件"
+
+      # 路由决策超时告警
+      - alert: RoutingDecisionTimeout
+        expr: rate(routing_decision_timeout_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: routing
+        annotations:
+          summary: "路由决策超时"
+          description: "路由决策超时事件"
+
+      # 路由执行超时告警
+      - alert: RoutingExecutionTimeout
+        expr: rate(routing_execution_timeout_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: routing
+        annotations:
+          summary: "路由执行超时"
+          description: "路由执行超时事件"
+
+      # 熔断器触发告警
+      - alert: CircuitBreakerTripped
+        expr: circuit_breaker_state{state="tripped"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: routing
+        annotations:
+          summary: "熔断器触发"
+          description: "API Key {{ $labels.api_key_id }} 熔断器触发"

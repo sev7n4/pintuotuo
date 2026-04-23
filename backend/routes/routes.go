@@ -491,4 +491,19 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 		adminRoutingStrategies.PUT("/:id", handlers.AdminUpdateRoutingStrategy)
 		adminRoutingStrategies.DELETE("/:id", handlers.AdminDeleteRoutingStrategy)
 	}
+
+	adminAPIKeyStatus := router.Group("/admin/api-key-status")
+	adminAPIKeyStatus.Use(middleware.AuthMiddleware())
+	{
+		adminAPIKeyStatus.GET("", handlers.GetAllAPIKeyStatus)
+		adminAPIKeyStatus.GET("/:id", handlers.GetAPIKeyStatus)
+		adminAPIKeyStatus.POST("/batch", handlers.GetBatchAPIKeyStatus)
+	}
+
+	adminRouteDecisionLogs := router.Group("/admin/route-decision-logs")
+	adminRouteDecisionLogs.Use(middleware.AuthMiddleware())
+	{
+		adminRouteDecisionLogs.GET("", handlers.GetRouteDecisionLogs)
+		adminRouteDecisionLogs.GET("/:id", handlers.GetRouteDecisionLog)
+	}
 }
