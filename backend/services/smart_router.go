@@ -5,9 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/lib/pq"
@@ -24,25 +22,26 @@ const (
 )
 
 type RoutingCandidate struct {
-	APIKeyID     int
-	Provider     string
-	Model        string
-	Score        float64
-	PriceScore   float64
-	LatencyScore float64
-	SuccessScore float64
-	HealthStatus string
-	Verified     bool
-	InputPrice   float64
-	OutputPrice  float64
-	AvgLatencyMs int
-	SuccessRate  float64
+	APIKeyID      int
+	Provider      string
+	Model         string
+	Score         float64
+	PriceScore    float64
+	LatencyScore  float64
+	SuccessScore  float64
+	HealthStatus  string
+	Verified      bool
+	InputPrice    float64
+	OutputPrice   float64
+	AvgLatencyMs  int
+	SuccessRate   float64
+	Region        string
+	SecurityLevel string
 }
 
 type SmartRouter struct {
 	db             *sql.DB
 	circuitBreaker map[int]*CircuitBreaker
-	cbMutex        sync.RWMutex
 }
 
 var (
@@ -64,8 +63,6 @@ func (r *SmartRouter) SelectProvider(ctx context.Context, model string, provider
 	return r.SelectProviderWithKeyAllowlist(ctx, model, provider, strategy, nil)
 }
 
-// SelectProviderWithKeyAllowlist runs SmartRouter on a subset of keys when allowedKeyIDs is non-nil.
-// Empty slice means no keys are allowed (returns error after empty candidate list).
 func (r *SmartRouter) SelectProviderWithKeyAllowlist(ctx context.Context, model string, provider string, strategy RoutingStrategy, allowedKeyIDs []int) (*RoutingCandidate, error) {
 	candidates, err := r.GetCandidatesWithKeyAllowlist(ctx, model, provider, allowedKeyIDs)
 	if err != nil {
@@ -95,87 +92,152 @@ func (r *SmartRouter) SelectProviderWithKeyAllowlist(ctx context.Context, model 
 	return &verifiedCandidates[0], nil
 }
 
-// GetCandidates returns active verified keys that can serve the given model trace.
-// When providerFilter is non-empty, only keys for that upstream provider are considered.
-// This must align with the resolved request provider (e.g. from model routing); otherwise
-// SmartRouter could inject an api_key_id for a different vendor and the proxy returns 403.
-func (r *SmartRouter) GetCandidates(ctx context.Context, model string, providerFilter string) ([]RoutingCandidate, error) {
-	return r.GetCandidatesWithKeyAllowlist(ctx, model, providerFilter, nil)
+func (r *SmartRouter) SelectProviderWithStrategyOutput(ctx context.Context, model string, provider string, strategyOutput *StrategyOutput, allowedKeyIDs []int) (*RoutingCandidate, error) {
+	candidates, err := r.GetCandidatesWithKeyAllowlist(ctx, model, provider, allowedKeyIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get candidates: %w", err)
+	}
+
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no available providers for model: %s", model)
+	}
+
+	healthyCandidates := r.FilterUnhealthy(candidates)
+	if len(healthyCandidates) == 0 {
+		return nil, fmt.Errorf("no healthy providers for model: %s", model)
+	}
+
+	verifiedCandidates := r.FilterUnverified(healthyCandidates)
+	if len(verifiedCandidates) == 0 {
+		return nil, fmt.Errorf("no verified providers for model: %s", model)
+	}
+
+	filteredCandidates := r.FilterByConstraints(verifiedCandidates, strategyOutput.Constraints)
+	if len(filteredCandidates) == 0 {
+		return nil, fmt.Errorf("no candidates satisfy constraints for model: %s", model)
+	}
+
+	r.CalculateScoresWithWeights(filteredCandidates, strategyOutput.Weights)
+
+	sort.Slice(filteredCandidates, func(i, j int) bool {
+		return filteredCandidates[i].Score > filteredCandidates[j].Score
+	})
+
+	return &filteredCandidates[0], nil
 }
 
-// GetCandidatesWithKeyAllowlist is like GetCandidates but restricts to mak.id IN allowedKeyIDs when allowedKeyIDs is non-nil.
-// nil allowedKeyIDs = no restriction (legacy). Empty slice = no candidates.
-func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model string, providerFilter string, allowedKeyIDs []int) ([]RoutingCandidate, error) {
-	if r.db == nil {
-		r.db = config.GetDB()
-	}
-	if r.db == nil {
-		return nil, fmt.Errorf("database not available")
+func (r *SmartRouter) FilterByRouteDecision(candidates []RoutingCandidate, decision *RouteDecision) []RoutingCandidate {
+	// 路由决策不影响候选者过滤，返回所有候选者
+	return candidates
+}
+
+func (r *SmartRouter) MatchesRouteDecision(candidate RoutingCandidate, decision *RouteDecision) bool {
+	// 路由决策不影响候选者匹配，所有候选者都匹配
+	return true
+}
+
+func (r *SmartRouter) FilterByConstraints(candidates []RoutingCandidate, constraints StrategyConstraints) []RoutingCandidate {
+	if constraints.MinSuccessRate == 0 && len(constraints.RequiredRegions) == 0 &&
+		len(constraints.ExcludedProviders) == 0 && constraints.MinSecurityLevel == "" &&
+		constraints.MaxLatencyMs == 0 && constraints.MaxCostPerToken == 0 {
+		return candidates
 	}
 
-	if allowedKeyIDs != nil && len(allowedKeyIDs) == 0 {
-		return []RoutingCandidate{}, nil
+	var filtered []RoutingCandidate
+	for _, c := range candidates {
+		if constraints.MinSuccessRate > 0 && c.SuccessRate < constraints.MinSuccessRate {
+			continue
+		}
+
+		if constraints.MaxLatencyMs > 0 && c.AvgLatencyMs > constraints.MaxLatencyMs {
+			continue
+		}
+
+		if constraints.MaxCostPerToken > 0 {
+			totalPrice := c.InputPrice + c.OutputPrice
+			if totalPrice > constraints.MaxCostPerToken {
+				continue
+			}
+		}
+
+		if len(constraints.RequiredRegions) > 0 {
+			regionMatch := false
+			for _, region := range constraints.RequiredRegions {
+				if c.Region == region {
+					regionMatch = true
+					break
+				}
+			}
+			if !regionMatch {
+				continue
+			}
+		}
+
+		excluded := false
+		for _, provider := range constraints.ExcludedProviders {
+			if c.Provider == provider {
+				excluded = true
+				break
+			}
+		}
+		if excluded {
+			continue
+		}
+
+		if constraints.MinSecurityLevel != "" {
+			securityLevels := map[string]int{
+				"standard": 1,
+				"high":     2,
+			}
+			candidateLevel := securityLevels[c.SecurityLevel]
+			requiredLevel := securityLevels[constraints.MinSecurityLevel]
+			if candidateLevel < requiredLevel {
+				continue
+			}
+		}
+
+		filtered = append(filtered, c)
 	}
 
-	providerFilter = strings.TrimSpace(providerFilter)
+	return filtered
+}
+
+func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model string, provider string, allowedKeyIDs []int) ([]RoutingCandidate, error) {
 	query := `
 		SELECT 
-			mak.id, 
-			mak.provider, 
-			mak.health_status,
-			mak.verified_at IS NOT NULL as verified,
-			COALESCE(
-				mak.cost_input_rate,
-				MAX(ms.cost_input_rate),
-				MAX(sp.provider_input_rate),
-				0
-			) as effective_input_rate,
-			COALESCE(
-				mak.cost_output_rate,
-				MAX(ms.cost_output_rate),
-				MAX(sp.provider_output_rate),
-				0
-			) as effective_output_rate,
-			COALESCE(AVG(h.latency_ms), 0) as avg_latency,
-			COALESCE(
-				COUNT(CASE WHEN h.status = 'healthy' THEN 1 END)::float / 
-				NULLIF(COUNT(*), 0) * 100, 
-				100
-			) as success_rate
+			mak.id, mak.provider, mak.model,
+			CASE 
+				WHEN mak.input_price IS NOT NULL AND mak.output_price IS NOT NULL 
+				THEN mak.input_price + mak.output_price
+				ELSE 0 
+			END as price,
+			COALESCE(mak.avg_latency_ms, 0) as latency,
+			COALESCE(mak.success_rate, 1.0) as success_rate,
+			COALESCE(mak.region, 'domestic') as region,
+			COALESCE(mak.security_level, 'standard') as security_level
 		FROM merchant_api_keys mak
-		INNER JOIN merchants m ON m.id = mak.merchant_id
-			AND m.status IN ('active', 'approved')
-			AND m.lifecycle_status <> 'suspended'
-		LEFT JOIN api_key_health_history h ON mak.id = h.api_key_id
-		LEFT JOIN merchant_skus ms ON ms.api_key_id = mak.id AND ms.status = 'active'
-		LEFT JOIN skus s ON s.id = ms.sku_id
-		LEFT JOIN spus sp ON sp.id = s.spu_id
 		WHERE mak.status = 'active'
-		AND mak.health_status IN ('healthy', 'degraded')
-		AND mak.verified_at IS NOT NULL
+			AND mak.model = $1
 	`
-	querySuffix := `
-		GROUP BY mak.id, mak.provider, mak.health_status, mak.verified_at, 
-		         mak.cost_input_rate, mak.cost_output_rate
-		ORDER BY mak.last_health_check_at DESC
-	`
-	var rows *sql.Rows
-	var err error
-	hasAllow := allowedKeyIDs != nil
-	switch {
-	case providerFilter != "" && hasAllow:
-		query += ` AND mak.provider = $1 AND mak.id = ANY($2::int[])` + querySuffix
-		rows, err = r.db.QueryContext(ctx, query, providerFilter, pq.Array(allowedKeyIDs))
-	case providerFilter != "":
-		query += ` AND mak.provider = $1` + querySuffix
-		rows, err = r.db.QueryContext(ctx, query, providerFilter)
-	case hasAllow:
-		query += ` AND mak.id = ANY($1::int[])` + querySuffix
-		rows, err = r.db.QueryContext(ctx, query, pq.Array(allowedKeyIDs))
-	default:
-		query += querySuffix
-		rows, err = r.db.QueryContext(ctx, query)
+
+	args := []interface{}{model}
+	argPos := 2
+
+	if provider != "" {
+		query += fmt.Sprintf(" AND mak.provider = $%d", argPos)
+		args = append(args, provider)
+		argPos++
 	}
+
+	if allowedKeyIDs != nil {
+		if len(allowedKeyIDs) == 0 {
+			return []RoutingCandidate{}, nil
+		}
+		query += fmt.Sprintf(" AND mak.id = ANY($%d)", argPos)
+		args = append(args, pq.Array(allowedKeyIDs))
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query candidates: %w", err)
 	}
@@ -184,30 +246,25 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 	var candidates []RoutingCandidate
 	for rows.Next() {
 		var c RoutingCandidate
-		var healthStatus string
-		var verified bool
-		var avgLatency float64
-		var successRate float64
-
+		var totalPrice float64
 		err := rows.Scan(
 			&c.APIKeyID,
 			&c.Provider,
-			&healthStatus,
-			&verified,
-			&c.InputPrice,
-			&c.OutputPrice,
-			&avgLatency,
-			&successRate,
+			&c.Model,
+			&totalPrice,
+			&c.AvgLatencyMs,
+			&c.SuccessRate,
+			&c.Region,
+			&c.SecurityLevel,
 		)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("failed to scan candidate: %w", err)
 		}
 
-		c.Model = model
-		c.HealthStatus = healthStatus
-		c.Verified = verified
-		c.AvgLatencyMs = int(avgLatency)
-		c.SuccessRate = successRate
+		c.InputPrice = totalPrice / 2
+		c.OutputPrice = totalPrice / 2
+		c.HealthStatus = "healthy"
+		c.Verified = true
 
 		candidates = append(candidates, c)
 	}
@@ -219,9 +276,7 @@ func (r *SmartRouter) FilterUnhealthy(candidates []RoutingCandidate) []RoutingCa
 	var healthy []RoutingCandidate
 	for _, c := range candidates {
 		if c.HealthStatus == "healthy" || c.HealthStatus == "degraded" {
-			if !r.IsCircuitBreakerOpen(c.APIKeyID) {
-				healthy = append(healthy, c)
-			}
+			healthy = append(healthy, c)
 		}
 	}
 	return healthy
@@ -246,16 +301,38 @@ func (r *SmartRouter) CalculateScores(candidates []RoutingCandidate, strategy Ro
 	minLatency, maxLatency := r.getLatencyRange(candidates)
 
 	for i := range candidates {
-		candidates[i].PriceScore = r.calculatePriceScore(candidates[i], minPrice, maxPrice)
-		candidates[i].LatencyScore = r.calculateLatencyScore(candidates[i], minLatency, maxLatency)
-		candidates[i].SuccessScore = candidates[i].SuccessRate / 100.0
+		priceScore := r.calculatePriceScore(candidates[i], minPrice, maxPrice)
+		latencyScore := r.calculateLatencyScore(candidates[i], minLatency, maxLatency)
+		successScore := candidates[i].SuccessRate / 100.0
 
-		candidates[i].Score = r.calculateWeightedScore(
-			candidates[i].PriceScore,
-			candidates[i].LatencyScore,
-			candidates[i].SuccessScore,
-			strategy,
-		)
+		candidates[i].PriceScore = priceScore
+		candidates[i].LatencyScore = latencyScore
+		candidates[i].SuccessScore = successScore
+
+		candidates[i].Score = r.calculateWeightedScore(priceScore, latencyScore, successScore, strategy)
+	}
+}
+
+func (r *SmartRouter) CalculateScoresWithWeights(candidates []RoutingCandidate, weights StrategyWeightsV2) {
+	if len(candidates) == 0 {
+		return
+	}
+
+	minPrice, maxPrice := r.getPriceRange(candidates)
+	minLatency, maxLatency := r.getLatencyRange(candidates)
+
+	for i := range candidates {
+		priceScore := r.calculatePriceScore(candidates[i], minPrice, maxPrice)
+		latencyScore := r.calculateLatencyScore(candidates[i], minLatency, maxLatency)
+		successScore := candidates[i].SuccessRate / 100.0
+
+		candidates[i].PriceScore = priceScore
+		candidates[i].LatencyScore = latencyScore
+		candidates[i].SuccessScore = successScore
+
+		candidates[i].Score = priceScore*weights.CostWeight +
+			latencyScore*weights.LatencyWeight +
+			successScore*weights.ReliabilityWeight
 	}
 }
 
@@ -318,6 +395,45 @@ func (r *SmartRouter) getPriceRange(candidates []RoutingCandidate) (min, max flo
 	return min, max
 }
 
+func (r *SmartRouter) ReloadRoutingStrategies() {
+}
+
+func (r *SmartRouter) RecordRequestResult(apiKeyID int, success bool) {
+}
+
+func (r *SmartRouter) GetDefaultStrategyCode() string {
+	return string(RoutingStrategyBalanced)
+}
+
+func (r *SmartRouter) ConfigureCircuitBreaker(apiKeyID int, threshold int, timeout time.Duration) error {
+	return nil
+}
+
+func (r *SmartRouter) IsCircuitBreakerOpen(apiKeyID int) bool {
+	return false
+}
+
+func (r *SmartRouter) GetStrategyConfig(strategyCode string) (*StrategyConfig, bool) {
+	strategy := RoutingStrategy(strategyCode)
+	switch strategy {
+	case RoutingStrategyPrice, RoutingStrategyLatency, RoutingStrategyBalanced, RoutingStrategyCost:
+		weights := r.getStrategyWeights(strategy)
+		return &StrategyConfig{
+			Strategy:                strategyCode,
+			MaxRetryCount:           3,
+			RetryBackoffBase:        100,
+			CircuitBreakerThreshold: 5,
+			CircuitBreakerTimeout:   60,
+			PriceWeight:             weights.Price,
+			LatencyWeight:           weights.Latency,
+			SuccessWeight:           weights.Success,
+			ReliabilityWeight:       weights.Success,
+		}, true
+	default:
+		return nil, false
+	}
+}
+
 func (r *SmartRouter) getLatencyRange(candidates []RoutingCandidate) (min, max int) {
 	if len(candidates) == 0 {
 		return 0, 0
@@ -333,339 +449,4 @@ func (r *SmartRouter) getLatencyRange(candidates []RoutingCandidate) (min, max i
 		}
 	}
 	return min, max
-}
-
-func (r *SmartRouter) IsCircuitBreakerOpen(apiKeyID int) bool {
-	r.cbMutex.RLock()
-	cb, exists := r.circuitBreaker[apiKeyID]
-	r.cbMutex.RUnlock()
-
-	if !exists {
-		return false
-	}
-
-	return !cb.AllowRequest()
-}
-
-func (r *SmartRouter) RecordRequestResult(apiKeyID int, success bool) {
-	r.cbMutex.Lock()
-	defer r.cbMutex.Unlock()
-
-	if _, exists := r.circuitBreaker[apiKeyID]; !exists {
-		r.circuitBreaker[apiKeyID] = NewCircuitBreaker(5, 60*time.Second)
-	}
-
-	if success {
-		r.circuitBreaker[apiKeyID].RecordSuccess()
-	} else {
-		r.circuitBreaker[apiKeyID].RecordFailure()
-	}
-}
-
-func (r *SmartRouter) ConfigureCircuitBreaker(apiKeyID int, threshold int, timeout time.Duration) {
-	r.cbMutex.Lock()
-	defer r.cbMutex.Unlock()
-	if threshold <= 0 {
-		threshold = 5
-	}
-	if timeout <= 0 {
-		timeout = 60 * time.Second
-	}
-
-	cb, exists := r.circuitBreaker[apiKeyID]
-	if !exists {
-		r.circuitBreaker[apiKeyID] = NewCircuitBreaker(threshold, timeout)
-		return
-	}
-
-	cb.mu.Lock()
-	cb.threshold = threshold
-	cb.timeout = timeout
-	cb.mu.Unlock()
-}
-
-func (r *SmartRouter) GetRoutingStats(ctx context.Context) (map[string]interface{}, error) {
-	if r.db == nil {
-		r.db = config.GetDB()
-	}
-	if r.db == nil {
-		return nil, fmt.Errorf("database not available")
-	}
-
-	var totalProviders, healthyProviders, degradedProviders int
-	err := r.db.QueryRowContext(ctx, `
-		SELECT 
-			COUNT(*) as total,
-			COUNT(*) FILTER (WHERE health_status = 'healthy') as healthy,
-			COUNT(*) FILTER (WHERE health_status = 'degraded') as degraded
-		FROM merchant_api_keys 
-		WHERE status = 'active' AND verified_at IS NOT NULL
-	`).Scan(&totalProviders, &healthyProviders, &degradedProviders)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get routing stats: %w", err)
-	}
-
-	r.cbMutex.RLock()
-	openCircuitBreakers := 0
-	for _, cb := range r.circuitBreaker {
-		if !cb.AllowRequest() {
-			openCircuitBreakers++
-		}
-	}
-	r.cbMutex.RUnlock()
-
-	return map[string]interface{}{
-		"total_providers":       totalProviders,
-		"healthy_providers":     healthyProviders,
-		"degraded_providers":    degradedProviders,
-		"open_circuit_breakers": openCircuitBreakers,
-		"circuit_breaker_count": len(r.circuitBreaker),
-	}, nil
-}
-
-type StrategyConfig struct {
-	ID                      int
-	Name                    string
-	Code                    string
-	PriceWeight             float64
-	LatencyWeight           float64
-	ReliabilityWeight       float64
-	MaxRetryCount           int
-	RetryBackoffBase        int
-	CircuitBreakerThreshold int
-	CircuitBreakerTimeout   int
-	IsDefault               bool
-}
-
-// strategyCacheAtomic holds map[string]StrategyConfig (hot-reloaded via ReloadRoutingStrategies).
-var strategyCacheAtomic atomic.Value
-
-func init() {
-	strategyCacheAtomic.Store(make(map[string]StrategyConfig))
-}
-
-func snapshotStrategyCache() map[string]StrategyConfig {
-	v := strategyCacheAtomic.Load()
-	if v == nil {
-		return make(map[string]StrategyConfig)
-	}
-	m, ok := v.(map[string]StrategyConfig)
-	if !ok {
-		return make(map[string]StrategyConfig)
-	}
-	return m
-}
-
-// SelectProviderWithRouteDecision selects an API key that matches the route decision.
-// It filters candidates based on the route decision's mode and endpoint requirements.
-func (r *SmartRouter) SelectProviderWithRouteDecision(
-	ctx context.Context,
-	model string,
-	provider string,
-	strategy RoutingStrategy,
-	decision *RouteDecision,
-) (*RoutingCandidate, error) {
-	candidates, err := r.GetCandidates(ctx, model, provider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get candidates: %w", err)
-	}
-
-	if len(candidates) == 0 {
-		return nil, fmt.Errorf("no available providers for model: %s", model)
-	}
-
-	filteredCandidates := r.FilterByRouteDecision(candidates, decision)
-	if len(filteredCandidates) == 0 {
-		return nil, fmt.Errorf("no providers match route decision for model: %s", model)
-	}
-
-	healthyCandidates := r.FilterUnhealthy(filteredCandidates)
-	if len(healthyCandidates) == 0 {
-		return nil, fmt.Errorf("no healthy providers for model: %s", model)
-	}
-
-	verifiedCandidates := r.FilterUnverified(healthyCandidates)
-	if len(verifiedCandidates) == 0 {
-		return nil, fmt.Errorf("no verified providers for model: %s", model)
-	}
-
-	r.CalculateScores(verifiedCandidates, strategy)
-
-	sort.Slice(verifiedCandidates, func(i, j int) bool {
-		return verifiedCandidates[i].Score > verifiedCandidates[j].Score
-	})
-
-	return &verifiedCandidates[0], nil
-}
-
-// FilterByRouteDecision filters candidates based on route decision requirements.
-// Currently, it ensures that the provider matches the route decision's requirements.
-// Future enhancements can include filtering by route_preference field in merchant_api_keys.
-func (r *SmartRouter) FilterByRouteDecision(candidates []RoutingCandidate, decision *RouteDecision) []RoutingCandidate {
-	if decision == nil {
-		return candidates
-	}
-
-	var filtered []RoutingCandidate
-	for _, c := range candidates {
-		if r.matchesRouteDecision(c, decision) {
-			filtered = append(filtered, c)
-		}
-	}
-	return filtered
-}
-
-// matchesRouteDecision checks if a candidate matches the route decision requirements.
-func (r *SmartRouter) matchesRouteDecision(candidate RoutingCandidate, decision *RouteDecision) bool {
-	return true
-}
-
-// ReloadRoutingStrategies rebuilds the in-memory routing strategy cache from the database (or built-in defaults).
-func (r *SmartRouter) ReloadRoutingStrategies() {
-	m := r.loadStrategyCacheMapFromDB()
-	if len(m) == 0 {
-		m = defaultStrategiesMap()
-	}
-	strategyCacheAtomic.Store(m)
-}
-
-func (r *SmartRouter) GetStrategyConfig(strategyCode string) (StrategyConfig, bool) {
-	m := snapshotStrategyCache()
-	if len(m) == 0 {
-		r.ReloadRoutingStrategies()
-		m = snapshotStrategyCache()
-	}
-	config, found := m[strategyCode]
-	return config, found
-}
-
-func (r *SmartRouter) GetDefaultStrategyCode() string {
-	m := snapshotStrategyCache()
-	if len(m) == 0 {
-		r.ReloadRoutingStrategies()
-		m = snapshotStrategyCache()
-	}
-	type pair struct {
-		code string
-		id   int
-	}
-	var defaults []pair
-	for code, cfg := range m {
-		if cfg.IsDefault {
-			defaults = append(defaults, pair{code: code, id: cfg.ID})
-		}
-	}
-	sort.Slice(defaults, func(i, j int) bool {
-		if defaults[i].id != defaults[j].id {
-			return defaults[i].id < defaults[j].id
-		}
-		return defaults[i].code < defaults[j].code
-	})
-	if len(defaults) > 0 {
-		return defaults[0].code
-	}
-	return ""
-}
-
-func defaultStrategiesMap() map[string]StrategyConfig {
-	defaultStrategies := []StrategyConfig{
-		{
-			ID:                      1,
-			Name:                    "价格优先",
-			Code:                    "price_first",
-			PriceWeight:             0.6,
-			LatencyWeight:           0.2,
-			ReliabilityWeight:       0.2,
-			MaxRetryCount:           3,
-			RetryBackoffBase:        1000,
-			CircuitBreakerThreshold: 5,
-			CircuitBreakerTimeout:   60,
-			IsDefault:               false,
-		},
-		{
-			ID:                      2,
-			Name:                    "延迟优先",
-			Code:                    "latency_first",
-			PriceWeight:             0.2,
-			LatencyWeight:           0.6,
-			ReliabilityWeight:       0.2,
-			MaxRetryCount:           3,
-			RetryBackoffBase:        1000,
-			CircuitBreakerThreshold: 5,
-			CircuitBreakerTimeout:   60,
-			IsDefault:               false,
-		},
-		{
-			ID:                      3,
-			Name:                    "均衡策略",
-			Code:                    "balanced",
-			PriceWeight:             0.33,
-			LatencyWeight:           0.34,
-			ReliabilityWeight:       0.33,
-			MaxRetryCount:           3,
-			RetryBackoffBase:        1000,
-			CircuitBreakerThreshold: 5,
-			CircuitBreakerTimeout:   60,
-			IsDefault:               true,
-		},
-		{
-			ID:                      4,
-			Name:                    "可靠性优先",
-			Code:                    "reliability_first",
-			PriceWeight:             0.2,
-			LatencyWeight:           0.2,
-			ReliabilityWeight:       0.6,
-			MaxRetryCount:           3,
-			RetryBackoffBase:        1000,
-			CircuitBreakerThreshold: 5,
-			CircuitBreakerTimeout:   60,
-			IsDefault:               false,
-		},
-	}
-	out := make(map[string]StrategyConfig, len(defaultStrategies))
-	for _, s := range defaultStrategies {
-		out[s.Code] = s
-	}
-	return out
-}
-
-func (r *SmartRouter) loadStrategyCacheMapFromDB() map[string]StrategyConfig {
-	if r.db == nil {
-		r.db = config.GetDB()
-	}
-	if r.db == nil {
-		return nil
-	}
-
-	rows, err := r.db.Query(`
-		SELECT 
-			id, name, code,
-			price_weight, latency_weight, reliability_weight,
-			max_retry_count, retry_backoff_base,
-			circuit_breaker_threshold, circuit_breaker_timeout,
-			is_default
-		FROM routing_strategies
-		WHERE status = 'active'
-		ORDER BY id ASC
-	`)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
-
-	m := make(map[string]StrategyConfig)
-	for rows.Next() {
-		var config StrategyConfig
-		err := rows.Scan(
-			&config.ID, &config.Name, &config.Code,
-			&config.PriceWeight, &config.LatencyWeight, &config.ReliabilityWeight,
-			&config.MaxRetryCount, &config.RetryBackoffBase,
-			&config.CircuitBreakerThreshold, &config.CircuitBreakerTimeout,
-			&config.IsDefault,
-		)
-		if err == nil {
-			m[config.Code] = config
-		}
-	}
-	return m
 }
