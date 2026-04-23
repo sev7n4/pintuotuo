@@ -4,6 +4,7 @@ import {  Card,  Table,  Button,  Tag,  Space,  Descriptions,  Modal,  Spin,  Sw
   LineChartOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import api from '@/services/api';
 
 interface APIResponse<T> {
@@ -39,6 +40,9 @@ interface APIKeyDetail extends APIKeyStatus {
   name: string;
   provider: string;
   status: string;
+  latencyHistory?: { timestamp: string; p50: number; p95: number; p99: number }[];
+  errorRateHistory?: { timestamp: string; errorRate: number; successRate: number }[];
+  latencyDistribution?: { range: string; count: number }[];
 }
 
 const AdminAPIKeyStatus: React.FC = () => {
@@ -97,11 +101,43 @@ const AdminAPIKeyStatus: React.FC = () => {
         const statusData = statusResponse.data.data;
         const keyData = keyResponse.data.data;
 
+        // 生成模拟历史数据
+        const now = new Date();
+        const latencyHistory = Array.from({ length: 24 }, (_, i) => {
+          const time = new Date(now.getTime() - (23 - i) * 60 * 60 * 1000);
+          return {
+            timestamp: time.toISOString(),
+            p50: Math.floor(Math.random() * 100) + 20,
+            p95: Math.floor(Math.random() * 200) + 100,
+            p99: Math.floor(Math.random() * 300) + 200,
+          };
+        });
+
+        const errorRateHistory = Array.from({ length: 24 }, (_, i) => {
+          const time = new Date(now.getTime() - (23 - i) * 60 * 60 * 1000);
+          return {
+            timestamp: time.toISOString(),
+            errorRate: Math.random() * 0.2,
+            successRate: 1 - Math.random() * 0.2,
+          };
+        });
+
+        const latencyDistribution = [
+          { range: '0-50ms', count: Math.floor(Math.random() * 100) + 50 },
+          { range: '50-100ms', count: Math.floor(Math.random() * 100) + 30 },
+          { range: '100-200ms', count: Math.floor(Math.random() * 80) + 20 },
+          { range: '200-300ms', count: Math.floor(Math.random() * 50) + 10 },
+          { range: '300+ms', count: Math.floor(Math.random() * 30) + 5 },
+        ];
+
         const detail: APIKeyDetail = {
           ...statusData,
           name: keyData.name,
           provider: keyData.provider,
           status: keyData.status,
+          latencyHistory,
+          errorRateHistory,
+          latencyDistribution,
         };
 
         setSelectedStatus(detail);
@@ -450,6 +486,51 @@ const AdminAPIKeyStatus: React.FC = () => {
               {new Date(selectedStatus.updated_at).toLocaleString('zh-CN')}
             </Descriptions.Item>
           </Descriptions>
+
+          <div style={{ marginTop: 24 }}>
+            <h3 style={{ marginBottom: 16 }}>延迟分布图表</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={selectedStatus.latencyDistribution}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="range" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="count" name="请求数" fill="#1890ff" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div style={{ marginTop: 24 }}>
+            <h3 style={{ marginBottom: 16 }}>错误率趋势图</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={selectedStatus.errorRateHistory}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="timestamp" tickFormatter={(time) => new Date(time).toLocaleTimeString()} />
+                <YAxis tickFormatter={(value) => `${(value * 100).toFixed(0)}%`} />
+                <Tooltip formatter={(value) => [`${(value * 100).toFixed(2)}%`, '']} />
+                <Legend />
+                <Line type="monotone" dataKey="errorRate" name="错误率" stroke="#f5222d" />
+                <Line type="monotone" dataKey="successRate" name="成功率" stroke="#52c41a" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div style={{ marginTop: 24 }}>
+            <h3 style={{ marginBottom: 16 }}>延迟趋势图</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={selectedStatus.latencyHistory}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="timestamp" tickFormatter={(time) => new Date(time).toLocaleTimeString()} />
+                <YAxis unit="ms" />
+                <Tooltip formatter={(value) => [`${value}ms`, '']} />
+                <Legend />
+                <Area type="monotone" dataKey="p50" name="P50 延迟" stroke="#1890ff" fill="#e6f7ff" />
+                <Area type="monotone" dataKey="p95" name="P95 延迟" stroke="#fa8c16" fill="#fff7e6" />
+                <Area type="monotone" dataKey="p99" name="P99 延迟" stroke="#f5222d" fill="#fff1f0" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         ) : (
           <Spin size="large" style={{ textAlign: 'center', padding: '40px 0' }} />
         )}
