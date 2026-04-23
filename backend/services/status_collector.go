@@ -11,12 +11,12 @@ import (
 )
 
 type StatusCollector struct {
-	db              *sql.DB
-	awareness       IRouteAwareness
-	interval        time.Duration
-	stopChan        chan struct{}
-	wg              sync.WaitGroup
-	healthChecker   *HealthChecker
+	db            *sql.DB
+	awareness     IRouteAwareness
+	interval      time.Duration
+	stopChan      chan struct{}
+	wg            sync.WaitGroup
+	healthChecker *HealthChecker
 }
 
 func NewStatusCollector(db *sql.DB, awareness IRouteAwareness, healthChecker *HealthChecker, interval time.Duration) *StatusCollector {
@@ -175,7 +175,7 @@ func (c *StatusCollector) measureLatency(ctx context.Context, apiKey *models.Mer
 	}
 
 	start := time.Now()
-	
+
 	_, err := c.healthChecker.LightweightPing(ctx, apiKey)
 	if err != nil {
 		return 0, err
