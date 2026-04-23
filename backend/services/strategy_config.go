@@ -9,4 +9,5 @@ type StrategyConfig struct {
 	PriceWeight            float64 `json:"price_weight"`
 	LatencyWeight          float64 `json:"latency_weight"`
 	SuccessWeight          float64 `json:"success_weight"`
+	ReliabilityWeight      float64 `json:"reliability_weight"`
 }

@@ -412,6 +412,7 @@ func (r *SmartRouter) GetStrategyConfig(strategyCode string) (*StrategyConfig, b
 		PriceWeight:            weights.Price,
 		LatencyWeight:          weights.Latency,
 		SuccessWeight:          weights.Success,
+		ReliabilityWeight:      weights.Success,
 	}, true
 }
 
