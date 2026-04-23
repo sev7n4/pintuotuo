@@ -300,6 +300,8 @@ const MerchantAPIKeys = () => {
       cost_input_rate: record.cost_input_rate ?? fallbackInput,
       cost_output_rate: record.cost_output_rate ?? fallbackOutput,
       profit_margin: record.profit_margin ?? fallbackMargin,
+      region: record.region || 'domestic',
+      security_level: record.security_level || 'standard',
     });
     setModalVisible(true);
   };
@@ -326,6 +328,8 @@ const MerchantAPIKeys = () => {
           cost_output_rate: values.cost_output_rate as number | undefined,
           profit_margin: values.profit_margin as number | undefined,
           quota_limit: unlimited ? null : (values.quota_limit as number),
+          region: values.region as 'domestic' | 'overseas' | undefined,
+          security_level: values.security_level as 'standard' | 'high' | undefined,
         };
         const success = await updateAPIKey(editingKey.id, patch);
         if (!success) {
@@ -974,6 +978,22 @@ const MerchantAPIKeys = () => {
               <Select.Option value="medium">中频（约每5分钟）</Select.Option>
               <Select.Option value="low">低频（约每30分钟）</Select.Option>
               <Select.Option value="daily">每日一次</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Divider>智能路由配置</Divider>
+
+          <Form.Item name="region" label="区域">
+            <Select placeholder="选择 API Key 区域（用于智能路由）">
+              <Select.Option value="domestic">国内</Select.Option>
+              <Select.Option value="overseas">海外</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item name="security_level" label="安全等级">
+            <Select placeholder="选择安全等级（用于智能路由）">
+              <Select.Option value="standard">标准</Select.Option>
+              <Select.Option value="high">高安全</Select.Option>
             </Select>
           </Form.Item>
 

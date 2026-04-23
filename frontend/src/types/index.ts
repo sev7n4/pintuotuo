@@ -480,6 +480,10 @@ export interface MerchantAPIKey {
   cost_input_rate?: number;
   cost_output_rate?: number;
   profit_margin?: number;
+
+  region?: 'domestic' | 'overseas';
+  security_level?: 'standard' | 'high';
+  route_preference?: Record<string, unknown>;
 }
 
 export interface HealthStatus {

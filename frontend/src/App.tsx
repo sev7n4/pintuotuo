@@ -67,6 +67,8 @@ import AdminRoutingStrategies from '@pages/admin/AdminRoutingStrategies';
 import AdminRouteConfigs from '@pages/admin/AdminRouteConfigs';
 import AdminReconciliation from '@pages/admin/AdminReconciliation';
 import AdminEntitlementPackages from '@pages/admin/AdminEntitlementPackages';
+import AdminAPIKeyStatus from '@pages/admin/AdminAPIKeyStatus';
+import AdminRouteDecisionLogs from '@pages/admin/AdminRouteDecisionLogs';
 
 function LegacyProductDetailRedirect() {
   const { id } = useParams();
@@ -175,6 +177,8 @@ function App() {
             <Route path="model-fallback" element={<AdminModelFallback />} />
             <Route path="routing-strategies" element={<AdminRoutingStrategies />} />
             <Route path="route-configs" element={<AdminRouteConfigs />} />
+            <Route path="api-key-status" element={<AdminAPIKeyStatus />} />
+            <Route path="route-decision-logs" element={<AdminRouteDecisionLogs />} />
             <Route path="reconciliation" element={<AdminReconciliation />} />
             <Route path="flash-sales" element={<AdminFlashSales />} />
             <Route path="fuel-station" element={<AdminFuelStation />} />
