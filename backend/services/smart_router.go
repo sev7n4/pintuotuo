@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/lib/pq"
 	"github.com/pintuotuo/backend/config"
@@ -387,6 +388,33 @@ func (r *SmartRouter) getPriceRange(candidates []RoutingCandidate) (min, max flo
 
 func (r *SmartRouter) ReloadRoutingStrategies() {
 }
+
+func (r *SmartRouter) RecordRequestResult(apiKeyID int, success bool) {
+}
+
+func (r *SmartRouter) GetDefaultStrategyCode() string {
+	return string(RoutingStrategyBalanced)
+}
+
+func (r *SmartRouter) ConfigureCircuitBreaker(apiKeyID int, threshold int, timeout time.Duration) error {
+	return nil
+}
+
+func (r *SmartRouter) GetStrategyConfig(strategyCode string) (*StrategyConfig, bool) {
+	strategy := RoutingStrategy(strategyCode)
+	weights := r.getStrategyWeights(strategy)
+	return &StrategyConfig{
+		Strategy:               strategyCode,
+		MaxRetryCount:          3,
+		RetryBackoffBase:       100,
+		CircuitBreakerThreshold: 5,
+		CircuitBreakerTimeout:  60,
+		PriceWeight:            weights.Price,
+		LatencyWeight:          weights.Latency,
+		SuccessWeight:          weights.Success,
+	}, true
+}
+
 
 func (r *SmartRouter) getLatencyRange(candidates []RoutingCandidate) (min, max int) {
 	if len(candidates) == 0 {
