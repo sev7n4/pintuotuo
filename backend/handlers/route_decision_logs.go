@@ -103,7 +103,7 @@ func GetRouteDecisionLogs(c *gin.Context) {
 			createdAt           time.Time
 		)
 
-		err := rows.Scan(
+		scanErr := rows.Scan(
 			&id,
 			&requestID,
 			&merchantID,
@@ -113,7 +113,7 @@ func GetRouteDecisionLogs(c *gin.Context) {
 			&executionLayerResult,
 			&createdAt,
 		)
-		if err != nil {
+		if scanErr != nil {
 			continue
 		}
 

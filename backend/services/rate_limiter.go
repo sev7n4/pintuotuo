@@ -15,20 +15,20 @@ type RateLimiter interface {
 
 type TokenBucket struct {
 	mu           sync.Mutex
-	rate         int           // 令牌生成速率（每秒）
-	burst        int           // 令牌桶容量
-	tokens       float64       // 当前令牌数
-	lastRefilled time.Time     // 上次填充时间
-	ratePerNano  float64       // 每纳秒生成的令牌数
+	rate         int       // 令牌生成速率（每秒）
+	burst        int       // 令牌桶容量
+	tokens       float64   // 当前令牌数
+	lastRefilled time.Time // 上次填充时间
+	ratePerNano  float64   // 每纳秒生成的令牌数
 	stats        *RateLimitStats
 }
 
 type RateLimitStats struct {
-	Requests     int64 `json:"requests"`
-	Allowed      int64 `json:"allowed"`
-	Denied       int64 `json:"denied"`
-	LastReset    time.Time `json:"last_reset"`
-	mu           sync.Mutex
+	Requests  int64     `json:"requests"`
+	Allowed   int64     `json:"allowed"`
+	Denied    int64     `json:"denied"`
+	LastReset time.Time `json:"last_reset"`
+	mu        sync.Mutex
 }
 
 type RateLimiterFactory struct {
@@ -130,11 +130,11 @@ func (tb *TokenBucket) GetStats() map[string]interface{} {
 	defer tb.stats.mu.Unlock()
 
 	return map[string]interface{}{
-		"requests":     tb.stats.Requests,
-		"allowed":      tb.stats.Allowed,
-		"denied":       tb.stats.Denied,
-		"denied_rate":  float64(tb.stats.Denied) / float64(tb.stats.Requests+1),
-		"last_reset":   tb.stats.LastReset,
+		"requests":    tb.stats.Requests,
+		"allowed":     tb.stats.Allowed,
+		"denied":      tb.stats.Denied,
+		"denied_rate": float64(tb.stats.Denied) / float64(tb.stats.Requests+1),
+		"last_reset":  tb.stats.LastReset,
 	}
 }
 

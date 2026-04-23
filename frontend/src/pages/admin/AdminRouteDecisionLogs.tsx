@@ -25,6 +25,12 @@ import {
 } from '@ant-design/icons';
 import api from '@/services/api';
 
+interface APIResponse<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
 const { RangePicker } = DatePicker;
 
 interface RouteDecisionLog {
@@ -90,9 +96,9 @@ const AdminRouteDecisionLogs: React.FC = () => {
         params.end_time = filters.time_range[1];
       }
 
-      const response = await api.get('/admin/route-decision-logs', { params });
+      const response = await api.get<APIResponse<LogsResponse>>('/admin/route-decision-logs', { params });
       if (response.data && response.data.code === 0) {
-        const data = response.data.data as LogsResponse;
+        const data = response.data.data;
         setLogs(data.logs || []);
         setPagination({
           ...pagination,
@@ -134,7 +140,7 @@ const AdminRouteDecisionLogs: React.FC = () => {
     });
   };
 
-  const handleTimeRangeChange = (dates: any, dateStrings: [string, string]) => {
+  const handleTimeRangeChange = (_: any, dateStrings: [string, string]) => {
     setFilters({
       ...filters,
       time_range: dateStrings,
@@ -207,7 +213,7 @@ const AdminRouteDecisionLogs: React.FC = () => {
       title: '决策结果',
       key: 'decision_result',
       width: 200,
-      render: (_, record: RouteDecisionLog) => {
+      render: (_: any, record: RouteDecisionLog) => {
         const decision = record.decision_layer_output;
         if (!decision) return '-';
         
@@ -230,7 +236,7 @@ const AdminRouteDecisionLogs: React.FC = () => {
       title: '执行结果',
       key: 'execution_result',
       width: 120,
-      render: (_, record: RouteDecisionLog) => {
+      render: (_: any, record: RouteDecisionLog) => {
         const execution = record.execution_layer_result;
         if (!execution) return '-';
         
@@ -259,7 +265,7 @@ const AdminRouteDecisionLogs: React.FC = () => {
       title: '操作',
       key: 'action',
       width: 80,
-      render: (_, record: RouteDecisionLog) => (
+      render: (_: any, record: RouteDecisionLog) => (
         <Button
           type="link"
           icon={<EyeOutlined />}

@@ -1,32 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  Card,
-  Table,
-  Button,
-  Tag,
-  Space,
-  Descriptions,
-  Modal,
-  Spin,
-  Switch,
-  Select,
-  Input,
-  message,
-  Alert,
-  Divider,
-  Tooltip,
-  Progress,
-} from 'antd';
-import {
+import {  Card,  Table,  Button,  Tag,  Space,  Descriptions,  Modal,  Spin,  Switch,  Select,  Input,  message,  Alert,  Progress,} from 'antd';import {
   SyncOutlined,
-  InfoCircleOutlined,
   LineChartOutlined,
   EyeOutlined,
-  WarningOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
 } from '@ant-design/icons';
 import api from '@/services/api';
+
+interface APIResponse<T> {
+  code: number;
+  message: string;
+  data: T;
+}
 
 interface APIKeyStatus {
   api_key_id: number;
@@ -42,6 +26,13 @@ interface APIKeyStatus {
   load_balance_weight: number;
   last_request_at: string | null;
   updated_at: string;
+}
+
+interface APIKeyInfo {
+  id: number;
+  name: string;
+  provider: string;
+  status: string;
 }
 
 interface APIKeyDetail extends APIKeyStatus {
@@ -64,7 +55,7 @@ const AdminAPIKeyStatus: React.FC = () => {
   const fetchStatuses = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/api-key-status');
+      const response = await api.get<APIResponse<APIKeyStatus[]>>('/admin/api-key-status');
       if (response.data && response.data.code === 0) {
         setStatuses(response.data.data || []);
       }
@@ -98,8 +89,8 @@ const AdminAPIKeyStatus: React.FC = () => {
   const handleViewDetail = async (apiKeyID: number) => {
     try {
       const [statusResponse, keyResponse] = await Promise.all([
-        api.get(`/admin/api-key-status/${apiKeyID}`),
-        api.get(`/admin/merchants/api-keys/${apiKeyID}`),
+        api.get<APIResponse<APIKeyStatus>>(`/admin/api-key-status/${apiKeyID}`),
+        api.get<APIResponse<APIKeyInfo>>(`/admin/merchants/api-keys/${apiKeyID}`),
       ]);
 
       if (statusResponse.data.code === 0 && keyResponse.data.code === 0) {
@@ -139,12 +130,7 @@ const AdminAPIKeyStatus: React.FC = () => {
     return 'red';
   };
 
-  const getConnectionPoolColor = (active: number, total: number) => {
-    const usage = total > 0 ? active / total : 0;
-    if (usage < 0.5) return 'green';
-    if (usage < 0.8) return 'orange';
-    return 'red';
-  };
+
 
   const columns = [
     {
@@ -157,7 +143,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       title: '延迟 (ms)',
       key: 'latency',
       width: 180,
-      render: (_, record: APIKeyStatus) => (
+      render: (_: any, record: APIKeyStatus) => (
         <Space direction="vertical" size={2}>
           <div>
             <span>P50: </span>
@@ -206,7 +192,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       title: '连接池',
       key: 'connection_pool',
       width: 120,
-      render: (_, record: APIKeyStatus) => (
+      render: (_: any, record: APIKeyStatus) => (
         <div>
           <Progress
             percent={(record.connection_pool_active / record.connection_pool_size) * 100}
@@ -266,7 +252,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       title: '操作',
       key: 'action',
       width: 80,
-      render: (_, record: APIKeyStatus) => (
+      render: (_: any, record: APIKeyStatus) => (
         <Button
           type="link"
           icon={<EyeOutlined />}

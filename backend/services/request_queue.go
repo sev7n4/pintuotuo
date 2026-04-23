@@ -37,14 +37,14 @@ type PriorityQueue struct {
 }
 
 type QueueStats struct {
-	Enqueued      int64     `json:"enqueued"`
-	Dequeued      int64     `json:"dequeued"`
-	Expired       int64     `json:"expired"`
-	Dropped       int64     `json:"dropped"`
-	AvgWaitTime   float64   `json:"avg_wait_time_ms"`
-	MaxWaitTime   float64   `json:"max_wait_time_ms"`
-	LastReset     time.Time `json:"last_reset"`
-	mu            sync.Mutex
+	Enqueued    int64     `json:"enqueued"`
+	Dequeued    int64     `json:"dequeued"`
+	Expired     int64     `json:"expired"`
+	Dropped     int64     `json:"dropped"`
+	AvgWaitTime float64   `json:"avg_wait_time_ms"`
+	MaxWaitTime float64   `json:"max_wait_time_ms"`
+	LastReset   time.Time `json:"last_reset"`
+	mu          sync.Mutex
 }
 
 type QueueFactory struct {
@@ -66,7 +66,7 @@ func GetQueueFactory() *QueueFactory {
 
 func NewPriorityQueue(maxSize int) *PriorityQueue {
 	return &PriorityQueue{
-		reqs:    make([]*QueuedRequest, 0),
+		reqs: make([]*QueuedRequest, 0),
 		stats: &QueueStats{
 			LastReset: time.Now(),
 		},
@@ -193,15 +193,15 @@ func (pq *PriorityQueue) GetStats() map[string]interface{} {
 	defer pq.stats.mu.Unlock()
 
 	return map[string]interface{}{
-		"current_size":    currentSize,
-		"max_size":       pq.maxSize,
-		"enqueued":       pq.stats.Enqueued,
-		"dequeued":       pq.stats.Dequeued,
-		"expired":        pq.stats.Expired,
-		"dropped":        pq.stats.Dropped,
+		"current_size":     currentSize,
+		"max_size":         pq.maxSize,
+		"enqueued":         pq.stats.Enqueued,
+		"dequeued":         pq.stats.Dequeued,
+		"expired":          pq.stats.Expired,
+		"dropped":          pq.stats.Dropped,
 		"avg_wait_time_ms": pq.stats.AvgWaitTime,
 		"max_wait_time_ms": pq.stats.MaxWaitTime,
-		"last_reset":     pq.stats.LastReset,
+		"last_reset":       pq.stats.LastReset,
 	}
 }
 

@@ -26,53 +26,53 @@ type GatewayRequest struct {
 }
 
 type GatewayResponse struct {
-	RequestID      string                 `json:"request_id"`
-	MerchantID     int                    `json:"merchant_id"`
-	Model          string                 `json:"model"`
-	Provider       string                 `json:"provider"`
-	APIKeyID       int                    `json:"api_key_id"`
-	ResponseBody   map[string]interface{} `json:"response_body"`
-	Status         string                 `json:"status"`
-	Error          string                 `json:"error,omitempty"`
-	LatencyMs      int                    `json:"latency_ms"`
-	TokensUsed     int                    `json:"tokens_used,omitempty"`
-	Cost           float64                `json:"cost,omitempty"`
-	Timestamp      time.Time              `json:"timestamp"`
+	RequestID    string                 `json:"request_id"`
+	MerchantID   int                    `json:"merchant_id"`
+	Model        string                 `json:"model"`
+	Provider     string                 `json:"provider"`
+	APIKeyID     int                    `json:"api_key_id"`
+	ResponseBody map[string]interface{} `json:"response_body"`
+	Status       string                 `json:"status"`
+	Error        string                 `json:"error,omitempty"`
+	LatencyMs    int                    `json:"latency_ms"`
+	TokensUsed   int                    `json:"tokens_used,omitempty"`
+	Cost         float64                `json:"cost,omitempty"`
+	Timestamp    time.Time              `json:"timestamp"`
 }
 
 type GatewayStats struct {
-	Requests       int64     `json:"requests"`
-	Successes      int64     `json:"successes"`
-	Failures       int64     `json:"failures"`
-	AvgLatencyMs   float64   `json:"avg_latency_ms"`
-	MaxLatencyMs   float64   `json:"max_latency_ms"`
-	TotalTokens    int64     `json:"total_tokens"`
-	TotalCost      float64   `json:"total_cost"`
-	LastReset      time.Time `json:"last_reset"`
+	Requests     int64     `json:"requests"`
+	Successes    int64     `json:"successes"`
+	Failures     int64     `json:"failures"`
+	AvgLatencyMs float64   `json:"avg_latency_ms"`
+	MaxLatencyMs float64   `json:"max_latency_ms"`
+	TotalTokens  int64     `json:"total_tokens"`
+	TotalCost    float64   `json:"total_cost"`
+	LastReset    time.Time `json:"last_reset"`
 }
 
 type UnifiedGatewayImpl struct {
-	pipeline      *ThreeLayerRoutingPipeline
-	rateLimiter   *RateLimiterFactory
-	queueFactory  *QueueFactory
-	stats         *GatewayStats
-	enableQueue   bool
-	queueMaxSize  int
-	rateLimitRate int
+	pipeline       *ThreeLayerRoutingPipeline
+	rateLimiter    *RateLimiterFactory
+	queueFactory   *QueueFactory
+	stats          *GatewayStats
+	enableQueue    bool
+	queueMaxSize   int
+	rateLimitRate  int
 	rateLimitBurst int
 }
 
 func NewUnifiedGateway() *UnifiedGatewayImpl {
 	return &UnifiedGatewayImpl{
-		pipeline:      NewThreeLayerRoutingPipeline(),
-		rateLimiter:   GetRateLimiter(),
-		queueFactory:  GetQueueFactory(),
+		pipeline:     NewThreeLayerRoutingPipeline(),
+		rateLimiter:  GetRateLimiter(),
+		queueFactory: GetQueueFactory(),
 		stats: &GatewayStats{
 			LastReset: time.Now(),
 		},
-		enableQueue:   true,
-		queueMaxSize: 1000,
-		rateLimitRate: 100,
+		enableQueue:    true,
+		queueMaxSize:   1000,
+		rateLimitRate:  100,
 		rateLimitBurst: 200,
 	}
 }
@@ -81,10 +81,10 @@ func (g *UnifiedGatewayImpl) HandleRequest(ctx context.Context, req *GatewayRequ
 	startTime := time.Now()
 
 	response := &GatewayResponse{
-		RequestID: req.RequestID,
+		RequestID:  req.RequestID,
 		MerchantID: req.MerchantID,
-		Model: req.Model,
-		Timestamp: startTime,
+		Model:      req.Model,
+		Timestamp:  startTime,
 	}
 
 	// 1. 限流检查
@@ -100,17 +100,17 @@ func (g *UnifiedGatewayImpl) HandleRequest(ctx context.Context, req *GatewayRequ
 	if g.enableQueue {
 		queueKey := fmt.Sprintf("merchant:%d:model:%s", req.MerchantID, req.Model)
 		queuedReq := &QueuedRequest{
-			RequestID: req.RequestID,
-			MerchantID: req.MerchantID,
-			Model: req.Model,
-			Provider: req.Provider,
-			RequestBody: req.RequestBody,
-			UserPrefs: req.UserPrefs,
-			CostBudget: req.CostBudget,
+			RequestID:      req.RequestID,
+			MerchantID:     req.MerchantID,
+			Model:          req.Model,
+			Provider:       req.Provider,
+			RequestBody:    req.RequestBody,
+			UserPrefs:      req.UserPrefs,
+			CostBudget:     req.CostBudget,
 			ComplianceReqs: req.ComplianceReqs,
-			AllowedKeyIDs: req.AllowedKeyIDs,
-			Priority: req.Priority,
-			Timeout: req.Timeout,
+			AllowedKeyIDs:  req.AllowedKeyIDs,
+			Priority:       req.Priority,
+			Timeout:        req.Timeout,
 		}
 
 		err := g.queueFactory.Enqueue(queueKey, g.queueMaxSize, queuedReq)
@@ -140,15 +140,15 @@ func (g *UnifiedGatewayImpl) HandleRequest(ctx context.Context, req *GatewayRequ
 
 	// 3. 路由决策
 	routingReq := &RoutingRequest{
-		RequestID: req.RequestID,
-		MerchantID: req.MerchantID,
-		Model: req.Model,
-		Provider: req.Provider,
-		RequestBody: req.RequestBody,
-		UserPrefs: req.UserPrefs,
-		CostBudget: req.CostBudget,
+		RequestID:      req.RequestID,
+		MerchantID:     req.MerchantID,
+		Model:          req.Model,
+		Provider:       req.Provider,
+		RequestBody:    req.RequestBody,
+		UserPrefs:      req.UserPrefs,
+		CostBudget:     req.CostBudget,
 		ComplianceReqs: req.ComplianceReqs,
-		AllowedKeyIDs: req.AllowedKeyIDs,
+		AllowedKeyIDs:  req.AllowedKeyIDs,
 	}
 
 	decision, err := g.pipeline.Execute(ctx, routingReq)
@@ -167,24 +167,24 @@ func (g *UnifiedGatewayImpl) HandleRequest(ctx context.Context, req *GatewayRequ
 	// 暂时模拟一个成功的响应
 	response.Status = "success"
 	response.ResponseBody = map[string]interface{}{
-		"id": req.RequestID,
-		"object": "chat.completion",
+		"id":      req.RequestID,
+		"object":  "chat.completion",
 		"created": time.Now().Unix(),
-		"model": req.Model,
+		"model":   req.Model,
 		"choices": []map[string]interface{}{
 			{
 				"index": 0,
 				"message": map[string]interface{}{
-					"role": "assistant",
+					"role":    "assistant",
 					"content": "This is a simulated response from the unified gateway",
 				},
 				"finish_reason": "stop",
 			},
 		},
 		"usage": map[string]interface{}{
-			"prompt_tokens": 10,
+			"prompt_tokens":     10,
 			"completion_tokens": 20,
-			"total_tokens": 30,
+			"total_tokens":      30,
 		},
 	}
 
@@ -223,15 +223,15 @@ func (g *UnifiedGatewayImpl) updateStats(response *GatewayResponse) {
 
 func (g *UnifiedGatewayImpl) GetStats() map[string]interface{} {
 	return map[string]interface{}{
-		"requests": g.stats.Requests,
-		"successes": g.stats.Successes,
-		"failures": g.stats.Failures,
-		"success_rate": float64(g.stats.Successes) / float64(g.stats.Requests+1),
+		"requests":       g.stats.Requests,
+		"successes":      g.stats.Successes,
+		"failures":       g.stats.Failures,
+		"success_rate":   float64(g.stats.Successes) / float64(g.stats.Requests+1),
 		"avg_latency_ms": g.stats.AvgLatencyMs,
 		"max_latency_ms": g.stats.MaxLatencyMs,
-		"total_tokens": g.stats.TotalTokens,
-		"total_cost": g.stats.TotalCost,
-		"last_reset": g.stats.LastReset,
+		"total_tokens":   g.stats.TotalTokens,
+		"total_cost":     g.stats.TotalCost,
+		"last_reset":     g.stats.LastReset,
 	}
 }
 
