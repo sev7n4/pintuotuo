@@ -93,14 +93,14 @@ func GetRouteDecisionLogs(c *gin.Context) {
 	for rows.Next() {
 		var log map[string]interface{} = make(map[string]interface{})
 		var (
-			id                  int
-			requestID           string
-			merchantID          int
-			apiKeyID            int
-			strategyLayerGoal   string
-			decisionLayerOutput []byte
+			id                   int
+			requestID            string
+			merchantID           int
+			apiKeyID             int
+			strategyLayerGoal    string
+			decisionLayerOutput  []byte
 			executionLayerResult []byte
-			createdAt           time.Time
+			createdAt            time.Time
 		)
 
 		scanErr := rows.Scan(
@@ -199,14 +199,14 @@ func GetRouteDecisionLog(c *gin.Context) {
 
 	var log map[string]interface{} = make(map[string]interface{})
 	var (
-		id                  int
-		requestID           string
-		merchantID          int
-		apiKeyID            int
-		strategyLayerGoal   string
-		decisionLayerOutput []byte
+		id                   int
+		requestID            string
+		merchantID           int
+		apiKeyID             int
+		strategyLayerGoal    string
+		decisionLayerOutput  []byte
 		executionLayerResult []byte
-		createdAt           time.Time
+		createdAt            time.Time
 	)
 
 	err = db.QueryRowContext(c.Request.Context(), query, logID).Scan(
