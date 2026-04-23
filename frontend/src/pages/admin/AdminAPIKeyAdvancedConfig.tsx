@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Button, Form, Input, Select, Tag, Space, Modal, message, Descriptions, Spin } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SaveOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Form, Input, Select, Tag, Space, Modal, message, Descriptions } from 'antd';
+import { EditOutlined, SaveOutlined } from '@ant-design/icons';
 import api from '@/services/api';
 
 interface APIResponse<T> {
@@ -16,7 +16,7 @@ interface APIKey {
   status: string;
   region: string;
   security_level: string;
-  route_preference: Record<string, unknown>;
+  route_preference: RoutePreference | null;
 }
 
 interface RoutePreference {
@@ -27,6 +27,15 @@ interface RoutePreference {
   circuit_break_threshold: number;
   load_balance_weight: number;
 }
+
+const defaultRoutePreference: RoutePreference = {
+  strategy: 'balanced',
+  weight: 1,
+  max_retries: 3,
+  timeout_ms: 30000,
+  circuit_break_threshold: 0.5,
+  load_balance_weight: 1,
+};
 
 const AdminAPIKeyAdvancedConfig: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
@@ -55,14 +64,7 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
 
   const handleEdit = (apiKey: APIKey) => {
     setCurrentKey(apiKey);
-    const routePref = apiKey.route_preference as RoutePreference || {
-      strategy: 'balanced',
-      weight: 1,
-      max_retries: 3,
-      timeout_ms: 30000,
-      circuit_break_threshold: 0.5,
-      load_balance_weight: 1,
-    };
+    const routePref = apiKey.route_preference || defaultRoutePreference;
     form.setFieldsValue({
       strategy: routePref.strategy,
       weight: routePref.weight,
@@ -82,15 +84,15 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
       const patch = {
         route_preference: {
           strategy: values.strategy,
-          weight: values.weight,
-          max_retries: values.max_retries,
-          timeout_ms: values.timeout_ms,
-          circuit_break_threshold: values.circuit_break_threshold,
-          load_balance_weight: values.load_balance_weight,
+          weight: Number(values.weight),
+          max_retries: Number(values.max_retries),
+          timeout_ms: Number(values.timeout_ms),
+          circuit_break_threshold: Number(values.circuit_break_threshold),
+          load_balance_weight: Number(values.load_balance_weight),
         },
       };
 
-      const response = await api.patch<APIResponse<any>>(`/admin/merchants/api-keys/${currentKey.id}`, patch);
+      const response = await api.patch<APIResponse<unknown>>(`/admin/merchants/api-keys/${currentKey.id}`, patch);
       if (response.data.code === 0) {
         message.success('配置更新成功');
         setModalVisible(false);
@@ -156,7 +158,7 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
       title: '操作',
       key: 'action',
       width: 100,
-      render: (_: any, record: APIKey) => (
+      render: (_: unknown, record: APIKey) => (
         <Space>
           <Button
             type="link"
