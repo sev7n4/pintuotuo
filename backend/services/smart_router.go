@@ -400,6 +400,10 @@ func (r *SmartRouter) ConfigureCircuitBreaker(apiKeyID int, threshold int, timeo
 	return nil
 }
 
+func (r *SmartRouter) IsCircuitBreakerOpen(apiKeyID int) bool {
+	return false
+}
+
 func (r *SmartRouter) GetStrategyConfig(strategyCode string) (*StrategyConfig, bool) {
 	strategy := RoutingStrategy(strategyCode)
 	weights := r.getStrategyWeights(strategy)
