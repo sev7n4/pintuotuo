@@ -6,23 +6,6 @@ import (
 )
 
 var (
-	RoutingDecisionDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "routing_decision_duration_seconds",
-			Help:    "Duration of routing decision in seconds",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"strategy", "provider"},
-	)
-
-	RoutingDecisionTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "routing_decision_total",
-			Help: "Total number of routing decisions",
-		},
-		[]string{"strategy", "provider", "result"},
-	)
-
 	APIKeyLatency = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "api_key_latency_seconds",
@@ -101,11 +84,6 @@ type MetricsRecorder struct{}
 
 func NewMetricsRecorder() *MetricsRecorder {
 	return &MetricsRecorder{}
-}
-
-func (m *MetricsRecorder) RecordRoutingDecision(strategy, provider string, durationSeconds float64, result string) {
-	RoutingDecisionDuration.WithLabelValues(strategy, provider).Observe(durationSeconds)
-	RoutingDecisionTotal.WithLabelValues(strategy, provider, result).Inc()
 }
 
 func (m *MetricsRecorder) RecordAPIKeyLatency(apiKeyID int, provider string, latencySeconds float64) {
