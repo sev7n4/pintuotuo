@@ -419,21 +419,20 @@ func (r *SmartRouter) GetStrategyConfig(strategyCode string) (*StrategyConfig, b
 	case RoutingStrategyPrice, RoutingStrategyLatency, RoutingStrategyBalanced, RoutingStrategyCost:
 		weights := r.getStrategyWeights(strategy)
 		return &StrategyConfig{
-			Strategy:               strategyCode,
-			MaxRetryCount:          3,
-			RetryBackoffBase:       100,
+			Strategy:                strategyCode,
+			MaxRetryCount:           3,
+			RetryBackoffBase:        100,
 			CircuitBreakerThreshold: 5,
-			CircuitBreakerTimeout:  60,
-			PriceWeight:            weights.Price,
-			LatencyWeight:          weights.Latency,
-			SuccessWeight:          weights.Success,
-			ReliabilityWeight:      weights.Success,
+			CircuitBreakerTimeout:   60,
+			PriceWeight:             weights.Price,
+			LatencyWeight:           weights.Latency,
+			SuccessWeight:           weights.Success,
+			ReliabilityWeight:       weights.Success,
 		}, true
 	default:
 		return nil, false
 	}
 }
-
 
 func (r *SmartRouter) getLatencyRange(candidates []RoutingCandidate) (min, max int) {
 	if len(candidates) == 0 {
