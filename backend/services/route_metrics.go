@@ -80,6 +80,23 @@ var (
 		},
 		[]string{"status"},
 	)
+
+	RoutingDecisionDurationByStrategy = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "routing_decision_duration_by_strategy_seconds",
+			Help:    "Routing decision duration by strategy in seconds",
+			Buckets: []float64{.00001, .00005, .0001, .0005, .001, .005, .01},
+		},
+		[]string{"strategy", "provider"},
+	)
+
+	RoutingDecisionTotalByStrategy = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "routing_decision_total_by_strategy",
+			Help: "Total number of routing decisions by strategy",
+		},
+		[]string{"strategy", "provider", "result"},
+	)
 )
 
 type MetricsRecorder struct{}
@@ -90,14 +107,14 @@ func NewMetricsRecorder() *MetricsRecorder {
 
 func (m *MetricsRecorder) RecordAPIKeyLatency(apiKeyID int, provider string, latencySeconds float64) {
 	APIKeyLatency.WithLabelValues(
-		string(rune(apiKeyID)),
+		strconv.Itoa(apiKeyID),
 		provider,
 	).Observe(latencySeconds)
 }
 
 func (m *MetricsRecorder) UpdateAPIKeyErrorRate(apiKeyID int, provider string, errorRate float64) {
 	APIKeyErrorRate.WithLabelValues(
-		string(rune(apiKeyID)),
+		strconv.Itoa(apiKeyID),
 		provider,
 	).Set(errorRate)
 }
@@ -118,7 +135,7 @@ func (m *MetricsRecorder) UpdateRequestQueueLength(priority string, length float
 }
 
 func (m *MetricsRecorder) UpdateConnectionPool(apiKeyID int, active, size float64) {
-	apiKeyIDStr := string(rune(apiKeyID))
+	apiKeyIDStr := strconv.Itoa(apiKeyID)
 	ConnectionPoolActive.WithLabelValues(apiKeyIDStr).Set(active)
 	ConnectionPoolSize.WithLabelValues(apiKeyIDStr).Set(size)
 }
@@ -132,4 +149,9 @@ func (m *MetricsRecorder) RecordRouteAwarenessUpdate(apiKeyID int, status string
 
 func (m *MetricsRecorder) RecordStatusCollectorRun(status string) {
 	StatusCollectorRunsTotal.WithLabelValues(status).Inc()
+}
+
+func (m *MetricsRecorder) RecordRoutingDecisionByStrategy(strategy, provider string, durationSeconds float64, result string) {
+	RoutingDecisionDurationByStrategy.WithLabelValues(strategy, provider).Observe(durationSeconds)
+	RoutingDecisionTotalByStrategy.WithLabelValues(strategy, provider, result).Inc()
 }
