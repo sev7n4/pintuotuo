@@ -152,7 +152,10 @@ export default function EntitlementPackagesPage() {
           <Segmented
             value={category}
             onChange={(v) => setCategory(String(v))}
-            options={ENTITLEMENT_PACKAGE_FILTER_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
+            options={ENTITLEMENT_PACKAGE_FILTER_OPTIONS.map((o) => ({
+              label: o.label,
+              value: o.value,
+            }))}
             style={{ flex: 1, maxWidth: '100%' }}
           />
         </div>

@@ -147,7 +147,8 @@ export function EntitlementModelVerifyCard({
     } catch (e: unknown) {
       let msg = '请求失败';
       if (typeof e === 'object' && e !== null && 'response' in e) {
-        const data = (e as { response?: { data?: { error?: { message?: string } } } }).response?.data;
+        const data = (e as { response?: { data?: { error?: { message?: string } } } }).response
+          ?.data;
         msg = data?.error?.message ?? msg;
       } else if (e instanceof Error) {
         msg = e.message;
@@ -249,7 +250,13 @@ export function EntitlementModelVerifyCard({
           />
         </div>
 
-        <Button type="primary" icon={<SendOutlined />} onClick={onVerify} loading={submitting} block>
+        <Button
+          type="primary"
+          icon={<SendOutlined />}
+          onClick={onVerify}
+          loading={submitting}
+          block
+        >
           发送验证
         </Button>
 
@@ -273,7 +280,8 @@ export function EntitlementModelVerifyCard({
                   )}
                   {lastUsage.completion_tokens != null && (
                     <Text>
-                      <PieChartOutlined /> 输出 {lastUsage.completion_tokens.toLocaleString('zh-CN')}
+                      <PieChartOutlined /> 输出{' '}
+                      {lastUsage.completion_tokens.toLocaleString('zh-CN')}
                     </Text>
                   )}
                   {lastUsage.total_tokens != null && (

@@ -61,7 +61,7 @@ const AdminRouteDecisionLogs: React.FC = () => {
     pageSize: 20,
     total: 0,
   });
-  
+
   // 筛选条件
   const [filters, setFilters] = useState({
     merchant_id: '',
@@ -73,7 +73,7 @@ const AdminRouteDecisionLogs: React.FC = () => {
   const fetchLogs = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       const params: Record<string, any> = {
         page: pagination.current,
         page_size: pagination.pageSize,
@@ -96,7 +96,9 @@ const AdminRouteDecisionLogs: React.FC = () => {
         params.end_time = filters.time_range[1];
       }
 
-      const response = await api.get<APIResponse<LogsResponse>>('/admin/route-decision-logs', { params });
+      const response = await api.get<APIResponse<LogsResponse>>('/admin/route-decision-logs', {
+        params,
+      });
       if (response.data && response.data.code === 0) {
         const data = response.data.data;
         setLogs(data.logs || []);
@@ -158,12 +160,12 @@ const AdminRouteDecisionLogs: React.FC = () => {
 
   const getStrategyLabel = (strategy: string) => {
     const strategyMap: Record<string, string> = {
-      'performance_first': '性能优先',
-      'price_first': '价格优先',
-      'reliability_first': '可靠性优先',
-      'security_first': '安全优先',
-      'balanced': '均衡策略',
-      'auto': '自动模式',
+      performance_first: '性能优先',
+      price_first: '价格优先',
+      reliability_first: '可靠性优先',
+      security_first: '安全优先',
+      balanced: '均衡策略',
+      auto: '自动模式',
     };
     return strategyMap[strategy] || strategy;
   };
@@ -203,11 +205,7 @@ const AdminRouteDecisionLogs: React.FC = () => {
       dataIndex: 'strategy_layer_goal',
       key: 'strategy_layer_goal',
       width: 120,
-      render: (strategy: string) => (
-        <Tag color="blue">
-          {getStrategyLabel(strategy)}
-        </Tag>
-      ),
+      render: (strategy: string) => <Tag color="blue">{getStrategyLabel(strategy)}</Tag>,
     },
     {
       title: '决策结果',
@@ -216,18 +214,14 @@ const AdminRouteDecisionLogs: React.FC = () => {
       render: (_: any, record: RouteDecisionLog) => {
         const decision = record.decision_layer_output;
         if (!decision) return '-';
-        
+
         const selectedAPIKey = decision.selected_api_key_id || decision.api_key_id;
         const routeMode = decision.route_mode || decision.mode;
-        
+
         return (
           <Space direction="vertical" size={2}>
-            {selectedAPIKey && (
-              <div>API Key: {selectedAPIKey}</div>
-            )}
-            {routeMode && (
-              <div>模式: {routeMode}</div>
-            )}
+            {selectedAPIKey && <div>API Key: {selectedAPIKey}</div>}
+            {routeMode && <div>模式: {routeMode}</div>}
           </Space>
         );
       },
@@ -239,12 +233,12 @@ const AdminRouteDecisionLogs: React.FC = () => {
       render: (_: any, record: RouteDecisionLog) => {
         const execution = record.execution_layer_result;
         if (!execution) return '-';
-        
+
         const status = execution.status || execution.success ? 'success' : 'error';
-        
+
         return (
-          <Badge 
-            status={status as 'success' | 'error' | 'warning' | 'default'} 
+          <Badge
+            status={status as 'success' | 'error' | 'warning' | 'default'}
             text={status === 'success' ? '成功' : '失败'}
           />
         );
@@ -255,22 +249,14 @@ const AdminRouteDecisionLogs: React.FC = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (createdAt: string) => (
-        <span>
-          {new Date(createdAt).toLocaleString('zh-CN')}
-        </span>
-      ),
+      render: (createdAt: string) => <span>{new Date(createdAt).toLocaleString('zh-CN')}</span>,
     },
     {
       title: '操作',
       key: 'action',
       width: 80,
       render: (_: any, record: RouteDecisionLog) => (
-        <Button
-          type="link"
-          icon={<EyeOutlined />}
-          onClick={() => handleViewDetail(record)}
-        >
+        <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)}>
           详情
         </Button>
       ),
@@ -286,11 +272,7 @@ const AdminRouteDecisionLogs: React.FC = () => {
         </Space>
       }
       extra={
-        <Button
-          icon={<ReloadOutlined spin={loading} />}
-          onClick={handleRefresh}
-          loading={loading}
-        >
+        <Button icon={<ReloadOutlined spin={loading} />} onClick={handleRefresh} loading={loading}>
           刷新
         </Button>
       }
@@ -350,10 +332,7 @@ const AdminRouteDecisionLogs: React.FC = () => {
               { value: 'auto', label: '自动模式' },
             ]}
           />
-          <RangePicker
-            style={{ width: 300 }}
-            onChange={handleTimeRangeChange}
-          />
+          <RangePicker style={{ width: 300 }} onChange={handleTimeRangeChange} />
           <Button onClick={handleResetFilters}>重置筛选</Button>
           <Button type="primary" onClick={handleRefresh}>
             <SearchOutlined />
@@ -390,22 +369,12 @@ const AdminRouteDecisionLogs: React.FC = () => {
         {selectedLog ? (
           <div>
             <Descriptions bordered column={2} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="日志ID">
-                {selectedLog.id}
-              </Descriptions.Item>
-              <Descriptions.Item label="请求ID">
-                {selectedLog.request_id}
-              </Descriptions.Item>
-              <Descriptions.Item label="商户ID">
-                {selectedLog.merchant_id}
-              </Descriptions.Item>
-              <Descriptions.Item label="API Key ID">
-                {selectedLog.api_key_id}
-              </Descriptions.Item>
+              <Descriptions.Item label="日志ID">{selectedLog.id}</Descriptions.Item>
+              <Descriptions.Item label="请求ID">{selectedLog.request_id}</Descriptions.Item>
+              <Descriptions.Item label="商户ID">{selectedLog.merchant_id}</Descriptions.Item>
+              <Descriptions.Item label="API Key ID">{selectedLog.api_key_id}</Descriptions.Item>
               <Descriptions.Item label="策略目标">
-                <Tag color="blue">
-                  {getStrategyLabel(selectedLog.strategy_layer_goal)}
-                </Tag>
+                <Tag color="blue">{getStrategyLabel(selectedLog.strategy_layer_goal)}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="创建时间">
                 {new Date(selectedLog.created_at).toLocaleString('zh-CN')}

@@ -10,15 +10,12 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
@@ -27,29 +24,10 @@ import (
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
-	"github.com/pintuotuo/backend/tracing"
 	"github.com/pintuotuo/backend/utils"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
-var (
-	proxyHTTPOnce         sync.Once
-	proxyHTTPRoundTripper http.RoundTripper
-)
-
-func proxyHTTPClient(timeout time.Duration) *http.Client {
-	proxyHTTPOnce.Do(func() {
-		proxyHTTPRoundTripper = otelhttp.NewTransport(http.DefaultTransport)
-	})
-	return &http.Client{Transport: proxyHTTPRoundTripper, Timeout: timeout}
-}
-
-const (
-	providerAnthropic = "anthropic"
-	apiFormatOpenAI   = "openai"
-	// llmGatewayLitellm 与 LLM_GATEWAY_ACTIVE=litellm 对齐（goconst）
-	llmGatewayLitellm = "litellm"
-)
+const providerAnthropic = "anthropic"
 
 // 路由策略来源（trace / 落库 effective_policy_source，与 JSON 对外字段一致）
 const (
@@ -98,14 +76,6 @@ type APIProxyRequest struct {
 type ChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
-}
-
-func estimateInputTokens(messages []ChatMessage) int {
-	totalChars := 0
-	for _, msg := range messages {
-		totalChars += len(msg.Role) + len(msg.Content)
-	}
-	return totalChars / 4
 }
 
 type APIProxyResponse struct {
@@ -168,22 +138,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 	c.Header("X-Request-ID", requestID)
-	traceSpan := services.StartLLMTrace(requestID, userIDInt)
-	defer traceSpan.Finish(c.Request.Context())
-
-	var strictPricingVID *int
-	if services.EntitlementEnforcementStrict() {
-		vid, _, ok, entErr := services.ResolveChosenPricingVersion(db, userIDInt, req.Provider, req.Model)
-		if entErr != nil {
-			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-			return
-		}
-		if !ok {
-			middleware.RespondWithError(c, apperrors.ErrEntitlementDenied)
-			return
-		}
-		strictPricingVID = &vid
-	}
+	c.Header("X-Trace-ID", requestID)
 
 	var tokenBalance float64
 	err := db.QueryRow("SELECT balance FROM tokens WHERE user_id = $1", userIDInt).Scan(&tokenBalance)
@@ -197,85 +152,11 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
-	inputTokensEstimate := estimateInputTokens(req.Messages)
-	billingEngine := billing.GetBillingEngine()
-	preDeductConfig := billingEngine.GetPreDeductConfig(0, 0, req.Provider)
-	estimatedUsage := billingEngine.EstimateTokenUsage(inputTokensEstimate, preDeductConfig)
-
-	if tokenBalance < float64(estimatedUsage) {
-		logger.LogWarn(c.Request.Context(), "api_proxy", "Insufficient balance for pre-deduction", map[string]interface{}{
-			"user_id":         userIDInt,
-			"balance":         tokenBalance,
-			"estimated_usage": estimatedUsage,
-			"input_estimate":  inputTokensEstimate,
-			"multiplier":      preDeductConfig.Multiplier,
-			"request_id":      requestID,
-		})
-		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
-		return
-	}
-
-	preDeductErr := billingEngine.PreDeductBalance(userIDInt, estimatedUsage, "API call pre-deduct", requestID)
-	if preDeductErr != nil {
-		logger.LogError(c.Request.Context(), "api_proxy", "Pre-deduction failed", preDeductErr, map[string]interface{}{
-			"user_id":         userIDInt,
-			"estimated_usage": estimatedUsage,
-			"request_id":      requestID,
-		})
-		// PreDeductBalance wraps many failures; only true short-balance cases should map to 409.
-		if strings.Contains(preDeductErr.Error(), "insufficient balance") {
-			middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
-		} else {
-			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		}
-		return
-	}
-
-	logger.LogInfo(c.Request.Context(), "api_proxy", "Pre-deduction successful", map[string]interface{}{
-		"user_id":         userIDInt,
-		"estimated_usage": estimatedUsage,
-		"request_id":      requestID,
-	})
-
 	merchantID, merchantErr := resolveMerchantIDByUser(db, userIDInt)
 	if merchantErr != nil {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-
-	var entCtx *services.EntitlementRoutingContext
-	if services.EntitlementEnforcementStrict() {
-		var entErr error
-		entCtx, entErr = services.ResolveEntitlementRoutingContext(db, userIDInt, req.Provider, req.Model)
-		if entErr != nil {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-			return
-		}
-		if req.APIKeyID != nil && *req.APIKeyID > 0 && !entCtx.AllowsAPIKey(*req.APIKeyID) {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"API_KEY_NOT_AUTHORIZED",
-				"api_key_id is not allowed for your entitlement",
-				http.StatusForbidden,
-				nil,
-			))
-			return
-		}
-		if req.MerchantSKUID != nil && *req.MerchantSKUID > 0 && !entCtx.AllowsMerchantSKU(*req.MerchantSKUID) {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"API_KEY_NOT_AUTHORIZED",
-				"merchant_sku_id is not allowed for your entitlement",
-				http.StatusForbidden,
-				nil,
-			))
-			return
-		}
-	}
-
-	keyFilter := entitlementKeyFilterForRouter(services.EntitlementEnforcementStrict(), entCtx)
 
 	selectedStrategy := "legacy_fallback"
 	effectivePolicySource := ""
@@ -283,32 +164,17 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	decisionStart := time.Now()
 	if req.APIKeyID == nil && req.MerchantSKUID == nil && shouldUseSmartRouting(userIDInt, requestID) {
 		strategyCode, policySrc := routingStrategyWithSource()
-		if smartReq := trySelectAPIKeyWithSmartRouter(req, strategyCode, keyFilter); smartReq.APIKeyID != nil {
+		if smartReq := trySelectAPIKeyWithSmartRouter(req, strategyCode); smartReq.APIKeyID != nil {
 			req.APIKeyID = smartReq.APIKeyID
-			if entCtx != nil {
-				if msid, ok := entCtx.MerchantSKUForAPIKey(*req.APIKeyID); ok && req.MerchantSKUID == nil {
-					req.MerchantSKUID = &msid
-				}
-			}
 			selectedStrategy = strategyCode
 			smartCandidatesJSON = smartReq.CandidatesJSON
 			effectivePolicySource = policySrc
 		}
 	}
-	if req.APIKeyID == nil && req.MerchantSKUID == nil && services.EntitlementEnforcementStrict() && entCtx != nil && len(entCtx.AllowedAPIKeyIDs) > 0 {
-		if pick, msid := pickDeterministicEntitledKey(entCtx); pick > 0 {
-			p := pick
-			req.APIKeyID = &p
-			if req.MerchantSKUID == nil && msid > 0 {
-				req.MerchantSKUID = &msid
-			}
-		}
-	}
 
 	var apiKey models.MerchantAPIKey
-	err = selectAPIKeyForRequest(db, userIDInt, merchantID, req, &apiKey, entCtx)
+	err = selectAPIKeyForRequest(db, userIDInt, merchantID, req, &apiKey)
 	if err != nil {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		if errors.Is(err, sql.ErrNoRows) {
 			logger.LogWarn(c.Request.Context(), "api_proxy", "API key authorization miss", map[string]interface{}{
 				"request_id":        requestID,
@@ -340,7 +206,6 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	decryptedKey, err := utils.Decrypt(apiKey.APIKeyEncrypted)
 	if err != nil {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"DECRYPTION_FAILED",
 			"Failed to decrypt API key",
@@ -352,7 +217,6 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	providerCfg, err := getProviderRuntimeConfig(db, req.Provider)
 	if err == sql.ErrNoRows {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"UNSUPPORTED_PROVIDER",
 			fmt.Sprintf("Provider %s is not supported", req.Provider),
@@ -362,16 +226,12 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 	if err != nil {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	providerCfg = applyGatewayOverride(providerCfg)
-	traceSpan.SetRoute(req.Provider, req.Model)
 
 	baseURL := strings.TrimRight(providerCfg.APIBaseURL, "/")
 	if baseURL == "" {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"UNSUPPORTED_PROVIDER",
 			fmt.Sprintf("Provider %s is missing api_base_url", req.Provider),
@@ -381,463 +241,161 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
+	endpoint := fmt.Sprintf("%s/chat/completions", baseURL)
+	if providerCfg.APIFormat == providerAnthropic {
+		endpoint = fmt.Sprintf("%s/messages", baseURL)
+	}
+
+	requestBody := map[string]interface{}{
+		"model":    req.Model,
+		"messages": req.Messages,
+		"stream":   req.Stream,
+	}
+
+	if req.Options != nil {
+		var options map[string]interface{}
+		if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
+			for k, v := range options {
+				requestBody[k] = v
+			}
+		}
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"REQUEST_BUILD_FAILED",
+			"Failed to build request body",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	httpReq, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"REQUEST_CREATE_FAILED",
+			"Failed to create request",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+	httpReq.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(jsonBody)), nil
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	switch providerCfg.APIFormat {
+	case providerAnthropic:
+		httpReq.Header.Set("x-api-key", decryptedKey)
+		httpReq.Header.Set("anthropic-version", "2023-06-01")
+	default:
+		httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", decryptedKey))
+	}
+
+	client := &http.Client{Timeout: 60 * time.Second}
 	strategySnapshot := buildStrategyRuntimeSnapshot(selectedStrategy)
 	applyCircuitBreakerConfig(apiKey.ID, strategySnapshot)
-
-	if req.Stream {
-		if providerCfg.APIFormat != apiFormatOpenAI {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"STREAMING_NOT_SUPPORTED",
-				"Streaming is only supported for OpenAI-compatible providers",
-				http.StatusBadRequest,
-				nil,
-			))
-			return
-		}
-		streamClient := proxyHTTPClient(15 * time.Minute)
-		retryPolicyStream := buildRetryPolicy(strategySnapshot)
-		retryPolicyStream = applyLitellmGatewayRetryCap(retryPolicyStream)
-		streamAttempts := buildProxyCatalogAttempts(c.Request.Context(), db, req)
-		var retryCountStream int
-		for attemptIdx, att := range streamAttempts {
-			traceSpan.SetRoute(att.provider, att.model)
-
-			pk, dk, pcfg, skip, fatalErr := resolveProxyAttemptRuntime(
-				c.Request.Context(),
-				db,
-				userIDInt,
-				merchantID,
-				req,
-				att,
-				apiKey,
-				decryptedKey,
-				providerCfg,
-				entCtx,
-				requestID,
-			)
-			if fatalErr != nil {
-				billingEngine.CancelPreDeduct(userIDInt, requestID)
-				middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-				return
-			}
-			if skip {
-				continue
-			}
-
-			if pcfg.APIFormat != apiFormatOpenAI {
-				if attemptIdx < len(streamAttempts)-1 {
-					continue
-				}
-				billingEngine.CancelPreDeduct(userIDInt, requestID)
-				middleware.RespondWithError(c, apperrors.NewAppError(
-					"STREAMING_NOT_SUPPORTED",
-					"Streaming is only supported for OpenAI-compatible providers",
-					http.StatusBadRequest,
-					nil,
-				))
-				return
-			}
-
-			base := strings.TrimRight(pcfg.APIBaseURL, "/")
-			if base == "" {
-				if attemptIdx < len(streamAttempts)-1 {
-					continue
-				}
-				billingEngine.CancelPreDeduct(userIDInt, requestID)
-				middleware.RespondWithError(c, apperrors.NewAppError(
-					"UNSUPPORTED_PROVIDER",
-					fmt.Sprintf("Provider %s is missing api_base_url", att.provider),
-					http.StatusBadRequest,
-					nil,
-				))
-				return
-			}
-
-			ep := fmt.Sprintf("%s/chat/completions", base)
-			rb := map[string]interface{}{
-				"model":    att.model,
-				"messages": req.Messages,
-				"stream":   true,
-			}
-			if req.Options != nil {
-				var options map[string]interface{}
-				if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
-					for k, v := range options {
-						rb[k] = v
-					}
-				}
-			}
-			jb, mErr := json.Marshal(rb)
-			if mErr != nil {
-				billingEngine.CancelPreDeduct(userIDInt, requestID)
-				middleware.RespondWithError(c, apperrors.NewAppError(
-					"REQUEST_BUILD_FAILED",
-					"Failed to build request body",
-					http.StatusInternalServerError,
-					mErr,
-				))
-				return
-			}
-			hreq, hErr := http.NewRequestWithContext(c.Request.Context(), "POST", ep, bytes.NewBuffer(jb))
-			if hErr != nil {
-				billingEngine.CancelPreDeduct(userIDInt, requestID)
-				middleware.RespondWithError(c, apperrors.NewAppError(
-					"REQUEST_CREATE_FAILED",
-					"Failed to create request",
-					http.StatusInternalServerError,
-					hErr,
-				))
-				return
-			}
-			hreq.GetBody = func() (io.ReadCloser, error) {
-				return io.NopCloser(bytes.NewReader(jb)), nil
-			}
-			hreq.Header.Set("Content-Type", "application/json")
-			authToken := resolveGatewayAuthToken(pcfg, dk)
-			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
-			hreq.Header.Set("Accept", "text/event-stream")
-			applyProxyUpstreamHeaders(c, hreq, requestID)
-
-			r, rc, execErr := executeProviderRequestWithRetry(streamClient, hreq, retryPolicyStream)
-			retryCountStream += rc
-
-			if execErr != nil {
-				info := providerInfoFromUpstreamFailure(0, nil, nil, execErr)
-				services.GetSmartRouter().RecordRequestResult(pk.ID, false)
-				recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
-				if attemptIdx < len(streamAttempts)-1 && services.SuggestModelFallbackAfterFailure(info) {
-					logger.LogInfo(c.Request.Context(), "api_proxy", "stream model fallback after transport error", map[string]interface{}{
-						"request_id": requestID, "attempt": att.provider + "/" + att.model,
-					})
-					continue
-				}
-				traceSpan.SetStatusCode(http.StatusBadGateway)
-				traceSpan.SetErrorCode("API_STREAM_REQUEST_FAILED")
-				billingEngine.CancelPreDeduct(userIDInt, requestID)
-				middleware.RespondWithError(c, apperrors.NewAppError(
-					"API_REQUEST_FAILED",
-					"Failed to send streaming request to provider",
-					http.StatusBadGateway,
-					execErr,
-				))
-				return
-			}
-
-			if r.StatusCode != http.StatusOK {
-				bRead, _ := io.ReadAll(io.LimitReader(r.Body, upstreamErrorBodyPeek))
-				_ = r.Body.Close()
-				info := providerInfoFromUpstreamFailure(r.StatusCode, bRead, r.Header, nil)
-				services.GetSmartRouter().RecordRequestResult(pk.ID, false)
-				recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
-				if attemptIdx < len(streamAttempts)-1 && services.SuggestModelFallbackAfterFailure(info) {
-					logger.LogInfo(c.Request.Context(), "api_proxy", "stream model fallback after upstream HTTP error", map[string]interface{}{
-						"request_id": requestID, "status": r.StatusCode, "attempt": att.provider + "/" + att.model,
-					})
-					continue
-				}
-				traceSpan.SetStatusCode(r.StatusCode)
-				billingEngine.CancelPreDeduct(userIDInt, requestID)
-				c.Data(r.StatusCode, "application/json", bRead)
-				return
-			}
-
-			executeProxyChatCompletionStreamFromUpstream(c, r, requestID, userIDInt, req, att.provider, att.model, requestPath, startTime, db,
-				billingEngine, pk, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
-				decisionStart, traceSpan, strategySnapshot, retryCountStream)
-			return
-		}
-
-		traceSpan.SetStatusCode(http.StatusBadGateway)
-		traceSpan.SetErrorCode("API_REQUEST_FAILED")
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"API_REQUEST_FAILED",
-			"Failed to complete streaming request via model fallback chain",
-			http.StatusBadGateway,
-			nil,
-		))
-		return
-	}
-
-	client := proxyHTTPClient(60 * time.Second)
 	retryPolicy := buildRetryPolicy(strategySnapshot)
-	retryPolicy = applyLitellmGatewayRetryCap(retryPolicy)
-	attempts := buildProxyCatalogAttempts(c.Request.Context(), db, req)
-
-	var (
-		resp            *http.Response
-		body            []byte
-		retryCountTotal int
-		billProv        string
-		billModel       string
-		winningKey      models.MerchantAPIKey
-	)
-
-	for attemptIdx, att := range attempts {
-		traceSpan.SetRoute(att.provider, att.model)
-
-		pk, dk, pcfg, skip, fatalErr := resolveProxyAttemptRuntime(
-			c.Request.Context(),
-			db,
-			userIDInt,
-			merchantID,
-			req,
-			att,
-			apiKey,
-			decryptedKey,
-			providerCfg,
-			entCtx,
-			requestID,
-		)
-		if fatalErr != nil {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-			return
-		}
-		if skip {
-			continue
-		}
-
-		base := strings.TrimRight(pcfg.APIBaseURL, "/")
-		if base == "" {
-			if attemptIdx < len(attempts)-1 {
-				continue
-			}
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"UNSUPPORTED_PROVIDER",
-				fmt.Sprintf("Provider %s is missing api_base_url", att.provider),
-				http.StatusBadRequest,
-				nil,
-			))
-			return
-		}
-
-		ep := fmt.Sprintf("%s/chat/completions", base)
-		if pcfg.APIFormat == providerAnthropic {
-			ep = fmt.Sprintf("%s/messages", base)
-		}
-
-		rb := map[string]interface{}{
-			"model":    att.model,
-			"messages": req.Messages,
-			"stream":   req.Stream,
-		}
-		if req.Options != nil {
-			var options map[string]interface{}
-			if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
-				for k, v := range options {
-					rb[k] = v
-				}
-			}
-		}
-		jb, mErr := json.Marshal(rb)
-		if mErr != nil {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"REQUEST_BUILD_FAILED",
-				"Failed to build request body",
-				http.StatusInternalServerError,
-				mErr,
-			))
-			return
-		}
-		hreq, hErr := http.NewRequestWithContext(c.Request.Context(), "POST", ep, bytes.NewBuffer(jb))
-		if hErr != nil {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"REQUEST_CREATE_FAILED",
-				"Failed to create request",
-				http.StatusInternalServerError,
-				hErr,
-			))
-			return
-		}
-		hreq.GetBody = func() (io.ReadCloser, error) {
-			return io.NopCloser(bytes.NewReader(jb)), nil
-		}
-		hreq.Header.Set("Content-Type", "application/json")
-		switch pcfg.APIFormat {
-		case providerAnthropic:
-			hreq.Header.Set("x-api-key", dk)
-			hreq.Header.Set("anthropic-version", "2023-06-01")
-		default:
-			authToken := resolveGatewayAuthToken(pcfg, dk)
-			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
-		}
-		applyProxyUpstreamHeaders(c, hreq, requestID)
-
-		r, rc, execErr := executeProviderRequestWithRetry(client, hreq, retryPolicy)
-		retryCountTotal += rc
-
-		if execErr != nil {
-			info := providerInfoFromUpstreamFailure(0, nil, nil, execErr)
-			services.GetSmartRouter().RecordRequestResult(pk.ID, false)
-			recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
-			if attemptIdx < len(attempts)-1 && services.SuggestModelFallbackAfterFailure(info) {
-				logger.LogInfo(c.Request.Context(), "api_proxy", "model fallback after transport error", map[string]interface{}{
-					"request_id": requestID, "attempt": att.provider + "/" + att.model,
-				})
-				continue
-			}
-			traceSpan.SetStatusCode(http.StatusBadGateway)
-			traceSpan.SetErrorCode("API_REQUEST_FAILED")
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"API_REQUEST_FAILED",
-				"Failed to send request to provider",
-				http.StatusBadGateway,
-				execErr,
-			))
-			return
-		}
-
-		bRead, readErr := io.ReadAll(r.Body)
-		_ = r.Body.Close()
-		if readErr != nil {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"RESPONSE_READ_FAILED",
-				"Failed to read response",
-				http.StatusInternalServerError,
-				readErr,
-			))
-			return
-		}
-
-		if chatCompletionJSONIndicatesProxySuccess(r.StatusCode, bRead) {
-			resp = r
-			body = bRead
-			billProv = att.provider
-			billModel = att.model
-			winningKey = pk
-			proxyTransportOK := r.StatusCode < http.StatusInternalServerError && r.StatusCode != http.StatusTooManyRequests
-			services.GetSmartRouter().RecordRequestResult(pk.ID, proxyTransportOK)
-			recordHealthCheckerProxyOutcome(c, pk.ID, true, startTime)
-			break
-		}
-
-		info := providerInfoFromUpstreamFailure(r.StatusCode, bRead, r.Header, nil)
-		services.GetSmartRouter().RecordRequestResult(pk.ID, false)
-		recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
-		if attemptIdx < len(attempts)-1 && services.SuggestModelFallbackAfterFailure(info) {
-			logger.LogInfo(c.Request.Context(), "api_proxy", "model fallback after upstream HTTP error", map[string]interface{}{
-				"request_id": requestID, "status": r.StatusCode, "attempt": att.provider + "/" + att.model,
-			})
-			continue
-		}
-
-		traceSpan.SetStatusCode(r.StatusCode)
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		c.Data(r.StatusCode, "application/json", bRead)
-		return
-	}
-
-	if resp == nil || body == nil {
-		traceSpan.SetStatusCode(http.StatusBadGateway)
-		traceSpan.SetErrorCode("API_REQUEST_FAILED")
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
+	resp, err := executeProviderRequestWithRetry(client, httpReq, retryPolicy)
+	if err != nil {
+		services.GetSmartRouter().RecordRequestResult(apiKey.ID, false)
+		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"API_REQUEST_FAILED",
-			"Failed to complete request via model fallback chain",
+			"Failed to send request to provider",
 			http.StatusBadGateway,
-			nil,
+			err,
 		))
 		return
 	}
+	defer resp.Body.Close()
+	proxyTransportOK := resp.StatusCode < http.StatusInternalServerError && resp.StatusCode != http.StatusTooManyRequests
+	services.GetSmartRouter().RecordRequestResult(apiKey.ID, proxyTransportOK)
+	recordHealthCheckerProxyOutcome(c, apiKey.ID, proxyTransportOK, startTime)
 
-	retryCount := retryCountTotal
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		recordHealthCheckerProxyOutcome(c, apiKey.ID, false, startTime)
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"RESPONSE_READ_FAILED",
+			"Failed to read response",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
 
 	var apiResp APIProxyResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		traceSpan.SetStatusCode(resp.StatusCode)
-		traceSpan.SetErrorCode("UNMARSHAL_PROXY_RESPONSE_FAILED")
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		c.Data(resp.StatusCode, "application/json", body)
 		return
-	}
-
-	if sm := strings.TrimSpace(apiResp.Model); sm != "" && sm != strings.TrimSpace(billModel) {
-		logger.LogInfo(c.Request.Context(), "api_proxy", "upstream response model differs from request (e.g. gateway fallback)", map[string]interface{}{
-			"request_id": requestID, "requested_model": billModel, "response_model": sm,
-		})
 	}
 
 	latency := int(time.Since(startTime).Milliseconds())
 
 	var inputTokens, outputTokens int
-	var tokenUsage int64
 	var cost float64
 
 	if apiResp.Usage.TotalTokens > 0 {
 		inputTokens = apiResp.Usage.PromptTokens
 		outputTokens = apiResp.Usage.CompletionTokens
-		tokenUsage = billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
-		var cerr error
-		cost, cerr = calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
-		if cerr != nil {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			logger.LogError(context.Background(), "api_proxy", "Token cost resolution failed", cerr, map[string]interface{}{
-				"user_id": userIDInt, "provider": billProv, "model": billModel, "request_id": requestID,
-			})
-			middleware.RespondWithError(c, apperrors.ErrPricingSnapshotMiss)
-			return
-		}
-	}
-
-	if tokenUsage > 0 {
-		settleErr := billingEngine.SettlePreDeduct(userIDInt, requestID, tokenUsage)
-		if settleErr != nil {
-			logger.LogError(context.Background(), "api_proxy", "Settle pre-deduct failed", settleErr, map[string]interface{}{
-				"user_id":     userIDInt,
-				"token_usage": tokenUsage,
-				"request_id":  requestID,
-			})
-		}
-	} else {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
+		cost = calculateTokenCost(db, userIDInt, req.Provider, req.Model, inputTokens, outputTokens)
 	}
 
 	if cost > 0 {
-		billReq := req
-		billReq.Provider = billProv
-		billReq.Model = billModel
-		logMerchantSKUID, logProcurementCNY := resolveMerchantSKUProcurementForLog(db, billReq, winningKey.ID, merchantID, inputTokens, outputTokens)
 		tx, err := db.Begin()
 		if err == nil {
-			_, updateErr := tx.Exec(
-				"UPDATE merchant_api_keys SET quota_used = quota_used + $1, last_used_at = $2 WHERE id = $3",
-				cost, time.Now(), winningKey.ID,
+			res, updateErr := tx.Exec(
+				"UPDATE tokens SET balance = balance - $1, total_used = total_used + $1 WHERE user_id = $2 AND balance >= $1",
+				cost, userIDInt,
 			)
 			err = updateErr
 			if err == nil {
+				var rowsAffected int64
+				rowsAffected, err = res.RowsAffected()
+				if err == nil && rowsAffected == 0 {
+					err = apperrors.ErrInsufficientBalance
+				}
+			}
+			if err == nil {
 				_, err = tx.Exec(
-					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, token_usage, merchant_sku_id, procurement_cost_cny) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
-					userIDInt, winningKey.ID, requestID, billProv, billModel, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost, tokenUsage, nullInt64Arg(logMerchantSKUID), nullFloat64Arg(logProcurementCNY),
+					"INSERT INTO token_transactions (user_id, type, amount, reason, request_id) VALUES ($1, $2, $3, $4, $5)",
+					userIDInt, "usage", -cost, fmt.Sprintf("API call: %s/%s", req.Provider, req.Model), requestID,
+				)
+			}
+			if err == nil {
+				_, err = tx.Exec(
+					"UPDATE merchant_api_keys SET quota_used = quota_used + $1, last_used_at = $2 WHERE id = $3",
+					cost, time.Now(), apiKey.ID,
+				)
+			}
+			if err == nil {
+				_, err = tx.Exec(
+					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+					userIDInt, apiKey.ID, requestID, req.Provider, req.Model, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost,
 				)
 			}
 
 			if err != nil {
 				tx.Rollback()
 				logger.LogError(context.Background(), "api_proxy", "Transaction rollback", err, map[string]interface{}{
-					"user_id":     userIDInt,
-					"provider":    billProv,
-					"model":       billModel,
-					"cost":        cost,
-					"token_usage": tokenUsage,
-					"request_id":  requestID,
+					"user_id":    userIDInt,
+					"provider":   req.Provider,
+					"model":      req.Model,
+					"cost":       cost,
+					"request_id": requestID,
 				})
 			} else {
 				tx.Commit()
 				logger.LogInfo(context.Background(), "api_proxy", "API request completed", map[string]interface{}{
 					"user_id":       userIDInt,
-					"provider":      billProv,
-					"model":         billModel,
+					"provider":      req.Provider,
+					"model":         req.Model,
 					"input_tokens":  inputTokens,
 					"output_tokens": outputTokens,
-					"token_usage":   tokenUsage,
 					"cost":          cost,
 					"latency_ms":    latency,
 					"status_code":   resp.StatusCode,
@@ -854,104 +412,12 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	}
 
 	decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
-	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, winningKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCount)
+	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, apiKey.ID, int(time.Since(decisionStart).Milliseconds()))
 
-	traceSpan.SetStatusCode(resp.StatusCode)
 	c.Data(resp.StatusCode, "application/json", body)
 }
 
-// applyProxyUpstreamHeaders 将本请求的追踪关联信息传给上游（含 LiteLLM），便于与网关 /metrics、日志对齐定界。
-// 见 deploy/litellm/README.md 与 LiteLLM reliability 文档。
-// applyLitellmGatewayRetryCap 在走 LiteLLM 网关时限制业务层 HTTP 重试次数，避免与网关 router num_retries 叠加放大。
-// 环境变量 API_PROXY_LITELLM_MAX_RETRIES 表示 MaxRetries 上限（默认 1，即最多 2 次出站尝试）。
-func applyLitellmGatewayRetryCap(policy *services.RetryPolicy) *services.RetryPolicy {
-	if policy == nil {
-		return policy
-	}
-	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if active != llmGatewayLitellm {
-		return policy
-	}
-	cap := 1
-	if v := strings.TrimSpace(os.Getenv("API_PROXY_LITELLM_MAX_RETRIES")); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-			cap = n
-		}
-	}
-	if policy.MaxRetries > cap {
-		p := *policy
-		p.MaxRetries = cap
-		return &p
-	}
-	return policy
-}
-
-func applyProxyUpstreamHeaders(c *gin.Context, httpReq *http.Request, requestID string) {
-	if strings.TrimSpace(requestID) != "" {
-		httpReq.Header.Set("X-Request-ID", requestID)
-	}
-	// W3C：启用 OTLP 时由 otelhttp 注入 traceparent；未启用时透传入口头以保持旧行为。
-	if tracing.Enabled() {
-		for _, h := range []string{"tracestate", "baggage"} {
-			if v := strings.TrimSpace(c.GetHeader(h)); v != "" {
-				httpReq.Header.Set(h, v)
-			}
-		}
-		return
-	}
-	for _, h := range []string{"traceparent", "tracestate", "baggage"} {
-		if v := strings.TrimSpace(c.GetHeader(h)); v != "" {
-			httpReq.Header.Set(h, v)
-		}
-	}
-}
-
-func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
-	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == "none" {
-		return cfg
-	}
-	switch active {
-	case llmGatewayLitellm:
-		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
-			cfg.APIBaseURL = strings.TrimRight(base, "/") + "/v1"
-		}
-	}
-	return cfg
-}
-
-func resolveGatewayAuthToken(cfg providerRuntimeConfig, fallbackToken string) string {
-	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == "none" {
-		return fallbackToken
-	}
-	switch active {
-	case llmGatewayLitellm:
-		if token := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY")); token != "" {
-			return token
-		}
-	}
-	return fallbackToken
-}
-
-func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTokens, outputTokens int, strictPricingVID *int) (float64, error) {
-	if strictPricingVID != nil {
-		cost, ok := services.CalculateCostFromPricingVersion(db, *strictPricingVID, provider, model, inputTokens, outputTokens)
-		if !ok {
-			return 0, fmt.Errorf("strict pricing snapshot miss for version %d", *strictPricingVID)
-		}
-		logger.LogDebug(context.Background(), "api_proxy", "Token cost from entitlement pricing_version", map[string]interface{}{
-			"pricing_version_id": *strictPricingVID,
-			"pricing_source":     "entitlement_strict",
-			"provider":           provider,
-			"model":              model,
-			"input_tokens":       inputTokens,
-			"output_tokens":      outputTokens,
-			"cost":               cost,
-		})
-		return cost, nil
-	}
-
+func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTokens, outputTokens int) float64 {
 	vid := services.LatestUserPricingVersionID(db, userID)
 	if vid.Valid {
 		if cost, ok := services.CalculateCostFromPricingVersion(db, int(vid.Int64), provider, model, inputTokens, outputTokens); ok {
@@ -964,7 +430,7 @@ func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTok
 				"output_tokens":      outputTokens,
 				"cost":               cost,
 			})
-			return cost, nil
+			return cost
 		}
 		logger.LogDebug(context.Background(), "api_proxy", "pricing_version snapshot miss, fallback live SPU", map[string]interface{}{
 			"pricing_version_id": vid.Int64,
@@ -985,7 +451,7 @@ func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTok
 		"pricing_source": "live_spu",
 	})
 
-	return cost, nil
+	return cost
 }
 
 func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeConfig, error) {
@@ -1000,36 +466,6 @@ func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeC
 	return cfg, err
 }
 
-// entitlementKeyFilterForRouter: nil = no filter (legacy); strict with no keys = empty slice (no SmartRouter pool).
-func entitlementKeyFilterForRouter(strict bool, ent *services.EntitlementRoutingContext) []int {
-	if !strict {
-		return nil
-	}
-	if ent == nil || len(ent.AllowedAPIKeyIDs) == 0 {
-		return []int{}
-	}
-	out := make([]int, 0, len(ent.AllowedAPIKeyIDs))
-	for id := range ent.AllowedAPIKeyIDs {
-		out = append(out, id)
-	}
-	sort.Ints(out)
-	return out
-}
-
-func pickDeterministicEntitledKey(ent *services.EntitlementRoutingContext) (apiKeyID int, merchantSKUID int) {
-	if ent == nil || len(ent.AllowedAPIKeyIDs) == 0 {
-		return 0, 0
-	}
-	minK := 0
-	for k := range ent.AllowedAPIKeyIDs {
-		if minK == 0 || k < minK {
-			minK = k
-		}
-	}
-	msid, _ := ent.MerchantSKUForAPIKey(minK)
-	return minK, msid
-}
-
 func scanMerchantAPIKeyQuotaRow(row *sql.Row, apiKey *models.MerchantAPIKey) error {
 	var qLim sql.NullFloat64
 	if err := row.Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &qLim, &apiKey.QuotaUsed, &apiKey.Status); err != nil {
@@ -1039,32 +475,27 @@ func scanMerchantAPIKeyQuotaRow(row *sql.Row, apiKey *models.MerchantAPIKey) err
 	return nil
 }
 
-func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequest, apiKey *models.MerchantAPIKey, ent *services.EntitlementRoutingContext) error {
+func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequest, apiKey *models.MerchantAPIKey) error {
 	if req.APIKeyID != nil && *req.APIKeyID > 0 {
-		keyPick := `SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
-			 FROM merchant_api_keys mak
-			 INNER JOIN merchants m ON m.id = mak.merchant_id
-			 WHERE mak.id = $1 AND mak.provider = $2 AND mak.status = 'active'
-			   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')
-			   AND (mak.quota_limit IS NULL OR mak.quota_used < mak.quota_limit)
-			   AND m.status IN ('active', 'approved')
-			   AND m.lifecycle_status <> 'suspended'`
+		query := `SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+			 FROM merchant_api_keys
+			 WHERE id = $1 AND provider = $2 AND status = 'active'
+			   AND (verified_at IS NOT NULL OR verification_result = 'verified')
+			   AND (quota_limit IS NULL OR quota_used < quota_limit)`
+		args := []interface{}{*req.APIKeyID, req.Provider}
 		if merchantID <= 0 {
-			if ent != nil && ent.AllowsAPIKey(*req.APIKeyID) {
-				return scanMerchantAPIKeyQuotaRow(
-					db.QueryRow(keyPick+` LIMIT 1`, *req.APIKeyID, req.Provider),
-					apiKey,
-				)
-			}
-			keyPick += ` AND m.user_id = $3`
 			return scanMerchantAPIKeyQuotaRow(
-				db.QueryRow(keyPick+` LIMIT 1`, *req.APIKeyID, req.Provider, userID),
+				db.QueryRow(query+" LIMIT 1", args...),
 				apiKey,
 			)
 		}
-		keyPick += ` AND mak.merchant_id = $3 LIMIT 1`
+		query += " AND merchant_id = $3 LIMIT 1"
+		args = append(args, merchantID)
 		err := scanMerchantAPIKeyQuotaRow(
-			db.QueryRow(keyPick, *req.APIKeyID, req.Provider, merchantID),
+			db.QueryRow(
+				query,
+				args...,
+			),
 			apiKey,
 		)
 		if err == nil {
@@ -1077,31 +508,6 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 
 	if req.MerchantSKUID != nil && *req.MerchantSKUID > 0 {
 		if merchantID <= 0 {
-			if ent != nil && ent.AllowsMerchantSKU(*req.MerchantSKUID) {
-				err := scanMerchantAPIKeyQuotaRow(
-					db.QueryRow(
-						`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
-						 FROM merchant_skus ms
-						 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
-						 JOIN merchants m ON m.id = ms.merchant_id
-						 WHERE ms.id = $1 AND ms.status = 'active'
-						   AND mak.provider = $2 AND mak.status = 'active'
-						   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')
-						   AND m.status IN ('active', 'approved')
-						   AND m.lifecycle_status <> 'suspended'
-						   AND (mak.quota_limit IS NULL OR mak.quota_used < mak.quota_limit)
-						 LIMIT 1`,
-						*req.MerchantSKUID, req.Provider,
-					),
-					apiKey,
-				)
-				if err == nil {
-					return nil
-				}
-				if err != sql.ErrNoRows {
-					return err
-				}
-			}
 			return sql.ErrNoRows
 		}
 		err := scanMerchantAPIKeyQuotaRow(
@@ -1114,8 +520,7 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 				   AND ms.merchant_id = $2
 				   AND m.user_id = $3
 				   AND mak.provider = $4 AND mak.status = 'active'
-				   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')
-				   AND m.lifecycle_status <> 'suspended'`,
+				   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')`,
 				*req.MerchantSKUID, merchantID, userID, req.Provider,
 			),
 			apiKey,
@@ -1147,74 +552,22 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 
 	return scanMerchantAPIKeyQuotaRow(
 		db.QueryRow(
-			`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
-			 FROM merchant_api_keys mak
-			 INNER JOIN merchants m ON m.id = mak.merchant_id
-			 WHERE mak.provider = $1 AND mak.status = 'active'
-			   AND m.user_id = $2
-			   AND m.status IN ('active', 'approved')
-			   AND m.lifecycle_status <> 'suspended'
-			   AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')
-			   AND (mak.quota_limit IS NULL OR mak.quota_used < mak.quota_limit)
-			 ORDER BY COALESCE((mak.quota_limit - mak.quota_used)::double precision, 1e30::double precision) DESC
+			`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+			 FROM merchant_api_keys
+			 WHERE provider = $1 AND status = 'active'
+			   AND (verified_at IS NOT NULL OR verification_result = 'verified')
+			   AND (quota_limit IS NULL OR quota_used < quota_limit)
+			 ORDER BY COALESCE((quota_limit - quota_used)::double precision, 1e30::double precision) DESC
 			 LIMIT 1`,
-			req.Provider, userID,
+			req.Provider,
 		),
 		apiKey,
 	)
 }
 
-// resolveMerchantSKUProcurementForLog 按 merchant_skus 成本单价计算采购成本；无绑定在售 SKU 时返回空。
-func resolveMerchantSKUProcurementForLog(db *sql.DB, req APIProxyRequest, apiKeyID int, merchantID int, inputTokens, outputTokens int) (sql.NullInt64, sql.NullFloat64) {
-	var msID int
-	var inRate, outRate float64
-	var err error
-	if req.MerchantSKUID != nil && *req.MerchantSKUID > 0 && merchantID > 0 {
-		err = db.QueryRow(
-			`SELECT ms.id, ms.cost_input_rate, ms.cost_output_rate
-			 FROM merchant_skus ms
-			 WHERE ms.id = $1 AND ms.api_key_id = $2 AND ms.merchant_id = $3 AND ms.status = 'active'`,
-			*req.MerchantSKUID, apiKeyID, merchantID,
-		).Scan(&msID, &inRate, &outRate)
-	} else {
-		err = db.QueryRow(
-			`SELECT ms.id, ms.cost_input_rate, ms.cost_output_rate
-			 FROM merchant_skus ms
-			 WHERE ms.api_key_id = $1 AND ms.status = 'active'
-			 LIMIT 1`,
-			apiKeyID,
-		).Scan(&msID, &inRate, &outRate)
-	}
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return sql.NullInt64{}, sql.NullFloat64{}
-		}
-		logger.LogWarn(context.Background(), "api_proxy", "resolve procurement merchant_sku failed", map[string]interface{}{
-			"error": err.Error(), "api_key_id": apiKeyID, "merchant_id": merchantID,
-		})
-		return sql.NullInt64{}, sql.NullFloat64{}
-	}
-	proc := services.ProcurementCostCNY(inRate, outRate, inputTokens, outputTokens)
-	return sql.NullInt64{Int64: int64(msID), Valid: true}, sql.NullFloat64{Float64: proc, Valid: true}
-}
-
-func nullInt64Arg(n sql.NullInt64) interface{} {
-	if n.Valid {
-		return n.Int64
-	}
-	return nil
-}
-
-func nullFloat64Arg(n sql.NullFloat64) interface{} {
-	if n.Valid {
-		return n.Float64
-	}
-	return nil
-}
-
 func resolveMerchantIDByUser(db *sql.DB, userID int) (int, error) {
 	var merchantID int
-	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1 AND "+sqlMerchantOperational+" LIMIT 1", userID).Scan(&merchantID)
+	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1 AND status = 'active' LIMIT 1", userID).Scan(&merchantID)
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}
@@ -1251,20 +604,17 @@ type traceTopCandidate struct {
 	Score    float64 `json:"score"`
 }
 
-func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string, keyFilter []int) smartRoutingPick {
+func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string) smartRoutingPick {
 	if strings.TrimSpace(req.Provider) == "" {
 		return smartRoutingPick{}
 	}
-	if keyFilter != nil && len(keyFilter) == 0 {
-		return smartRoutingPick{}
-	}
 	router := services.GetSmartRouter()
-	choice, err := router.SelectProviderWithKeyAllowlist(context.Background(), req.Model, req.Provider, services.RoutingStrategy(strategyCode), keyFilter)
+	choice, err := router.SelectProvider(context.Background(), req.Model, req.Provider, services.RoutingStrategy(strategyCode))
 	if err != nil || choice == nil {
 		return smartRoutingPick{}
 	}
 
-	candidates, cErr := router.GetCandidatesWithKeyAllowlist(context.Background(), req.Model, req.Provider, keyFilter)
+	candidates, cErr := router.GetCandidates(context.Background(), req.Model, req.Provider)
 	if cErr == nil {
 		router.CalculateScores(candidates, services.RoutingStrategy(strategyCode))
 	}
@@ -1341,30 +691,26 @@ func recordHealthCheckerProxyOutcome(c *gin.Context, apiKeyID int, success bool,
 	}
 }
 
-func insertRoutingDecision(db *sql.DB, requestID string, userID int, req APIProxyRequest, strategy string, candidatesJSON []byte, selectedAPIKeyID int, latencyMs int, retryCount int) error {
+func insertRoutingDecision(db *sql.DB, requestID string, userID int, req APIProxyRequest, strategy string, candidatesJSON []byte, selectedAPIKeyID int, latencyMs int) error {
 	if db == nil {
 		return nil
 	}
-	wasRetry := retryCount > 0
 	_, err := db.Exec(
 		`INSERT INTO routing_decisions
 		(request_id, user_id, model_requested, strategy_used, candidates, selected_provider, selected_api_key_id, decision_latency_ms, was_retry, retry_count)
-		VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8, $9)`,
-		requestID, userID, req.Model, strategy, candidatesJSON, selectedAPIKeyID, latencyMs, wasRetry, retryCount,
+		VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, FALSE, 0)`,
+		requestID, userID, req.Model, strategy, candidatesJSON, selectedAPIKeyID, latencyMs,
 	)
 	return err
 }
 
-const upstreamErrorBodyPeek = 8192
-
-func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request, policy *services.RetryPolicy) (*http.Response, int, error) {
+func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request, policy *services.RetryPolicy) (*http.Response, error) {
 	if policy == nil {
 		policy = services.DefaultRetryPolicy
 	}
 	var (
-		resp       *http.Response
-		err        error
-		retryCount int
+		resp *http.Response
+		err  error
 	)
 	ctx := baseReq.Context()
 	for i := 0; i <= policy.MaxRetries; i++ {
@@ -1377,33 +723,22 @@ func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request,
 		}
 
 		resp, err = client.Do(req) // #nosec G704 -- upstream URL from admin-configured model_providers.api_base_url, not user-supplied host
-		if err != nil {
-			info := services.MapProviderError(0, "", err.Error(), nil, err, "")
-			if !info.Retryable || i >= policy.MaxRetries {
-				return nil, retryCount, err
-			}
-			retryCount++
-			time.Sleep(policy.DelayForAttempt(i))
-			continue
+		if err == nil && resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < http.StatusInternalServerError {
+			return resp, nil
 		}
 
-		if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < http.StatusInternalServerError {
-			return resp, retryCount, nil
+		if resp != nil && (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= http.StatusInternalServerError) {
+			resp.Body.Close()
+			err = fmt.Errorf("upstream status %d", resp.StatusCode)
 		}
 
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, upstreamErrorBodyPeek))
-		_ = resp.Body.Close()
-		status := resp.StatusCode
-		headers := resp.Header
-		retryable := services.HTTPUpstreamRetryable(status, b, headers)
-		if !retryable || i >= policy.MaxRetries {
-			resp.Body = io.NopCloser(bytes.NewReader(b))
-			return resp, retryCount, nil
+		shouldRetry, delay := policy.ShouldRetry(err, i)
+		if !shouldRetry {
+			return nil, err
 		}
-		retryCount++
-		time.Sleep(policy.DelayForAttempt(i))
+		time.Sleep(delay)
 	}
-	return nil, retryCount, err
+	return nil, err
 }
 
 func buildRetryPolicy(snapshot strategyRuntimeSnapshot) *services.RetryPolicy {

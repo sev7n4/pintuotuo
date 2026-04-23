@@ -21,13 +21,7 @@ import (
 	"github.com/pintuotuo/backend/utils"
 )
 
-const (
-	defaultHealthCheckLevel = "medium"
-	regionDomestic          = "domestic"
-	regionOverseas          = "overseas"
-	securityLevelStandard   = "standard"
-	securityLevelHigh       = "high"
-)
+const defaultHealthCheckLevel = "medium"
 
 func CreateMerchantAPIKey(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -234,9 +228,7 @@ func ListMerchantAPIKeys(c *gin.Context) {
 			models_supported,
 			COALESCE(cost_input_rate, 0),
 			COALESCE(cost_output_rate, 0),
-			COALESCE(profit_margin, 0),
-			COALESCE(region, 'domestic'),
-			COALESCE(security_level, 'standard')
+			COALESCE(profit_margin, 0)
 		 FROM merchant_api_keys WHERE merchant_id = $1 ORDER BY created_at DESC`,
 		merchantID,
 	)
@@ -260,7 +252,6 @@ func ListMerchantAPIKeys(c *gin.Context) {
 			&key.HealthCheckLevel, &key.EndpointURL, &key.HealthStatus, &key.HealthErrorMessage, &key.HealthErrorCategory, &key.HealthErrorCode, &key.HealthRequestID, &lastHealth, &key.ConsecutiveFailures,
 			&verifiedAt, &key.VerificationResult, &key.VerificationMsg, &modelsJSON,
 			&key.CostInputRate, &key.CostOutputRate, &key.ProfitMargin,
-			&key.Region, &key.SecurityLevel,
 		)
 		key.QuotaLimit = utils.NullFloat64Ptr(qLim)
 		if scanErr != nil {
@@ -437,48 +428,6 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		}
 	}
 
-	patchRegion := false
-	regionStr := ""
-	if raw, has := patch["region"]; has {
-		patchRegion = true
-		_ = json.Unmarshal(raw, &regionStr)
-		regionStr = strings.ToLower(strings.TrimSpace(regionStr))
-		if regionStr != "" {
-			switch regionStr {
-			case regionDomestic, regionOverseas:
-			default:
-				middleware.RespondWithError(c, apperrors.NewAppError(
-					"INVALID_REGION",
-					"region must be domestic or overseas",
-					http.StatusBadRequest,
-					nil,
-				))
-				return
-			}
-		}
-	}
-
-	patchSecurityLevel := false
-	securityLevelStr := ""
-	if raw, has := patch["security_level"]; has {
-		patchSecurityLevel = true
-		_ = json.Unmarshal(raw, &securityLevelStr)
-		securityLevelStr = strings.ToLower(strings.TrimSpace(securityLevelStr))
-		if securityLevelStr != "" {
-			switch securityLevelStr {
-			case securityLevelStandard, securityLevelHigh:
-			default:
-				middleware.RespondWithError(c, apperrors.NewAppError(
-					"INVALID_SECURITY_LEVEL",
-					"security_level must be standard or high",
-					http.StatusBadRequest,
-					nil,
-				))
-				return
-			}
-		}
-	}
-
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -514,10 +463,8 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		 cost_input_rate = CASE WHEN $10::bool THEN $11::numeric ELSE cost_input_rate END,
 		 cost_output_rate = CASE WHEN $12::bool THEN $13::numeric ELSE cost_output_rate END,
 		 profit_margin = CASE WHEN $14::bool THEN $15::numeric ELSE profit_margin END,
-		 region = CASE WHEN $16::bool THEN $17::varchar(20) ELSE region END,
-		 security_level = CASE WHEN $18::bool THEN $19::varchar(20) ELSE security_level END,
 		 updated_at = CURRENT_TIMESTAMP
-		 WHERE id = $20 AND merchant_id = $21
+		 WHERE id = $16 AND merchant_id = $17
 		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, last_used_at, created_at, updated_at,
 			COALESCE(NULLIF(TRIM(health_check_level), ''), 'medium'),
 			COALESCE(endpoint_url, ''),
@@ -530,24 +477,19 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 			models_supported,
 			COALESCE(cost_input_rate, 0),
 			COALESCE(cost_output_rate, 0),
-			COALESCE(profit_margin, 0),
-			COALESCE(region, 'domestic'),
-			COALESCE(security_level, 'standard')`,
+			COALESCE(profit_margin, 0)`,
 		name, status, patchQuota, unlimitedQuota, quotaVal,
 		patchEndpoint, endpointStr,
 		patchHCL, hclStr,
 		patchCin, cinVal,
 		patchCout, coutVal,
 		patchPM, pmVal,
-		patchRegion, regionStr,
-		patchSecurityLevel, securityLevelStr,
 		keyID, merchantID,
 	).Scan(
 		&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaAfter, &apiKey.QuotaUsed, &apiKey.Status, &lastUsedAt, &apiKey.CreatedAt, &apiKey.UpdatedAt,
 		&apiKey.HealthCheckLevel, &apiKey.EndpointURL, &apiKey.HealthStatus, &lastHealth, &apiKey.ConsecutiveFailures,
 		&verifiedAt, &apiKey.VerificationResult, &apiKey.VerificationMsg, &modelsJSON,
 		&apiKey.CostInputRate, &apiKey.CostOutputRate, &apiKey.ProfitMargin,
-		&apiKey.Region, &apiKey.SecurityLevel,
 	)
 	apiKey.QuotaLimit = utils.NullFloat64Ptr(quotaAfter)
 

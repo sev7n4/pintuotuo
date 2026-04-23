@@ -1,5 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Table, Button, Form, Input, Select, Tag, Space, Modal, message, Descriptions } from 'antd';
+import {
+  Card,
+  Table,
+  Button,
+  Form,
+  Input,
+  Select,
+  Tag,
+  Space,
+  Modal,
+  message,
+  Descriptions,
+} from 'antd';
 import { EditOutlined, SaveOutlined } from '@ant-design/icons';
 import api from '@/services/api';
 
@@ -92,7 +104,10 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
         },
       };
 
-      const response = await api.patch<APIResponse<unknown>>(`/admin/merchants/api-keys/${currentKey.id}`, patch);
+      const response = await api.patch<APIResponse<unknown>>(
+        `/admin/merchants/api-keys/${currentKey.id}`,
+        patch
+      );
       if (response.data.code === 0) {
         message.success('配置更新成功');
         setModalVisible(false);
@@ -149,9 +164,7 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
       key: 'security_level',
       width: 100,
       render: (level: string) => (
-        <Tag color={level === 'high' ? 'red' : 'default'}>
-          {level === 'high' ? '高' : '标准'}
-        </Tag>
+        <Tag color={level === 'high' ? 'red' : 'default'}>{level === 'high' ? '高' : '标准'}</Tag>
       ),
     },
     {
@@ -160,11 +173,7 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
       width: 100,
       render: (_: unknown, record: APIKey) => (
         <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
+          <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             配置
           </Button>
         </Space>
@@ -234,7 +243,13 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
                 label="策略权重"
                 rules={[{ required: true, message: '请输入策略权重' }]}
               >
-                <Input type="number" min={0} max={10} step={0.1} placeholder="输入策略权重 (0-10)" />
+                <Input
+                  type="number"
+                  min={0}
+                  max={10}
+                  step={0.1}
+                  placeholder="输入策略权重 (0-10)"
+                />
               </Form.Item>
 
               <Form.Item
@@ -242,7 +257,13 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
                 label="最大重试次数"
                 rules={[{ required: true, message: '请输入最大重试次数' }]}
               >
-                <Input type="number" min={0} max={10} step={1} placeholder="输入最大重试次数 (0-10)" />
+                <Input
+                  type="number"
+                  min={0}
+                  max={10}
+                  step={1}
+                  placeholder="输入最大重试次数 (0-10)"
+                />
               </Form.Item>
 
               <Form.Item
@@ -250,7 +271,13 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
                 label="超时时间 (ms)"
                 rules={[{ required: true, message: '请输入超时时间' }]}
               >
-                <Input type="number" min={1000} max={60000} step={1000} placeholder="输入超时时间 (毫秒)" />
+                <Input
+                  type="number"
+                  min={1000}
+                  max={60000}
+                  step={1000}
+                  placeholder="输入超时时间 (毫秒)"
+                />
               </Form.Item>
 
               <Form.Item
@@ -266,7 +293,13 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
                 label="负载均衡权重"
                 rules={[{ required: true, message: '请输入负载均衡权重' }]}
               >
-                <Input type="number" min={0} max={10} step={0.1} placeholder="输入负载均衡权重 (0-10)" />
+                <Input
+                  type="number"
+                  min={0}
+                  max={10}
+                  step={0.1}
+                  placeholder="输入负载均衡权重 (0-10)"
+                />
               </Form.Item>
             </Form>
           </>

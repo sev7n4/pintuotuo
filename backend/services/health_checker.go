@@ -8,11 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/pintuotuo/backend/billing"
-	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/utils"
@@ -33,47 +31,6 @@ const (
 	HealthStatusUnhealthy = "unhealthy"
 	HealthStatusUnknown   = "unknown"
 )
-
-const fallbackProviderCode = "__default__"
-
-// normalizeOpenAICompatBase trims the resolved provider/merchant base URL for path joining.
-func normalizeOpenAICompatBase(endpoint string) string {
-	return strings.TrimRight(strings.TrimSpace(endpoint), "/")
-}
-
-// openAICompatModelsProbeURL returns the GET URL for OpenAI-compatible model listing.
-// When the base is already a versioned OpenAI-compat root (…/v1, …/v4, 智谱 paas/v4, 阿里 compatible-mode/v1, etc.),
-// append "/models" only — matching api_key_validator (base + "/models") and avoiding paths like "…/v4/v1/models".
-func openAICompatModelsProbeURL(endpoint string) string {
-	b := normalizeOpenAICompatBase(endpoint)
-	if hasOpenAICompatVersionedRootSuffix(b) {
-		return b + "/models"
-	}
-	return b + "/v1/models"
-}
-
-// openAICompatChatCompletionsURL returns the POST URL for OpenAI-compatible chat completions.
-func openAICompatChatCompletionsURL(endpoint string) string {
-	b := normalizeOpenAICompatBase(endpoint)
-	if hasOpenAICompatVersionedRootSuffix(b) {
-		return b + "/chat/completions"
-	}
-	return b + "/v1/chat/completions"
-}
-
-// hasOpenAICompatVersionedRootSuffix reports whether the path already ends with a typical
-// OpenAI-style API version segment. Order matters: check longer tokens before "/v1" to avoid
-// false positives on hostnames like *ev1* (we only match a slash before the version).
-func hasOpenAICompatVersionedRootSuffix(base string) bool {
-	b := strings.ToLower(base)
-	// v4: 智谱 `…/api/paas/v4`; v1: 多数厂商、DashScope compatible-mode/v1、MiniMax 国际版 等
-	for _, suf := range []string{"/v4", "/v3", "/v2", "/v1"} {
-		if strings.HasSuffix(b, suf) {
-			return true
-		}
-	}
-	return false
-}
 
 var healthCheckIntervalMap = map[HealthCheckLevel]int{
 	HealthCheckLevelHigh:   60,
@@ -96,19 +53,13 @@ type ProviderHealth struct {
 }
 
 type HealthCheckResult struct {
-	Success           bool
-	Status            string
-	LatencyMs         int
-	ErrorMessage      string
-	ErrorCategory     string
-	ProviderErrorCode string
-	ProviderRequestID string
-	EndpointUsed      string
-	StatusCode        int
-	RawErrorExcerpt   string
-	ModelsFound       []string
-	PricingInfo       map[string]interface{}
-	CheckType         string
+	Success      bool
+	Status       string
+	LatencyMs    int
+	ErrorMessage string
+	ModelsFound  []string
+	PricingInfo  map[string]interface{}
+	CheckType    string
 }
 
 type HealthChecker struct {
@@ -134,14 +85,9 @@ func (s *HealthChecker) GetHealthCheckInterval(level string) int {
 }
 
 func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.MerchantAPIKey) (*HealthCheckResult, error) {
-	endpoint, resolveErr := s.resolveEndpoint(ctx, apiKey)
-	if resolveErr != nil {
-		return &HealthCheckResult{
-			Success:      false,
-			Status:       HealthStatusUnhealthy,
-			ErrorMessage: resolveErr.Error(),
-			CheckType:    "lightweight",
-		}, nil
+	endpoint := apiKey.EndpointURL
+	if endpoint == "" {
+		endpoint = s.getDefaultEndpoint(apiKey.Provider)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
@@ -191,55 +137,81 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 }
 
 func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.MerchantAPIKey) (*HealthCheckResult, error) {
-	endpoint, resolveErr := s.resolveEndpoint(ctx, apiKey)
-	if resolveErr != nil {
-		return &HealthCheckResult{
-			Success:      false,
-			Status:       HealthStatusUnhealthy,
-			ErrorMessage: resolveErr.Error(),
-			CheckType:    "full",
-		}, nil
+	endpoint := apiKey.EndpointURL
+	if endpoint == "" {
+		endpoint = s.getDefaultEndpoint(apiKey.Provider)
 	}
 
-	modelsEndpoint := openAICompatModelsProbeURL(endpoint)
-	probe, err := ProbeProviderModels(ctx, s.httpClient, modelsEndpoint, s.getDecryptedAPIKey(apiKey))
+	modelsEndpoint := endpoint + "/v1/models"
+
+	req, err := http.NewRequestWithContext(ctx, "GET", modelsEndpoint, nil)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
 			Status:       HealthStatusUnhealthy,
-			LatencyMs:    probeLatency(probe),
-			ErrorMessage: fmt.Sprintf("connection failed: %v", err),
-			CheckType:    "full",
-		}, nil
-	}
-	if probe != nil && probe.Success {
-		return &HealthCheckResult{
-			Success:      true,
-			Status:       HealthStatusHealthy,
-			LatencyMs:    probe.LatencyMs,
-			ModelsFound:  probe.Models,
-			PricingInfo:  s.extractPricingInfo(apiKey.Provider),
-			EndpointUsed: modelsEndpoint,
+			ErrorMessage: fmt.Sprintf("failed to create request: %v", err),
 			CheckType:    "full",
 		}, nil
 	}
 
-	errMsg := "verification failed"
-	if probe != nil && strings.TrimSpace(probe.ErrorMsg) != "" {
-		errMsg = probe.ErrorMsg
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.getDecryptedAPIKey(apiKey)))
+	req.Header.Set("Content-Type", "application/json")
+
+	start := time.Now()
+	resp, err := s.httpClient.Do(req)
+	latencyMs := int(time.Since(start).Milliseconds())
+
+	if err != nil {
+		return &HealthCheckResult{
+			Success:      false,
+			Status:       HealthStatusUnhealthy,
+			LatencyMs:    latencyMs,
+			ErrorMessage: fmt.Sprintf("connection failed: %v", err),
+			CheckType:    "full",
+		}, nil
 	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		var modelsResp struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+
+		if err := json.Unmarshal(body, &modelsResp); err != nil {
+			return &HealthCheckResult{
+				Success:      false,
+				Status:       HealthStatusDegraded,
+				LatencyMs:    latencyMs,
+				ErrorMessage: fmt.Sprintf("failed to parse models: %v", err),
+				CheckType:    "full",
+			}, nil
+		}
+
+		models := make([]string, 0, len(modelsResp.Data))
+		for _, m := range modelsResp.Data {
+			models = append(models, m.ID)
+		}
+
+		return &HealthCheckResult{
+			Success:     true,
+			Status:      HealthStatusHealthy,
+			LatencyMs:   latencyMs,
+			ModelsFound: models,
+			PricingInfo: s.extractPricingInfo(apiKey.Provider),
+			CheckType:   "full",
+		}, nil
+	}
+
 	return &HealthCheckResult{
-		Success:           false,
-		Status:            HealthStatusUnhealthy,
-		LatencyMs:         probeLatency(probe),
-		ErrorMessage:      errMsg,
-		ErrorCategory:     safeProbeValue(probe, func(p *ProbeModelsResult) string { return p.ErrorCategory }),
-		ProviderErrorCode: safeProbeValue(probe, func(p *ProbeModelsResult) string { return p.ErrorCode }),
-		ProviderRequestID: safeProbeValue(probe, func(p *ProbeModelsResult) string { return p.ProviderRequestID }),
-		StatusCode:        safeProbeInt(probe, func(p *ProbeModelsResult) int { return p.StatusCode }),
-		RawErrorExcerpt:   safeProbeValue(probe, func(p *ProbeModelsResult) string { return p.RawErrorExcerpt }),
-		EndpointUsed:      modelsEndpoint,
-		CheckType:         "full",
+		Success:      false,
+		Status:       HealthStatusUnhealthy,
+		LatencyMs:    latencyMs,
+		ErrorMessage: fmt.Sprintf("verification failed with status: %d, body: %s", resp.StatusCode, string(body)),
+		CheckType:    "full",
 	}, nil
 }
 
@@ -433,11 +405,10 @@ func (s *HealthChecker) SaveHealthCheckResult(ctx context.Context, apiKeyID int,
 
 	_, err := db.ExecContext(ctx, `
 		INSERT INTO api_key_health_history 
-		(api_key_id, check_type, status, latency_ms, error_message, models_available, pricing_info,
-		 status_code, provider_error_code, provider_request_id, endpoint_used, error_category, raw_error_excerpt)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF(TRIM($9), ''), NULLIF(TRIM($10), ''), NULLIF(TRIM($11), ''), NULLIF(TRIM($12), ''), NULLIF(TRIM($13), ''))`,
+		(api_key_id, check_type, status, latency_ms, error_message, models_available, pricing_info)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		apiKeyID, result.CheckType, result.Status, result.LatencyMs, result.ErrorMessage,
-		modelsJSON, pricingJSON, result.StatusCode, result.ProviderErrorCode, result.ProviderRequestID, result.EndpointUsed, result.ErrorCategory, result.RawErrorExcerpt,
+		modelsJSON, pricingJSON,
 	)
 	if err != nil {
 		return err
@@ -445,62 +416,33 @@ func (s *HealthChecker) SaveHealthCheckResult(ctx context.Context, apiKeyID int,
 
 	statusToUpdate := result.Status
 	if result.Status == HealthStatusHealthy && result.CheckType == "passive" {
-		statusToUpdate = HealthStatusHealthy
+		statusToUpdate = "healthy"
 	}
 
-	var merchantID int
-	err = db.QueryRowContext(ctx, `
+	_, err = db.ExecContext(ctx, `
 		UPDATE merchant_api_keys 
 		SET health_status = $1,
 		    last_health_check_at = CURRENT_TIMESTAMP,
-		    consecutive_failures = CASE WHEN $2 = $4 THEN 0 ELSE consecutive_failures END
-		WHERE id = $3
-		RETURNING merchant_id`,
-		statusToUpdate, result.Status, apiKeyID, HealthStatusHealthy,
-	).Scan(&merchantID)
-	if err != nil {
-		return err
-	}
+		    consecutive_failures = CASE WHEN $2 = 'healthy' THEN 0 ELSE consecutive_failures END
+		WHERE id = $3`,
+		statusToUpdate, result.Status, apiKeyID,
+	)
 
-	cache.Delete(context.Background(), cache.MerchantAPIKeysKey(merchantID))
-
-	return nil
+	return err
 }
 
-func (s *HealthChecker) resolveEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
-	if ep := strings.TrimSpace(apiKey.EndpointURL); ep != "" {
-		return ep, nil
+func (s *HealthChecker) getDefaultEndpoint(provider string) string {
+	endpoints := map[string]string{
+		"openai":    "https://api.openai.com",
+		"anthropic": "https://api.anthropic.com",
+		"google":    "https://generativelanguage.googleapis.com",
+		"azure":     "https://{resource}.openai.azure.com",
+		"custom":    "http://localhost:8080",
 	}
-	if ep, ok := s.getProviderBaseURL(ctx, apiKey.Provider); ok {
-		return ep, nil
+	if ep, ok := endpoints[provider]; ok {
+		return ep
 	}
-	if ep, ok := s.getProviderBaseURL(ctx, fallbackProviderCode); ok {
-		return ep, nil
-	}
-	return "", fmt.Errorf("provider endpoint not configured for code=%s and fallback=%s", strings.TrimSpace(apiKey.Provider), fallbackProviderCode)
-}
-
-func (s *HealthChecker) getProviderBaseURL(ctx context.Context, provider string) (string, bool) {
-	db := config.GetDB()
-	if db == nil {
-		return "", false
-	}
-	var baseURL string
-	err := db.QueryRowContext(ctx, `
-		SELECT COALESCE(NULLIF(TRIM(api_base_url), ''), '')
-		FROM model_providers
-		WHERE code = $1 AND status = 'active'
-		ORDER BY updated_at DESC, id DESC
-		LIMIT 1
-	`, strings.TrimSpace(provider)).Scan(&baseURL)
-	if err != nil {
-		return "", false
-	}
-	baseURL = strings.TrimSpace(baseURL)
-	if baseURL == "" {
-		return "", false
-	}
-	return baseURL, true
+	return endpoints["openai"]
 }
 
 func (s *HealthChecker) getDecryptedAPIKey(apiKey *models.MerchantAPIKey) string {
@@ -582,7 +524,7 @@ func (s *HealthChecker) TriggerActiveCheck(ctx context.Context, apiKeyID int) er
 
 	var key models.MerchantAPIKey
 	err := db.QueryRowContext(ctx, `
-		SELECT id, merchant_id, provider, api_key_encrypted, COALESCE(endpoint_url, ''), health_check_level
+		SELECT id, merchant_id, provider, api_key_encrypted, endpoint_url, health_check_level
 		FROM merchant_api_keys WHERE id = $1`,
 		apiKeyID,
 	).Scan(&key.ID, &key.MerchantID, &key.Provider, &key.APIKeyEncrypted, &key.EndpointURL, &key.HealthCheckLevel)
@@ -591,7 +533,7 @@ func (s *HealthChecker) TriggerActiveCheck(ctx context.Context, apiKeyID int) er
 		return err
 	}
 
-	result, err := s.runByLevel(ctx, &key)
+	result, err := s.FullVerification(ctx, &key)
 	if err != nil {
 		return err
 	}
@@ -623,40 +565,18 @@ func PerformHealthCheckAsync(apiKeyID int) {
 		return
 	}
 
-	result, _ := checker.runByLevel(ctx, &key)
+	var result *HealthCheckResult
+	level := HealthCheckLevel(key.HealthCheckLevel)
+
+	if level == HealthCheckLevelHigh {
+		result, _ = checker.LightweightPing(ctx, &key)
+	} else {
+		result, _ = checker.FullVerification(ctx, &key)
+	}
 
 	if result != nil {
 		checker.SaveHealthCheckResult(ctx, apiKeyID, result)
 	}
-}
-
-func (s *HealthChecker) runByLevel(ctx context.Context, apiKey *models.MerchantAPIKey) (*HealthCheckResult, error) {
-	level := HealthCheckLevel(strings.ToLower(strings.TrimSpace(apiKey.HealthCheckLevel)))
-	if level == HealthCheckLevelHigh {
-		return s.LightweightPing(ctx, apiKey)
-	}
-	return s.FullVerification(ctx, apiKey)
-}
-
-func probeLatency(probe *ProbeModelsResult) int {
-	if probe == nil {
-		return 0
-	}
-	return probe.LatencyMs
-}
-
-func safeProbeValue(probe *ProbeModelsResult, getter func(*ProbeModelsResult) string) string {
-	if probe == nil {
-		return ""
-	}
-	return getter(probe)
-}
-
-func safeProbeInt(probe *ProbeModelsResult, getter func(*ProbeModelsResult) int) int {
-	if probe == nil {
-		return 0
-	}
-	return getter(probe)
 }
 
 func IsHealthy(status string) bool {
@@ -681,17 +601,12 @@ type TestChatRequest struct {
 }
 
 func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.MerchantAPIKey, model string) (*HealthCheckResult, error) {
-	endpoint, resolveErr := s.resolveEndpoint(ctx, apiKey)
-	if resolveErr != nil {
-		return &HealthCheckResult{
-			Success:      false,
-			Status:       HealthStatusUnhealthy,
-			ErrorMessage: resolveErr.Error(),
-			CheckType:    "chat_test",
-		}, nil
+	endpoint := apiKey.EndpointURL
+	if endpoint == "" {
+		endpoint = s.getDefaultEndpoint(apiKey.Provider)
 	}
 
-	chatEndpoint := openAICompatChatCompletionsURL(endpoint)
+	chatEndpoint := endpoint + "/v1/chat/completions"
 
 	testReq := TestChatRequest{
 		Model: model,
@@ -723,14 +638,12 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 	latencyMs := int(time.Since(start).Milliseconds())
 
 	if err != nil {
-		errInfo := MapProviderError(0, "", fmt.Sprintf("connection failed: %v", err), nil, err, "")
 		return &HealthCheckResult{
-			Success:       false,
-			Status:        HealthStatusUnhealthy,
-			LatencyMs:     latencyMs,
-			ErrorMessage:  errInfo.ProviderMessage,
-			ErrorCategory: errInfo.Category,
-			CheckType:     "chat_test",
+			Success:      false,
+			Status:       HealthStatusUnhealthy,
+			LatencyMs:    latencyMs,
+			ErrorMessage: fmt.Sprintf("connection failed: %v", err),
+			CheckType:    "chat_test",
 		}, nil
 	}
 	defer resp.Body.Close()
@@ -745,22 +658,11 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 	}
 
 	respBody, _ := io.ReadAll(resp.Body)
-	code, msg := ExtractProviderError(respBody)
-	if msg == "" {
-		msg = strings.TrimSpace(string(respBody))
-	}
-	errInfo := MapProviderError(resp.StatusCode, code, msg, resp.Header, nil, string(respBody))
 	return &HealthCheckResult{
-		Success:           false,
-		Status:            HealthStatusDegraded,
-		LatencyMs:         latencyMs,
-		ErrorMessage:      firstNonEmpty(errInfo.ProviderMessage, fmt.Sprintf("status: %d", resp.StatusCode)),
-		ErrorCategory:     errInfo.Category,
-		ProviderErrorCode: firstNonEmpty(code, errInfo.ProviderCode),
-		ProviderRequestID: errInfo.ProviderRequestID,
-		StatusCode:        resp.StatusCode,
-		RawErrorExcerpt:   errInfo.RawErrorExcerpt,
-		EndpointUsed:      chatEndpoint,
-		CheckType:         "chat_test",
+		Success:      false,
+		Status:       HealthStatusDegraded,
+		LatencyMs:    latencyMs,
+		ErrorMessage: fmt.Sprintf("status: %d, body: %s", resp.StatusCode, string(respBody)),
+		CheckType:    "chat_test",
 	}, nil
 }

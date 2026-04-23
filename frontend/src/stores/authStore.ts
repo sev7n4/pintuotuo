@@ -17,7 +17,12 @@ export interface AuthState {
   isAuthenticated: boolean;
   rememberMe: boolean;
 
-  login: (email: string, password: string, rememberMe?: boolean, totpCode?: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+    rememberMe?: boolean,
+    totpCode?: string
+  ) => Promise<void>;
   register: (email: string, password: string, role?: string, inviteCode?: string) => Promise<void>;
   loginWithSms: (phone: string, code: string) => Promise<void>;
   registerWithSms: (

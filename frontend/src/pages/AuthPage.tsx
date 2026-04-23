@@ -175,9 +175,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
         message.success('登录成功');
       }
     } catch (err) {
-      let errorMsg = isRegisterRoute
-        ? '注册失败，请检查邮箱与密码'
-        : '登录失败，请检查邮箱和密码';
+      let errorMsg = isRegisterRoute ? '注册失败，请检查邮箱与密码' : '登录失败，请检查邮箱和密码';
       if (isAxiosError(err)) {
         const d = err.response?.data as { message?: string } | undefined;
         if (d?.message) errorMsg = d.message;
@@ -297,7 +295,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
               >
                 <Input placeholder="example@email.com" />
               </Form.Item>
-              <Form.Item label="密码" name="password"
+              <Form.Item
+                label="密码"
+                name="password"
                 rules={
                   isRegisterRoute
                     ? [

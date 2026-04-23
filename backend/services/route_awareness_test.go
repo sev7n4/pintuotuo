@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/pintuotuo/backend/models"
 	"github.com/stretchr/testify/assert"
-	_ "github.com/lib/pq"
 )
 
 func TestRouteAwarenessService_GetRealtimeStatus(t *testing.T) {
@@ -39,16 +39,16 @@ func TestRouteAwarenessService_GetRealtimeStatus(t *testing.T) {
 
 	t.Run("should return existing status", func(t *testing.T) {
 		status := &models.APIKeyRealtimeStatus{
-			APIKeyID:            1,
-			LatencyP50:          100,
-			LatencyP95:          200,
-			LatencyP99:          300,
-			ErrorRate:           0.01,
-			SuccessRate:         0.99,
-			ConnectionPoolSize:  20,
+			APIKeyID:             1,
+			LatencyP50:           100,
+			LatencyP95:           200,
+			LatencyP99:           300,
+			ErrorRate:            0.01,
+			SuccessRate:          0.99,
+			ConnectionPoolSize:   20,
 			ConnectionPoolActive: 5,
-			RateLimitRemaining:  1000,
-			LoadBalanceWeight:   0.8,
+			RateLimitRemaining:   1000,
+			LoadBalanceWeight:    0.8,
 		}
 
 		err := service.UpdateStatus(ctx, 1, status)
@@ -87,16 +87,16 @@ func TestRouteAwarenessService_UpdateStatus(t *testing.T) {
 
 	t.Run("should create new status if not exists", func(t *testing.T) {
 		status := &models.APIKeyRealtimeStatus{
-			APIKeyID:            2,
-			LatencyP50:          150,
-			LatencyP95:          250,
-			LatencyP99:          350,
-			ErrorRate:           0.02,
-			SuccessRate:         0.98,
-			ConnectionPoolSize:  15,
+			APIKeyID:             2,
+			LatencyP50:           150,
+			LatencyP95:           250,
+			LatencyP99:           350,
+			ErrorRate:            0.02,
+			SuccessRate:          0.98,
+			ConnectionPoolSize:   15,
 			ConnectionPoolActive: 3,
-			RateLimitRemaining:  500,
-			LoadBalanceWeight:   0.9,
+			RateLimitRemaining:   500,
+			LoadBalanceWeight:    0.9,
 		}
 
 		err := service.UpdateStatus(ctx, 2, status)
@@ -115,16 +115,16 @@ func TestRouteAwarenessService_UpdateStatus(t *testing.T) {
 
 	t.Run("should update existing status", func(t *testing.T) {
 		status := &models.APIKeyRealtimeStatus{
-			APIKeyID:            2,
-			LatencyP50:          200,
-			LatencyP95:          300,
-			LatencyP99:          400,
-			ErrorRate:           0.03,
-			SuccessRate:         0.97,
-			ConnectionPoolSize:  15,
+			APIKeyID:             2,
+			LatencyP50:           200,
+			LatencyP95:           300,
+			LatencyP99:           400,
+			ErrorRate:            0.03,
+			SuccessRate:          0.97,
+			ConnectionPoolSize:   15,
 			ConnectionPoolActive: 5,
-			RateLimitRemaining:  400,
-			LoadBalanceWeight:   0.85,
+			RateLimitRemaining:   400,
+			LoadBalanceWeight:    0.85,
 		}
 
 		err := service.UpdateStatus(ctx, 2, status)
@@ -165,25 +165,25 @@ func TestRouteAwarenessService_GetBatchStatus(t *testing.T) {
 
 	t.Run("should return multiple statuses", func(t *testing.T) {
 		status1 := &models.APIKeyRealtimeStatus{
-			APIKeyID:            10,
-			LatencyP50:          100,
-			ErrorRate:           0.01,
-			SuccessRate:         0.99,
-			ConnectionPoolSize:  10,
+			APIKeyID:             10,
+			LatencyP50:           100,
+			ErrorRate:            0.01,
+			SuccessRate:          0.99,
+			ConnectionPoolSize:   10,
 			ConnectionPoolActive: 2,
-			RateLimitRemaining:  1000,
-			LoadBalanceWeight:   1.0,
+			RateLimitRemaining:   1000,
+			LoadBalanceWeight:    1.0,
 		}
 
 		status2 := &models.APIKeyRealtimeStatus{
-			APIKeyID:            11,
-			LatencyP50:          200,
-			ErrorRate:           0.02,
-			SuccessRate:         0.98,
-			ConnectionPoolSize:  10,
+			APIKeyID:             11,
+			LatencyP50:           200,
+			ErrorRate:            0.02,
+			SuccessRate:          0.98,
+			ConnectionPoolSize:   10,
 			ConnectionPoolActive: 3,
-			RateLimitRemaining:  800,
-			LoadBalanceWeight:   0.9,
+			RateLimitRemaining:   800,
+			LoadBalanceWeight:    0.9,
 		}
 
 		err := service.UpdateStatus(ctx, 10, status1)

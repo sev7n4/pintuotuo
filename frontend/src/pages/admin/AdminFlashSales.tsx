@@ -18,7 +18,9 @@ const AdminFlashSales = () => {
   const [form] = Form.useForm();
 
   const isStrictModelSKU = (provider?: string, modelName?: string, providerModelID?: string) => {
-    const p = String(provider || '').trim().toLowerCase();
+    const p = String(provider || '')
+      .trim()
+      .toLowerCase();
     if (!p || p === 'internal' || p === 'virtual_goods') return false;
     return Boolean(String(providerModelID || '').trim() || String(modelName || '').trim());
   };
@@ -36,7 +38,10 @@ const AdminFlashSales = () => {
         const skuID = Number(row.sku_id);
         const res = await skuService.getSKU(skuID);
         const sku = res.data.data;
-        if (sku.sku_type === 'token_pack' && !isStrictModelSKU(sku.model_provider, sku.model_name, sku.provider_model_id)) {
+        if (
+          sku.sku_type === 'token_pack' &&
+          !isStrictModelSKU(sku.model_provider, sku.model_name, sku.provider_model_id)
+        ) {
           message.warning(`SKU ${skuID} 不可单独作为加油包秒杀，请改为带模型商品`);
           setLoading(false);
           return;

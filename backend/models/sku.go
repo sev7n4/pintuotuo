@@ -1,33 +1,22 @@
 package models
 
-import (
-	"encoding/json"
-	"time"
-)
+import "time"
 
 type ModelProvider struct {
-	ID          int    `json:"id"`
-	Code        string `json:"code"`
-	Name        string `json:"name"`
-	APIBaseURL  string `json:"api_base_url,omitempty"`
-	APIFormat   string `json:"api_format"`
-	BillingType string `json:"billing_type,omitempty"`
-	// LiteLLM 网关：与 litellm-catalog-sync / 部署侧 os.environ 对齐（DB 为主 SSOT）
-	LitellmModelTemplate    string         `json:"litellm_model_template,omitempty"`
-	LitellmGatewayAPIKeyEnv string         `json:"litellm_gateway_api_key_env,omitempty"`
-	LitellmGatewayAPIBase   string         `json:"litellm_gateway_api_base,omitempty"`
-	CompatPrefixes          []string       `json:"compat_prefixes,omitempty"`
-	SegmentConfig           map[string]any `json:"segment_config,omitempty"`
-	CacheEnabled            bool           `json:"cache_enabled"`
-	CacheDiscount           float64        `json:"cache_discount_rate,omitempty"`
-	// 统一配置化路由系统字段
-	ProviderRegion string          `json:"provider_region,omitempty"` // domestic, overseas
-	RouteStrategy  json.RawMessage `json:"route_strategy,omitempty"`  // JSONB: route strategy config
-	Endpoints      json.RawMessage `json:"endpoints,omitempty"`       // JSONB: endpoints config
-	Status         string          `json:"status"`
-	SortOrder      int             `json:"sort_order"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
+	ID             int            `json:"id"`
+	Code           string         `json:"code"`
+	Name           string         `json:"name"`
+	APIBaseURL     string         `json:"api_base_url,omitempty"`
+	APIFormat      string         `json:"api_format"`
+	BillingType    string         `json:"billing_type,omitempty"`
+	CompatPrefixes []string       `json:"compat_prefixes,omitempty"`
+	SegmentConfig  map[string]any `json:"segment_config,omitempty"`
+	CacheEnabled   bool           `json:"cache_enabled"`
+	CacheDiscount  float64        `json:"cache_discount_rate,omitempty"`
+	Status         string         `json:"status"`
+	SortOrder      int            `json:"sort_order"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 type SPU struct {
@@ -180,19 +169,17 @@ type ComputePointTransaction struct {
 }
 
 type UserSubscription struct {
-	ID                  int        `json:"id"`
-	UserID              int        `json:"user_id"`
-	SKUID               int        `json:"sku_id"`
-	StartDate           time.Time  `json:"start_date"`
-	EndDate             time.Time  `json:"end_date"`
-	UsedTokens          int64      `json:"used_tokens"`
-	UsedComputePoints   float64    `json:"used_compute_points"`
-	Status              string     `json:"status"`
-	AutoRenew           bool       `json:"auto_renew"`
-	PricingVersionID    *int       `json:"pricing_version_id,omitempty"`
-	EntitlementAnchorAt *time.Time `json:"entitlement_anchor_at,omitempty"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                int       `json:"id"`
+	UserID            int       `json:"user_id"`
+	SKUID             int       `json:"sku_id"`
+	StartDate         time.Time `json:"start_date"`
+	EndDate           time.Time `json:"end_date"`
+	UsedTokens        int64     `json:"used_tokens"`
+	UsedComputePoints float64   `json:"used_compute_points"`
+	Status            string    `json:"status"`
+	AutoRenew         bool      `json:"auto_renew"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type UserSubscriptionWithSKU struct {
@@ -257,11 +244,11 @@ type SKUCreateRequest struct {
 	RetailPrice        float64 `json:"retail_price" binding:"required"`
 	WholesalePrice     float64 `json:"wholesale_price"`
 	OriginalPrice      float64 `json:"original_price"`
-	Stock              FlexInt `json:"stock"`
-	DailyLimit         FlexInt `json:"daily_limit"`
+	Stock              int     `json:"stock"`
+	DailyLimit         int     `json:"daily_limit"`
 	GroupEnabled       bool    `json:"group_enabled"`
-	MinGroupSize       FlexInt `json:"min_group_size"`
-	MaxGroupSize       FlexInt `json:"max_group_size"`
+	MinGroupSize       int     `json:"min_group_size"`
+	MaxGroupSize       int     `json:"max_group_size"`
 	GroupDiscountRate  float64 `json:"group_discount_rate"`
 	CostInputRate      float64 `json:"cost_input_rate"`
 	CostOutputRate     float64 `json:"cost_output_rate"`
@@ -273,30 +260,23 @@ type SKUCreateRequest struct {
 }
 
 type SKUUpdateRequest struct {
-	Name               string  `json:"name"`
-	TokenAmount        int64   `json:"token_amount"`
-	ComputePoints      float64 `json:"compute_points"`
-	SubscriptionPeriod string  `json:"subscription_period"`
-	IsUnlimited        bool    `json:"is_unlimited"`
-	FairUseLimit       int64   `json:"fair_use_limit"`
-	TPMLimit           int     `json:"tpm_limit"`
-	RPMLimit           int     `json:"rpm_limit"`
-	ConcurrentReqs     int     `json:"concurrent_requests"`
-	RetailPrice        float64 `json:"retail_price"`
-	WholesalePrice     float64 `json:"wholesale_price"`
-	OriginalPrice      float64 `json:"original_price"`
-	Stock              FlexInt `json:"stock"`
-	DailyLimit         FlexInt `json:"daily_limit"`
-	GroupEnabled       bool    `json:"group_enabled"`
-	MinGroupSize       FlexInt `json:"min_group_size"`
-	MaxGroupSize       FlexInt `json:"max_group_size"`
-	GroupDiscountRate  float64 `json:"group_discount_rate"`
-	CostInputRate      float64 `json:"cost_input_rate"`
-	CostOutputRate     float64 `json:"cost_output_rate"`
-	InheritSPUCost     *bool   `json:"inherit_spu_cost"`
-	ValidDays          FlexInt `json:"valid_days"`
-	Status             string  `json:"status"`
-	IsPromoted         bool    `json:"is_promoted"`
+	Name              string  `json:"name"`
+	TokenAmount       int64   `json:"token_amount"`
+	ComputePoints     float64 `json:"compute_points"`
+	RetailPrice       float64 `json:"retail_price"`
+	WholesalePrice    float64 `json:"wholesale_price"`
+	OriginalPrice     float64 `json:"original_price"`
+	Stock             int     `json:"stock"`
+	DailyLimit        int     `json:"daily_limit"`
+	GroupEnabled      bool    `json:"group_enabled"`
+	MinGroupSize      int     `json:"min_group_size"`
+	MaxGroupSize      int     `json:"max_group_size"`
+	GroupDiscountRate float64 `json:"group_discount_rate"`
+	CostInputRate     float64 `json:"cost_input_rate"`
+	CostOutputRate    float64 `json:"cost_output_rate"`
+	InheritSPUCost    bool    `json:"inherit_spu_cost"`
+	Status            string  `json:"status"`
+	IsPromoted        bool    `json:"is_promoted"`
 }
 
 type ComputePointBalanceResponse struct {

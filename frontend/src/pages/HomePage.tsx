@@ -282,9 +282,7 @@ const HomePage = () => {
       <Card style={{ marginBottom: 16, borderRadius: 12 }}>
         <Space direction="vertical" size={6}>
           <Text strong>套餐包专区</Text>
-          <Text type="secondary">
-            多模型与赠送 Token 组合定价，一步开通可用权益。
-          </Text>
+          <Text type="secondary">多模型与赠送 Token 组合定价，一步开通可用权益。</Text>
           <Button type="primary" onClick={() => navigate('/packages')}>
             查看套餐包
           </Button>

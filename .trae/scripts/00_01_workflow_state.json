@@ -1,8 +1,8 @@
 {
-  "workflow_id": "intelligent-routing-phase2",
+  "workflow_id": "intelligent-routing-phase1-001",
   "created_at": "2026-04-23T00:00:00Z",
-  "current_step": 2,
-  "branch": "",
+  "current_step": 8,
+  "branch": "feature/intelligent-routing-phase1-001",
   "pr_number": null,
   "current_fix_cases": [],
   "retry_count": 0,
@@ -13,24 +13,17 @@
     "e2e": "",
     "deploy": ""
   },
-  "local_validation": "",
+  "local_validation": "passed",
   "merged": false,
   "issue": {
     "type": "feature",
-    "title": "智能路由 Phase 2 - 路由策略层建设",
-    "description": "实现请求分析器和策略引擎",
+    "title": "智能路由 Phase 1 - 数据库迁移脚本",
+    "description": "扩展 merchant_api_keys 表字段，添加区域、安全等级和路由偏好配置",
     "tasks": [
-      "P2-001: 实现 RequestAnalysis 数据结构",
-      "P2-002: 实现 RequestAnalyzer 核心逻辑",
-      "P2-003: 实现 Token 估算算法",
-      "P2-004: 实现 StrategyGoal 数据结构",
-      "P2-005: 实现 RoutingStrategyEngine 核心逻辑",
-      "P2-006: 扩展策略类型",
-      "P2-007: 实现成本预算控制",
-      "P2-008: 实现合规区域约束",
-      "P2-009: 实现策略配置管理 API",
-      "P2-010: RequestAnalyzer 单元测试",
-      "P2-011: RoutingStrategyEngine 单元测试"
+      "创建数据库迁移脚本",
+      "添加 region 字段",
+      "添加 security_level 字段",
+      "添加 route_preference 字段"
     ]
   }
 }

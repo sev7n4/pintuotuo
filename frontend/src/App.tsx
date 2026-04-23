@@ -179,8 +179,8 @@ function App() {
             <Route path="routing-strategies" element={<AdminRoutingStrategies />} />
             <Route path="route-configs" element={<AdminRouteConfigs />} />
             <Route path="api-key-status" element={<AdminAPIKeyStatus />} />
-              <Route path="route-decision-logs" element={<AdminRouteDecisionLogs />} />
-              <Route path="api-key-advanced-config" element={<AdminAPIKeyAdvancedConfig />} />
+            <Route path="route-decision-logs" element={<AdminRouteDecisionLogs />} />
+            <Route path="api-key-advanced-config" element={<AdminAPIKeyAdvancedConfig />} />
             <Route path="reconciliation" element={<AdminReconciliation />} />
             <Route path="flash-sales" element={<AdminFlashSales />} />
             <Route path="fuel-station" element={<AdminFuelStation />} />

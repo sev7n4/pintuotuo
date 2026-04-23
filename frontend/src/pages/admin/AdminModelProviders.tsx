@@ -186,12 +186,7 @@ const AdminModelProviders = () => {
       width: 88,
       fixed: 'right' as const,
       render: (_: unknown, record: ModelProvider) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<EditOutlined />}
-          onClick={() => handleEdit(record)}
-        >
+        <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
           编辑
         </Button>
       ),
@@ -258,7 +253,11 @@ const AdminModelProviders = () => {
                 },
                 {
                   validator: async (_rule, value) => {
-                    if (String(value || '').trim().toLowerCase() === fallbackCode) {
+                    if (
+                      String(value || '')
+                        .trim()
+                        .toLowerCase() === fallbackCode
+                    ) {
                       throw new Error('__default__ 为系统保留兜底代码，请勿新建');
                     }
                   },
@@ -281,7 +280,11 @@ const AdminModelProviders = () => {
             <Input placeholder="例如 https://api.openai.com/v1" disabled={isFallbackEditing} />
           </Form.Item>
           <Form.Item name="api_format" label="API 格式" rules={[{ required: true }]}>
-            <Select options={apiFormatOptions} placeholder="选择格式" disabled={isFallbackEditing} />
+            <Select
+              options={apiFormatOptions}
+              placeholder="选择格式"
+              disabled={isFallbackEditing}
+            />
           </Form.Item>
           <Form.Item
             name="compat_prefixes"

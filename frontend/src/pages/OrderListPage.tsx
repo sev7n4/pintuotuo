@@ -73,15 +73,8 @@ const statusTabs = [
 
 export const OrderListPage: React.FC = () => {
   const navigate = useNavigate();
-  const {
-    orders,
-    isLoading,
-    error,
-    fetchOrders,
-    cancelOrder,
-    requestRefund,
-    createOrder,
-  } = useOrderStore();
+  const { orders, isLoading, error, fetchOrders, cancelOrder, requestRefund, createOrder } =
+    useOrderStore();
   const { addItem } = useCartStore();
   const { fetchProductByID } = useProductStore();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -470,7 +463,11 @@ export const OrderListPage: React.FC = () => {
                               <Button size="small" onClick={() => handleBuyAgain(order)}>
                                 加购
                               </Button>
-                              <Button size="small" type="primary" onClick={() => handleQuickReorder(order)}>
+                              <Button
+                                size="small"
+                                type="primary"
+                                onClick={() => handleQuickReorder(order)}
+                              >
                                 再下一单
                               </Button>
                             </>
@@ -565,11 +562,7 @@ export const OrderListPage: React.FC = () => {
                       locale={{ emptyText: <Text type="secondary">暂无明细</Text> }}
                       renderItem={(item) => (
                         <List.Item>
-                          <Space
-                            direction="vertical"
-                            size={0}
-                            style={{ width: '100%' }}
-                          >
+                          <Space direction="vertical" size={0} style={{ width: '100%' }}>
                             <Space style={{ justifyContent: 'space-between', width: '100%' }}>
                               <Text>{orderItemLineTitle(item)}</Text>
                               <Text strong>¥{item.total_price.toFixed(2)}</Text>

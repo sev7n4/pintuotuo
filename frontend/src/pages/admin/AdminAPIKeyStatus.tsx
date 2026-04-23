@@ -1,10 +1,35 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {  Card,  Table,  Button,  Tag,  Space,  Descriptions,  Modal,  Spin,  Switch,  Select,  Input,  message,  Alert,  Progress,} from 'antd';import {
-  SyncOutlined,
-  LineChartOutlined,
-  EyeOutlined,
-} from '@ant-design/icons';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Card,
+  Table,
+  Button,
+  Tag,
+  Space,
+  Descriptions,
+  Modal,
+  Spin,
+  Switch,
+  Select,
+  Input,
+  message,
+  Alert,
+  Progress,
+} from 'antd';
+import { SyncOutlined, LineChartOutlined, EyeOutlined } from '@ant-design/icons';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import api from '@/services/api';
 
 interface APIResponse<T> {
@@ -165,8 +190,6 @@ const AdminAPIKeyStatus: React.FC = () => {
     return 'red';
   };
 
-
-
   const columns = [
     {
       title: 'API Key ID',
@@ -182,21 +205,15 @@ const AdminAPIKeyStatus: React.FC = () => {
         <Space direction="vertical" size={2}>
           <div>
             <span>P50: </span>
-            <Tag color={getLatencyColor(record.latency_p50)}>
-              {record.latency_p50}
-            </Tag>
+            <Tag color={getLatencyColor(record.latency_p50)}>{record.latency_p50}</Tag>
           </div>
           <div>
             <span>P95: </span>
-            <Tag color={getLatencyColor(record.latency_p95)}>
-              {record.latency_p95}
-            </Tag>
+            <Tag color={getLatencyColor(record.latency_p95)}>{record.latency_p95}</Tag>
           </div>
           <div>
             <span>P99: </span>
-            <Tag color={getLatencyColor(record.latency_p99)}>
-              {record.latency_p99}
-            </Tag>
+            <Tag color={getLatencyColor(record.latency_p99)}>{record.latency_p99}</Tag>
           </div>
         </Space>
       ),
@@ -207,9 +224,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       key: 'error_rate',
       width: 100,
       render: (errorRate: number) => (
-        <Tag color={getErrorRateColor(errorRate)}>
-          {(errorRate * 100).toFixed(2)}%
-        </Tag>
+        <Tag color={getErrorRateColor(errorRate)}>{(errorRate * 100).toFixed(2)}%</Tag>
       ),
     },
     {
@@ -218,9 +233,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       key: 'success_rate',
       width: 100,
       render: (successRate: number) => (
-        <Tag color={getSuccessRateColor(successRate)}>
-          {(successRate * 100).toFixed(2)}%
-        </Tag>
+        <Tag color={getSuccessRateColor(successRate)}>{(successRate * 100).toFixed(2)}%</Tag>
       ),
     },
     {
@@ -255,11 +268,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       dataIndex: 'load_balance_weight',
       key: 'load_balance_weight',
       width: 120,
-      render: (weight: number) => (
-        <Tag color="blue">
-          {weight.toFixed(2)}
-        </Tag>
-      ),
+      render: (weight: number) => <Tag color="blue">{weight.toFixed(2)}</Tag>,
     },
     {
       title: '最后请求',
@@ -267,9 +276,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       key: 'last_request_at',
       width: 150,
       render: (lastRequestAt: string | null) => (
-        <span>
-          {lastRequestAt ? new Date(lastRequestAt).toLocaleString('zh-CN') : '无'}
-        </span>
+        <span>{lastRequestAt ? new Date(lastRequestAt).toLocaleString('zh-CN') : '无'}</span>
       ),
     },
     {
@@ -277,11 +284,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       dataIndex: 'updated_at',
       key: 'updated_at',
       width: 150,
-      render: (updatedAt: string) => (
-        <span>
-          {new Date(updatedAt).toLocaleString('zh-CN')}
-        </span>
-      ),
+      render: (updatedAt: string) => <span>{new Date(updatedAt).toLocaleString('zh-CN')}</span>,
     },
     {
       title: '操作',
@@ -320,9 +323,7 @@ const AdminAPIKeyStatus: React.FC = () => {
             style={{ width: 150 }}
             value={filterProvider}
             onChange={setFilterProvider}
-            options={[
-              { value: 'all', label: '所有提供商' },
-            ]}
+            options={[{ value: 'all', label: '所有提供商' }]}
           />
           <Select
             style={{ width: 120 }}
@@ -350,11 +351,7 @@ const AdminAPIKeyStatus: React.FC = () => {
               { value: 60, label: '1分钟' },
             ]}
           />
-          <Button
-            icon={<SyncOutlined spin={loading} />}
-            onClick={handleRefresh}
-            loading={loading}
-          >
+          <Button icon={<SyncOutlined spin={loading} />} onClick={handleRefresh} loading={loading}>
             刷新
           </Button>
         </Space>
@@ -404,12 +401,8 @@ const AdminAPIKeyStatus: React.FC = () => {
         {selectedStatus ? (
           <>
             <Descriptions bordered column={1}>
-              <Descriptions.Item label="API Key ID">
-                {selectedStatus.api_key_id}
-              </Descriptions.Item>
-              <Descriptions.Item label="名称">
-                {selectedStatus.name}
-              </Descriptions.Item>
+              <Descriptions.Item label="API Key ID">{selectedStatus.api_key_id}</Descriptions.Item>
+              <Descriptions.Item label="名称">{selectedStatus.name}</Descriptions.Item>
               <Descriptions.Item label="提供商">
                 <Tag color="blue">{selectedStatus.provider}</Tag>
               </Descriptions.Item>
@@ -453,15 +446,21 @@ const AdminAPIKeyStatus: React.FC = () => {
               <Descriptions.Item label="连接池状态">
                 <div>
                   <Progress
-                    percent={(selectedStatus.connection_pool_active / selectedStatus.connection_pool_size) * 100}
+                    percent={
+                      (selectedStatus.connection_pool_active /
+                        selectedStatus.connection_pool_size) *
+                      100
+                    }
                     status={
-                      selectedStatus.connection_pool_active > selectedStatus.connection_pool_size * 0.8
+                      selectedStatus.connection_pool_active >
+                      selectedStatus.connection_pool_size * 0.8
                         ? 'exception'
                         : 'normal'
                     }
                   />
                   <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                    活跃连接: {selectedStatus.connection_pool_active} / {selectedStatus.connection_pool_size}
+                    活跃连接: {selectedStatus.connection_pool_active} /{' '}
+                    {selectedStatus.connection_pool_size}
                   </div>
                 </div>
               </Descriptions.Item>
@@ -470,7 +469,8 @@ const AdminAPIKeyStatus: React.FC = () => {
                   <div>剩余配额: {selectedStatus.rate_limit_remaining}</div>
                   {selectedStatus.rate_limit_reset_at && (
                     <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
-                      重置时间: {new Date(selectedStatus.rate_limit_reset_at).toLocaleString('zh-CN')}
+                      重置时间:{' '}
+                      {new Date(selectedStatus.rate_limit_reset_at).toLocaleString('zh-CN')}
                     </div>
                   )}
                 </div>
@@ -479,7 +479,9 @@ const AdminAPIKeyStatus: React.FC = () => {
                 <Tag color="blue">{selectedStatus.load_balance_weight.toFixed(2)}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="最后请求时间">
-                {selectedStatus.last_request_at ? new Date(selectedStatus.last_request_at).toLocaleString('zh-CN') : '无'}
+                {selectedStatus.last_request_at
+                  ? new Date(selectedStatus.last_request_at).toLocaleString('zh-CN')
+                  : '无'}
               </Descriptions.Item>
               <Descriptions.Item label="状态更新时间">
                 {new Date(selectedStatus.updated_at).toLocaleString('zh-CN')}
@@ -505,9 +507,14 @@ const AdminAPIKeyStatus: React.FC = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={selectedStatus.errorRateHistory}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" tickFormatter={(time) => new Date(time).toLocaleTimeString()} />
+                  <XAxis
+                    dataKey="timestamp"
+                    tickFormatter={(time) => new Date(time).toLocaleTimeString()}
+                  />
                   <YAxis tickFormatter={(value: number) => `${(value * 100).toFixed(0)}%`} />
-                  <Tooltip formatter={(value) => [`${((value as number) * 100).toFixed(2)}%`, '']} />
+                  <Tooltip
+                    formatter={(value) => [`${((value as number) * 100).toFixed(2)}%`, '']}
+                  />
                   <Legend />
                   <Line type="monotone" dataKey="errorRate" name="错误率" stroke="#f5222d" />
                   <Line type="monotone" dataKey="successRate" name="成功率" stroke="#52c41a" />
@@ -520,13 +527,34 @@ const AdminAPIKeyStatus: React.FC = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={selectedStatus.latencyHistory}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" tickFormatter={(time) => new Date(time).toLocaleTimeString()} />
+                  <XAxis
+                    dataKey="timestamp"
+                    tickFormatter={(time) => new Date(time).toLocaleTimeString()}
+                  />
                   <YAxis unit="ms" />
                   <Tooltip formatter={(value) => [`${value}ms`, '']} />
                   <Legend />
-                  <Area type="monotone" dataKey="p50" name="P50 延迟" stroke="#1890ff" fill="#e6f7ff" />
-                  <Area type="monotone" dataKey="p95" name="P95 延迟" stroke="#fa8c16" fill="#fff7e6" />
-                  <Area type="monotone" dataKey="p99" name="P99 延迟" stroke="#f5222d" fill="#fff1f0" />
+                  <Area
+                    type="monotone"
+                    dataKey="p50"
+                    name="P50 延迟"
+                    stroke="#1890ff"
+                    fill="#e6f7ff"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="p95"
+                    name="P95 延迟"
+                    stroke="#fa8c16"
+                    fill="#fff7e6"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="p99"
+                    name="P99 延迟"
+                    stroke="#f5222d"
+                    fill="#fff1f0"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

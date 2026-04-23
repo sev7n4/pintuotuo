@@ -19,7 +19,6 @@ import {
   Empty,
   Typography,
   Alert,
-  Tooltip,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -33,7 +32,7 @@ import {
 } from '@ant-design/icons';
 import { useTokenStore } from '@/stores/tokenStore';
 import { tokenService } from '@/services/token';
-import { UserAPIKey, RechargeOrder, APIUsageGuideResponse, TokenLot } from '@/types';
+import { UserAPIKey, RechargeOrder, APIUsageGuideResponse } from '@/types';
 import styles from './MyToken.module.css';
 
 const { TabPane } = Tabs;
@@ -83,35 +82,13 @@ const MyToken = () => {
   const [newKeyDisplay, setNewKeyDisplay] = useState<string | null>(null);
   const [usageGuide, setUsageGuide] = useState<APIUsageGuideResponse | null>(null);
   const [usageGuideLoading, setUsageGuideLoading] = useState(false);
-  const [tokenLots, setTokenLots] = useState<TokenLot[]>([]);
-  const [lotsLoading, setLotsLoading] = useState(false);
-
-  const fetchTokenLots = async () => {
-    setLotsLoading(true);
-    try {
-      const res = await tokenService.getTokenLots();
-      const rows = (res.data as { data?: TokenLot[] })?.data;
-      setTokenLots(Array.isArray(rows) ? rows : []);
-    } catch {
-      setTokenLots([]);
-    } finally {
-      setLotsLoading(false);
-    }
-  };
 
   useEffect(() => {
     fetchBalance();
     fetchTransactions();
     fetchAPIKeys();
     fetchRechargeOrders();
-    fetchTokenLots();
   }, [fetchBalance, fetchTransactions, fetchAPIKeys, fetchRechargeOrders]);
-
-  /** 顶部统计三项同源（GET /tokens/balance）；批次表与余额联动，一并刷新 */
-  const refreshOverviewStats = () => {
-    fetchBalance();
-    fetchTokenLots();
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -225,7 +202,6 @@ const MyToken = () => {
   const transactionTypeMap: Record<string, { color: string; text: string }> = {
     purchase: { color: 'green', text: '购买' },
     usage: { color: 'orange', text: '使用' },
-    expired: { color: 'default', text: '过期' },
     transfer: { color: 'blue', text: '转账' },
     reward: { color: 'purple', text: '奖励' },
     refund: { color: 'cyan', text: '退款' },
@@ -398,51 +374,15 @@ const MyToken = () => {
 
   return (
     <div className={styles.myToken}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 8,
-          marginBottom: 8,
-        }}
-      >
-        <h2 className={styles.pageTitle} style={{ marginBottom: 0 }}>
-          我的Token
-        </h2>
-        <Tooltip title="刷新当前余额、累计使用/获得及下方余额批次（与底部「刷新」中的余额部分一致）">
-          <Button
-            type="default"
-            size="middle"
-            icon={<ReloadOutlined />}
-            loading={isLoading}
-            onClick={refreshOverviewStats}
-          >
-            刷新余额
-          </Button>
-        </Tooltip>
-      </div>
+      <h2 className={styles.pageTitle}>我的Token</h2>
 
       <Row gutter={[16, 16]} className={styles.statsRow}>
         <Col xs={24} sm={8}>
-          <Card
-            extra={
-              <Tooltip title="重新拉取账户统计">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<ReloadOutlined />}
-                  loading={isLoading}
-                  onClick={refreshOverviewStats}
-                  aria-label="刷新当前余额"
-                />
-              </Tooltip>
-            }
-          >
+          <Card>
             <Statistic
               title="当前余额"
               value={balance?.balance || 0}
+              precision={2}
               prefix={<WalletOutlined />}
               suffix="Token"
               valueStyle={{ color: '#1890ff' }}
@@ -450,23 +390,11 @@ const MyToken = () => {
           </Card>
         </Col>
         <Col xs={24} sm={8}>
-          <Card
-            extra={
-              <Tooltip title="重新拉取账户统计">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<ReloadOutlined />}
-                  loading={isLoading}
-                  onClick={refreshOverviewStats}
-                  aria-label="刷新累计使用"
-                />
-              </Tooltip>
-            }
-          >
+          <Card>
             <Statistic
               title="累计使用"
               value={balance?.total_used || 0}
+              precision={2}
               prefix={<HistoryOutlined />}
               suffix="Token"
               valueStyle={{ color: '#faad14' }}
@@ -474,23 +402,11 @@ const MyToken = () => {
           </Card>
         </Col>
         <Col xs={24} sm={8}>
-          <Card
-            extra={
-              <Tooltip title="重新拉取账户统计">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<ReloadOutlined />}
-                  loading={isLoading}
-                  onClick={refreshOverviewStats}
-                  aria-label="刷新累计获得"
-                />
-              </Tooltip>
-            }
-          >
+          <Card>
             <Statistic
               title="累计获得"
               value={balance?.total_earned || 0}
+              precision={2}
               prefix={<WalletOutlined />}
               suffix="Token"
               valueStyle={{ color: '#52c41a' }}
@@ -498,46 +414,6 @@ const MyToken = () => {
           </Card>
         </Col>
       </Row>
-
-      <Card title="余额批次（先到期先扣）" style={{ marginBottom: 16 }} loading={lotsLoading}>
-        <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-          购买 Token 包 / 订阅赠送等会按批次入账；带有效期的批次将优先于「长期有效」余额被消耗。
-        </Paragraph>
-        <Table<TokenLot>
-          size="small"
-          rowKey="id"
-          pagination={false}
-          dataSource={tokenLots}
-          locale={{ emptyText: '暂无批次明细（或全部为已合并的长期余额）' }}
-          columns={[
-            {
-              title: '剩余',
-              dataIndex: 'remaining_amount',
-              key: 'remaining_amount',
-              render: (v: number) => v.toLocaleString(),
-            },
-            {
-              title: '类型',
-              dataIndex: 'lot_type',
-              key: 'lot_type',
-              width: 120,
-            },
-            {
-              title: '到期时间',
-              dataIndex: 'expires_at',
-              key: 'expires_at',
-              render: (v: string | null) =>
-                v ? new Date(v).toLocaleString('zh-CN') : '长期有效',
-            },
-            {
-              title: '创建时间',
-              dataIndex: 'created_at',
-              key: 'created_at',
-              render: (v: string) => new Date(v).toLocaleString('zh-CN'),
-            },
-          ]}
-        />
-      </Card>
 
       <Card className={styles.actionCard}>
         <Space wrap size="middle" className={styles.actionBar}>
@@ -565,7 +441,6 @@ const MyToken = () => {
               fetchTransactions();
               fetchAPIKeys();
               fetchRechargeOrders();
-              fetchTokenLots();
             }}
           >
             刷新
@@ -646,14 +521,7 @@ const MyToken = () => {
               loading={usageGuideLoading}
               style={{ marginBottom: 16 }}
             >
-              <Alert
-                type="info"
-                showIcon
-                style={{ marginBottom: 12 }}
-                message="Token 计费说明"
-                description="调用 API 时，系统将直接扣除模型 Token 数量（input_tokens + output_tokens），无需按费率换算。请确保账户余额充足。"
-              />
-              {usageGuide && (usageGuide.items?.length ?? 0) > 0 ? (
+              {usageGuide && usageGuide.items.length > 0 ? (
                 <>
                   <Paragraph type="secondary" style={{ marginBottom: 8 }}>
                     {usageGuide.disclaimer}
