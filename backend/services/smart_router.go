@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"sort"
 	"sync"
 	"time"
@@ -70,21 +71,26 @@ func (r *SmartRouter) SelectProvider(ctx context.Context, model string, provider
 }
 
 func (r *SmartRouter) SelectProviderWithKeyAllowlist(ctx context.Context, model string, provider string, strategy RoutingStrategy, allowedKeyIDs []int) (*RoutingCandidate, error) {
+	log.Printf("[DEBUG] SelectProviderWithKeyAllowlist: model=%s, provider=%s, strategy=%s, allowedKeyIDs=%v", model, provider, strategy, allowedKeyIDs)
 	candidates, err := r.GetCandidatesWithKeyAllowlist(ctx, model, provider, allowedKeyIDs)
 	if err != nil {
+		log.Printf("[DEBUG] SelectProviderWithKeyAllowlist: GetCandidatesWithKeyAllowlist error=%v", err)
 		return nil, fmt.Errorf("failed to get candidates: %w", err)
 	}
 
+	log.Printf("[DEBUG] SelectProviderWithKeyAllowlist: got %d candidates", len(candidates))
 	if len(candidates) == 0 {
 		return nil, fmt.Errorf("no available providers for model: %s", model)
 	}
 
 	healthyCandidates := r.FilterUnhealthy(candidates)
+	log.Printf("[DEBUG] SelectProviderWithKeyAllowlist: %d healthy candidates", len(healthyCandidates))
 	if len(healthyCandidates) == 0 {
 		return nil, fmt.Errorf("no healthy providers for model: %s", model)
 	}
 
 	verifiedCandidates := r.FilterUnverified(healthyCandidates)
+	log.Printf("[DEBUG] SelectProviderWithKeyAllowlist: %d verified candidates", len(verifiedCandidates))
 	if len(verifiedCandidates) == 0 {
 		return nil, fmt.Errorf("no verified providers for model: %s", model)
 	}
@@ -209,6 +215,7 @@ func (r *SmartRouter) FilterByConstraints(candidates []RoutingCandidate, constra
 }
 
 func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model string, provider string, allowedKeyIDs []int) ([]RoutingCandidate, error) {
+	log.Printf("[DEBUG] GetCandidatesWithKeyAllowlist: model=%s, provider=%s, allowedKeyIDs=%v", model, provider, allowedKeyIDs)
 	query := `
 		SELECT 
 			mak.id, mak.provider, mak.models_supported,
@@ -246,6 +253,7 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 	}
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
+	log.Printf("[DEBUG] GetCandidatesWithKeyAllowlist: query executed, err=%v", err)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query candidates: %w", err)
 	}
@@ -282,6 +290,7 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 		candidates = append(candidates, c)
 	}
 
+	log.Printf("[DEBUG] GetCandidatesWithKeyAllowlist: found %d candidates", len(candidates))
 	return candidates, nil
 }
 
