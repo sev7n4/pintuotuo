@@ -350,6 +350,8 @@ const MerchantAPIKeys = () => {
         quota_limit: values.unlimited_quota ? null : (values.quota_limit as number),
         health_check_level: (values.health_check_level as MerchantAPIKey['health_check_level']) || 'medium',
         endpoint_url: (values.endpoint_url as string | undefined)?.trim() || undefined,
+        region: (values.region as 'domestic' | 'overseas') || 'domestic',
+        security_level: (values.security_level as 'standard' | 'high') || 'standard',
       };
       const success = await createAPIKey(payload);
       if (!success) {
@@ -479,6 +481,26 @@ const MerchantAPIKeys = () => {
       dataIndex: 'provider',
       key: 'provider',
       render: (provider: string) => <Tag color="blue">{provider.toUpperCase()}</Tag>,
+    },
+    {
+      title: '区域',
+      dataIndex: 'region',
+      key: 'region',
+      render: (region?: string) => (
+        <Tag color={region === 'overseas' ? 'blue' : 'green'}>
+          {region === 'overseas' ? '海外' : '国内'}
+        </Tag>
+      ),
+    },
+    {
+      title: '安全等级',
+      dataIndex: 'security_level',
+      key: 'security_level',
+      render: (level?: string) => (
+        <Tag color={level === 'high' ? 'red' : 'default'}>
+          {level === 'high' ? '高安全' : '标准'}
+        </Tag>
+      ),
     },
     {
       title: '端点URL',

@@ -66,6 +66,8 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
     setCurrentKey(apiKey);
     const routePref = apiKey.route_preference || defaultRoutePreference;
     form.setFieldsValue({
+      region: apiKey.region || 'domestic',
+      security_level: apiKey.security_level || 'standard',
       strategy: routePref.strategy,
       weight: routePref.weight,
       max_retries: routePref.max_retries,
@@ -82,6 +84,8 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
       if (!currentKey) return;
 
       const patch = {
+        region: values.region,
+        security_level: values.security_level,
         route_preference: {
           strategy: values.strategy,
           weight: Number(values.weight),
@@ -215,6 +219,28 @@ const AdminAPIKeyAdvancedConfig: React.FC = () => {
             </Descriptions>
 
             <Form form={form} layout="vertical">
+              <Form.Item
+                name="region"
+                label="区域"
+                rules={[{ required: true, message: '请选择区域' }]}
+              >
+                <Select placeholder="选择区域">
+                  <Select.Option value="domestic">国内</Select.Option>
+                  <Select.Option value="overseas">海外</Select.Option>
+                </Select>
+              </Form.Item>
+
+              <Form.Item
+                name="security_level"
+                label="安全等级"
+                rules={[{ required: true, message: '请选择安全等级' }]}
+              >
+                <Select placeholder="选择安全等级">
+                  <Select.Option value="standard">标准</Select.Option>
+                  <Select.Option value="high">高安全</Select.Option>
+                </Select>
+              </Form.Item>
+
               <Form.Item
                 name="strategy"
                 label="路由策略"

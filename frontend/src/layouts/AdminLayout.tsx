@@ -21,6 +21,8 @@ import {
   AccountBookOutlined,
   GiftOutlined,
   ClusterOutlined,
+  LineChartOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -82,6 +84,21 @@ const menuItems = [
     key: '/admin/route-configs',
     icon: <ApiOutlined />,
     label: '路由配置',
+  },
+  {
+    key: '/admin/api-key-status',
+    icon: <LineChartOutlined />,
+    label: 'API Key 状态',
+  },
+  {
+    key: '/admin/route-decision-logs',
+    icon: <ClockCircleOutlined />,
+    label: '决策日志',
+  },
+  {
+    key: '/admin/api-key-advanced-config',
+    icon: <SettingOutlined />,
+    label: 'API Key 配置',
   },
   {
     key: '/admin/flash-sales',
