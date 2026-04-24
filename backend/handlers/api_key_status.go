@@ -155,7 +155,7 @@ func TriggerStatusCollect(c *gin.Context) {
 				ErrorRate:   0,
 				SuccessRate: 1.0,
 			}
-			if healthResult.Status != "healthy" {
+			if healthResult.Status != services.HealthStatusHealthy {
 				statusUpdate.ErrorRate = 1.0
 				statusUpdate.SuccessRate = 0
 			}
