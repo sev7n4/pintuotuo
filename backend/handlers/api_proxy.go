@@ -248,6 +248,10 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	if services.EntitlementEnforcementStrict() {
 		var entErr error
 		entCtx, entErr = services.ResolveEntitlementRoutingContext(db, userIDInt, req.Provider, req.Model)
+		log.Printf("[DEBUG] ResolveEntitlementRoutingContext: userID=%d, provider=%s, model=%s, allowedKeys=%v, err=%v", userIDInt, req.Provider, req.Model, entCtx != nil, entErr)
+		if entCtx != nil {
+			log.Printf("[DEBUG] AllowedAPIKeyIDs: %+v", entCtx.AllowedAPIKeyIDs)
+		}
 		if entErr != nil {
 			billingEngine.CancelPreDeduct(userIDInt, requestID)
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
