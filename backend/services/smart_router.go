@@ -40,8 +40,10 @@ type RoutingCandidate struct {
 }
 
 type SmartRouter struct {
-	db             *sql.DB
-	circuitBreaker map[int]*CircuitBreaker
+	db                  *sql.DB
+	circuitBreaker      map[int]*CircuitBreaker
+	defaultStrategyCode string
+	defaultStrategyMu   sync.RWMutex
 }
 
 var (
@@ -396,12 +398,40 @@ func (r *SmartRouter) getPriceRange(candidates []RoutingCandidate) (min, max flo
 }
 
 func (r *SmartRouter) ReloadRoutingStrategies() {
+	r.loadDefaultStrategyCode()
+}
+
+func (r *SmartRouter) loadDefaultStrategyCode() {
+	var code string
+	err := r.db.QueryRow(
+		"SELECT code FROM routing_strategies WHERE is_default = true AND status = 'active' LIMIT 1",
+	).Scan(&code)
+	if err == nil && code != "" {
+		r.defaultStrategyMu.Lock()
+		r.defaultStrategyCode = code
+		r.defaultStrategyMu.Unlock()
+	}
 }
 
 func (r *SmartRouter) RecordRequestResult(apiKeyID int, success bool) {
 }
 
 func (r *SmartRouter) GetDefaultStrategyCode() string {
+	r.defaultStrategyMu.RLock()
+	if r.defaultStrategyCode != "" {
+		code := r.defaultStrategyCode
+		r.defaultStrategyMu.RUnlock()
+		return code
+	}
+	r.defaultStrategyMu.RUnlock()
+
+	r.loadDefaultStrategyCode()
+
+	r.defaultStrategyMu.RLock()
+	defer r.defaultStrategyMu.RUnlock()
+	if r.defaultStrategyCode != "" {
+		return r.defaultStrategyCode
+	}
 	return string(RoutingStrategyBalanced)
 }
 

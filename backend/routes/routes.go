@@ -488,6 +488,7 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 		adminRoutingStrategies.GET("", handlers.AdminGetRoutingStrategies)
 		adminRoutingStrategies.GET("/:id", handlers.AdminGetRoutingStrategy)
 		adminRoutingStrategies.POST("", handlers.AdminCreateRoutingStrategy)
+		adminRoutingStrategies.POST("/test", handlers.TestRoutingStrategy)
 		adminRoutingStrategies.PUT("/:id", handlers.AdminUpdateRoutingStrategy)
 		adminRoutingStrategies.DELETE("/:id", handlers.AdminDeleteRoutingStrategy)
 	}
@@ -506,5 +507,27 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 	{
 		adminRouteDecisionLogs.GET("", handlers.GetRouteDecisionLogs)
 		adminRouteDecisionLogs.GET("/:id", handlers.GetRouteDecisionLog)
+	}
+
+	adminGateway := router.Group("/admin/gateway")
+	adminGateway.Use(middleware.AuthMiddleware())
+	{
+		adminGateway.GET("/stats", handlers.GetGatewayStats)
+	}
+
+	adminRateLimiter := router.Group("/admin/rate-limiter")
+	adminRateLimiter.Use(middleware.AuthMiddleware())
+	{
+		adminRateLimiter.GET("/stats", handlers.GetRateLimiterStats)
+		adminRateLimiter.PUT("/config", handlers.UpdateRateLimiterConfig)
+		adminRateLimiter.POST("/reset", handlers.ResetRateLimiterStats)
+	}
+
+	adminQueue := router.Group("/admin/queue")
+	adminQueue.Use(middleware.AuthMiddleware())
+	{
+		adminQueue.GET("/stats", handlers.GetQueueStats)
+		adminQueue.PUT("/config", handlers.UpdateQueueConfig)
+		adminQueue.POST("/reset", handlers.ResetQueueStats)
 	}
 }

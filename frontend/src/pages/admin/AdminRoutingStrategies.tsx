@@ -20,6 +20,8 @@ import {
   Alert,
   Divider,
   Select,
+  Descriptions,
+  Spin,
 } from 'antd';
 import {
   PlusOutlined,
@@ -28,6 +30,7 @@ import {
   InfoCircleOutlined,
   StarOutlined,
   StarFilled,
+  ExperimentOutlined,
 } from '@ant-design/icons';
 import api from '@services/api';
 
@@ -104,6 +107,11 @@ const AdminRoutingStrategies: React.FC = () => {
     latency: 34,
     reliability: 33,
   });
+
+  const [testModalVisible, setTestModalVisible] = useState(false);
+  const [testForm] = Form.useForm();
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
   useEffect(() => {
     fetchStrategies();
@@ -218,6 +226,36 @@ const AdminRoutingStrategies: React.FC = () => {
         circuit_breaker_threshold: preset.circuitBreaker.threshold,
         circuit_breaker_timeout: preset.circuitBreaker.timeout,
       });
+    }
+  };
+
+  const handleTestStrategy = (strategy?: RoutingStrategyConfig) => {
+    setTestResult(null);
+    testForm.resetFields();
+    if (strategy) {
+      testForm.setFieldsValue({
+        strategy_code: strategy.code,
+        model: 'gpt-4',
+      });
+    } else {
+      testForm.setFieldsValue({
+        model: 'gpt-4',
+      });
+    }
+    setTestModalVisible(true);
+  };
+
+  const handleRunTest = async () => {
+    try {
+      const values = await testForm.validateFields();
+      setTestLoading(true);
+      const response = await api.post('/admin/routing-strategies/test', values);
+      setTestResult(response.data);
+      message.success('测试完成');
+    } catch (error) {
+      message.error('测试失败');
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -439,9 +477,14 @@ const AdminRoutingStrategies: React.FC = () => {
     <Card
       title="路由策略管理"
       extra={
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          新建策略
-        </Button>
+        <Space>
+          <Button icon={<ExperimentOutlined />} onClick={() => handleTestStrategy()}>
+            测试策略
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            新建策略
+          </Button>
+        </Space>
       }
     >
       <Alert
@@ -787,6 +830,109 @@ const AdminRoutingStrategies: React.FC = () => {
             </Col>
           </Row>
         </Form>
+      </Modal>
+
+      <Modal
+        title="测试路由策略"
+        open={testModalVisible}
+        onOk={handleRunTest}
+        onCancel={() => setTestModalVisible(false)}
+        width={800}
+        okText="运行测试"
+        confirmLoading={testLoading}
+      >
+        <Form form={testForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="strategy_code"
+                label="策略编码"
+                rules={[{ required: true, message: '请输入策略编码' }]}
+              >
+                <Select
+                  placeholder="选择或输入策略编码"
+                  showSearch
+                  options={strategies.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="model"
+                label="模型"
+                rules={[{ required: true, message: '请输入模型名称' }]}
+              >
+                <Input placeholder="如: gpt-4, claude-3-opus" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="provider" label="厂商 (可选)">
+                <Input placeholder="如: openai, anthropic" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+
+        {testResult && (
+          <div style={{ marginTop: 16 }}>
+            <Divider>测试结果</Divider>
+            <Spin spinning={testLoading}>
+              <Descriptions bordered column={2} size="small">
+                <Descriptions.Item label="策略编码">{testResult.strategy_code}</Descriptions.Item>
+                <Descriptions.Item label="模型">{testResult.model}</Descriptions.Item>
+                <Descriptions.Item label="总候选数">{testResult.total_candidates}</Descriptions.Item>
+                <Descriptions.Item label="健康数">{testResult.healthy_count}</Descriptions.Item>
+                <Descriptions.Item label="验证数">{testResult.verified_count}</Descriptions.Item>
+                <Descriptions.Item label="选中厂商">
+                  {testResult.selected?.provider ? (
+                    <Tag color="blue">{testResult.selected.provider}</Tag>
+                  ) : '-'}
+                </Descriptions.Item>
+              </Descriptions>
+
+              {testResult.selected && (
+                <Card title="选中的 API Key" size="small" style={{ marginTop: 16 }}>
+                  <Descriptions column={2} size="small">
+                    <Descriptions.Item label="API Key ID">{testResult.selected.api_key_id}</Descriptions.Item>
+                    <Descriptions.Item label="模型">{testResult.selected.model}</Descriptions.Item>
+                    <Descriptions.Item label="综合评分">
+                      <Tag color="green">{testResult.selected.score?.toFixed(4)}</Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="健康状态">
+                      <Tag color={testResult.selected.health_status === 'healthy' ? 'green' : 'orange'}>
+                        {testResult.selected.health_status}
+                      </Tag>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="价格评分">{testResult.selected.price_score?.toFixed(4)}</Descriptions.Item>
+                    <Descriptions.Item label="延迟评分">{testResult.selected.latency_score?.toFixed(4)}</Descriptions.Item>
+                    <Descriptions.Item label="成功评分">{testResult.selected.success_score?.toFixed(4)}</Descriptions.Item>
+                    <Descriptions.Item label="平均延迟">{testResult.selected.avg_latency_ms}ms</Descriptions.Item>
+                    <Descriptions.Item label="成功率">{(testResult.selected.success_rate * 100).toFixed(2)}%</Descriptions.Item>
+                  </Descriptions>
+                </Card>
+              )}
+
+              {testResult.candidates && testResult.candidates.length > 1 && (
+                <Card title="其他候选" size="small" style={{ marginTop: 16 }}>
+                  <Table
+                    dataSource={testResult.candidates.slice(1, 6)}
+                    rowKey="APIKeyID"
+                    size="small"
+                    pagination={false}
+                    columns={[
+                      { title: 'API Key ID', dataIndex: 'APIKeyID', width: 100 },
+                      { title: 'Provider', dataIndex: 'Provider', width: 100 },
+                      { title: '评分', dataIndex: 'Score', render: (v: number) => v?.toFixed(4) },
+                      { title: '健康', dataIndex: 'HealthStatus', render: (v: string) => (
+                        <Tag color={v === 'healthy' ? 'green' : 'orange'}>{v}</Tag>
+                      )},
+                    ]}
+                  />
+                </Card>
+              )}
+            </Spin>
+          </div>
+        )}
       </Modal>
     </Card>
   );
