@@ -39,8 +39,14 @@ interface RouteDecisionLog {
   merchant_id: number;
   api_key_id: number;
   strategy_layer_goal: string;
+  strategy_layer_input: Record<string, any>;
+  strategy_layer_output: Record<string, any>;
+  decision_layer_candidates: Record<string, any>;
   decision_layer_output: Record<string, any>;
   execution_layer_result: Record<string, any>;
+  decision_duration_ms: number;
+  decision_result: string;
+  error_message: string;
   created_at: string;
 }
 
@@ -210,8 +216,43 @@ const AdminRouteDecisionLogs: React.FC = () => {
       ),
     },
     {
+      title: '决策耗时',
+      dataIndex: 'decision_duration_ms',
+      key: 'decision_duration_ms',
+      width: 100,
+      render: (duration: number) => (
+        <Tag color={duration > 10 ? 'orange' : 'green'}>
+          {duration ? `${duration}ms` : '-'}
+        </Tag>
+      ),
+    },
+    {
       title: '决策结果',
+      dataIndex: 'decision_result',
       key: 'decision_result',
+      width: 100,
+      render: (result: string) => {
+        if (!result) return '-';
+        const colorMap: Record<string, string> = {
+          'success': 'green',
+          'failed': 'red',
+          'fallback': 'orange',
+        };
+        const labelMap: Record<string, string> = {
+          'success': '成功',
+          'failed': '失败',
+          'fallback': '降级',
+        };
+        return (
+          <Tag color={colorMap[result] || 'default'}>
+            {labelMap[result] || result}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: '选中 API Key',
+      key: 'selected_api_key',
       width: 200,
       render: (_: any, record: RouteDecisionLog) => {
         const decision = record.decision_layer_output;
@@ -407,9 +448,39 @@ const AdminRouteDecisionLogs: React.FC = () => {
                   {getStrategyLabel(selectedLog.strategy_layer_goal)}
                 </Tag>
               </Descriptions.Item>
+              <Descriptions.Item label="决策耗时">
+                <Tag color={selectedLog.decision_duration_ms > 10 ? 'orange' : 'green'}>
+                  {selectedLog.decision_duration_ms ? `${selectedLog.decision_duration_ms}ms` : '-'}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="决策结果">
+                {(() => {
+                  if (!selectedLog.decision_result) return '-';
+                  const colorMap: Record<string, string> = {
+                    'success': 'green',
+                    'failed': 'red',
+                    'fallback': 'orange',
+                  };
+                  const labelMap: Record<string, string> = {
+                    'success': '成功',
+                    'failed': '失败',
+                    'fallback': '降级',
+                  };
+                  return (
+                    <Tag color={colorMap[selectedLog.decision_result] || 'default'}>
+                      {labelMap[selectedLog.decision_result] || selectedLog.decision_result}
+                    </Tag>
+                  );
+                })()}
+              </Descriptions.Item>
               <Descriptions.Item label="创建时间">
                 {new Date(selectedLog.created_at).toLocaleString('zh-CN')}
               </Descriptions.Item>
+              {selectedLog.error_message && (
+                <Descriptions.Item label="错误信息" span={2}>
+                  <Alert type="error" message={selectedLog.error_message} />
+                </Descriptions.Item>
+              )}
             </Descriptions>
 
             <Card title="决策层输出" style={{ marginBottom: 16 }}>

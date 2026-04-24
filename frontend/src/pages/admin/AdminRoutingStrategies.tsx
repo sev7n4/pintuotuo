@@ -370,6 +370,30 @@ const AdminRoutingStrategies: React.FC = () => {
       ),
     },
     {
+      title: '创建时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 160,
+      responsive: ['xl'] as any,
+      render: (createdAt: string) => (
+        <span style={{ fontSize: 12 }}>
+          {createdAt ? new Date(createdAt).toLocaleString('zh-CN') : '-'}
+        </span>
+      ),
+    },
+    {
+      title: '更新时间',
+      dataIndex: 'updated_at',
+      key: 'updated_at',
+      width: 160,
+      responsive: ['xl'] as any,
+      render: (updatedAt: string) => (
+        <span style={{ fontSize: 12 }}>
+          {updatedAt ? new Date(updatedAt).toLocaleString('zh-CN') : '-'}
+        </span>
+      ),
+    },
+    {
       title: '操作',
       key: 'action',
       width: isMobile ? 80 : 200,
