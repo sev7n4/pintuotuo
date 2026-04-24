@@ -36,13 +36,6 @@ func TestGetStrategyWeights_AllStrategies(t *testing.T) {
 			expectSuccess: 0.33,
 		},
 		{
-			name:          "cost_first strategy",
-			strategy:      RoutingStrategyCost,
-			expectPrice:   0.7,
-			expectLatency: 0.1,
-			expectSuccess: 0.2,
-		},
-		{
 			name:          "reliability_first strategy",
 			strategy:      RoutingStrategyReliability,
 			expectPrice:   0.2,
@@ -62,13 +55,6 @@ func TestGetStrategyWeights_AllStrategies(t *testing.T) {
 			expectPrice:   0.1,
 			expectLatency: 0.1,
 			expectSuccess: 0.2,
-		},
-		{
-			name:          "auto strategy",
-			strategy:      RoutingStrategyAuto,
-			expectPrice:   0.2,
-			expectLatency: 0.3,
-			expectSuccess: 0.3,
 		},
 	}
 

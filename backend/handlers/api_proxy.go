@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"sort"
@@ -249,10 +248,6 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	if services.EntitlementEnforcementStrict() {
 		var entErr error
 		entCtx, entErr = services.ResolveEntitlementRoutingContext(db, userIDInt, req.Provider, req.Model)
-		log.Printf("[DEBUG] ResolveEntitlementRoutingContext: userID=%d, provider=%s, model=%s, allowedKeys=%v, err=%v", userIDInt, req.Provider, req.Model, entCtx != nil, entErr)
-		if entCtx != nil {
-			log.Printf("[DEBUG] AllowedAPIKeyIDs: %+v", entCtx.AllowedAPIKeyIDs)
-		}
 		if entErr != nil {
 			billingEngine.CancelPreDeduct(userIDInt, requestID)
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -1257,22 +1252,17 @@ type traceTopCandidate struct {
 }
 
 func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string, keyFilter []int) smartRoutingPick {
-	log.Printf("[DEBUG] trySelectAPIKeyWithSmartRouter: provider=%s, model=%s, strategyCode=%s, keyFilter=%v", req.Provider, req.Model, strategyCode, keyFilter)
 	if strings.TrimSpace(req.Provider) == "" {
-		log.Printf("[DEBUG] trySelectAPIKeyWithSmartRouter: provider is empty, returning empty pick")
 		return smartRoutingPick{}
 	}
 	if keyFilter != nil && len(keyFilter) == 0 {
-		log.Printf("[DEBUG] trySelectAPIKeyWithSmartRouter: keyFilter is empty slice, returning empty pick")
 		return smartRoutingPick{}
 	}
 	router := services.GetSmartRouter()
 	choice, err := router.SelectProviderWithKeyAllowlist(context.Background(), req.Model, req.Provider, services.RoutingStrategy(strategyCode), keyFilter)
 	if err != nil || choice == nil {
-		log.Printf("[DEBUG] trySelectAPIKeyWithSmartRouter: SelectProviderWithKeyAllowlist returned error=%v, choice=%v", err, choice)
 		return smartRoutingPick{}
 	}
-	log.Printf("[DEBUG] trySelectAPIKeyWithSmartRouter: successfully selected apiKeyID=%d", choice.APIKeyID)
 
 	candidates, cErr := router.GetCandidatesWithKeyAllowlist(context.Background(), req.Model, req.Provider, keyFilter)
 	if cErr == nil {

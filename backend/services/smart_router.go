@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"sort"
 	"sync"
 	"time"
@@ -19,11 +18,9 @@ const (
 	RoutingStrategyPrice       RoutingStrategy = "price_first"
 	RoutingStrategyLatency     RoutingStrategy = "latency_first"
 	RoutingStrategyBalanced    RoutingStrategy = "balanced"
-	RoutingStrategyCost        RoutingStrategy = "cost_first"
 	RoutingStrategyReliability RoutingStrategy = "reliability_first"
 	RoutingStrategyPerformance RoutingStrategy = "performance_first"
 	RoutingStrategySecurity    RoutingStrategy = "security_first"
-	RoutingStrategyAuto        RoutingStrategy = "auto"
 )
 
 type RoutingCandidate struct {
@@ -71,26 +68,21 @@ func (r *SmartRouter) SelectProvider(ctx context.Context, model string, provider
 }
 
 func (r *SmartRouter) SelectProviderWithKeyAllowlist(ctx context.Context, model string, provider string, strategy RoutingStrategy, allowedKeyIDs []int) (*RoutingCandidate, error) {
-	log.Printf("[DEBUG] SelectProviderWithKeyAllowlist: model=%s, provider=%s, strategy=%s, allowedKeyIDs=%v", model, provider, strategy, allowedKeyIDs)
 	candidates, err := r.GetCandidatesWithKeyAllowlist(ctx, model, provider, allowedKeyIDs)
 	if err != nil {
-		log.Printf("[DEBUG] SelectProviderWithKeyAllowlist: GetCandidatesWithKeyAllowlist error=%v", err)
 		return nil, fmt.Errorf("failed to get candidates: %w", err)
 	}
 
-	log.Printf("[DEBUG] SelectProviderWithKeyAllowlist: got %d candidates", len(candidates))
 	if len(candidates) == 0 {
 		return nil, fmt.Errorf("no available providers for model: %s", model)
 	}
 
 	healthyCandidates := r.FilterUnhealthy(candidates)
-	log.Printf("[DEBUG] SelectProviderWithKeyAllowlist: %d healthy candidates", len(healthyCandidates))
 	if len(healthyCandidates) == 0 {
 		return nil, fmt.Errorf("no healthy providers for model: %s", model)
 	}
 
 	verifiedCandidates := r.FilterUnverified(healthyCandidates)
-	log.Printf("[DEBUG] SelectProviderWithKeyAllowlist: %d verified candidates", len(verifiedCandidates))
 	if len(verifiedCandidates) == 0 {
 		return nil, fmt.Errorf("no verified providers for model: %s", model)
 	}
@@ -215,13 +207,12 @@ func (r *SmartRouter) FilterByConstraints(candidates []RoutingCandidate, constra
 }
 
 func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model string, provider string, allowedKeyIDs []int) ([]RoutingCandidate, error) {
-	log.Printf("[DEBUG] GetCandidatesWithKeyAllowlist: model=%s, provider=%s, allowedKeyIDs=%v", model, provider, allowedKeyIDs)
 	query := `
 		SELECT 
 			mak.id, mak.provider, mak.models_supported,
 			CASE 
-				WHEN mak.input_price IS NOT NULL AND mak.output_price IS NOT NULL 
-				THEN mak.input_price + mak.output_price
+				WHEN mak.cost_input_rate IS NOT NULL AND mak.cost_output_rate IS NOT NULL 
+				THEN mak.cost_input_rate + mak.cost_output_rate
 				ELSE 0 
 			END as price,
 			COALESCE(mak.avg_latency_ms, 0) as latency,
@@ -253,7 +244,6 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 	}
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
-	log.Printf("[DEBUG] GetCandidatesWithKeyAllowlist: query executed, err=%v", err)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query candidates: %w", err)
 	}
@@ -290,7 +280,6 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 		candidates = append(candidates, c)
 	}
 
-	log.Printf("[DEBUG] GetCandidatesWithKeyAllowlist: found %d candidates", len(candidates))
 	return candidates, nil
 }
 
@@ -397,16 +386,12 @@ func (r *SmartRouter) getStrategyWeights(strategy RoutingStrategy) StrategyWeigh
 		return StrategyWeights{Price: 0.6, Latency: 0.2, Success: 0.2}
 	case RoutingStrategyLatency:
 		return StrategyWeights{Price: 0.2, Latency: 0.6, Success: 0.2}
-	case RoutingStrategyCost:
-		return StrategyWeights{Price: 0.7, Latency: 0.1, Success: 0.2}
 	case RoutingStrategyReliability:
 		return StrategyWeights{Price: 0.2, Latency: 0.2, Success: 0.6}
 	case RoutingStrategyPerformance:
 		return StrategyWeights{Price: 0.1, Latency: 0.5, Success: 0.2}
 	case RoutingStrategySecurity:
 		return StrategyWeights{Price: 0.1, Latency: 0.1, Success: 0.2}
-	case RoutingStrategyAuto:
-		return StrategyWeights{Price: 0.2, Latency: 0.3, Success: 0.3}
 	default:
 		return StrategyWeights{Price: 0.33, Latency: 0.34, Success: 0.33}
 	}
@@ -502,7 +487,7 @@ func (r *SmartRouter) IsCircuitBreakerOpen(apiKeyID int) bool {
 func (r *SmartRouter) GetStrategyConfig(strategyCode string) (*StrategyConfig, bool) {
 	strategy := RoutingStrategy(strategyCode)
 	switch strategy {
-	case RoutingStrategyPrice, RoutingStrategyLatency, RoutingStrategyBalanced, RoutingStrategyCost:
+	case RoutingStrategyPrice, RoutingStrategyLatency, RoutingStrategyBalanced, RoutingStrategyReliability, RoutingStrategyPerformance, RoutingStrategySecurity:
 		weights := r.getStrategyWeights(strategy)
 		return &StrategyConfig{
 			Strategy:                strategyCode,

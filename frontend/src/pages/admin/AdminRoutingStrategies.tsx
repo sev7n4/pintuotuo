@@ -87,12 +87,6 @@ const STRATEGY_PRESETS: Record<
     circuitBreaker: { threshold: 5, timeout: 60 },
     description: '均衡考虑价格、延迟和可靠性，适合通用场景',
   },
-  cost_first: {
-    weights: { price: 70, latency: 10, reliability: 20 },
-    retry: { count: 3, backoff: 1000 },
-    circuitBreaker: { threshold: 5, timeout: 60 },
-    description: '优先选择成本最低的Provider，适合对成本敏感的场景',
-  },
   performance_first: {
     weights: { price: 10, latency: 50, reliability: 20 },
     retry: { count: 2, backoff: 500 },
@@ -104,12 +98,6 @@ const STRATEGY_PRESETS: Record<
     retry: { count: 3, backoff: 1000 },
     circuitBreaker: { threshold: 5, timeout: 60 },
     description: '优先选择安全等级最高的Provider，适合对数据安全要求高的场景',
-  },
-  auto: {
-    weights: { price: 20, latency: 30, reliability: 30 },
-    retry: { count: 3, backoff: 1000 },
-    circuitBreaker: { threshold: 5, timeout: 60 },
-    description: '根据请求特征自动选择最优策略，适合通用场景',
   },
 };
 

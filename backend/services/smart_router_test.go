@@ -13,7 +13,9 @@ func TestRoutingStrategyConstants(t *testing.T) {
 		{"price strategy", RoutingStrategyPrice, "price_first"},
 		{"latency strategy", RoutingStrategyLatency, "latency_first"},
 		{"balanced strategy", RoutingStrategyBalanced, "balanced"},
-		{"cost strategy", RoutingStrategyCost, "cost_first"},
+		{"reliability strategy", RoutingStrategyReliability, "reliability_first"},
+		{"performance strategy", RoutingStrategyPerformance, "performance_first"},
+		{"security strategy", RoutingStrategySecurity, "security_first"},
 	}
 
 	for _, tt := range tests {
@@ -158,14 +160,14 @@ func TestGetStrategyWeights(t *testing.T) {
 			expected: StrategyWeights{Price: 0.2, Latency: 0.6, Success: 0.2},
 		},
 		{
-			name:     "cost strategy",
-			strategy: RoutingStrategyCost,
-			expected: StrategyWeights{Price: 0.7, Latency: 0.1, Success: 0.2},
-		},
-		{
 			name:     "balanced strategy",
 			strategy: RoutingStrategyBalanced,
 			expected: StrategyWeights{Price: 0.33, Latency: 0.34, Success: 0.33},
+		},
+		{
+			name:     "reliability strategy",
+			strategy: RoutingStrategyReliability,
+			expected: StrategyWeights{Price: 0.2, Latency: 0.2, Success: 0.6},
 		},
 	}
 
