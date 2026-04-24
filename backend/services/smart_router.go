@@ -15,10 +15,14 @@ import (
 type RoutingStrategy string
 
 const (
-	RoutingStrategyPrice    RoutingStrategy = "price_first"
-	RoutingStrategyLatency  RoutingStrategy = "latency_first"
-	RoutingStrategyBalanced RoutingStrategy = "balanced"
-	RoutingStrategyCost     RoutingStrategy = "cost_first"
+	RoutingStrategyPrice       RoutingStrategy = "price_first"
+	RoutingStrategyLatency     RoutingStrategy = "latency_first"
+	RoutingStrategyBalanced    RoutingStrategy = "balanced"
+	RoutingStrategyCost        RoutingStrategy = "cost_first"
+	RoutingStrategyReliability RoutingStrategy = "reliability_first"
+	RoutingStrategyPerformance RoutingStrategy = "performance_first"
+	RoutingStrategySecurity    RoutingStrategy = "security_first"
+	RoutingStrategyAuto        RoutingStrategy = "auto"
 )
 
 type RoutingCandidate struct {
@@ -207,7 +211,7 @@ func (r *SmartRouter) FilterByConstraints(candidates []RoutingCandidate, constra
 func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model string, provider string, allowedKeyIDs []int) ([]RoutingCandidate, error) {
 	query := `
 		SELECT 
-			mak.id, mak.provider, mak.model,
+			mak.id, mak.provider, mak.models_supported,
 			CASE 
 				WHEN mak.input_price IS NOT NULL AND mak.output_price IS NOT NULL 
 				THEN mak.input_price + mak.output_price
@@ -216,10 +220,12 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 			COALESCE(mak.avg_latency_ms, 0) as latency,
 			COALESCE(mak.success_rate, 1.0) as success_rate,
 			COALESCE(mak.region, 'domestic') as region,
-			COALESCE(mak.security_level, 'standard') as security_level
+			COALESCE(mak.security_level, 'standard') as security_level,
+			COALESCE(mak.health_status, 'unknown') as health_status,
+			CASE WHEN mak.verified_at IS NOT NULL OR mak.verification_result = 'verified' THEN true ELSE false END as verified
 		FROM merchant_api_keys mak
 		WHERE mak.status = 'active'
-			AND mak.model = $1
+			AND mak.models_supported ? $1
 	`
 
 	args := []interface{}{model}
@@ -249,15 +255,20 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 	for rows.Next() {
 		var c RoutingCandidate
 		var totalPrice float64
+		var modelsSupported []byte
+		var healthStatus string
+		var verified bool
 		err := rows.Scan(
 			&c.APIKeyID,
 			&c.Provider,
-			&c.Model,
+			&modelsSupported,
 			&totalPrice,
 			&c.AvgLatencyMs,
 			&c.SuccessRate,
 			&c.Region,
 			&c.SecurityLevel,
+			&healthStatus,
+			&verified,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan candidate: %w", err)
@@ -265,8 +276,8 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 
 		c.InputPrice = totalPrice / 2
 		c.OutputPrice = totalPrice / 2
-		c.HealthStatus = "healthy"
-		c.Verified = true
+		c.HealthStatus = healthStatus
+		c.Verified = verified
 
 		candidates = append(candidates, c)
 	}
@@ -367,6 +378,11 @@ type StrategyWeights struct {
 }
 
 func (r *SmartRouter) getStrategyWeights(strategy RoutingStrategy) StrategyWeights {
+	weights, err := r.getStrategyWeightsFromDB(string(strategy))
+	if err == nil {
+		return weights
+	}
+
 	switch strategy {
 	case RoutingStrategyPrice:
 		return StrategyWeights{Price: 0.6, Latency: 0.2, Success: 0.2}
@@ -374,9 +390,40 @@ func (r *SmartRouter) getStrategyWeights(strategy RoutingStrategy) StrategyWeigh
 		return StrategyWeights{Price: 0.2, Latency: 0.6, Success: 0.2}
 	case RoutingStrategyCost:
 		return StrategyWeights{Price: 0.7, Latency: 0.1, Success: 0.2}
+	case RoutingStrategyReliability:
+		return StrategyWeights{Price: 0.2, Latency: 0.2, Success: 0.6}
+	case RoutingStrategyPerformance:
+		return StrategyWeights{Price: 0.1, Latency: 0.5, Success: 0.2}
+	case RoutingStrategySecurity:
+		return StrategyWeights{Price: 0.1, Latency: 0.1, Success: 0.2}
+	case RoutingStrategyAuto:
+		return StrategyWeights{Price: 0.2, Latency: 0.3, Success: 0.3}
 	default:
 		return StrategyWeights{Price: 0.33, Latency: 0.34, Success: 0.33}
 	}
+}
+
+func (r *SmartRouter) getStrategyWeightsFromDB(strategyCode string) (StrategyWeights, error) {
+	if r.db == nil {
+		return StrategyWeights{}, fmt.Errorf("database not available")
+	}
+
+	var priceWeight, latencyWeight, reliabilityWeight float64
+	err := r.db.QueryRow(`
+		SELECT price_weight, latency_weight, reliability_weight 
+		FROM routing_strategies 
+		WHERE code = $1 AND status = 'active'`,
+		strategyCode,
+	).Scan(&priceWeight, &latencyWeight, &reliabilityWeight)
+	if err != nil {
+		return StrategyWeights{}, fmt.Errorf("failed to get strategy weights from DB: %w", err)
+	}
+
+	return StrategyWeights{
+		Price:   priceWeight,
+		Latency: latencyWeight,
+		Success: reliabilityWeight,
+	}, nil
 }
 
 func (r *SmartRouter) getPriceRange(candidates []RoutingCandidate) (min, max float64) {
