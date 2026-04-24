@@ -3,6 +3,7 @@ import {  Card,  Table,  Button,  Tag,  Space,  Descriptions,  Modal,  Spin,  Sw
   SyncOutlined,
   LineChartOutlined,
   EyeOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import api from '@/services/api';
@@ -48,6 +49,7 @@ interface APIKeyDetail extends APIKeyStatus {
 const AdminAPIKeyStatus: React.FC = () => {
   const [statuses, setStatuses] = useState<APIKeyStatus[]>([]);
   const [loading, setLoading] = useState(false);
+  const [collectLoading, setCollectLoading] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<APIKeyDetail | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -88,6 +90,23 @@ const AdminAPIKeyStatus: React.FC = () => {
 
   const handleRefresh = () => {
     fetchStatuses();
+  };
+
+  const handleTriggerCollect = async () => {
+    try {
+      setCollectLoading(true);
+      const response = await api.post<APIResponse<{ message: string }>>('/admin/api-key-status/collect');
+      if (response.data && response.data.code === 0) {
+        message.success('状态采集已触发，请稍后刷新查看结果');
+        setTimeout(() => {
+          fetchStatuses();
+        }, 3000);
+      }
+    } catch (error) {
+      message.error('触发状态采集失败');
+    } finally {
+      setCollectLoading(false);
+    }
   };
 
   const handleViewDetail = async (apiKeyID: number) => {
@@ -356,6 +375,14 @@ const AdminAPIKeyStatus: React.FC = () => {
             loading={loading}
           >
             刷新
+          </Button>
+          <Button
+            type="primary"
+            icon={<ThunderboltOutlined />}
+            onClick={handleTriggerCollect}
+            loading={collectLoading}
+          >
+            立即采集状态
           </Button>
         </Space>
       }

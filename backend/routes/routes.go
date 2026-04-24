@@ -498,6 +498,7 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 		adminAPIKeyStatus.GET("", handlers.GetAllAPIKeyStatus)
 		adminAPIKeyStatus.GET("/:id", handlers.GetAPIKeyStatus)
 		adminAPIKeyStatus.POST("/batch", handlers.GetBatchAPIKeyStatus)
+		adminAPIKeyStatus.POST("/collect", handlers.TriggerStatusCollect)
 	}
 
 	adminRouteDecisionLogs := router.Group("/admin/route-decision-logs")

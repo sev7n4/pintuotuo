@@ -41,6 +41,10 @@ func (c *StatusCollector) Stop() {
 	log.Println("StatusCollector stopped")
 }
 
+func (c *StatusCollector) CollectOnce() {
+	go c.collect()
+}
+
 func (c *StatusCollector) run() {
 	defer c.wg.Done()
 
