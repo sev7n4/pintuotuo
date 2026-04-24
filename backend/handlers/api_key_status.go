@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"database/sql"
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
 )
 
@@ -90,6 +93,86 @@ func GetBatchAPIKeyStatus(c *gin.Context) {
 		"code":    0,
 		"message": "success",
 		"data":    statuses,
+	})
+}
+
+func TriggerStatusCollect(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"code":    500,
+			"message": "Database connection error",
+		})
+		return
+	}
+
+	awarenessService := services.NewRouteAwarenessService(db)
+	healthChecker := services.NewHealthChecker()
+
+	go func() {
+		ctx := c.Request.Context()
+		query := `SELECT id, merchant_id, name, provider, status, api_key_encrypted, api_secret_encrypted, endpoint_url FROM merchant_api_keys WHERE status = 'active'`
+		rows, err := db.QueryContext(ctx, query)
+		if err != nil {
+			log.Printf("Failed to get active API keys: %v", err)
+			return
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var apiKey models.MerchantAPIKey
+			var apiSecretEncrypted, endpointURL sql.NullString
+			if err := rows.Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &apiKey.Status, &apiKey.APIKeyEncrypted, &apiSecretEncrypted, &endpointURL); err != nil {
+				continue
+			}
+			if apiSecretEncrypted.Valid {
+				apiKey.APISecretEncrypted = apiSecretEncrypted.String
+			}
+			if endpointURL.Valid {
+				apiKey.EndpointURL = endpointURL.String
+			}
+
+			healthResult, err := healthChecker.LightweightPing(ctx, &apiKey)
+			if err != nil {
+				log.Printf("Health check failed for API key %d: %v", apiKey.ID, err)
+				continue
+			}
+
+			latencyMs := 0
+			if healthResult.LatencyMs > 0 {
+				latencyMs = int(healthResult.LatencyMs)
+			}
+
+			statusUpdate := &models.APIKeyRealtimeStatus{
+				APIKeyID:    apiKey.ID,
+				LatencyP50:  latencyMs,
+				LatencyP95:  latencyMs,
+				LatencyP99:  latencyMs,
+				ErrorRate:   0,
+				SuccessRate: 1.0,
+			}
+			if healthResult.Status != "healthy" {
+				statusUpdate.ErrorRate = 1.0
+				statusUpdate.SuccessRate = 0
+			}
+
+			if err := awarenessService.UpdateStatus(ctx, apiKey.ID, statusUpdate); err != nil {
+				log.Printf("Failed to update status for API key %d: %v", apiKey.ID, err)
+			}
+		}
+		log.Println("Status collection triggered successfully")
+	}()
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data": gin.H{
+			"message": "状态采集已触发，请稍后刷新查看结果",
+		},
 	})
 }
 
