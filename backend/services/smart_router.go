@@ -15,14 +15,14 @@ import (
 type RoutingStrategy string
 
 const (
-	RoutingStrategyPrice        RoutingStrategy = "price_first"
-	RoutingStrategyLatency      RoutingStrategy = "latency_first"
-	RoutingStrategyBalanced     RoutingStrategy = "balanced"
-	RoutingStrategyCost         RoutingStrategy = "cost_first"
-	RoutingStrategyReliability  RoutingStrategy = "reliability_first"
-	RoutingStrategyPerformance  RoutingStrategy = "performance_first"
-	RoutingStrategySecurity     RoutingStrategy = "security_first"
-	RoutingStrategyAuto         RoutingStrategy = "auto"
+	RoutingStrategyPrice       RoutingStrategy = "price_first"
+	RoutingStrategyLatency     RoutingStrategy = "latency_first"
+	RoutingStrategyBalanced    RoutingStrategy = "balanced"
+	RoutingStrategyCost        RoutingStrategy = "cost_first"
+	RoutingStrategyReliability RoutingStrategy = "reliability_first"
+	RoutingStrategyPerformance RoutingStrategy = "performance_first"
+	RoutingStrategySecurity    RoutingStrategy = "security_first"
+	RoutingStrategyAuto        RoutingStrategy = "auto"
 )
 
 type RoutingCandidate struct {
