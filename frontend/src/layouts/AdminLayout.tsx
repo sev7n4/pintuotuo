@@ -23,6 +23,9 @@ import {
   ClusterOutlined,
   LineChartOutlined,
   ClockCircleOutlined,
+  CloudServerOutlined,
+  SafetyOutlined,
+  OrderedListOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './AdminLayout.module.css';
@@ -99,6 +102,21 @@ const menuItems = [
     key: '/admin/api-key-advanced-config',
     icon: <SettingOutlined />,
     label: 'API Key 配置',
+  },
+  {
+    key: '/admin/gateway-stats',
+    icon: <CloudServerOutlined />,
+    label: '网关统计',
+  },
+  {
+    key: '/admin/rate-limiter',
+    icon: <SafetyOutlined />,
+    label: '限流器配置',
+  },
+  {
+    key: '/admin/queue-config',
+    icon: <OrderedListOutlined />,
+    label: '队列配置',
   },
   {
     key: '/admin/flash-sales',
