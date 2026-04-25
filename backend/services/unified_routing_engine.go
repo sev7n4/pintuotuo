@@ -180,6 +180,11 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 		apiKeyID = &decision.SelectedAPIKeyID
 	}
 
+	var merchantID *int
+	if decision.MerchantID > 0 {
+		merchantID = &decision.MerchantID
+	}
+
 	candidatesJSON, _ := json.Marshal(decision.DecisionLayerCandidates)
 
 	var strategyLayerInput, strategyLayerOutput, decisionLayerOutput, executionLayerResult interface{}
@@ -198,7 +203,7 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 
 	_, err := e.db.ExecContext(ctx, query,
 		decision.RequestID,
-		decision.MerchantID,
+		merchantID,
 		apiKeyID,
 		string(decision.StrategyLayerGoal),
 		decision.StrategyLayerReason,
