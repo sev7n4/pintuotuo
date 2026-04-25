@@ -209,11 +209,8 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 	query := `
 		SELECT 
 			mak.id, mak.merchant_id, mak.provider, mak.models_supported,
-			CASE 
-				WHEN mak.cost_input_rate IS NOT NULL AND mak.cost_output_rate IS NOT NULL 
-				THEN mak.cost_input_rate + mak.cost_output_rate
-				ELSE 0 
-			END as price,
+			COALESCE(mak.cost_input_rate, 0) as input_price,
+			COALESCE(mak.cost_output_rate, 0) as output_price,
 			COALESCE(mak.avg_latency_ms, 0) as latency,
 			COALESCE(mak.success_rate, 1.0) as success_rate,
 			COALESCE(mak.region, 'domestic') as region,
@@ -251,7 +248,6 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 	var candidates []RoutingCandidate
 	for rows.Next() {
 		var c RoutingCandidate
-		var totalPrice float64
 		var modelsSupported []byte
 		var healthStatus string
 		var verified bool
@@ -260,7 +256,8 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 			&c.MerchantID,
 			&c.Provider,
 			&modelsSupported,
-			&totalPrice,
+			&c.InputPrice,
+			&c.OutputPrice,
 			&c.AvgLatencyMs,
 			&c.SuccessRate,
 			&c.Region,
@@ -272,8 +269,6 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 			return nil, fmt.Errorf("failed to scan candidate: %w", err)
 		}
 
-		c.InputPrice = totalPrice / 2
-		c.OutputPrice = totalPrice / 2
 		c.HealthStatus = healthStatus
 		c.Verified = verified
 
@@ -353,6 +348,49 @@ func (r *SmartRouter) calculatePriceScore(c RoutingCandidate, minPrice, maxPrice
 	}
 	price := c.InputPrice + c.OutputPrice
 	return 1.0 - (price-minPrice)/(maxPrice-minPrice)
+}
+
+//nolint:unused // Reserved for future token-aware price scoring
+func (r *SmartRouter) calculatePriceScoreWithEstimation(candidates []RoutingCandidate, estimation *TokenEstimation) []float64 {
+	if len(candidates) == 0 {
+		return []float64{}
+	}
+
+	if estimation == nil {
+		estimation = &TokenEstimation{
+			EstimatedInputTokens:  500,
+			EstimatedOutputTokens: 500,
+			Source:                "fallback",
+		}
+	}
+
+	estimatedCosts := make([]float64, len(candidates))
+	for i, c := range candidates {
+		estimatedCosts[i] = c.InputPrice*estimation.EstimatedInputTokens +
+			c.OutputPrice*estimation.EstimatedOutputTokens
+	}
+
+	minCost := estimatedCosts[0]
+	maxCost := estimatedCosts[0]
+	for _, cost := range estimatedCosts {
+		if cost < minCost {
+			minCost = cost
+		}
+		if cost > maxCost {
+			maxCost = cost
+		}
+	}
+
+	scores := make([]float64, len(candidates))
+	for i, cost := range estimatedCosts {
+		if maxCost == minCost {
+			scores[i] = 1.0
+		} else {
+			scores[i] = 1.0 - (cost-minCost)/(maxCost-minCost)
+		}
+	}
+
+	return scores
 }
 
 func (r *SmartRouter) calculateLatencyScore(c RoutingCandidate, minLatency, maxLatency int) float64 {
