@@ -113,6 +113,7 @@ func (s *TokenEstimationService) estimateInputFromRequestBody(requestBody map[st
 	return totalChars / 4
 }
 
+//nolint:unused // Reserved for future use with parsed Message slices
 func (s *TokenEstimationService) estimateInputFromMessages(messages []Message) int {
 	var totalChars int
 	for _, msg := range messages {

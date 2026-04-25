@@ -350,6 +350,7 @@ func (r *SmartRouter) calculatePriceScore(c RoutingCandidate, minPrice, maxPrice
 	return 1.0 - (price-minPrice)/(maxPrice-minPrice)
 }
 
+//nolint:unused // Reserved for future token-aware price scoring
 func (r *SmartRouter) calculatePriceScoreWithEstimation(candidates []RoutingCandidate, estimation *TokenEstimation) []float64 {
 	if len(candidates) == 0 {
 		return []float64{}
