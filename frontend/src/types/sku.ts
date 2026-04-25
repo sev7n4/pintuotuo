@@ -20,6 +20,12 @@ export interface ModelProvider {
   compat_prefixes?: string[];
   cache_enabled: boolean;
   cache_discount_rate?: number;
+  /** 厂商区域：domestic(国内), overseas(海外) */
+  provider_region?: string;
+  /** 路由策略配置 */
+  route_strategy?: Record<string, any>;
+  /** 端点配置 */
+  endpoints?: Record<string, any>;
   status: string;
   sort_order: number;
   created_at: string;

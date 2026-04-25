@@ -71,7 +71,7 @@ const menuItems = [
   {
     key: '/admin/model-providers',
     icon: <ApiOutlined />,
-    label: '模型厂商',
+    label: '厂商配置',
   },
   {
     key: '/admin/model-fallback',
@@ -82,11 +82,6 @@ const menuItems = [
     key: '/admin/routing-strategies',
     icon: <BranchesOutlined />,
     label: '路由策略',
-  },
-  {
-    key: '/admin/route-configs',
-    icon: <ApiOutlined />,
-    label: '路由配置',
   },
   {
     key: '/admin/api-key-status',

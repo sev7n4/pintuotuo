@@ -12,10 +12,23 @@ import {
   InputNumber,
   message,
   Space,
+  Tabs,
+  Divider,
+  Tooltip,
 } from 'antd';
-import { EditOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  EditOutlined,
+  PlusOutlined,
+  SettingOutlined,
+  InfoCircleOutlined,
+  QuestionCircleOutlined,
+  GlobalOutlined,
+} from '@ant-design/icons';
 import { skuService } from '@/services/sku';
+import { routeConfigService } from '@/services/routeConfig';
 import type { ModelProvider } from '@/types/sku';
+import RouteStrategyConfig from '@/components/admin/RouteStrategyConfig';
+import EndpointsConfig from '@/components/admin/EndpointsConfig';
 
 type ModalMode = 'create' | 'edit';
 
@@ -27,6 +40,7 @@ const AdminModelProviders = () => {
   const [modalMode, setModalMode] = useState<ModalMode>('edit');
   const [editing, setEditing] = useState<ModelProvider | null>(null);
   const [form] = Form.useForm();
+  const [activeTab, setActiveTab] = useState('basic');
   const isFallbackEditing = modalMode === 'edit' && editing?.code === fallbackCode;
 
   const fetchList = async () => {
@@ -48,6 +62,7 @@ const AdminModelProviders = () => {
   const openCreate = () => {
     setModalMode('create');
     setEditing(null);
+    setActiveTab('basic');
     form.resetFields();
     form.setFieldsValue({
       api_format: 'openai',
@@ -55,13 +70,17 @@ const AdminModelProviders = () => {
       status: 'active',
       sort_order: 0,
       compat_prefixes: [],
+      provider_region: 'domestic',
+      route_strategy: {},
+      endpoints: {},
     });
     setModalVisible(true);
   };
 
-  const handleEdit = (record: ModelProvider) => {
+  const handleEdit = async (record: ModelProvider) => {
     setModalMode('edit');
     setEditing(record);
+    setActiveTab('basic');
     form.setFieldsValue({
       name: record.name,
       api_base_url: record.api_base_url ?? '',
@@ -70,6 +89,9 @@ const AdminModelProviders = () => {
       status: record.status,
       sort_order: record.sort_order,
       compat_prefixes: record.compat_prefixes?.length ? record.compat_prefixes : [],
+      provider_region: record.provider_region || 'domestic',
+      route_strategy: record.route_strategy || {},
+      endpoints: record.endpoints || {},
     });
     setModalVisible(true);
   };
@@ -90,6 +112,20 @@ const AdminModelProviders = () => {
             ? (values.compat_prefixes as string[]).map((s) => String(s).trim()).filter(Boolean)
             : undefined,
         });
+        if (values.provider_region || values.route_strategy || values.endpoints) {
+          try {
+            await routeConfigService.updateProviderRouteConfig(
+              (values.code as string).trim().toLowerCase(),
+              {
+                provider_region: values.provider_region,
+                route_strategy: values.route_strategy,
+                endpoints: values.endpoints,
+              }
+            );
+          } catch {
+            message.warning('厂商创建成功，但路由配置保存失败');
+          }
+        }
         message.success('已创建');
       } else {
         if (!editing) return;
@@ -104,6 +140,17 @@ const AdminModelProviders = () => {
             ? (values.compat_prefixes as string[]).map((s) => String(s).trim()).filter(Boolean)
             : [],
         });
+        if (!isFallbackEditing) {
+          try {
+            await routeConfigService.updateProviderRouteConfig(editing.code, {
+              provider_region: values.provider_region,
+              route_strategy: values.route_strategy,
+              endpoints: values.endpoints,
+            });
+          } catch {
+            message.warning('基础信息已保存，但路由配置保存失败');
+          }
+        }
         message.success('已保存');
       }
       setModalVisible(false);
@@ -136,7 +183,18 @@ const AdminModelProviders = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      width: 140,
+      width: 120,
+    },
+    {
+      title: '区域',
+      dataIndex: 'provider_region',
+      key: 'provider_region',
+      width: 80,
+      render: (v: string) => (
+        <Tag color={v === 'overseas' ? 'blue' : 'green'} icon={<GlobalOutlined />}>
+          {v === 'overseas' ? '海外' : '国内'}
+        </Tag>
+      ),
     },
     {
       title: 'API Base URL',
@@ -146,44 +204,42 @@ const AdminModelProviders = () => {
       render: (v: string) => v || '—',
     },
     {
-      title: '兼容前缀',
-      dataIndex: 'compat_prefixes',
-      key: 'compat_prefixes',
-      width: 160,
-      ellipsis: true,
-      render: (v: string[] | undefined) =>
-        v && v.length > 0 ? v.join(', ') : <span style={{ color: '#999' }}>—</span>,
-    },
-    {
       title: 'API 格式',
       dataIndex: 'api_format',
       key: 'api_format',
-      width: 140,
+      width: 120,
     },
     {
-      title: '计费类型',
-      dataIndex: 'billing_type',
-      key: 'billing_type',
+      title: '路由配置',
+      key: 'route_config',
       width: 100,
-      render: (v: string) => v || '—',
+      render: (_: unknown, record: ModelProvider) => {
+        const hasRouteConfig =
+          record.route_strategy && Object.keys(record.route_strategy || {}).length > 0;
+        return hasRouteConfig ? (
+          <Tag color="blue">已配置</Tag>
+        ) : (
+          <Tag color="default">未配置</Tag>
+        );
+      },
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 90,
+      width: 80,
       render: (s: string) => (s === 'active' ? <Tag color="green">启用</Tag> : <Tag>停用</Tag>),
     },
     {
       title: '排序',
       dataIndex: 'sort_order',
       key: 'sort_order',
-      width: 72,
+      width: 60,
     },
     {
       title: '操作',
       key: 'action',
-      width: 88,
+      width: 80,
       fixed: 'right' as const,
       render: (_: unknown, record: ModelProvider) => (
         <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
@@ -199,10 +255,140 @@ const AdminModelProviders = () => {
     { value: 'baidu', label: 'baidu（千帆等，需与代理实现一致）' },
   ];
 
+  const BasicInfoTab = () => (
+    <>
+      {modalMode === 'create' ? (
+        <Form.Item
+          name="code"
+          label="代码（唯一，小写字母/数字/下划线）"
+          rules={[
+            { required: true, message: '请输入代码' },
+            {
+              pattern: /^[a-z][a-z0-9_]{0,48}$/,
+              message: '须以小写字母开头，仅 a-z、0-9、下划线，最长 50 字符',
+            },
+            {
+              validator: async (_rule, value) => {
+                if (String(value || '').trim().toLowerCase() === fallbackCode) {
+                  throw new Error('__default__ 为系统保留兜底代码，请勿新建');
+                }
+              },
+            },
+          ]}
+        >
+          <Input placeholder="例如 minimax" autoComplete="off" />
+        </Form.Item>
+      ) : (
+        editing && (
+          <Form.Item label="代码（只读）">
+            <Input value={editing.code} disabled />
+          </Form.Item>
+        )
+      )}
+      <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
+        <Input disabled={isFallbackEditing} />
+      </Form.Item>
+      <Form.Item name="api_base_url" label="API Base URL">
+        <Input placeholder="例如 https://api.openai.com/v1" disabled={isFallbackEditing} />
+      </Form.Item>
+      <Form.Item name="api_format" label="API 格式" rules={[{ required: true }]}>
+        <Select options={apiFormatOptions} placeholder="选择格式" disabled={isFallbackEditing} />
+      </Form.Item>
+      <Form.Item
+        name="compat_prefixes"
+        label="OpenAI 兼容前缀（无前缀 model 名匹配）"
+        tooltip="小写字母/数字/点/下划线/连字符；用于 /openai/v1 下仅写模型名时路由到本厂商。可多个，最长匹配优先。"
+      >
+        <Select
+          mode="tags"
+          placeholder="输入后回车添加，如 deepseek、glm-"
+          tokenSeparators={[',']}
+          disabled={isFallbackEditing}
+        />
+      </Form.Item>
+      <Form.Item name="billing_type" label="计费类型">
+        <Input placeholder="可选，默认 flat" disabled={isFallbackEditing} />
+      </Form.Item>
+      <Form.Item name="status" label="状态" rules={[{ required: true }]}>
+        <Select
+          options={[
+            { value: 'active', label: '启用' },
+            { value: 'inactive', label: '停用' },
+          ]}
+        />
+      </Form.Item>
+      <Form.Item name="sort_order" label="排序" rules={[{ required: true }]}>
+        <InputNumber min={0} style={{ width: '100%' }} disabled={isFallbackEditing} />
+      </Form.Item>
+    </>
+  );
+
+  const RouteStrategyTab = () => (
+    <>
+      <Alert
+        message="路由策略配置"
+        description="配置不同用户类型的路由策略，系统会根据商户类型和区域自动选择最优路由模式。"
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+      />
+      <Form.Item
+        name="provider_region"
+        label={
+          <Space>
+            <span>厂商区域</span>
+            <Tooltip title="标识厂商服务器所在区域，影响路由决策">
+              <QuestionCircleOutlined style={{ color: '#999' }} />
+            </Tooltip>
+          </Space>
+        }
+      >
+        <Select
+          options={[
+            { value: 'domestic', label: '国内' },
+            { value: 'overseas', label: '海外' },
+          ]}
+        />
+      </Form.Item>
+      <Divider orientation="left">
+        <Space>
+          <span>路由策略</span>
+          <Tooltip title="为不同用户类型配置路由策略">
+            <InfoCircleOutlined style={{ color: '#1890ff' }} />
+          </Tooltip>
+        </Space>
+      </Divider>
+      <Form.Item name="route_strategy" noStyle>
+        <RouteStrategyConfig providerRegion={form.getFieldValue('provider_region')} />
+      </Form.Item>
+    </>
+  );
+
+  const EndpointsTab = () => (
+    <>
+      <Alert
+        message="端点配置"
+        description="配置不同路由模式的端点地址，支持直连、LiteLLM、代理等多种模式。"
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+      />
+      <Form.Item name="endpoints" noStyle>
+        <EndpointsConfig />
+      </Form.Item>
+    </>
+  );
+
+  const tabItems = [
+    { key: 'basic', label: '基础信息', children: <BasicInfoTab /> },
+    { key: 'route', label: '路由策略', children: <RouteStrategyTab />, disabled: isFallbackEditing },
+    { key: 'endpoints', label: '端点配置', children: <EndpointsTab />, disabled: isFallbackEditing },
+  ];
+
   return (
     <div>
       <Card
-        title="模型厂商"
+        title="厂商配置"
         extra={
           <Space>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
@@ -216,21 +402,30 @@ const AdminModelProviders = () => {
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          message="Endpoint 决策说明"
-          description="运行时优先使用商户自定义 endpoint_url，其次读取 model_providers 对应 code 的 api_base_url，再次读取 __default__ 兜底提供商。__default__ 仅允许启停，其他字段只读。"
+          message="统一厂商配置"
+          description="在此页面可配置厂商基础信息、路由策略和端点地址。系统会根据商户类型和区域自动选择最优路由模式（直连/LiteLLM/代理）。"
         />
         <Table
           rowKey="id"
           loading={loading}
           columns={columns}
           dataSource={rows}
-          scroll={{ x: 1100 }}
+          scroll={{ x: 1200 }}
           pagination={{ pageSize: 50, showSizeChanger: true }}
         />
       </Card>
 
       <Modal
-        title={modalMode === 'create' ? '新增模型厂商' : editing ? `编辑：${editing.code}` : '编辑'}
+        title={
+          <Space>
+            {modalMode === 'create' ? '新增厂商' : editing ? `编辑：${editing.code}` : '编辑'}
+            {editing && editing.code !== fallbackCode && (
+              <Tag color="blue">
+                <SettingOutlined /> 统一配置
+              </Tag>
+            )}
+          </Space>
+        }
         open={modalVisible}
         onOk={handleSubmit}
         onCancel={() => {
@@ -238,80 +433,16 @@ const AdminModelProviders = () => {
           setEditing(null);
         }}
         destroyOnClose
-        width={560}
+        width={900}
+        style={{ top: 20 }}
+        bodyStyle={{ maxHeight: '70vh', overflowY: 'auto' }}
       >
         <Form form={form} layout="vertical">
-          {modalMode === 'create' ? (
-            <Form.Item
-              name="code"
-              label="代码（唯一，小写字母/数字/下划线）"
-              rules={[
-                { required: true, message: '请输入代码' },
-                {
-                  pattern: /^[a-z][a-z0-9_]{0,48}$/,
-                  message: '须以小写字母开头，仅 a-z、0-9、下划线，最长 50 字符',
-                },
-                {
-                  validator: async (_rule, value) => {
-                    if (
-                      String(value || '')
-                        .trim()
-                        .toLowerCase() === fallbackCode
-                    ) {
-                      throw new Error('__default__ 为系统保留兜底代码，请勿新建');
-                    }
-                  },
-                },
-              ]}
-            >
-              <Input placeholder="例如 minimax" autoComplete="off" />
-            </Form.Item>
-          ) : (
-            editing && (
-              <Form.Item label="代码（只读）">
-                <Input value={editing.code} disabled />
-              </Form.Item>
-            )
-          )}
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-            <Input disabled={isFallbackEditing} />
-          </Form.Item>
-          <Form.Item name="api_base_url" label="API Base URL">
-            <Input placeholder="例如 https://api.openai.com/v1" disabled={isFallbackEditing} />
-          </Form.Item>
-          <Form.Item name="api_format" label="API 格式" rules={[{ required: true }]}>
-            <Select
-              options={apiFormatOptions}
-              placeholder="选择格式"
-              disabled={isFallbackEditing}
-            />
-          </Form.Item>
-          <Form.Item
-            name="compat_prefixes"
-            label="OpenAI 兼容前缀（无前缀 model 名匹配）"
-            tooltip="小写字母/数字/点/下划线/连字符；用于 /openai/v1 下仅写模型名时路由到本厂商。可多个，最长匹配优先。"
-          >
-            <Select
-              mode="tags"
-              placeholder="输入后回车添加，如 deepseek、glm-"
-              tokenSeparators={[',']}
-              disabled={isFallbackEditing}
-            />
-          </Form.Item>
-          <Form.Item name="billing_type" label="计费类型">
-            <Input placeholder="可选，默认 flat" disabled={isFallbackEditing} />
-          </Form.Item>
-          <Form.Item name="status" label="状态" rules={[{ required: true }]}>
-            <Select
-              options={[
-                { value: 'active', label: '启用' },
-                { value: 'inactive', label: '停用' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="sort_order" label="排序" rules={[{ required: true }]}>
-            <InputNumber min={0} style={{ width: '100%' }} disabled={isFallbackEditing} />
-          </Form.Item>
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={tabItems}
+          />
         </Form>
       </Modal>
     </div>

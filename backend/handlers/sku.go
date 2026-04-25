@@ -1402,6 +1402,7 @@ func ListAllModelProviders(c *gin.Context) {
 		`SELECT id, code, name, api_base_url, api_format, billing_type, cache_enabled, COALESCE(cache_discount_rate, 0),
 			compat_prefixes,
 			litellm_model_template, litellm_gateway_api_key_env, litellm_gateway_api_base,
+			COALESCE(provider_region, 'domestic'), COALESCE(route_strategy, '{}'::jsonb), COALESCE(endpoints, '{}'::jsonb),
 			status, sort_order, created_at, updated_at
 		 FROM model_providers ORDER BY sort_order ASC, id ASC`,
 	)
@@ -1417,8 +1418,11 @@ func ListAllModelProviders(c *gin.Context) {
 		var apiBaseURL, billingType sql.NullString
 		var litellmTpl, litellmKey, litellmBase sql.NullString
 		var compatPfx pq.StringArray
+		var providerRegion sql.NullString
+		var routeStrategyJSON, endpointsJSON []byte
 		err := rows.Scan(&p.ID, &p.Code, &p.Name, &apiBaseURL, &p.APIFormat, &billingType, &p.CacheEnabled, &p.CacheDiscount,
-			&compatPfx, &litellmTpl, &litellmKey, &litellmBase, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+			&compatPfx, &litellmTpl, &litellmKey, &litellmBase, &providerRegion, &routeStrategyJSON, &endpointsJSON,
+			&p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -1440,6 +1444,15 @@ func ListAllModelProviders(c *gin.Context) {
 		}
 		if len(compatPfx) > 0 {
 			p.CompatPrefixes = []string(compatPfx)
+		}
+		if providerRegion.Valid {
+			p.ProviderRegion = providerRegion.String
+		}
+		if len(routeStrategyJSON) > 0 {
+			json.Unmarshal(routeStrategyJSON, &p.RouteStrategy)
+		}
+		if len(endpointsJSON) > 0 {
+			json.Unmarshal(endpointsJSON, &p.Endpoints)
 		}
 		providers = append(providers, p)
 	}
