@@ -42,6 +42,7 @@ type RoutingDecision struct {
 
 type RoutingCandidateScore struct {
 	APIKeyID      int     `json:"api_key_id"`
+	MerchantID    int     `json:"merchant_id"`
 	Provider      string  `json:"provider"`
 	Model         string  `json:"model"`
 	Score         float64 `json:"score"`

@@ -95,29 +95,29 @@ func (r *SmartRouter) SelectProviderWithKeyAllowlist(ctx context.Context, model 
 	return &verifiedCandidates[0], nil
 }
 
-func (r *SmartRouter) SelectProviderWithStrategyOutput(ctx context.Context, model string, provider string, strategyOutput *StrategyOutput, allowedKeyIDs []int) (*RoutingCandidate, error) {
+func (r *SmartRouter) SelectProviderWithStrategyOutput(ctx context.Context, model string, provider string, strategyOutput *StrategyOutput, allowedKeyIDs []int) (*RoutingCandidate, []RoutingCandidate, error) {
 	candidates, err := r.GetCandidatesWithKeyAllowlist(ctx, model, provider, allowedKeyIDs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get candidates: %w", err)
+		return nil, nil, fmt.Errorf("failed to get candidates: %w", err)
 	}
 
 	if len(candidates) == 0 {
-		return nil, fmt.Errorf("no available providers for model: %s", model)
+		return nil, nil, fmt.Errorf("no available providers for model: %s", model)
 	}
 
 	healthyCandidates := r.FilterUnhealthy(candidates)
 	if len(healthyCandidates) == 0 {
-		return nil, fmt.Errorf("no healthy providers for model: %s", model)
+		return nil, nil, fmt.Errorf("no healthy providers for model: %s", model)
 	}
 
 	verifiedCandidates := r.FilterUnverified(healthyCandidates)
 	if len(verifiedCandidates) == 0 {
-		return nil, fmt.Errorf("no verified providers for model: %s", model)
+		return nil, nil, fmt.Errorf("no verified providers for model: %s", model)
 	}
 
 	filteredCandidates := r.FilterByConstraints(verifiedCandidates, strategyOutput.Constraints)
 	if len(filteredCandidates) == 0 {
-		return nil, fmt.Errorf("no candidates satisfy constraints for model: %s", model)
+		return nil, nil, fmt.Errorf("no candidates satisfy constraints for model: %s", model)
 	}
 
 	r.CalculateScoresWithWeights(filteredCandidates, strategyOutput.Weights)
@@ -126,7 +126,7 @@ func (r *SmartRouter) SelectProviderWithStrategyOutput(ctx context.Context, mode
 		return filteredCandidates[i].Score > filteredCandidates[j].Score
 	})
 
-	return &filteredCandidates[0], nil
+	return &filteredCandidates[0], filteredCandidates, nil
 }
 
 func (r *SmartRouter) FilterByRouteDecision(candidates []RoutingCandidate, decision *RouteDecision) []RoutingCandidate {

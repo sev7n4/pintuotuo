@@ -110,14 +110,38 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 		Model:             req.Model,
 		Provider:          req.Provider,
 		StrategyLayerGoal: strategyOutput.Goal,
+		StrategyLayerReason: strategyOutput.Reason,
 		Timestamp:         startTime,
+	}
+
+	strategyInput := map[string]interface{}{
+		"request_id":    req.RequestID,
+		"merchant_id":   req.MerchantID,
+		"model":         req.Model,
+		"provider":      req.Provider,
+		"allowed_keys":  req.AllowedKeyIDs,
+		"cost_budget":   req.CostBudget,
+	}
+	if inputBytes, err := json.Marshal(strategyInput); err == nil {
+		decision.StrategyLayerInput = inputBytes
+	}
+
+	strategyOutputData := map[string]interface{}{
+		"goal":        strategyOutput.Goal,
+		"weights":     strategyOutput.Weights,
+		"constraints": strategyOutput.Constraints,
+		"priority":    strategyOutput.Priority,
+		"reason":      strategyOutput.Reason,
+	}
+	if outputBytes, err := json.Marshal(strategyOutputData); err == nil {
+		decision.StrategyLayerOutput = outputBytes
 	}
 
 	defer func() {
 		decision.DecisionDurationMs = int(time.Since(startTime).Milliseconds())
 	}()
 
-	candidate, err := e.smartRouter.SelectProviderWithStrategyOutput(
+	candidate, allCandidates, err := e.smartRouter.SelectProviderWithStrategyOutput(
 		ctx,
 		req.Model,
 		req.Provider,
@@ -130,6 +154,23 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 		decision.ErrorMessage = fmt.Sprintf("failed to select provider: %v", err)
 		return decision, fmt.Errorf(decision.ErrorMessage)
 	}
+
+	var candidateScores []RoutingCandidateScore
+	for _, c := range allCandidates {
+		candidateScores = append(candidateScores, RoutingCandidateScore{
+			APIKeyID:      c.APIKeyID,
+			MerchantID:    c.MerchantID,
+			Provider:      c.Provider,
+			Model:         c.Model,
+			Score:         c.Score,
+			PriceScore:    c.PriceScore,
+			LatencyScore:  c.LatencyScore,
+			SuccessScore:  c.SuccessScore,
+			Region:        c.Region,
+			SecurityLevel: c.SecurityLevel,
+		})
+	}
+	decision.DecisionLayerCandidates = candidateScores
 
 	decision.SelectedAPIKeyID = candidate.APIKeyID
 	decision.SelectedMerchantID = candidate.MerchantID
