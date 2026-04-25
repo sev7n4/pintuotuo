@@ -12,13 +12,19 @@ type RoutingDecision struct {
 	Provider   string `json:"provider,omitempty"`
 
 	StrategyLayerGoal   StrategyGoal    `json:"strategy_layer_goal"`
+	StrategyLayerReason string          `json:"strategy_layer_reason,omitempty"`
 	StrategyLayerInput  json.RawMessage `json:"strategy_layer_input,omitempty"`
 	StrategyLayerOutput json.RawMessage `json:"strategy_layer_output,omitempty"`
 
 	DecisionLayerCandidates []RoutingCandidateScore `json:"decision_layer_candidates,omitempty"`
 	DecisionLayerOutput     json.RawMessage         `json:"decision_layer_output,omitempty"`
+	RoutingMode             string                  `json:"routing_mode,omitempty"`
 
-	ExecutionLayerResult json.RawMessage `json:"execution_layer_result,omitempty"`
+	ExecutionLayerResult   json.RawMessage `json:"execution_layer_result,omitempty"`
+	ExecutionSuccess       bool            `json:"execution_success"`
+	ExecutionStatusCode    int             `json:"execution_status_code,omitempty"`
+	ExecutionLatencyMs     int             `json:"execution_latency_ms,omitempty"`
+	ExecutionErrorMessage  string          `json:"execution_error_message,omitempty"`
 
 	SelectedAPIKeyID int    `json:"selected_api_key_id"`
 	SelectedProvider string `json:"selected_provider"`
@@ -50,3 +56,12 @@ const (
 	DecisionResultFailed  DecisionResult = "failed"
 	DecisionResultTimeout DecisionResult = "timeout"
 )
+
+type ExecutionLayerResultData struct {
+	Success      bool   `json:"success"`
+	StatusCode   int    `json:"status_code,omitempty"`
+	LatencyMs    int    `json:"latency_ms,omitempty"`
+	ErrorMessage string `json:"error_message,omitempty"`
+	Model        string `json:"model,omitempty"`
+	Provider     string `json:"provider,omitempty"`
+}

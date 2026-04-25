@@ -280,10 +280,11 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	selectedStrategy := "legacy_fallback"
 	effectivePolicySource := ""
 	var smartCandidatesJSON []byte
+	var currentRoutingDecision *services.RoutingDecision
 	decisionStart := time.Now()
 	if req.APIKeyID == nil && req.MerchantSKUID == nil && shouldUseSmartRouting(userIDInt, requestID) {
 		strategyCode, policySrc := routingStrategyWithSource()
-		if smartReq := trySelectAPIKeyWithSmartRouter(req, strategyCode, keyFilter); smartReq.APIKeyID != nil {
+		if smartReq := trySelectAPIKeyWithSmartRouter(req, strategyCode, keyFilter, requestID, merchantID); smartReq.APIKeyID != nil {
 			req.APIKeyID = smartReq.APIKeyID
 			if entCtx != nil {
 				if msid, ok := entCtx.MerchantSKUForAPIKey(*req.APIKeyID); ok && req.MerchantSKUID == nil {
@@ -293,6 +294,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			selectedStrategy = strategyCode
 			smartCandidatesJSON = smartReq.CandidatesJSON
 			effectivePolicySource = policySrc
+			currentRoutingDecision = smartReq.RoutingDecision
 		}
 	}
 	if req.APIKeyID == nil && req.MerchantSKUID == nil && services.EntitlementEnforcementStrict() && entCtx != nil && len(entCtx.AllowedAPIKeyIDs) > 0 {
@@ -853,8 +855,27 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		cache.Delete(ctx, cache.ComputePointBalanceKey(userIDInt))
 	}
 
-	decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
-	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, winningKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCount)
+	if currentRoutingDecision != nil {
+		pipeline := services.NewThreeLayerRoutingPipeline()
+		execSuccess := resp.StatusCode >= 200 && resp.StatusCode < 300
+		execLatency := int(time.Since(decisionStart).Milliseconds())
+		var execErrMsg string
+		if !execSuccess {
+			execErrMsg = fmt.Sprintf("HTTP %d", resp.StatusCode)
+		}
+		pipeline.RecordExecutionResult(currentRoutingDecision, execSuccess, resp.StatusCode, execLatency, execErrMsg)
+
+		engine := services.NewUnifiedRoutingEngine()
+		if logErr := engine.LogDecision(c.Request.Context(), currentRoutingDecision); logErr != nil {
+			logger.LogWarn(c.Request.Context(), "api_proxy", "Failed to log routing decision", map[string]interface{}{
+				"request_id": requestID,
+				"error":      logErr.Error(),
+			})
+		}
+	} else {
+		decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
+		_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, winningKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCount)
+	}
 
 	traceSpan.SetStatusCode(resp.StatusCode)
 	c.Data(resp.StatusCode, "application/json", body)
@@ -1227,6 +1248,7 @@ func resolveMerchantIDByUser(db *sql.DB, userID int) (int, error) {
 type smartRoutingPick struct {
 	APIKeyID       *int
 	CandidatesJSON []byte
+	RoutingDecision *services.RoutingDecision
 }
 
 type strategyRuntimeSnapshot struct {
@@ -1251,33 +1273,40 @@ type traceTopCandidate struct {
 	Score    float64 `json:"score"`
 }
 
-func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string, keyFilter []int) smartRoutingPick {
+func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string, keyFilter []int, requestID string, merchantID int) smartRoutingPick {
 	if strings.TrimSpace(req.Provider) == "" {
 		return smartRoutingPick{}
 	}
 	if keyFilter != nil && len(keyFilter) == 0 {
 		return smartRoutingPick{}
 	}
-	router := services.GetSmartRouter()
-	choice, err := router.SelectProviderWithKeyAllowlist(context.Background(), req.Model, req.Provider, services.RoutingStrategy(strategyCode), keyFilter)
-	if err != nil || choice == nil {
+
+	pipeline := services.NewThreeLayerRoutingPipeline()
+	routingReq := &services.RoutingRequest{
+		RequestID:     requestID,
+		MerchantID:    merchantID,
+		Model:         req.Model,
+		Provider:      req.Provider,
+		AllowedKeyIDs: keyFilter,
+		RequestBody:   map[string]interface{}{"messages": req.Messages},
+	}
+
+	decision, err := pipeline.Execute(context.Background(), routingReq)
+	if err != nil || decision == nil || decision.SelectedAPIKeyID == 0 {
 		return smartRoutingPick{}
 	}
 
-	candidates, cErr := router.GetCandidatesWithKeyAllowlist(context.Background(), req.Model, req.Provider, keyFilter)
-	if cErr == nil {
-		router.CalculateScores(candidates, services.RoutingStrategy(strategyCode))
-	}
-
-	apiKeyID := choice.APIKeyID
 	var candidatesJSON []byte
-	if cErr == nil {
-		candidatesJSON, _ = json.Marshal(candidates)
+	if len(decision.DecisionLayerCandidates) > 0 {
+		candidatesJSON, _ = json.Marshal(map[string]interface{}{
+			"candidates": decision.DecisionLayerCandidates,
+		})
 	}
 
 	return smartRoutingPick{
-		APIKeyID:       &apiKeyID,
+		APIKeyID:       &decision.SelectedAPIKeyID,
 		CandidatesJSON: candidatesJSON,
+		RoutingDecision: decision,
 	}
 }
 

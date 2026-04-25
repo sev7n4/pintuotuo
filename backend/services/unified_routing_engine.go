@@ -134,6 +134,7 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 	decision.SelectedAPIKeyID = candidate.APIKeyID
 	decision.SelectedProvider = candidate.Provider
 	decision.SelectedModel = candidate.Model
+	decision.RoutingMode = determineRoutingMode(candidate)
 	decision.DecisionResult = string(DecisionResultSuccess)
 
 	decisionOutput := map[string]interface{}{
@@ -146,6 +147,7 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 		"success_score":  candidate.SuccessScore,
 		"region":         candidate.Region,
 		"security_level": candidate.SecurityLevel,
+		"routing_mode":   decision.RoutingMode,
 	}
 
 	if outputBytes, err := json.Marshal(decisionOutput); err == nil {
@@ -155,15 +157,22 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 	return decision, nil
 }
 
+func determineRoutingMode(candidate *RoutingCandidate) string {
+	if candidate == nil {
+		return "unknown"
+	}
+	return "direct"
+}
+
 func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *RoutingDecision) error {
 	query := `
 		INSERT INTO routing_decision_logs (
 			request_id, merchant_id, api_key_id,
-			strategy_layer_goal, strategy_layer_input, strategy_layer_output,
-			decision_layer_candidates, decision_layer_output,
-			execution_layer_result, decision_duration_ms,
-			decision_result, error_message, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+			strategy_layer_goal, strategy_layer_reason, strategy_layer_input, strategy_layer_output,
+			decision_layer_candidates, decision_layer_output, routing_mode,
+			execution_layer_result, execution_success, execution_status_code, execution_latency_ms, execution_error_message,
+			decision_duration_ms, decision_result, error_message, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 	`
 
 	var apiKeyID *int
@@ -171,16 +180,24 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 		apiKeyID = &decision.SelectedAPIKeyID
 	}
 
+	candidatesJSON, _ := json.Marshal(decision.DecisionLayerCandidates)
+
 	_, err := e.db.ExecContext(ctx, query,
 		decision.RequestID,
 		decision.MerchantID,
 		apiKeyID,
 		string(decision.StrategyLayerGoal),
+		decision.StrategyLayerReason,
 		decision.StrategyLayerInput,
 		decision.StrategyLayerOutput,
-		decision.DecisionLayerCandidates,
+		candidatesJSON,
 		decision.DecisionLayerOutput,
+		decision.RoutingMode,
 		decision.ExecutionLayerResult,
+		decision.ExecutionSuccess,
+		decision.ExecutionStatusCode,
+		decision.ExecutionLatencyMs,
+		decision.ExecutionErrorMessage,
 		decision.DecisionDurationMs,
 		decision.DecisionResult,
 		decision.ErrorMessage,
