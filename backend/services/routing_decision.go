@@ -20,11 +20,11 @@ type RoutingDecision struct {
 	DecisionLayerOutput     json.RawMessage         `json:"decision_layer_output,omitempty"`
 	RoutingMode             string                  `json:"routing_mode,omitempty"`
 
-	ExecutionLayerResult   json.RawMessage `json:"execution_layer_result,omitempty"`
-	ExecutionSuccess       bool            `json:"execution_success"`
-	ExecutionStatusCode    int             `json:"execution_status_code,omitempty"`
-	ExecutionLatencyMs     int             `json:"execution_latency_ms,omitempty"`
-	ExecutionErrorMessage  string          `json:"execution_error_message,omitempty"`
+	ExecutionLayerResult  json.RawMessage `json:"execution_layer_result,omitempty"`
+	ExecutionSuccess      bool            `json:"execution_success"`
+	ExecutionStatusCode   int             `json:"execution_status_code,omitempty"`
+	ExecutionLatencyMs    int             `json:"execution_latency_ms,omitempty"`
+	ExecutionErrorMessage string          `json:"execution_error_message,omitempty"`
 
 	SelectedAPIKeyID int    `json:"selected_api_key_id"`
 	SelectedProvider string `json:"selected_provider"`

@@ -1246,8 +1246,8 @@ func resolveMerchantIDByUser(db *sql.DB, userID int) (int, error) {
 }
 
 type smartRoutingPick struct {
-	APIKeyID       *int
-	CandidatesJSON []byte
+	APIKeyID        *int
+	CandidatesJSON  []byte
 	RoutingDecision *services.RoutingDecision
 }
 
@@ -1304,8 +1304,8 @@ func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string, ke
 	}
 
 	return smartRoutingPick{
-		APIKeyID:       &decision.SelectedAPIKeyID,
-		CandidatesJSON: candidatesJSON,
+		APIKeyID:        &decision.SelectedAPIKeyID,
+		CandidatesJSON:  candidatesJSON,
 		RoutingDecision: decision,
 	}
 }
