@@ -518,6 +518,7 @@ func (r *SmartRouter) IsCircuitBreakerOpen(apiKeyID int) bool {
 	return false
 }
 
+//nolint:unused // Reserved for future five-dimensional scoring
 func (r *SmartRouter) calculateSecurityScore(candidates []RoutingCandidate, requiredRegions []string) []float64 {
 	scores := make([]float64, len(candidates))
 	for i, c := range candidates {
@@ -555,6 +556,7 @@ func (r *SmartRouter) calculateSecurityScore(candidates []RoutingCandidate, requ
 	return scores
 }
 
+//nolint:unused // Reserved for future five-dimensional scoring
 func (r *SmartRouter) calculateLoadBalanceScore(candidates []RoutingCandidate, usageStats map[int]int) []float64 {
 	scores := make([]float64, len(candidates))
 
@@ -588,6 +590,7 @@ func (r *SmartRouter) calculateLoadBalanceScore(candidates []RoutingCandidate, u
 	return scores
 }
 
+//nolint:unused // Reserved for future use
 func min(a, b float64) float64 {
 	if a < b {
 		return a
