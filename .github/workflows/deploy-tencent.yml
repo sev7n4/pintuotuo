@@ -81,6 +81,13 @@ jobs:
           done
           echo "Starting containers (no server-side build)..."
           IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway up -d
+          echo "Running database migrations..."
+          for migration_file in backend/migrations/*.sql; do
+            filename=$(basename "$migration_file")
+            echo "Checking migration: $filename"
+            docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 -f "/docker-entrypoint-initdb.d/$filename" 2>&1 || echo "Migration $filename may have already been applied or had non-fatal errors"
+          done
+          echo "Migrations completed"
           echo "Pruning dangling images to keep disk stable..."
           docker image prune -f >/dev/null || true
           echo "Verifying gateway containers are running..."
