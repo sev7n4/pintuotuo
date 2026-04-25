@@ -44,6 +44,8 @@ interface RoutingStrategyConfig {
   price_weight: number;
   latency_weight: number;
   reliability_weight: number;
+  security_weight: number;
+  load_balance_weight: number;
   max_retry_count: number;
   retry_backoff_base: number;
   circuit_breaker_threshold: number;
@@ -57,35 +59,47 @@ interface RoutingStrategyConfig {
 const STRATEGY_PRESETS: Record<
   string,
   {
-    weights: { price: number; latency: number; reliability: number };
+    weights: {
+      price: number;
+      latency: number;
+      reliability: number;
+      security: number;
+      loadBalance: number;
+    };
     retry: { count: number; backoff: number };
     circuitBreaker: { threshold: number; timeout: number };
     description: string;
   }
 > = {
   price_first: {
-    weights: { price: 60, latency: 20, reliability: 20 },
+    weights: { price: 60, latency: 10, reliability: 15, security: 5, loadBalance: 10 },
     retry: { count: 3, backoff: 1000 },
     circuitBreaker: { threshold: 5, timeout: 60 },
     description: '优先选择价格最低的Provider，适合成本敏感场景',
   },
   latency_first: {
-    weights: { price: 20, latency: 60, reliability: 20 },
+    weights: { price: 10, latency: 50, reliability: 20, security: 10, loadBalance: 10 },
     retry: { count: 2, backoff: 500 },
     circuitBreaker: { threshold: 3, timeout: 30 },
     description: '优先选择延迟最低的Provider，适合实时性要求高的场景',
   },
   reliability_first: {
-    weights: { price: 20, latency: 20, reliability: 60 },
+    weights: { price: 10, latency: 20, reliability: 50, security: 10, loadBalance: 10 },
     retry: { count: 5, backoff: 2000 },
     circuitBreaker: { threshold: 3, timeout: 120 },
     description: '优先选择最可靠的Provider，适合稳定性要求高的场景',
   },
-  balanced: {
-    weights: { price: 33, latency: 34, reliability: 33 },
+  security_first: {
+    weights: { price: 10, latency: 10, reliability: 20, security: 50, loadBalance: 10 },
     retry: { count: 3, backoff: 1000 },
     circuitBreaker: { threshold: 5, timeout: 60 },
-    description: '均衡考虑价格、延迟和可靠性，适合通用场景',
+    description: '优先选择安全级别最高的Provider，适合合规要求高的场景',
+  },
+  balanced: {
+    weights: { price: 25, latency: 25, reliability: 25, security: 15, loadBalance: 10 },
+    retry: { count: 3, backoff: 1000 },
+    circuitBreaker: { threshold: 5, timeout: 60 },
+    description: '均衡考虑价格、延迟、可靠性和安全，适合通用场景',
   },
 };
 
@@ -103,9 +117,11 @@ const AdminRoutingStrategies: React.FC = () => {
   const screens = useBreakpoint();
 
   const [weightValues, setWeightValues] = useState({
-    price: 33,
-    latency: 34,
-    reliability: 33,
+    price: 25,
+    latency: 25,
+    reliability: 25,
+    security: 15,
+    loadBalance: 10,
   });
 
   const [testModalVisible, setTestModalVisible] = useState(false);
@@ -135,12 +151,20 @@ const AdminRoutingStrategies: React.FC = () => {
   const handleCreate = () => {
     setEditingStrategy(null);
     form.resetFields();
-    const defaultWeights = { price: 33, latency: 34, reliability: 33 };
+    const defaultWeights = {
+      price: 25,
+      latency: 25,
+      reliability: 25,
+      security: 15,
+      loadBalance: 10,
+    };
     setWeightValues(defaultWeights);
     form.setFieldsValue({
-      price_weight: 0.33,
-      latency_weight: 0.34,
-      reliability_weight: 0.33,
+      price_weight: 0.25,
+      latency_weight: 0.25,
+      reliability_weight: 0.25,
+      security_weight: 0.15,
+      load_balance_weight: 0.1,
       max_retry_count: 3,
       retry_backoff_base: 1000,
       circuit_breaker_threshold: 5,
@@ -157,6 +181,8 @@ const AdminRoutingStrategies: React.FC = () => {
       price: Math.round(strategy.price_weight * 100),
       latency: Math.round(strategy.latency_weight * 100),
       reliability: Math.round(strategy.reliability_weight * 100),
+      security: Math.round((strategy.security_weight || 0.15) * 100),
+      loadBalance: Math.round((strategy.load_balance_weight || 0.1) * 100),
     });
     form.setFieldsValue(strategy);
     setModalVisible(true);
@@ -203,24 +229,37 @@ const AdminRoutingStrategies: React.FC = () => {
     }
   };
 
-  const handleWeightChange = (type: 'price' | 'latency' | 'reliability', value: number) => {
+  const handleWeightChange = (
+    type: 'price' | 'latency' | 'reliability' | 'security' | 'loadBalance',
+    value: number
+  ) => {
     const newValues = { ...weightValues, [type]: value };
     setWeightValues(newValues);
     form.setFieldsValue({
       price_weight: newValues.price / 100,
       latency_weight: newValues.latency / 100,
       reliability_weight: newValues.reliability / 100,
+      security_weight: newValues.security / 100,
+      load_balance_weight: newValues.loadBalance / 100,
     });
   };
 
   const applyPreset = (presetKey: string) => {
     const preset = STRATEGY_PRESETS[presetKey];
     if (preset) {
-      setWeightValues(preset.weights);
+      setWeightValues({
+        price: preset.weights.price,
+        latency: preset.weights.latency,
+        reliability: preset.weights.reliability,
+        security: preset.weights.security,
+        loadBalance: preset.weights.loadBalance,
+      });
       form.setFieldsValue({
         price_weight: preset.weights.price / 100,
         latency_weight: preset.weights.latency / 100,
         reliability_weight: preset.weights.reliability / 100,
+        security_weight: preset.weights.security / 100,
+        load_balance_weight: preset.weights.loadBalance / 100,
         max_retry_count: preset.retry.count,
         retry_backoff_base: preset.retry.backoff,
         circuit_breaker_threshold: preset.circuitBreaker.threshold,
@@ -318,10 +357,12 @@ const AdminRoutingStrategies: React.FC = () => {
         </Col>
         <Col span={24}>
           <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>权重配置</div>
-          <Space size={4}>
+          <Space size={4} wrap>
             <Tag>价格 {Math.round(record.price_weight * 100)}%</Tag>
             <Tag>延迟 {Math.round(record.latency_weight * 100)}%</Tag>
             <Tag>可靠 {Math.round(record.reliability_weight * 100)}%</Tag>
+            <Tag>安全 {Math.round((record.security_weight || 0.15) * 100)}%</Tag>
+            <Tag>负载 {Math.round((record.load_balance_weight || 0.1) * 100)}%</Tag>
           </Space>
         </Col>
         <Col span={12}>
@@ -374,10 +415,12 @@ const AdminRoutingStrategies: React.FC = () => {
       key: 'weights',
       responsive: ['lg'] as any,
       render: (_: any, record: RoutingStrategyConfig) => (
-        <Space size={4}>
+        <Space size={4} wrap>
           <Tag>价格 {Math.round(record.price_weight * 100)}%</Tag>
           <Tag>延迟 {Math.round(record.latency_weight * 100)}%</Tag>
           <Tag>可靠 {Math.round(record.reliability_weight * 100)}%</Tag>
+          <Tag>安全 {Math.round((record.security_weight || 0.15) * 100)}%</Tag>
+          <Tag>负载 {Math.round((record.load_balance_weight || 0.1) * 100)}%</Tag>
         </Space>
       ),
     },
@@ -588,7 +631,9 @@ const AdminRoutingStrategies: React.FC = () => {
                         ? '延迟优先'
                         : key === 'reliability_first'
                           ? '可靠性优先'
-                          : '均衡策略'}
+                          : key === 'security_first'
+                            ? '安全优先'
+                            : '均衡策略'}
                   </Button>
                 ))}
               </Space>
@@ -704,6 +749,80 @@ const AdminRoutingStrategies: React.FC = () => {
                   </Col>
                 </Row>
                 <Form.Item name="reliability_weight" noStyle>
+                  <input type="hidden" />
+                </Form.Item>
+              </Form.Item>
+            </Col>
+
+            <Col span={24}>
+              <Form.Item
+                label={
+                  <Space>
+                    安全权重
+                    <Tooltip title="安全优先策略建议: 50%">
+                      <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
+                <Row gutter={16} align="middle">
+                  <Col flex="auto">
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={weightValues.security}
+                      onChange={(v) => handleWeightChange('security', v)}
+                    />
+                  </Col>
+                  <Col span={4}>
+                    <InputNumber
+                      min={0}
+                      max={100}
+                      value={weightValues.security}
+                      onChange={(v) => handleWeightChange('security', v || 0)}
+                      formatter={(v) => `${v}%`}
+                      parser={(v) => Number(v?.replace('%', '')) || 0}
+                    />
+                  </Col>
+                </Row>
+                <Form.Item name="security_weight" noStyle>
+                  <input type="hidden" />
+                </Form.Item>
+              </Form.Item>
+            </Col>
+
+            <Col span={24}>
+              <Form.Item
+                label={
+                  <Space>
+                    负载均衡权重
+                    <Tooltip title="控制API Key的负载均衡，使用越少分数越高">
+                      <InfoCircleOutlined style={{ color: '#999', fontSize: 12 }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
+                <Row gutter={16} align="middle">
+                  <Col flex="auto">
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={weightValues.loadBalance}
+                      onChange={(v) => handleWeightChange('loadBalance', v)}
+                    />
+                  </Col>
+                  <Col span={4}>
+                    <InputNumber
+                      min={0}
+                      max={100}
+                      value={weightValues.loadBalance}
+                      onChange={(v) => handleWeightChange('loadBalance', v || 0)}
+                      formatter={(v) => `${v}%`}
+                      parser={(v) => Number(v?.replace('%', '')) || 0}
+                    />
+                  </Col>
+                </Row>
+                <Form.Item name="load_balance_weight" noStyle>
                   <input type="hidden" />
                 </Form.Item>
               </Form.Item>
