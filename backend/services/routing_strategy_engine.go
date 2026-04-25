@@ -111,7 +111,7 @@ func (e *RoutingStrategyEngine) determineStrategy(reqCtx *RequestContext) Strate
 		return GoalSecurityFirst
 	}
 
-	return e.defaultStrategy
+	return e.getDefaultStrategyFromDB()
 }
 
 func (e *RoutingStrategyEngine) GetStrategyWeights(strategy StrategyGoal) (*StrategyWeightsV2, error) {
@@ -145,6 +145,32 @@ func (e *RoutingStrategyEngine) getStrategyWeightsFromDB(strategy StrategyGoal) 
 		SecurityWeight:    securityWeight,
 		LoadBalanceWeight: loadBalanceWeight,
 	}, nil
+}
+
+func (e *RoutingStrategyEngine) getDefaultStrategyFromDB() StrategyGoal {
+	if e.db == nil {
+		return GoalBalanced
+	}
+
+	var code string
+	err := e.db.QueryRow(`
+		SELECT code 
+		FROM routing_strategies 
+		WHERE is_default = true AND status = 'active'
+		LIMIT 1`,
+	).Scan(&code)
+	if err != nil {
+		return GoalBalanced
+	}
+
+	strategy := StrategyGoal(code)
+	switch strategy {
+	case GoalPerformanceFirst, GoalPriceFirst, GoalReliabilityFirst,
+		GoalBalanced, GoalSecurityFirst, GoalAuto:
+		return strategy
+	default:
+		return GoalBalanced
+	}
 }
 
 func (e *RoutingStrategyEngine) getDefaultStrategyWeights(strategy StrategyGoal) (*StrategyWeightsV2, error) {
