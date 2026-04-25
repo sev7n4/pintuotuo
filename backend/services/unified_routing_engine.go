@@ -114,6 +114,12 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 		Timestamp:           startTime,
 	}
 
+	tokenEstimationService := NewTokenEstimationService()
+	tokenEstimation := tokenEstimationService.EstimateTokens(req)
+	decision.EstimatedInputTokens = tokenEstimation.EstimatedInputTokens
+	decision.EstimatedOutputTokens = tokenEstimation.EstimatedOutputTokens
+	decision.TokenEstimationSource = tokenEstimation.Source
+
 	strategyInput := map[string]interface{}{
 		"request_id":   req.RequestID,
 		"merchant_id":  req.MerchantID,
@@ -225,8 +231,9 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 			decision_layer_candidates, decision_layer_output, routing_mode,
 			execution_layer_input, execution_layer_result, execution_success, execution_status_code, execution_latency_ms, execution_error_message,
 			decision_duration_ms, decision_result, error_message, created_at,
-			selected_merchant_id, input_token_cost, output_token_cost
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+			selected_merchant_id, input_token_cost, output_token_cost,
+			estimated_input_tokens, estimated_output_tokens, token_estimation_source
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
 	`
 
 	var apiKeyID *int
@@ -287,6 +294,9 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 		selectedMerchantID,
 		decision.InputTokenCost,
 		decision.OutputTokenCost,
+		decision.EstimatedInputTokens,
+		decision.EstimatedOutputTokens,
+		decision.TokenEstimationSource,
 	)
 
 	return err

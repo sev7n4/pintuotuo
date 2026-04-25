@@ -34,6 +34,10 @@ type RoutingDecision struct {
 	InputTokenCost     float64 `json:"input_token_cost,omitempty"`
 	OutputTokenCost    float64 `json:"output_token_cost,omitempty"`
 
+	EstimatedInputTokens  float64 `json:"estimated_input_tokens,omitempty"`
+	EstimatedOutputTokens float64 `json:"estimated_output_tokens,omitempty"`
+	TokenEstimationSource string  `json:"token_estimation_source,omitempty"`
+
 	DecisionDurationMs int    `json:"decision_duration_ms"`
 	DecisionResult     string `json:"decision_result"`
 	ErrorMessage       string `json:"error_message,omitempty"`
