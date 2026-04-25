@@ -234,6 +234,58 @@ func (e *RoutingStrategyEngine) getDefaultStrategyWeights(strategy StrategyGoal)
 	}
 }
 
+func (e *RoutingStrategyEngine) DetermineAutoStrategyWeights(req *RoutingRequest) *StrategyWeightsV2 {
+	weights := &StrategyWeightsV2{
+		CostWeight:        0.25,
+		LatencyWeight:     0.25,
+		ReliabilityWeight: 0.25,
+		SecurityWeight:    0.15,
+		LoadBalanceWeight: 0.10,
+	}
+
+	if req == nil {
+		return weights
+	}
+
+	if req.Stream {
+		weights.LatencyWeight = 0.40
+		weights.CostWeight = 0.15
+		weights.ReliabilityWeight = 0.20
+		weights.SecurityWeight = 0.15
+		weights.LoadBalanceWeight = 0.10
+		return weights
+	}
+
+	if req.MaxTokens > 4000 {
+		weights.CostWeight = 0.45
+		weights.LatencyWeight = 0.15
+		weights.ReliabilityWeight = 0.20
+		weights.SecurityWeight = 0.10
+		weights.LoadBalanceWeight = 0.10
+		return weights
+	}
+
+	if len(req.ComplianceReqs) > 0 {
+		weights.SecurityWeight = 0.40
+		weights.CostWeight = 0.15
+		weights.LatencyWeight = 0.15
+		weights.ReliabilityWeight = 0.20
+		weights.LoadBalanceWeight = 0.10
+		return weights
+	}
+
+	if req.Priority == "high" {
+		weights.ReliabilityWeight = 0.40
+		weights.CostWeight = 0.15
+		weights.LatencyWeight = 0.20
+		weights.SecurityWeight = 0.15
+		weights.LoadBalanceWeight = 0.10
+		return weights
+	}
+
+	return weights
+}
+
 func (e *RoutingStrategyEngine) ValidateConstraints(goal *StrategyOutput, candidate *RoutingCandidateV2) bool {
 	if goal.Constraints.MinSuccessRate > 0 && candidate.SuccessRate < goal.Constraints.MinSuccessRate {
 		return false

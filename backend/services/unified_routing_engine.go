@@ -25,6 +25,9 @@ type RoutingRequest struct {
 	CostBudget     *float64               `json:"cost_budget,omitempty"`
 	ComplianceReqs []string               `json:"compliance_requirements,omitempty"`
 	AllowedKeyIDs  []int                  `json:"allowed_key_ids,omitempty"`
+	Stream         bool                   `json:"stream,omitempty"`
+	MaxTokens      int                    `json:"max_tokens,omitempty"`
+	Priority       string                 `json:"priority,omitempty"`
 }
 
 type UnifiedRoutingEngine struct {
