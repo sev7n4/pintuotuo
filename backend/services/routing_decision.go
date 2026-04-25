@@ -26,9 +26,12 @@ type RoutingDecision struct {
 	ExecutionLatencyMs    int             `json:"execution_latency_ms,omitempty"`
 	ExecutionErrorMessage string          `json:"execution_error_message,omitempty"`
 
-	SelectedAPIKeyID int    `json:"selected_api_key_id"`
-	SelectedProvider string `json:"selected_provider"`
-	SelectedModel    string `json:"selected_model"`
+	SelectedAPIKeyID   int     `json:"selected_api_key_id"`
+	SelectedMerchantID int     `json:"selected_merchant_id"`
+	SelectedProvider   string  `json:"selected_provider"`
+	SelectedModel      string  `json:"selected_model"`
+	InputTokenCost     float64 `json:"input_token_cost,omitempty"`
+	OutputTokenCost    float64 `json:"output_token_cost,omitempty"`
 
 	DecisionDurationMs int    `json:"decision_duration_ms"`
 	DecisionResult     string `json:"decision_result"`

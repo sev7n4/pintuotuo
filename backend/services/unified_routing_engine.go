@@ -132,22 +132,28 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 	}
 
 	decision.SelectedAPIKeyID = candidate.APIKeyID
+	decision.SelectedMerchantID = candidate.MerchantID
 	decision.SelectedProvider = candidate.Provider
 	decision.SelectedModel = candidate.Model
+	decision.InputTokenCost = candidate.InputPrice
+	decision.OutputTokenCost = candidate.OutputPrice
 	decision.RoutingMode = determineRoutingMode(candidate)
 	decision.DecisionResult = string(DecisionResultSuccess)
 
 	decisionOutput := map[string]interface{}{
-		"api_key_id":     candidate.APIKeyID,
-		"provider":       candidate.Provider,
-		"model":          candidate.Model,
-		"score":          candidate.Score,
-		"price_score":    candidate.PriceScore,
-		"latency_score":  candidate.LatencyScore,
-		"success_score":  candidate.SuccessScore,
-		"region":         candidate.Region,
-		"security_level": candidate.SecurityLevel,
-		"routing_mode":   decision.RoutingMode,
+		"api_key_id":       candidate.APIKeyID,
+		"merchant_id":      candidate.MerchantID,
+		"provider":         candidate.Provider,
+		"model":            candidate.Model,
+		"score":            candidate.Score,
+		"price_score":      candidate.PriceScore,
+		"latency_score":    candidate.LatencyScore,
+		"success_score":    candidate.SuccessScore,
+		"region":           candidate.Region,
+		"security_level":   candidate.SecurityLevel,
+		"routing_mode":     decision.RoutingMode,
+		"input_token_cost": candidate.InputPrice,
+		"output_token_cost": candidate.OutputPrice,
 	}
 
 	if outputBytes, err := json.Marshal(decisionOutput); err == nil {
@@ -171,8 +177,9 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 			strategy_layer_goal, strategy_layer_reason, strategy_layer_input, strategy_layer_output,
 			decision_layer_candidates, decision_layer_output, routing_mode,
 			execution_layer_result, execution_success, execution_status_code, execution_latency_ms, execution_error_message,
-			decision_duration_ms, decision_result, error_message, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+			decision_duration_ms, decision_result, error_message, created_at,
+			selected_merchant_id, input_token_cost, output_token_cost
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
 	`
 
 	var apiKeyID *int
@@ -183,6 +190,11 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 	var merchantID *int
 	if decision.MerchantID > 0 {
 		merchantID = &decision.MerchantID
+	}
+
+	var selectedMerchantID *int
+	if decision.SelectedMerchantID > 0 {
+		selectedMerchantID = &decision.SelectedMerchantID
 	}
 
 	candidatesJSON, _ := json.Marshal(decision.DecisionLayerCandidates)
@@ -221,6 +233,9 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 		decision.DecisionResult,
 		decision.ErrorMessage,
 		decision.Timestamp,
+		selectedMerchantID,
+		decision.InputTokenCost,
+		decision.OutputTokenCost,
 	)
 
 	return err

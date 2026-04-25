@@ -23,6 +23,7 @@ const (
 
 type RoutingCandidate struct {
 	APIKeyID      int
+	MerchantID    int
 	Provider      string
 	Model         string
 	Score         float64
@@ -207,7 +208,7 @@ func (r *SmartRouter) FilterByConstraints(candidates []RoutingCandidate, constra
 func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model string, provider string, allowedKeyIDs []int) ([]RoutingCandidate, error) {
 	query := `
 		SELECT 
-			mak.id, mak.provider, mak.models_supported,
+			mak.id, mak.merchant_id, mak.provider, mak.models_supported,
 			CASE 
 				WHEN mak.cost_input_rate IS NOT NULL AND mak.cost_output_rate IS NOT NULL 
 				THEN mak.cost_input_rate + mak.cost_output_rate
@@ -256,6 +257,7 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 		var verified bool
 		err := rows.Scan(
 			&c.APIKeyID,
+			&c.MerchantID,
 			&c.Provider,
 			&modelsSupported,
 			&totalPrice,
