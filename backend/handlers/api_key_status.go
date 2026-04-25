@@ -272,27 +272,27 @@ func GetAllAPIKeyStatus(c *gin.Context) {
 }
 
 type MerchantAPIKeyStatusResponse struct {
-	ID                  int     `json:"id"`
-	MerchantID          int     `json:"merchant_id"`
-	Name                string  `json:"name"`
-	Provider            string  `json:"provider"`
-	Status              string  `json:"status"`
-	Region              string  `json:"region"`
-	SecurityLevel       string  `json:"security_level"`
-	EndpointURL         string  `json:"endpoint_url"`
-	HealthStatus        string  `json:"health_status"`
-	LatencyP50          int     `json:"latency_p50"`
-	LatencyP95          int     `json:"latency_p95"`
-	LatencyP99          int     `json:"latency_p99"`
-	ErrorRate           float64 `json:"error_rate"`
-	SuccessRate         float64 `json:"success_rate"`
-	ConnectionPoolSize  int     `json:"connection_pool_size"`
-	ConnectionPoolActive int    `json:"connection_pool_active"`
-	RateLimitRemaining  int     `json:"rate_limit_remaining"`
-	LoadBalanceWeight   float64 `json:"load_balance_weight"`
-	LastRequestAt       string  `json:"last_request_at"`
-	StatusUpdatedAt     string  `json:"status_updated_at"`
-	CreatedAt           string  `json:"created_at"`
+	ID                   int     `json:"id"`
+	MerchantID           int     `json:"merchant_id"`
+	Name                 string  `json:"name"`
+	Provider             string  `json:"provider"`
+	Status               string  `json:"status"`
+	Region               string  `json:"region"`
+	SecurityLevel        string  `json:"security_level"`
+	EndpointURL          string  `json:"endpoint_url"`
+	HealthStatus         string  `json:"health_status"`
+	LatencyP50           int     `json:"latency_p50"`
+	LatencyP95           int     `json:"latency_p95"`
+	LatencyP99           int     `json:"latency_p99"`
+	ErrorRate            float64 `json:"error_rate"`
+	SuccessRate          float64 `json:"success_rate"`
+	ConnectionPoolSize   int     `json:"connection_pool_size"`
+	ConnectionPoolActive int     `json:"connection_pool_active"`
+	RateLimitRemaining   int     `json:"rate_limit_remaining"`
+	LoadBalanceWeight    float64 `json:"load_balance_weight"`
+	LastRequestAt        string  `json:"last_request_at"`
+	StatusUpdatedAt      string  `json:"status_updated_at"`
+	CreatedAt            string  `json:"created_at"`
 }
 
 func GetAPIKeyStatusByMerchantID(c *gin.Context) {

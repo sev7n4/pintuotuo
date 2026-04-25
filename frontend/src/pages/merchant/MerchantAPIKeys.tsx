@@ -154,7 +154,8 @@ function verificationTooltipDesc(k: MerchantAPIKey): string {
 
 function formatHealthError(record: MerchantAPIKey): string {
   const parts: string[] = [];
-  if (record.health_error_category) parts.push(`分类: ${toHealthCategoryCN(record.health_error_category)}`);
+  if (record.health_error_category)
+    parts.push(`分类: ${toHealthCategoryCN(record.health_error_category)}`);
   if (record.health_error_code) parts.push(`上游码: ${record.health_error_code}`);
   if (record.health_provider_request_id) parts.push(`请求ID: ${record.health_provider_request_id}`);
   if (record.health_error_message) parts.push(`信息: ${record.health_error_message}`);
@@ -205,7 +206,9 @@ const MerchantAPIKeys = () => {
   const [healthFilter, setHealthFilter] = useState<string>('all');
   const [verifyFilter, setVerifyFilter] = useState<string>('all');
   const [strictFilter, setStrictFilter] = useState<string>('all');
-  const [quickFilter, setQuickFilter] = useState<'all' | 'recent' | 'attention' | 'verifying'>('all');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'recent' | 'attention' | 'verifying'>(
+    'all'
+  );
   const [recentMinutes, setRecentMinutes] = useState<number>(10);
   const [autoRefresh, setAutoRefresh] = useState(false);
 
@@ -348,7 +351,8 @@ const MerchantAPIKeys = () => {
         api_key: values.api_key as string,
         api_secret: values.api_secret as string | undefined,
         quota_limit: values.unlimited_quota ? null : (values.quota_limit as number),
-        health_check_level: (values.health_check_level as MerchantAPIKey['health_check_level']) || 'medium',
+        health_check_level:
+          (values.health_check_level as MerchantAPIKey['health_check_level']) || 'medium',
         endpoint_url: (values.endpoint_url as string | undefined)?.trim() || undefined,
         region: (values.region as 'domestic' | 'overseas') || 'domestic',
         security_level: (values.security_level as 'standard' | 'high') || 'standard',
@@ -736,7 +740,8 @@ const MerchantAPIKeys = () => {
         return false;
       }
       if (kw) {
-        const hay = `${k.name || ''} ${(k.provider || '').toLowerCase()} ${k.endpoint_url || ''}`.toLowerCase();
+        const hay =
+          `${k.name || ''} ${(k.provider || '').toLowerCase()} ${k.endpoint_url || ''}`.toLowerCase();
         if (!hay.includes(kw)) {
           return false;
         }
@@ -801,7 +806,8 @@ const MerchantAPIKeys = () => {
               点击「立即探测」（或等待主动探测），使健康灯为绿（健康）或黄（降级）；避免长期停留在灰灯（未知）。
             </li>
             <li>
-              「Strict 权益」列为「可路由」时，表示与后端白名单条件一致；仍需 SKU 承接等数据完整，最终以接口与日志为准。
+              「Strict 权益」列为「可路由」时，表示与后端白名单条件一致；仍需 SKU
+              承接等数据完整，最终以接口与日志为准。
             </li>
           </ol>
         }

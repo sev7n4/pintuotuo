@@ -173,15 +173,15 @@ func TestGetVerificationHistory(t *testing.T) {
 
 func TestShouldRetryVerificationAttempt(t *testing.T) {
 	tests := []struct {
-		name    string
-		probe   *ProbeModelsResult
+		name     string
+		probe    *ProbeModelsResult
 		probeErr error
-		want    bool
+		want     bool
 	}{
 		{
-			name: "retry on network timeout",
+			name:     "retry on network timeout",
 			probeErr: errors.New("dial tcp timeout"),
-			want: true,
+			want:     true,
 		},
 		{
 			name: "retry on 429",

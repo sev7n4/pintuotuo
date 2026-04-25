@@ -42,14 +42,7 @@ export function EntitlementPackageCard({
         </Space>
       }
       actions={[
-        <Button
-          key="buy"
-          type="primary"
-          block
-          loading={loading}
-          disabled={!canBuy}
-          onClick={onBuy}
-        >
+        <Button key="buy" type="primary" block loading={loading} disabled={!canBuy} onClick={onBuy}>
           {canBuy ? '一键购买' : '暂不可购买'}
         </Button>,
       ]}

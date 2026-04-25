@@ -139,12 +139,7 @@ describe('Integration Tests', () => {
       error: null,
       isAuthenticated,
       rememberMe: false,
-      login: async (
-        email: string,
-        password: string,
-        rememberMe?: boolean,
-        totpCode?: string
-      ) => {
+      login: async (email: string, password: string, rememberMe?: boolean, totpCode?: string) => {
         const result = await mockLogin(email, password, rememberMe, totpCode);
         isAuthenticated = true;
         return result;
@@ -306,7 +301,12 @@ describe('Integration Tests', () => {
     });
 
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledWith('newuser@example.com', 'password123', 'user', undefined);
+      expect(mockRegister).toHaveBeenCalledWith(
+        'newuser@example.com',
+        'password123',
+        'user',
+        undefined
+      );
     });
     expect(mockBindReferralCode).not.toHaveBeenCalled();
   });

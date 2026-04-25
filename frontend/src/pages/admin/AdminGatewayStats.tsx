@@ -240,7 +240,9 @@ const AdminGatewayStats: React.FC = () => {
                   title="成功率"
                   value={Math.round((gatewayStats?.success_rate || 0) * 100)}
                   suffix="%"
-                  valueStyle={{ color: (gatewayStats?.success_rate || 0) > 0.9 ? '#3f8600' : '#cf1322' }}
+                  valueStyle={{
+                    color: (gatewayStats?.success_rate || 0) > 0.9 ? '#3f8600' : '#cf1322',
+                  }}
                 />
               </Card>
             </Col>
@@ -270,10 +272,7 @@ const AdminGatewayStats: React.FC = () => {
             </Col>
             <Col xs={12} sm={12} md={6}>
               <Card>
-                <Statistic
-                  title="总 Token"
-                  value={gatewayStats?.total_tokens || 0}
-                />
+                <Statistic title="总 Token" value={gatewayStats?.total_tokens || 0} />
               </Card>
             </Col>
             <Col xs={12} sm={12} md={6}>
@@ -290,10 +289,7 @@ const AdminGatewayStats: React.FC = () => {
         </Spin>
       </Card>
 
-      <Card
-        title="限流器统计"
-        style={{ marginTop: 16 }}
-      >
+      <Card title="限流器统计" style={{ marginTop: 16 }}>
         <Table
           columns={rateLimiterColumns}
           dataSource={rateLimiterData}
@@ -304,10 +300,7 @@ const AdminGatewayStats: React.FC = () => {
         />
       </Card>
 
-      <Card
-        title="队列统计"
-        style={{ marginTop: 16 }}
-      >
+      <Card title="队列统计" style={{ marginTop: 16 }}>
         <Table
           columns={queueColumns}
           dataSource={queueData}

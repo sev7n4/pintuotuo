@@ -16,4 +16,3 @@ describe('HelpCenterPage', () => {
     expect(screen.getByText(/加油包（Token）不可单独购买/)).toBeInTheDocument();
   });
 });
-

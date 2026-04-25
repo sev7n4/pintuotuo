@@ -6,8 +6,8 @@ export const fuelStationService = {
   getAdminConfig: () => api.get<{ data: FuelStationConfig }>('/admin/fuel-station-config'),
   updateAdminConfig: (payload: FuelStationConfig) =>
     api.put<{ data: FuelStationConfig }>('/admin/fuel-station-config', payload),
-  getAdminTemplates: () => api.get<{ data: FuelStationTemplate[] }>('/admin/fuel-station-templates'),
+  getAdminTemplates: () =>
+    api.get<{ data: FuelStationTemplate[] }>('/admin/fuel-station-templates'),
   updateAdminTemplates: (templates: FuelStationTemplate[]) =>
     api.put<{ data: FuelStationTemplate[] }>('/admin/fuel-station-templates', { templates }),
 };
-

@@ -14,7 +14,7 @@ func TestNewUnifiedRouter(t *testing.T) {
 
 func TestRouteDecision_DomesticUserOverseasProvider(t *testing.T) {
 	router := NewUnifiedRouter(nil)
-	
+
 	providerConfig := &ProviderConfig{
 		Code:           "openai",
 		ProviderRegion: "overseas",
@@ -34,26 +34,26 @@ func TestRouteDecision_DomesticUserOverseasProvider(t *testing.T) {
 			},
 		},
 	}
-	
+
 	merchantConfig := &MerchantConfig{
 		ID:     1,
 		Type:   "standard",
 		Region: "domestic",
 	}
-	
+
 	decision, err := router.DecideRoute(context.Background(), providerConfig, merchantConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	
+
 	if decision.Mode != "litellm" {
 		t.Errorf("expected mode to be 'litellm', got '%s'", decision.Mode)
 	}
-	
+
 	if decision.Endpoint == "" {
 		t.Error("expected endpoint to be set")
 	}
-	
+
 	if decision.FallbackMode != "proxy" {
 		t.Errorf("expected fallback mode to be 'proxy', got '%s'", decision.FallbackMode)
 	}
@@ -61,7 +61,7 @@ func TestRouteDecision_DomesticUserOverseasProvider(t *testing.T) {
 
 func TestRouteDecision_OverseasUserOverseasProvider(t *testing.T) {
 	router := NewUnifiedRouter(nil)
-	
+
 	providerConfig := &ProviderConfig{
 		Code:           "openai",
 		ProviderRegion: "overseas",
@@ -77,22 +77,22 @@ func TestRouteDecision_OverseasUserOverseasProvider(t *testing.T) {
 			},
 		},
 	}
-	
+
 	merchantConfig := &MerchantConfig{
 		ID:     2,
 		Type:   "standard",
 		Region: "overseas",
 	}
-	
+
 	decision, err := router.DecideRoute(context.Background(), providerConfig, merchantConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	
+
 	if decision.Mode != "direct" {
 		t.Errorf("expected mode to be 'direct', got '%s'", decision.Mode)
 	}
-	
+
 	if decision.Endpoint != "https://api.openai.com/v1" {
 		t.Errorf("expected endpoint to be 'https://api.openai.com/v1', got '%s'", decision.Endpoint)
 	}
@@ -100,7 +100,7 @@ func TestRouteDecision_OverseasUserOverseasProvider(t *testing.T) {
 
 func TestRouteDecision_EnterpriseUser(t *testing.T) {
 	router := NewUnifiedRouter(nil)
-	
+
 	providerConfig := &ProviderConfig{
 		Code:           "deepseek",
 		ProviderRegion: "domestic",
@@ -120,22 +120,22 @@ func TestRouteDecision_EnterpriseUser(t *testing.T) {
 			},
 		},
 	}
-	
+
 	merchantConfig := &MerchantConfig{
 		ID:     3,
 		Type:   "enterprise",
 		Region: "domestic",
 	}
-	
+
 	decision, err := router.DecideRoute(context.Background(), providerConfig, merchantConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	
+
 	if decision.Mode != "litellm" {
 		t.Errorf("expected mode to be 'litellm', got '%s'", decision.Mode)
 	}
-	
+
 	if decision.FallbackMode != "direct" {
 		t.Errorf("expected fallback mode to be 'direct', got '%s'", decision.FallbackMode)
 	}
@@ -143,12 +143,12 @@ func TestRouteDecision_EnterpriseUser(t *testing.T) {
 
 func TestRouteDecision_AutoMode(t *testing.T) {
 	router := NewUnifiedRouter(nil)
-	
+
 	tests := []struct {
-		name            string
-		providerRegion  string
-		merchantRegion  string
-		expectedMode    string
+		name           string
+		providerRegion string
+		merchantRegion string
+		expectedMode   string
 	}{
 		{
 			name:           "domestic user accessing overseas provider",
@@ -169,7 +169,7 @@ func TestRouteDecision_AutoMode(t *testing.T) {
 			expectedMode:   "direct",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			providerConfig := &ProviderConfig{
@@ -180,27 +180,27 @@ func TestRouteDecision_AutoMode(t *testing.T) {
 				},
 				Endpoints: map[string]interface{}{
 					"direct": map[string]interface{}{
-						"domestic":  "https://domestic.example.com",
+						"domestic": "https://domestic.example.com",
 						"overseas": "https://overseas.example.com",
 					},
 					"litellm": map[string]interface{}{
-						"domestic":  "http://litellm:4000/v1",
+						"domestic": "http://litellm:4000/v1",
 						"overseas": "http://litellm:4000/v1",
 					},
 				},
 			}
-			
+
 			merchantConfig := &MerchantConfig{
 				ID:     1,
 				Type:   "standard",
 				Region: tt.merchantRegion,
 			}
-			
+
 			decision, err := router.DecideRoute(context.Background(), providerConfig, merchantConfig)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			
+
 			if decision.Mode != tt.expectedMode {
 				t.Errorf("expected mode to be '%s', got '%s'", tt.expectedMode, decision.Mode)
 			}
@@ -210,22 +210,22 @@ func TestRouteDecision_AutoMode(t *testing.T) {
 
 func TestSelectEndpoint(t *testing.T) {
 	router := NewUnifiedRouter(nil)
-	
+
 	endpoints := map[string]interface{}{
 		"direct": map[string]interface{}{
-			"domestic":  "https://domestic.example.com",
+			"domestic": "https://domestic.example.com",
 			"overseas": "https://overseas.example.com",
 		},
 		"litellm": map[string]interface{}{
 			"domestic": "http://litellm:4000/v1",
 		},
 	}
-	
+
 	tests := []struct {
-		name          string
-		mode          string
-		region        string
-		expectedURL   string
+		name        string
+		mode        string
+		region      string
+		expectedURL string
 	}{
 		{
 			name:        "direct domestic",
@@ -246,7 +246,7 @@ func TestSelectEndpoint(t *testing.T) {
 			expectedURL: "http://litellm:4000/v1",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			endpoint := router.SelectEndpoint(tt.mode, tt.region, endpoints)

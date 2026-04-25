@@ -50,7 +50,9 @@ export default function AdminBYOKSummaryCard({ data, loading }: Props) {
             title={
               <div>
                 <div>仅统计启用（active）密钥参与「可路由」判断。</div>
-                <div>绿：至少一把 active 满足 strict 白名单；黄：无一可路由且存在不健康或验证失败；</div>
+                <div>
+                  绿：至少一把 active 满足 strict 白名单；黄：无一可路由且存在不健康或验证失败；
+                </div>
                 <div>灰：有启用 Key 但无一可路由且无上述坏信号。</div>
               </div>
             }

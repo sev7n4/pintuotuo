@@ -852,7 +852,10 @@ const AdminRoutingStrategies: React.FC = () => {
                 <Select
                   placeholder="选择或输入策略编码"
                   showSearch
-                  options={strategies.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` }))}
+                  options={strategies.map((s) => ({
+                    value: s.code,
+                    label: `${s.name} (${s.code})`,
+                  }))}
                 />
               </Form.Item>
             </Col>
@@ -880,34 +883,52 @@ const AdminRoutingStrategies: React.FC = () => {
               <Descriptions bordered column={2} size="small">
                 <Descriptions.Item label="策略编码">{testResult.strategy_code}</Descriptions.Item>
                 <Descriptions.Item label="模型">{testResult.model}</Descriptions.Item>
-                <Descriptions.Item label="总候选数">{testResult.total_candidates}</Descriptions.Item>
+                <Descriptions.Item label="总候选数">
+                  {testResult.total_candidates}
+                </Descriptions.Item>
                 <Descriptions.Item label="健康数">{testResult.healthy_count}</Descriptions.Item>
                 <Descriptions.Item label="验证数">{testResult.verified_count}</Descriptions.Item>
                 <Descriptions.Item label="选中厂商">
                   {testResult.selected?.provider ? (
                     <Tag color="blue">{testResult.selected.provider}</Tag>
-                  ) : '-'}
+                  ) : (
+                    '-'
+                  )}
                 </Descriptions.Item>
               </Descriptions>
 
               {testResult.selected && (
                 <Card title="选中的 API Key" size="small" style={{ marginTop: 16 }}>
                   <Descriptions column={2} size="small">
-                    <Descriptions.Item label="API Key ID">{testResult.selected.api_key_id}</Descriptions.Item>
+                    <Descriptions.Item label="API Key ID">
+                      {testResult.selected.api_key_id}
+                    </Descriptions.Item>
                     <Descriptions.Item label="模型">{testResult.selected.model}</Descriptions.Item>
                     <Descriptions.Item label="综合评分">
                       <Tag color="green">{testResult.selected.score?.toFixed(4)}</Tag>
                     </Descriptions.Item>
                     <Descriptions.Item label="健康状态">
-                      <Tag color={testResult.selected.health_status === 'healthy' ? 'green' : 'orange'}>
+                      <Tag
+                        color={testResult.selected.health_status === 'healthy' ? 'green' : 'orange'}
+                      >
                         {testResult.selected.health_status}
                       </Tag>
                     </Descriptions.Item>
-                    <Descriptions.Item label="价格评分">{testResult.selected.price_score?.toFixed(4)}</Descriptions.Item>
-                    <Descriptions.Item label="延迟评分">{testResult.selected.latency_score?.toFixed(4)}</Descriptions.Item>
-                    <Descriptions.Item label="成功评分">{testResult.selected.success_score?.toFixed(4)}</Descriptions.Item>
-                    <Descriptions.Item label="平均延迟">{testResult.selected.avg_latency_ms}ms</Descriptions.Item>
-                    <Descriptions.Item label="成功率">{(testResult.selected.success_rate * 100).toFixed(2)}%</Descriptions.Item>
+                    <Descriptions.Item label="价格评分">
+                      {testResult.selected.price_score?.toFixed(4)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="延迟评分">
+                      {testResult.selected.latency_score?.toFixed(4)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="成功评分">
+                      {testResult.selected.success_score?.toFixed(4)}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="平均延迟">
+                      {testResult.selected.avg_latency_ms}ms
+                    </Descriptions.Item>
+                    <Descriptions.Item label="成功率">
+                      {(testResult.selected.success_rate * 100).toFixed(2)}%
+                    </Descriptions.Item>
                   </Descriptions>
                 </Card>
               )}
@@ -923,9 +944,13 @@ const AdminRoutingStrategies: React.FC = () => {
                       { title: 'API Key ID', dataIndex: 'APIKeyID', width: 100 },
                       { title: 'Provider', dataIndex: 'Provider', width: 100 },
                       { title: '评分', dataIndex: 'Score', render: (v: number) => v?.toFixed(4) },
-                      { title: '健康', dataIndex: 'HealthStatus', render: (v: string) => (
-                        <Tag color={v === 'healthy' ? 'green' : 'orange'}>{v}</Tag>
-                      )},
+                      {
+                        title: '健康',
+                        dataIndex: 'HealthStatus',
+                        render: (v: string) => (
+                          <Tag color={v === 'healthy' ? 'green' : 'orange'}>{v}</Tag>
+                        ),
+                      },
                     ]}
                   />
                 </Card>

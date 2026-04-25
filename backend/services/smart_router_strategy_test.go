@@ -8,11 +8,11 @@ func TestGetStrategyWeights_AllStrategies(t *testing.T) {
 	router := GetSmartRouter()
 
 	tests := []struct {
-		name           string
-		strategy       RoutingStrategy
-		expectPrice    float64
-		expectLatency  float64
-		expectSuccess  float64
+		name          string
+		strategy      RoutingStrategy
+		expectPrice   float64
+		expectLatency float64
+		expectSuccess float64
 	}{
 		{
 			name:          "price_first strategy",

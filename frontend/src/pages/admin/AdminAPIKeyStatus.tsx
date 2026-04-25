@@ -188,7 +188,9 @@ const AdminAPIKeyStatus: React.FC = () => {
   const handleTriggerCollect = async () => {
     try {
       setCollectLoading(true);
-      const response = await api.post<APIResponse<{ message: string }>>('/admin/api-key-status/collect');
+      const response = await api.post<APIResponse<{ message: string }>>(
+        '/admin/api-key-status/collect'
+      );
       if (response.data && response.data.code === 0) {
         message.success('状态采集已触发，请稍后刷新查看结果');
         setTimeout(() => {
@@ -378,7 +380,11 @@ const AdminAPIKeyStatus: React.FC = () => {
       key: 'action',
       width: 80,
       render: (_: unknown, record: APIKeyStatus) => (
-        <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewDetail(record.api_key_id)}>
+        <Button
+          type="link"
+          icon={<EyeOutlined />}
+          onClick={() => handleViewDetail(record.api_key_id)}
+        >
           详情
         </Button>
       ),
@@ -637,11 +643,7 @@ const AdminAPIKeyStatus: React.FC = () => {
         style={{ marginBottom: 16 }}
       />
 
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={tabItems}
-      />
+      <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
 
       <Modal
         title="API Key 详细状态"
@@ -699,7 +701,8 @@ const AdminAPIKeyStatus: React.FC = () => {
                 <div>
                   <Progress
                     percent={
-                      (selectedStatus.connection_pool_active / selectedStatus.connection_pool_size) *
+                      (selectedStatus.connection_pool_active /
+                        selectedStatus.connection_pool_size) *
                       100
                     }
                     status={
@@ -720,7 +723,8 @@ const AdminAPIKeyStatus: React.FC = () => {
                   <div>剩余配额: {selectedStatus.rate_limit_remaining}</div>
                   {selectedStatus.rate_limit_reset_at && (
                     <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
-                      重置时间: {new Date(selectedStatus.rate_limit_reset_at).toLocaleString('zh-CN')}
+                      重置时间:{' '}
+                      {new Date(selectedStatus.rate_limit_reset_at).toLocaleString('zh-CN')}
                     </div>
                   )}
                 </div>
@@ -762,7 +766,9 @@ const AdminAPIKeyStatus: React.FC = () => {
                     tickFormatter={(time) => new Date(time).toLocaleTimeString()}
                   />
                   <YAxis tickFormatter={(value: number) => `${(value * 100).toFixed(0)}%`} />
-                  <Tooltip formatter={(value) => [`${((value as number) * 100).toFixed(2)}%`, '']} />
+                  <Tooltip
+                    formatter={(value) => [`${((value as number) * 100).toFixed(2)}%`, '']}
+                  />
                   <Legend />
                   <Line type="monotone" dataKey="errorRate" name="错误率" stroke="#f5222d" />
                   <Line type="monotone" dataKey="successRate" name="成功率" stroke="#52c41a" />

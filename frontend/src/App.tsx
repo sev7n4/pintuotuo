@@ -183,8 +183,8 @@ function App() {
             <Route path="api-key-status" element={<AdminAPIKeyStatus />} />
             <Route path="route-decision-logs" element={<AdminRouteDecisionLogs />} />
             <Route path="gateway-stats" element={<AdminGatewayStats />} />
-              <Route path="rate-limiter" element={<AdminRateLimiter />} />
-              <Route path="queue-config" element={<AdminQueueConfig />} />
+            <Route path="rate-limiter" element={<AdminRateLimiter />} />
+            <Route path="queue-config" element={<AdminQueueConfig />} />
             <Route path="reconciliation" element={<AdminReconciliation />} />
             <Route path="flash-sales" element={<AdminFlashSales />} />
             <Route path="fuel-station" element={<AdminFuelStation />} />

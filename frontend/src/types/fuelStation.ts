@@ -26,4 +26,3 @@ export interface FuelStationTemplate {
   description: string;
   payload: FuelStationConfig;
 }
-

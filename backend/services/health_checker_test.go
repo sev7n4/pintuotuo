@@ -256,9 +256,9 @@ func TestExtractPricingInfo(t *testing.T) {
 
 func TestOpenAICompatProbeURLs(t *testing.T) {
 	tests := []struct {
-		name    string
-		base    string
-		wantM   string
+		name     string
+		base     string
+		wantM    string
 		wantChat string
 	}{
 		{

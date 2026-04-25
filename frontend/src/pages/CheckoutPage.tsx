@@ -177,11 +177,23 @@ const CheckoutPage: React.FC = () => {
               description={
                 <span>
                   加油包不可单独购买，需与至少一个在售模型商品或套餐包组合下单；如需补充余额，可前往{' '}
-                  <a href="/catalog" onClick={(e) => { e.preventDefault(); navigate('/catalog'); }}>
+                  <a
+                    href="/catalog"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate('/catalog');
+                    }}
+                  >
                     卖场
                   </a>
                   或{' '}
-                  <a href="/fuel-station" onClick={(e) => { e.preventDefault(); navigate('/fuel-station'); }}>
+                  <a
+                    href="/fuel-station"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate('/fuel-station');
+                    }}
+                  >
                     模型加油站
                   </a>
                   选择组合方案。入账按批次有效期，先到期先扣（详见「我的 Token」页）。

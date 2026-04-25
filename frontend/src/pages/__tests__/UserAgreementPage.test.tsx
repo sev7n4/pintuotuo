@@ -14,4 +14,3 @@ describe('UserAgreementPage', () => {
     expect(screen.getByText(/在 strict 权益规则下，加油包不可单独购买/)).toBeInTheDocument();
   });
 });
-

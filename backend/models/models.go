@@ -219,19 +219,19 @@ type MerchantAPIKey struct {
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 
-	MerchantRegion      string          `json:"merchant_region,omitempty"`  // domestic, overseas
-	Region              string          `json:"region,omitempty"`           // domestic, overseas (智能路由字段)
-	SecurityLevel       string          `json:"security_level,omitempty"`   // standard, high (智能路由字段)
-	HealthCheckInterval int             `json:"health_check_interval,omitempty"`
-	HealthCheckLevel    string          `json:"health_check_level,omitempty"`
-	EndpointURL         string          `json:"endpoint_url,omitempty"`
-	HealthStatus        string          `json:"health_status,omitempty"`
-	HealthErrorMessage  string          `json:"health_error_message,omitempty"`
-	HealthErrorCategory string          `json:"health_error_category,omitempty"`
-	HealthErrorCode     string          `json:"health_error_code,omitempty"`
-	HealthRequestID     string          `json:"health_provider_request_id,omitempty"`
-	LastHealthCheckAt   *time.Time      `json:"last_health_check_at,omitempty"`
-	ConsecutiveFailures int             `json:"consecutive_failures,omitempty"`
+	MerchantRegion      string     `json:"merchant_region,omitempty"` // domestic, overseas
+	Region              string     `json:"region,omitempty"`          // domestic, overseas (智能路由字段)
+	SecurityLevel       string     `json:"security_level,omitempty"`  // standard, high (智能路由字段)
+	HealthCheckInterval int        `json:"health_check_interval,omitempty"`
+	HealthCheckLevel    string     `json:"health_check_level,omitempty"`
+	EndpointURL         string     `json:"endpoint_url,omitempty"`
+	HealthStatus        string     `json:"health_status,omitempty"`
+	HealthErrorMessage  string     `json:"health_error_message,omitempty"`
+	HealthErrorCategory string     `json:"health_error_category,omitempty"`
+	HealthErrorCode     string     `json:"health_error_code,omitempty"`
+	HealthRequestID     string     `json:"health_provider_request_id,omitempty"`
+	LastHealthCheckAt   *time.Time `json:"last_health_check_at,omitempty"`
+	ConsecutiveFailures int        `json:"consecutive_failures,omitempty"`
 
 	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
 	VerificationResult string     `json:"verification_result,omitempty"`

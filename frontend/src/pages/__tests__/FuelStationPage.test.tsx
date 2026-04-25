@@ -37,4 +37,3 @@ describe('FuelStationPage', () => {
     expect(screen.getByText(/加油包不可单独购买/)).toBeInTheDocument();
   });
 });
-

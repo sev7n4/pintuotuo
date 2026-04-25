@@ -29,7 +29,9 @@ export function lineValueHint(it: EntitlementPackageItem): string {
 /** 「套餐包含」四条要点（第 1 条来自组合内模型名；2～4 条据 SKU 类型与数量生成，缺类时给占位说明） */
 export type PackageIncludeBullet = { key: string; text: string };
 
-export function buildPackageIncludeBullets(items: EntitlementPackageItem[]): PackageIncludeBullet[] {
+export function buildPackageIncludeBullets(
+  items: EntitlementPackageItem[]
+): PackageIncludeBullet[] {
   const list = items ?? [];
   if (list.length === 0) return [];
 
@@ -64,9 +66,7 @@ export function buildPackageIncludeBullets(items: EntitlementPackageItem[]): Pac
     },
     {
       key: 'routing',
-      text: hasConcurrent
-        ? '智能线路选择/模型自由切换'
-        : '—（本组合暂无智能线路/并发类 SKU）',
+      text: hasConcurrent ? '智能线路选择/模型自由切换' : '—（本组合暂无智能线路/并发类 SKU）',
     },
   ];
 }

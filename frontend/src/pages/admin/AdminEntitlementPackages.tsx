@@ -334,87 +334,87 @@ export default function AdminEntitlementPackages() {
       />
       <div style={{ width: '100%', overflowX: 'auto' }}>
         <Table
-        rowKey="id"
-        loading={loading}
-        size="small"
-        scroll={{ x: 960 }}
-        dataSource={rows}
-        columns={[
-          { title: '编码', dataIndex: 'package_code', key: 'package_code', width: 140 },
-          { title: '名称', dataIndex: 'name', key: 'name', width: 220 },
-          {
-            title: '明细',
-            key: 'items',
-            render: (_, r) => (
-              <Space wrap>
-                {(r.items || []).map((it) => (
-                  <Tag key={it.id} color={it.line_purchasable === false ? 'error' : 'default'}>
-                    {it.sku_code} x{it.default_quantity}
-                    {it.line_issue ? ` (${it.line_issue})` : ''}
-                  </Tag>
-                ))}
-              </Space>
-            ),
-          },
-          {
-            title: '可售',
-            key: 'sell',
-            width: 88,
-            render: (_, r) =>
-              r.purchasable === false ? (
-                <Tag color="error">异常</Tag>
-              ) : (
-                <Tag color="success">正常</Tag>
+          rowKey="id"
+          loading={loading}
+          size="small"
+          scroll={{ x: 960 }}
+          dataSource={rows}
+          columns={[
+            { title: '编码', dataIndex: 'package_code', key: 'package_code', width: 140 },
+            { title: '名称', dataIndex: 'name', key: 'name', width: 220 },
+            {
+              title: '明细',
+              key: 'items',
+              render: (_, r) => (
+                <Space wrap>
+                  {(r.items || []).map((it) => (
+                    <Tag key={it.id} color={it.line_purchasable === false ? 'error' : 'default'}>
+                      {it.sku_code} x{it.default_quantity}
+                      {it.line_issue ? ` (${it.line_issue})` : ''}
+                    </Tag>
+                  ))}
+                </Space>
               ),
-          },
-          {
-            title: '状态',
-            dataIndex: 'status',
-            key: 'status',
-            width: 100,
-            render: (s: string) => <Tag color={s === 'active' ? 'success' : 'default'}>{s}</Tag>,
-          },
-          {
-            title: '运营',
-            key: 'ops',
-            width: 220,
-            render: (_, r) => (
-              <Space wrap>
-                {r.is_featured ? <Tag color="gold">推荐</Tag> : null}
-                {r.badge_text ? <Tag color="purple">{r.badge_text}</Tag> : null}
-                {r.start_at || r.end_at ? (
-                  <Tag>
-                    {r.start_at ? dayjs(r.start_at).format('MM-DD HH:mm') : '不限'} ~{' '}
-                    {r.end_at ? dayjs(r.end_at).format('MM-DD HH:mm') : '不限'}
-                  </Tag>
+            },
+            {
+              title: '可售',
+              key: 'sell',
+              width: 88,
+              render: (_, r) =>
+                r.purchasable === false ? (
+                  <Tag color="error">异常</Tag>
                 ) : (
-                  <Tag>长期有效</Tag>
-                )}
-              </Space>
-            ),
-          },
-          { title: '排序', dataIndex: 'sort_order', key: 'sort_order', width: 90 },
-          {
-            title: '操作',
-            key: 'action',
-            width: 240,
-            render: (_, r) => (
-              <Space wrap>
-                <Button type="link" icon={<EyeOutlined />} onClick={() => openSavedPreview(r)}>
-                  预览
-                </Button>
-                <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(r)}>
-                  编辑
-                </Button>
-                <Popconfirm title="确认删除该套餐包？" onConfirm={() => remove(r.id)}>
-                  <Button type="link" danger icon={<DeleteOutlined />}>
-                    删除
+                  <Tag color="success">正常</Tag>
+                ),
+            },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              key: 'status',
+              width: 100,
+              render: (s: string) => <Tag color={s === 'active' ? 'success' : 'default'}>{s}</Tag>,
+            },
+            {
+              title: '运营',
+              key: 'ops',
+              width: 220,
+              render: (_, r) => (
+                <Space wrap>
+                  {r.is_featured ? <Tag color="gold">推荐</Tag> : null}
+                  {r.badge_text ? <Tag color="purple">{r.badge_text}</Tag> : null}
+                  {r.start_at || r.end_at ? (
+                    <Tag>
+                      {r.start_at ? dayjs(r.start_at).format('MM-DD HH:mm') : '不限'} ~{' '}
+                      {r.end_at ? dayjs(r.end_at).format('MM-DD HH:mm') : '不限'}
+                    </Tag>
+                  ) : (
+                    <Tag>长期有效</Tag>
+                  )}
+                </Space>
+              ),
+            },
+            { title: '排序', dataIndex: 'sort_order', key: 'sort_order', width: 90 },
+            {
+              title: '操作',
+              key: 'action',
+              width: 240,
+              render: (_, r) => (
+                <Space wrap>
+                  <Button type="link" icon={<EyeOutlined />} onClick={() => openSavedPreview(r)}>
+                    预览
                   </Button>
-                </Popconfirm>
-              </Space>
-            ),
-          },
-        ]}
+                  <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(r)}>
+                    编辑
+                  </Button>
+                  <Popconfirm title="确认删除该套餐包？" onConfirm={() => remove(r.id)}>
+                    <Button type="link" danger icon={<DeleteOutlined />}>
+                      删除
+                    </Button>
+                  </Popconfirm>
+                </Space>
+              ),
+            },
+          ]}
         />
       </div>
 
@@ -491,10 +491,7 @@ export default function AdminEntitlementPackages() {
               </Col>
               <Col xs={24} md={12}>
                 <Form.Item name="category_code" label="分类">
-                  <Select
-                    options={ENTITLEMENT_CATEGORY_ADMIN_OPTIONS}
-                    placeholder="选择分类"
-                  />
+                  <Select options={ENTITLEMENT_CATEGORY_ADMIN_OPTIONS} placeholder="选择分类" />
                 </Form.Item>
               </Col>
               <Col xs={24} md={12}>
@@ -692,7 +689,7 @@ export default function AdminEntitlementPackages() {
               <Space wrap>
                 {(previewPkg.items || []).map((it) => (
                   <Tag key={`${it.sku_id}-${it.id}`} color="green">
-                    {(it.display_name?.trim() || it.spu_name) || it.sku_code} ×{it.default_quantity}
+                    {it.display_name?.trim() || it.spu_name || it.sku_code} ×{it.default_quantity}
                   </Tag>
                 ))}
               </Space>

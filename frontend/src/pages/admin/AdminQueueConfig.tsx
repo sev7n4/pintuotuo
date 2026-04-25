@@ -14,11 +14,7 @@ import {
   Typography,
   Alert,
 } from 'antd';
-import {
-  OrderedListOutlined,
-  ReloadOutlined,
-  EditOutlined,
-} from '@ant-design/icons';
+import { OrderedListOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons';
 import api from '@services/api';
 
 const { Text } = Typography;
@@ -84,9 +80,7 @@ const AdminQueueConfig: React.FC = () => {
 
   const handleReset = async (key?: string) => {
     try {
-      const url = key
-        ? `/admin/queue/reset?key=${encodeURIComponent(key)}`
-        : '/admin/queue/reset';
+      const url = key ? `/admin/queue/reset?key=${encodeURIComponent(key)}` : '/admin/queue/reset';
       await api.post(url);
       message.success('统计数据已重置');
       fetchStats();
@@ -221,10 +215,7 @@ const AdminQueueConfig: React.FC = () => {
         onCancel={() => setModalVisible(false)}
       >
         <Form form={form} layout="vertical">
-          <Form.Item
-            name="key"
-            label="Key"
-          >
+          <Form.Item name="key" label="Key">
             <Text code>{editingKey}</Text>
           </Form.Item>
           <Form.Item
