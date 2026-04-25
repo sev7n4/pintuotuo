@@ -518,6 +518,83 @@ func (r *SmartRouter) IsCircuitBreakerOpen(apiKeyID int) bool {
 	return false
 }
 
+func (r *SmartRouter) calculateSecurityScore(candidates []RoutingCandidate, requiredRegions []string) []float64 {
+	scores := make([]float64, len(candidates))
+	for i, c := range candidates {
+		score := 0.6
+		switch c.SecurityLevel {
+		case "enterprise":
+			score = 1.0
+		case "enhanced":
+			score = 0.8
+		case "standard":
+			score = 0.6
+		case "basic":
+			score = 0.4
+		}
+
+		if len(requiredRegions) > 0 {
+			regionMatch := false
+			for _, region := range requiredRegions {
+				if c.Region == region {
+					regionMatch = true
+					break
+				}
+			}
+			if !regionMatch {
+				score = 0.0
+			}
+		}
+
+		if c.Verified && score > 0 {
+			score = min(score+0.1, 1.0)
+		}
+
+		scores[i] = score
+	}
+	return scores
+}
+
+func (r *SmartRouter) calculateLoadBalanceScore(candidates []RoutingCandidate, usageStats map[int]int) []float64 {
+	scores := make([]float64, len(candidates))
+
+	if len(usageStats) == 0 {
+		for i := range scores {
+			scores[i] = 1.0
+		}
+		return scores
+	}
+
+	minUsage := int(^uint(0) >> 1)
+	maxUsage := 0
+	for _, usage := range usageStats {
+		if usage < minUsage {
+			minUsage = usage
+		}
+		if usage > maxUsage {
+			maxUsage = usage
+		}
+	}
+
+	for i, c := range candidates {
+		usage := usageStats[c.APIKeyID]
+		if maxUsage == minUsage {
+			scores[i] = 1.0
+		} else {
+			scores[i] = 1.0 - float64(usage-minUsage)/float64(maxUsage-minUsage)
+		}
+	}
+
+	return scores
+}
+
+func min(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func (r *SmartRouter) GetStrategyConfig(strategyCode string) (*StrategyConfig, bool) {
 	strategy := RoutingStrategy(strategyCode)
 	switch strategy {
