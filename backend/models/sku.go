@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"time"
 )
 
@@ -21,10 +20,10 @@ type ModelProvider struct {
 	CacheEnabled            bool           `json:"cache_enabled"`
 	CacheDiscount           float64        `json:"cache_discount_rate,omitempty"`
 	// 统一配置化路由系统字段
-	ProviderRegion string          `json:"provider_region,omitempty"` // domestic, overseas
-	RouteStrategy  json.RawMessage `json:"route_strategy,omitempty"`  // JSONB: route strategy config
-	Endpoints      json.RawMessage `json:"endpoints,omitempty"`       // JSONB: endpoints config
-	Status         string          `json:"status"`
+	ProviderRegion string                 `json:"provider_region,omitempty"` // domestic, overseas
+	RouteStrategy  map[string]interface{} `json:"route_strategy,omitempty"`  // JSONB: route strategy config
+	Endpoints      map[string]interface{} `json:"endpoints,omitempty"`       // JSONB: endpoints config
+	Status         string                 `json:"status"`
 	SortOrder      int             `json:"sort_order"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
