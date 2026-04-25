@@ -441,8 +441,7 @@ const AdminMerchants = () => {
         }
         const color =
           row.level === 'green' ? 'success' : row.level === 'yellow' ? 'warning' : 'default';
-        const label =
-          row.level === 'green' ? '可路由' : row.level === 'yellow' ? '异常' : '未就绪';
+        const label = row.level === 'green' ? '可路由' : row.level === 'yellow' ? '异常' : '未就绪';
         return (
           <Space direction="vertical" size={2}>
             <Tag color={color}>{label}</Tag>

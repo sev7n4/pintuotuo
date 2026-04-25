@@ -69,7 +69,6 @@ import AdminReconciliation from '@pages/admin/AdminReconciliation';
 import AdminEntitlementPackages from '@pages/admin/AdminEntitlementPackages';
 import AdminAPIKeyStatus from '@pages/admin/AdminAPIKeyStatus';
 import AdminRouteDecisionLogs from '@pages/admin/AdminRouteDecisionLogs';
-import AdminAPIKeyAdvancedConfig from '@pages/admin/AdminAPIKeyAdvancedConfig';
 import AdminGatewayStats from '@pages/admin/AdminGatewayStats';
 import AdminRateLimiter from '@pages/admin/AdminRateLimiter';
 import AdminQueueConfig from '@pages/admin/AdminQueueConfig';
@@ -182,11 +181,10 @@ function App() {
             <Route path="routing-strategies" element={<AdminRoutingStrategies />} />
             <Route path="route-configs" element={<AdminRouteConfigs />} />
             <Route path="api-key-status" element={<AdminAPIKeyStatus />} />
-              <Route path="route-decision-logs" element={<AdminRouteDecisionLogs />} />
-              <Route path="api-key-advanced-config" element={<AdminAPIKeyAdvancedConfig />} />
-              <Route path="gateway-stats" element={<AdminGatewayStats />} />
-              <Route path="rate-limiter" element={<AdminRateLimiter />} />
-              <Route path="queue-config" element={<AdminQueueConfig />} />
+            <Route path="route-decision-logs" element={<AdminRouteDecisionLogs />} />
+            <Route path="gateway-stats" element={<AdminGatewayStats />} />
+            <Route path="rate-limiter" element={<AdminRateLimiter />} />
+            <Route path="queue-config" element={<AdminQueueConfig />} />
             <Route path="reconciliation" element={<AdminReconciliation />} />
             <Route path="flash-sales" element={<AdminFlashSales />} />
             <Route path="fuel-station" element={<AdminFuelStation />} />

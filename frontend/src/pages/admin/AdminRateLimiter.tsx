@@ -14,11 +14,7 @@ import {
   Typography,
   Alert,
 } from 'antd';
-import {
-  SafetyOutlined,
-  ReloadOutlined,
-  EditOutlined,
-} from '@ant-design/icons';
+import { SafetyOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons';
 import api from '@services/api';
 
 const { Text } = Typography;
@@ -42,7 +38,9 @@ const AdminRateLimiter: React.FC = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const response = await api.get<{ limiters: Record<string, RateLimiterItem> }>('/admin/rate-limiter/stats');
+      const response = await api.get<{ limiters: Record<string, RateLimiterItem> }>(
+        '/admin/rate-limiter/stats'
+      );
       const limiters = response.data.limiters || {};
       const data = Object.entries(limiters).map(([key, stats]: [string, any]) => ({
         key,
@@ -114,7 +112,9 @@ const AdminRateLimiter: React.FC = () => {
       title: '拒绝',
       dataIndex: 'denied',
       key: 'denied',
-      render: (val: number) => <Tag color={val > 0 ? 'red' : 'default'}>{val?.toLocaleString() || 0}</Tag>,
+      render: (val: number) => (
+        <Tag color={val > 0 ? 'red' : 'default'}>{val?.toLocaleString() || 0}</Tag>
+      ),
     },
     {
       title: '拒绝率',
@@ -200,11 +200,7 @@ const AdminRateLimiter: React.FC = () => {
         onCancel={() => setModalVisible(false)}
       >
         <Form form={form} layout="vertical">
-          <Form.Item
-            name="key"
-            label="Key"
-            rules={[{ required: true, message: '请输入 Key' }]}
-          >
+          <Form.Item name="key" label="Key" rules={[{ required: true, message: '请输入 Key' }]}>
             <Text code>{editingKey || '新建'}</Text>
           </Form.Item>
           <Form.Item

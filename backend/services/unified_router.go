@@ -28,10 +28,9 @@ type ProviderConfig struct {
 }
 
 type MerchantConfig struct {
-	ID              int
-	Type            string
-	Region          string
-	RoutePreference map[string]interface{}
+	ID     int
+	Type   string
+	Region string
 }
 
 func NewUnifiedRouter(db *sql.DB) *UnifiedRouter {

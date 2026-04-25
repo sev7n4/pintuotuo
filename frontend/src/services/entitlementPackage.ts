@@ -47,7 +47,10 @@ export const entitlementPackageService = {
       `/entitlement-packages/${packageId}/like`
     ),
   upsertReview: (packageId: number, body: { rating: number; comment?: string }) =>
-    api.post<{ data: { review_count: number } }>(`/entitlement-packages/${packageId}/reviews`, body),
+    api.post<{ data: { review_count: number } }>(
+      `/entitlement-packages/${packageId}/reviews`,
+      body
+    ),
   listAdmin: () => api.get<{ data: EntitlementPackage[] }>('/admin/entitlement-packages'),
   createAdmin: (data: EntitlementPackageUpsertPayload) =>
     api.post('/admin/entitlement-packages', data),

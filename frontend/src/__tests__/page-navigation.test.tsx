@@ -200,7 +200,12 @@ describe('Page Navigation Integration Tests', () => {
       });
 
       await waitFor(() => {
-        expect(mockRegister).toHaveBeenCalledWith('cuser@example.com', 'password123', 'user', undefined);
+        expect(mockRegister).toHaveBeenCalledWith(
+          'cuser@example.com',
+          'password123',
+          'user',
+          undefined
+        );
       });
     });
 

@@ -109,7 +109,13 @@ const InviteManagementPanel = ({ visible }: Props) => {
   const columns: ColumnsType<MerchantInvite> = useMemo(
     () => [
       { title: '邀请码', dataIndex: 'code', key: 'code', width: 180, fixed: 'left' },
-      { title: '状态', dataIndex: 'status', key: 'status', width: 100, render: (v) => statusTag(v) },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        key: 'status',
+        width: 100,
+        render: (v) => statusTag(v),
+      },
       {
         title: '使用次数',
         key: 'usage',

@@ -22,11 +22,7 @@ import {
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
-import {
-  favoriteService,
-  type FavoriteListItem,
-  type FavoriteSKUItem,
-} from '@/services/favorite';
+import { favoriteService, type FavoriteListItem, type FavoriteSKUItem } from '@/services/favorite';
 import { entitlementPackageService } from '@/services/entitlementPackage';
 import styles from './FavoritesPage.module.css';
 

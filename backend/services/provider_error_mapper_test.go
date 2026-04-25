@@ -40,10 +40,10 @@ func TestMapProviderError(t *testing.T) {
 			wantCat:    errorCategoryQuotaInsufficient,
 		},
 		{
-			name:       "network timeout",
-			netErr:     errors.New("dial tcp timeout"),
-			wantCat:    errorCategoryNetworkTimeout,
-			retryable:  true,
+			name:      "network timeout",
+			netErr:    errors.New("dial tcp timeout"),
+			wantCat:   errorCategoryNetworkTimeout,
+			retryable: true,
 		},
 		{
 			name:       "request id extraction",

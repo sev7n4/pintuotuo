@@ -526,8 +526,7 @@ const MyToken = () => {
               title: '到期时间',
               dataIndex: 'expires_at',
               key: 'expires_at',
-              render: (v: string | null) =>
-                v ? new Date(v).toLocaleString('zh-CN') : '长期有效',
+              render: (v: string | null) => (v ? new Date(v).toLocaleString('zh-CN') : '长期有效'),
             },
             {
               title: '创建时间',

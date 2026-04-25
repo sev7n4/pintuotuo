@@ -166,7 +166,11 @@ const AdminUsers: React.FC = () => {
             dataSource={filteredUsers}
             rowKey="id"
             loading={loading}
-            pagination={{ pageSize: 10, showSizeChanger: false, showTotal: (total) => `共 ${total} 条` }}
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: false,
+              showTotal: (total) => `共 ${total} 条`,
+            }}
           />
         </div>
       </Card>

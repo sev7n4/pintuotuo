@@ -143,21 +143,33 @@ export const adminMerchantService = {
     merchantId: number,
     lifecycle_status: 'trial' | 'active' | 'suspended'
   ) =>
-    api.patch<{ code: number; message: string; data: { merchant_id: number; lifecycle_status: string } }>(
-      `/admin/merchants/${merchantId}/lifecycle`,
-      { lifecycle_status }
-    ),
+    api.patch<{
+      code: number;
+      message: string;
+      data: { merchant_id: number; lifecycle_status: string };
+    }>(`/admin/merchants/${merchantId}/lifecycle`, { lifecycle_status }),
 
   listMerchantInvites: (params?: { status?: string; keyword?: string; limit?: number }) =>
-    api.get<{ code: number; message: string; data: MerchantInvite[] }>('/admin/merchant-invites', { params }),
+    api.get<{ code: number; message: string; data: MerchantInvite[] }>('/admin/merchant-invites', {
+      params,
+    }),
 
   createMerchantInvite: (body: { max_uses: number; expires_in?: string; note?: string }) =>
     api.post<{
       code: number;
       message: string;
-      data: { id: number; code: string; max_uses: number; expires_at?: string; note: string; register_url: string };
+      data: {
+        id: number;
+        code: string;
+        max_uses: number;
+        expires_at?: string;
+        note: string;
+        register_url: string;
+      };
     }>('/admin/merchant-invites', body),
 
   revokeMerchantInvite: (id: number, reason?: string) =>
-    api.post<{ code: number; message: string }>(`/admin/merchant-invites/${id}/revoke`, { reason: reason ?? '' }),
+    api.post<{ code: number; message: string }>(`/admin/merchant-invites/${id}/revoke`, {
+      reason: reason ?? '',
+    }),
 };

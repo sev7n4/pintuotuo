@@ -113,7 +113,8 @@ const AdminFuelStation = () => {
     const issues: string[] = [];
     if (sku.status !== 'active') issues.push('SKU 非 active');
     if (sku.spu_status && sku.spu_status !== 'active') issues.push('所属 SPU 非 active');
-    if (sku.sku_type !== 'token_pack') issues.push(`SKU 类型为 ${sku.sku_type}，建议使用 token_pack`);
+    if (sku.sku_type !== 'token_pack')
+      issues.push(`SKU 类型为 ${sku.sku_type}，建议使用 token_pack`);
     if (Number(sku.stock || 0) === 0) issues.push('库存为 0');
     return { ok: issues.length === 0, messages: issues.length ? issues : ['可售'] };
   };
@@ -251,7 +252,11 @@ const AdminFuelStation = () => {
                 onChange={setSelectedTemplateKey}
                 options={templateLibrary.map((t) => ({ value: t.key, label: t.name }))}
               />
-              <Tooltip title={templateLibrary.find((t) => t.key === selectedTemplateKey)?.description || ''}>
+              <Tooltip
+                title={
+                  templateLibrary.find((t) => t.key === selectedTemplateKey)?.description || ''
+                }
+              >
                 <Tag color="blue">模板说明</Tag>
               </Tooltip>
               <Button onClick={applyTemplate}>应用模板到草稿</Button>
@@ -273,7 +278,11 @@ const AdminFuelStation = () => {
         </Card>
 
         <Form form={form} layout="vertical" onFinish={onFinish}>
-          <Form.Item name="page_title" label="页面标题" rules={[{ required: true, message: '必填' }]}>
+          <Form.Item
+            name="page_title"
+            label="页面标题"
+            rules={[{ required: true, message: '必填' }]}
+          >
             <Input />
           </Form.Item>
           <Form.Item name="page_subtitle" label="页面副标题">
@@ -387,7 +396,11 @@ const AdminFuelStation = () => {
                             </Row>
                           ))}
                           <Form.Item>
-                            <Button type="dashed" onClick={() => tierOps.add()} icon={<PlusOutlined />}>
+                            <Button
+                              type="dashed"
+                              onClick={() => tierOps.add()}
+                              icon={<PlusOutlined />}
+                            >
                               添加档位
                             </Button>
                           </Form.Item>
@@ -418,13 +431,17 @@ const AdminFuelStation = () => {
         <Title level={4} style={{ marginBottom: 0 }}>
           {watchedValues?.page_title || '智燃加油站'}
         </Title>
-        <Paragraph type="secondary">{watchedValues?.page_subtitle || '面向已订购模型权益用户，按用途补充 Token。'}</Paragraph>
+        <Paragraph type="secondary">
+          {watchedValues?.page_subtitle || '面向已订购模型权益用户，按用途补充 Token。'}
+        </Paragraph>
         <Alert
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
           message="规则提示"
-          description={watchedValues?.rule_text || '加油包不可单独购买，需与模型商品或套餐包组合下单。'}
+          description={
+            watchedValues?.rule_text || '加油包不可单独购买，需与模型商品或套餐包组合下单。'
+          }
         />
         <Alert
           type="warning"
@@ -447,7 +464,9 @@ const AdminFuelStation = () => {
                     <div key={`${tier?.label || 'tier'}-${i}`}>
                       <Text strong>{tier?.label || `档位 #${i + 1}`}</Text>
                       <br />
-                      <Text type="secondary">{skuLabelMap.get(Number(tier?.sku_id || 0)) || '未关联 SKU'}</Text>
+                      <Text type="secondary">
+                        {skuLabelMap.get(Number(tier?.sku_id || 0)) || '未关联 SKU'}
+                      </Text>
                     </div>
                   ))}
                 </Space>
@@ -491,4 +510,3 @@ const AdminFuelStation = () => {
 };
 
 export default AdminFuelStation;
-

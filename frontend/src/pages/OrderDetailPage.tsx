@@ -22,10 +22,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useOrderStore } from '@/stores/orderStore';
-import {
-  canReorderFromOrder,
-  orderItemLineTitle,
-} from '@/utils/orderSummary';
+import { canReorderFromOrder, orderItemLineTitle } from '@/utils/orderSummary';
 import { getApiErrorMessage } from '@/utils/apiError';
 
 const { Title, Text } = Typography;

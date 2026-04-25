@@ -19,8 +19,6 @@ const (
 	RoutingStrategyLatency     RoutingStrategy = "latency_first"
 	RoutingStrategyBalanced    RoutingStrategy = "balanced"
 	RoutingStrategyReliability RoutingStrategy = "reliability_first"
-	RoutingStrategyPerformance RoutingStrategy = "performance_first"
-	RoutingStrategySecurity    RoutingStrategy = "security_first"
 )
 
 type RoutingCandidate struct {
@@ -388,10 +386,6 @@ func (r *SmartRouter) getStrategyWeights(strategy RoutingStrategy) StrategyWeigh
 		return StrategyWeights{Price: 0.2, Latency: 0.6, Success: 0.2}
 	case RoutingStrategyReliability:
 		return StrategyWeights{Price: 0.2, Latency: 0.2, Success: 0.6}
-	case RoutingStrategyPerformance:
-		return StrategyWeights{Price: 0.1, Latency: 0.5, Success: 0.2}
-	case RoutingStrategySecurity:
-		return StrategyWeights{Price: 0.1, Latency: 0.1, Success: 0.2}
 	default:
 		return StrategyWeights{Price: 0.33, Latency: 0.34, Success: 0.33}
 	}
@@ -487,7 +481,7 @@ func (r *SmartRouter) IsCircuitBreakerOpen(apiKeyID int) bool {
 func (r *SmartRouter) GetStrategyConfig(strategyCode string) (*StrategyConfig, bool) {
 	strategy := RoutingStrategy(strategyCode)
 	switch strategy {
-	case RoutingStrategyPrice, RoutingStrategyLatency, RoutingStrategyBalanced, RoutingStrategyReliability, RoutingStrategyPerformance, RoutingStrategySecurity:
+	case RoutingStrategyPrice, RoutingStrategyLatency, RoutingStrategyBalanced, RoutingStrategyReliability:
 		weights := r.getStrategyWeights(strategy)
 		return &StrategyConfig{
 			Strategy:                strategyCode,

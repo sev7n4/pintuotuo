@@ -1,11 +1,43 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {  Card,  Table,  Button,  Tag,  Space,  Descriptions,  Modal,  Spin,  Switch,  Select,  Input,  message,  Alert,  Progress,} from 'antd';import {
+import {
+  Card,
+  Table,
+  Button,
+  Tag,
+  Space,
+  Descriptions,
+  Modal,
+  Spin,
+  Switch,
+  Select,
+  Input,
+  message,
+  Alert,
+  Progress,
+  Tabs,
+} from 'antd';
+import {
   SyncOutlined,
   LineChartOutlined,
   EyeOutlined,
   ThunderboltOutlined,
+  SearchOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import api from '@/services/api';
 
 interface APIResponse<T> {
@@ -30,6 +62,30 @@ interface APIKeyStatus {
   updated_at: string;
 }
 
+interface MerchantAPIKeyStatus {
+  id: number;
+  merchant_id: number;
+  name: string;
+  provider: string;
+  status: string;
+  region: string;
+  security_level: string;
+  endpoint_url: string;
+  health_status: string;
+  latency_p50: number;
+  latency_p95: number;
+  latency_p99: number;
+  error_rate: number;
+  success_rate: number;
+  connection_pool_size: number;
+  connection_pool_active: number;
+  rate_limit_remaining: number;
+  load_balance_weight: number;
+  last_request_at: string;
+  status_updated_at: string;
+  created_at: string;
+}
+
 interface APIKeyInfo {
   id: number;
   name: string;
@@ -48,6 +104,7 @@ interface APIKeyDetail extends APIKeyStatus {
 
 const AdminAPIKeyStatus: React.FC = () => {
   const [statuses, setStatuses] = useState<APIKeyStatus[]>([]);
+  const [merchantStatuses, setMerchantStatuses] = useState<MerchantAPIKeyStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [collectLoading, setCollectLoading] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -57,6 +114,8 @@ const AdminAPIKeyStatus: React.FC = () => {
   const [filterProvider, setFilterProvider] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [merchantIdSearch, setMerchantIdSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
 
   const fetchStatuses = useCallback(async () => {
     try {
@@ -67,6 +126,23 @@ const AdminAPIKeyStatus: React.FC = () => {
       }
     } catch (error) {
       message.error('获取API Key状态失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchStatusesByMerchantId = useCallback(async (merchantId: number) => {
+    try {
+      setLoading(true);
+      const response = await api.get<APIResponse<MerchantAPIKeyStatus[]>>(
+        `/admin/api-key-status/merchant?merchant_id=${merchantId}`
+      );
+      if (response.data && response.data.code === 0) {
+        setMerchantStatuses(response.data.data || []);
+        setActiveTab('merchant');
+      }
+    } catch (error) {
+      message.error('获取商户API Key状态失败');
     } finally {
       setLoading(false);
     }
@@ -89,17 +165,36 @@ const AdminAPIKeyStatus: React.FC = () => {
   }, [autoRefresh, refreshInterval, fetchStatuses]);
 
   const handleRefresh = () => {
-    fetchStatuses();
+    if (activeTab === 'merchant' && merchantIdSearch) {
+      fetchStatusesByMerchantId(parseInt(merchantIdSearch));
+    } else {
+      fetchStatuses();
+    }
+  };
+
+  const handleMerchantIdSearch = () => {
+    if (!merchantIdSearch) {
+      message.warning('请输入商户ID');
+      return;
+    }
+    const merchantId = parseInt(merchantIdSearch);
+    if (isNaN(merchantId)) {
+      message.error('商户ID必须是数字');
+      return;
+    }
+    fetchStatusesByMerchantId(merchantId);
   };
 
   const handleTriggerCollect = async () => {
     try {
       setCollectLoading(true);
-      const response = await api.post<APIResponse<{ message: string }>>('/admin/api-key-status/collect');
+      const response = await api.post<APIResponse<{ message: string }>>(
+        '/admin/api-key-status/collect'
+      );
       if (response.data && response.data.code === 0) {
         message.success('状态采集已触发，请稍后刷新查看结果');
         setTimeout(() => {
-          fetchStatuses();
+          handleRefresh();
         }, 3000);
       }
     } catch (error) {
@@ -184,9 +279,7 @@ const AdminAPIKeyStatus: React.FC = () => {
     return 'red';
   };
 
-
-
-  const columns = [
+  const allColumns = [
     {
       title: 'API Key ID',
       dataIndex: 'api_key_id',
@@ -197,25 +290,19 @@ const AdminAPIKeyStatus: React.FC = () => {
       title: '延迟 (ms)',
       key: 'latency',
       width: 180,
-      render: (_: any, record: APIKeyStatus) => (
+      render: (_: unknown, record: APIKeyStatus) => (
         <Space direction="vertical" size={2}>
           <div>
             <span>P50: </span>
-            <Tag color={getLatencyColor(record.latency_p50)}>
-              {record.latency_p50}
-            </Tag>
+            <Tag color={getLatencyColor(record.latency_p50)}>{record.latency_p50}</Tag>
           </div>
           <div>
             <span>P95: </span>
-            <Tag color={getLatencyColor(record.latency_p95)}>
-              {record.latency_p95}
-            </Tag>
+            <Tag color={getLatencyColor(record.latency_p95)}>{record.latency_p95}</Tag>
           </div>
           <div>
             <span>P99: </span>
-            <Tag color={getLatencyColor(record.latency_p99)}>
-              {record.latency_p99}
-            </Tag>
+            <Tag color={getLatencyColor(record.latency_p99)}>{record.latency_p99}</Tag>
           </div>
         </Space>
       ),
@@ -226,9 +313,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       key: 'error_rate',
       width: 100,
       render: (errorRate: number) => (
-        <Tag color={getErrorRateColor(errorRate)}>
-          {(errorRate * 100).toFixed(2)}%
-        </Tag>
+        <Tag color={getErrorRateColor(errorRate)}>{(errorRate * 100).toFixed(2)}%</Tag>
       ),
     },
     {
@@ -237,16 +322,14 @@ const AdminAPIKeyStatus: React.FC = () => {
       key: 'success_rate',
       width: 100,
       render: (successRate: number) => (
-        <Tag color={getSuccessRateColor(successRate)}>
-          {(successRate * 100).toFixed(2)}%
-        </Tag>
+        <Tag color={getSuccessRateColor(successRate)}>{(successRate * 100).toFixed(2)}%</Tag>
       ),
     },
     {
       title: '连接池',
       key: 'connection_pool',
       width: 120,
-      render: (_: any, record: APIKeyStatus) => (
+      render: (_: unknown, record: APIKeyStatus) => (
         <div>
           <Progress
             percent={(record.connection_pool_active / record.connection_pool_size) * 100}
@@ -274,11 +357,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       dataIndex: 'load_balance_weight',
       key: 'load_balance_weight',
       width: 120,
-      render: (weight: number) => (
-        <Tag color="blue">
-          {weight.toFixed(2)}
-        </Tag>
-      ),
+      render: (weight: number) => <Tag color="blue">{weight.toFixed(2)}</Tag>,
     },
     {
       title: '最后请求',
@@ -286,9 +365,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       key: 'last_request_at',
       width: 150,
       render: (lastRequestAt: string | null) => (
-        <span>
-          {lastRequestAt ? new Date(lastRequestAt).toLocaleString('zh-CN') : '无'}
-        </span>
+        <span>{lastRequestAt ? new Date(lastRequestAt).toLocaleString('zh-CN') : '无'}</span>
       ),
     },
     {
@@ -296,17 +373,13 @@ const AdminAPIKeyStatus: React.FC = () => {
       dataIndex: 'updated_at',
       key: 'updated_at',
       width: 150,
-      render: (updatedAt: string) => (
-        <span>
-          {new Date(updatedAt).toLocaleString('zh-CN')}
-        </span>
-      ),
+      render: (updatedAt: string) => <span>{new Date(updatedAt).toLocaleString('zh-CN')}</span>,
     },
     {
       title: '操作',
       key: 'action',
       width: 80,
-      render: (_: any, record: APIKeyStatus) => (
+      render: (_: unknown, record: APIKeyStatus) => (
         <Button
           type="link"
           icon={<EyeOutlined />}
@@ -318,12 +391,181 @@ const AdminAPIKeyStatus: React.FC = () => {
     },
   ];
 
+  const merchantColumns = [
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 80,
+    },
+    {
+      title: '商户ID',
+      dataIndex: 'merchant_id',
+      key: 'merchant_id',
+      width: 100,
+    },
+    {
+      title: '名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 150,
+    },
+    {
+      title: '提供商',
+      dataIndex: 'provider',
+      key: 'provider',
+      width: 120,
+      render: (provider: string) => <Tag color="blue">{provider}</Tag>,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 80,
+      render: (status: string) => (
+        <Tag color={status === 'active' ? 'green' : 'default'}>
+          {status === 'active' ? '启用' : '禁用'}
+        </Tag>
+      ),
+    },
+    {
+      title: '区域',
+      dataIndex: 'region',
+      key: 'region',
+      width: 80,
+      render: (region: string) => (
+        <Tag color="orange">{region === 'domestic' ? '国内' : '海外'}</Tag>
+      ),
+    },
+    {
+      title: '安全等级',
+      dataIndex: 'security_level',
+      key: 'security_level',
+      width: 100,
+      render: (level: string) => (
+        <Tag color={level === 'high' ? 'red' : 'default'}>{level === 'high' ? '高' : '标准'}</Tag>
+      ),
+    },
+    {
+      title: '健康状态',
+      dataIndex: 'health_status',
+      key: 'health_status',
+      width: 100,
+      render: (healthStatus: string) => {
+        if (healthStatus === 'healthy') return <Tag color="green">健康</Tag>;
+        if (healthStatus === 'degraded') return <Tag color="orange">降级</Tag>;
+        return <Tag color="red">异常</Tag>;
+      },
+    },
+    {
+      title: '延迟 (ms)',
+      key: 'latency',
+      width: 150,
+      render: (_: unknown, record: MerchantAPIKeyStatus) => (
+        <Space direction="vertical" size={2}>
+          <div>
+            P50: <Tag color={getLatencyColor(record.latency_p50)}>{record.latency_p50}</Tag>
+          </div>
+          <div>
+            P95: <Tag color={getLatencyColor(record.latency_p95)}>{record.latency_p95}</Tag>
+          </div>
+        </Space>
+      ),
+    },
+    {
+      title: '成功率',
+      dataIndex: 'success_rate',
+      key: 'success_rate',
+      width: 100,
+      render: (successRate: number) => (
+        <Tag color={getSuccessRateColor(successRate)}>{(successRate * 100).toFixed(2)}%</Tag>
+      ),
+    },
+    {
+      title: '错误率',
+      dataIndex: 'error_rate',
+      key: 'error_rate',
+      width: 100,
+      render: (errorRate: number) => (
+        <Tag color={getErrorRateColor(errorRate)}>{(errorRate * 100).toFixed(2)}%</Tag>
+      ),
+    },
+    {
+      title: '状态更新',
+      dataIndex: 'status_updated_at',
+      key: 'status_updated_at',
+      width: 150,
+      render: (updatedAt: string) => <span>{updatedAt || '-'}</span>,
+    },
+  ];
+
+  const tabItems = [
+    {
+      key: 'all',
+      label: '全部API Key状态',
+      children: (
+        <Table
+          columns={allColumns}
+          dataSource={statuses}
+          rowKey="api_key_id"
+          loading={loading && activeTab === 'all'}
+          pagination={{
+            pageSize: 20,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+          }}
+          scroll={{ x: 'max-content' }}
+        />
+      ),
+    },
+    {
+      key: 'merchant',
+      label: (
+        <span>
+          <UserOutlined style={{ marginRight: 4 }} />
+          按商户查询
+        </span>
+      ),
+      children: (
+        <div>
+          <Space style={{ marginBottom: 16 }}>
+            <Input
+              placeholder="输入商户ID"
+              value={merchantIdSearch}
+              onChange={(e) => setMerchantIdSearch(e.target.value)}
+              onPressEnter={handleMerchantIdSearch}
+              style={{ width: 200 }}
+              prefix={<SearchOutlined />}
+            />
+            <Button type="primary" onClick={handleMerchantIdSearch}>
+              查询
+            </Button>
+            <Button onClick={() => setMerchantStatuses([])}>清空</Button>
+          </Space>
+          <Table
+            columns={merchantColumns}
+            dataSource={merchantStatuses}
+            rowKey="id"
+            loading={loading && activeTab === 'merchant'}
+            pagination={{
+              pageSize: 20,
+              showSizeChanger: true,
+              showTotal: (total) => `共 ${total} 条`,
+            }}
+            scroll={{ x: 'max-content' }}
+            locale={{ emptyText: '请输入商户ID进行查询' }}
+          />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <Card
       title={
         <Space>
           <LineChartOutlined />
-          API Key 实时状态监控
+          API Key 状态管理
         </Space>
       }
       extra={
@@ -339,9 +581,7 @@ const AdminAPIKeyStatus: React.FC = () => {
             style={{ width: 150 }}
             value={filterProvider}
             onChange={setFilterProvider}
-            options={[
-              { value: 'all', label: '所有提供商' },
-            ]}
+            options={[{ value: 'all', label: '所有提供商' }]}
           />
           <Select
             style={{ width: 120 }}
@@ -369,11 +609,7 @@ const AdminAPIKeyStatus: React.FC = () => {
               { value: 60, label: '1分钟' },
             ]}
           />
-          <Button
-            icon={<SyncOutlined spin={loading} />}
-            onClick={handleRefresh}
-            loading={loading}
-          >
+          <Button icon={<SyncOutlined spin={loading} />} onClick={handleRefresh} loading={loading}>
             刷新
           </Button>
           <Button
@@ -397,6 +633,9 @@ const AdminAPIKeyStatus: React.FC = () => {
             <li>连接池：当前活跃连接数/总连接数</li>
             <li>限流剩余：当前剩余的请求配额</li>
             <li>负载均衡权重：API Key在负载均衡中的权重值</li>
+            <li>
+              <strong>按商户查询</strong>：输入商户ID可查询该商户上传的所有API Key状态（BYOK模式）
+            </li>
           </ul>
         }
         type="info"
@@ -404,39 +643,20 @@ const AdminAPIKeyStatus: React.FC = () => {
         style={{ marginBottom: 16 }}
       />
 
-      <Table
-        columns={columns}
-        dataSource={statuses}
-        rowKey="api_key_id"
-        loading={loading}
-        pagination={{
-          pageSize: 20,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-        }}
-        scroll={{ x: 'max-content' }}
-      />
+      <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
 
       <Modal
         title="API Key 详细状态"
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setDetailModalVisible(false)}>
-            关闭
-          </Button>,
-        ]}
+        footer={[<Button key="close">关闭</Button>]}
         width={800}
       >
         {selectedStatus ? (
           <>
             <Descriptions bordered column={1}>
-              <Descriptions.Item label="API Key ID">
-                {selectedStatus.api_key_id}
-              </Descriptions.Item>
-              <Descriptions.Item label="名称">
-                {selectedStatus.name}
-              </Descriptions.Item>
+              <Descriptions.Item label="API Key ID">{selectedStatus.api_key_id}</Descriptions.Item>
+              <Descriptions.Item label="名称">{selectedStatus.name}</Descriptions.Item>
               <Descriptions.Item label="提供商">
                 <Tag color="blue">{selectedStatus.provider}</Tag>
               </Descriptions.Item>
@@ -480,15 +700,21 @@ const AdminAPIKeyStatus: React.FC = () => {
               <Descriptions.Item label="连接池状态">
                 <div>
                   <Progress
-                    percent={(selectedStatus.connection_pool_active / selectedStatus.connection_pool_size) * 100}
+                    percent={
+                      (selectedStatus.connection_pool_active /
+                        selectedStatus.connection_pool_size) *
+                      100
+                    }
                     status={
-                      selectedStatus.connection_pool_active > selectedStatus.connection_pool_size * 0.8
+                      selectedStatus.connection_pool_active >
+                      selectedStatus.connection_pool_size * 0.8
                         ? 'exception'
                         : 'normal'
                     }
                   />
                   <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                    活跃连接: {selectedStatus.connection_pool_active} / {selectedStatus.connection_pool_size}
+                    活跃连接: {selectedStatus.connection_pool_active} /{' '}
+                    {selectedStatus.connection_pool_size}
                   </div>
                 </div>
               </Descriptions.Item>
@@ -497,7 +723,8 @@ const AdminAPIKeyStatus: React.FC = () => {
                   <div>剩余配额: {selectedStatus.rate_limit_remaining}</div>
                   {selectedStatus.rate_limit_reset_at && (
                     <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
-                      重置时间: {new Date(selectedStatus.rate_limit_reset_at).toLocaleString('zh-CN')}
+                      重置时间:{' '}
+                      {new Date(selectedStatus.rate_limit_reset_at).toLocaleString('zh-CN')}
                     </div>
                   )}
                 </div>
@@ -506,7 +733,9 @@ const AdminAPIKeyStatus: React.FC = () => {
                 <Tag color="blue">{selectedStatus.load_balance_weight.toFixed(2)}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="最后请求时间">
-                {selectedStatus.last_request_at ? new Date(selectedStatus.last_request_at).toLocaleString('zh-CN') : '无'}
+                {selectedStatus.last_request_at
+                  ? new Date(selectedStatus.last_request_at).toLocaleString('zh-CN')
+                  : '无'}
               </Descriptions.Item>
               <Descriptions.Item label="状态更新时间">
                 {new Date(selectedStatus.updated_at).toLocaleString('zh-CN')}
@@ -532,9 +761,14 @@ const AdminAPIKeyStatus: React.FC = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={selectedStatus.errorRateHistory}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" tickFormatter={(time) => new Date(time).toLocaleTimeString()} />
+                  <XAxis
+                    dataKey="timestamp"
+                    tickFormatter={(time) => new Date(time).toLocaleTimeString()}
+                  />
                   <YAxis tickFormatter={(value: number) => `${(value * 100).toFixed(0)}%`} />
-                  <Tooltip formatter={(value) => [`${((value as number) * 100).toFixed(2)}%`, '']} />
+                  <Tooltip
+                    formatter={(value) => [`${((value as number) * 100).toFixed(2)}%`, '']}
+                  />
                   <Legend />
                   <Line type="monotone" dataKey="errorRate" name="错误率" stroke="#f5222d" />
                   <Line type="monotone" dataKey="successRate" name="成功率" stroke="#52c41a" />
@@ -547,13 +781,34 @@ const AdminAPIKeyStatus: React.FC = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={selectedStatus.latencyHistory}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" tickFormatter={(time) => new Date(time).toLocaleTimeString()} />
+                  <XAxis
+                    dataKey="timestamp"
+                    tickFormatter={(time) => new Date(time).toLocaleTimeString()}
+                  />
                   <YAxis unit="ms" />
                   <Tooltip formatter={(value) => [`${value}ms`, '']} />
                   <Legend />
-                  <Area type="monotone" dataKey="p50" name="P50 延迟" stroke="#1890ff" fill="#e6f7ff" />
-                  <Area type="monotone" dataKey="p95" name="P95 延迟" stroke="#fa8c16" fill="#fff7e6" />
-                  <Area type="monotone" dataKey="p99" name="P99 延迟" stroke="#f5222d" fill="#fff1f0" />
+                  <Area
+                    type="monotone"
+                    dataKey="p50"
+                    name="P50 延迟"
+                    stroke="#1890ff"
+                    fill="#e6f7ff"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="p95"
+                    name="P95 延迟"
+                    stroke="#fa8c16"
+                    fill="#fff7e6"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="p99"
+                    name="P99 延迟"
+                    stroke="#f5222d"
+                    fill="#fff1f0"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

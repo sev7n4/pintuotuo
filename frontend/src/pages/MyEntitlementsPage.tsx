@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Col, Empty, List, Row, Space, Skeleton, Spin, Statistic, Tag, Typography } from 'antd';
+import {
+  Card,
+  Col,
+  Empty,
+  List,
+  Row,
+  Space,
+  Skeleton,
+  Spin,
+  Statistic,
+  Tag,
+  Typography,
+} from 'antd';
 import { WalletOutlined, ApiOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
 import { tokenService } from '@/services/token';
@@ -145,7 +157,10 @@ export default function MyEntitlementsPage() {
                 renderItem={(p) => (
                   <List.Item>
                     <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                      <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
+                      <Space
+                        align="start"
+                        style={{ width: '100%', justifyContent: 'space-between' }}
+                      >
                         <Space direction="vertical" size={2}>
                           <Text strong>{p.name}</Text>
                           <Text type="secondary">
@@ -207,8 +222,7 @@ export default function MyEntitlementsPage() {
                           <Text code>{it.provider_slash_example || it.model_example}</Text>
                         </Text>
                         <Text type="secondary">
-                          来源：{it.source === 'subscription' ? '订阅' : '订单'}{' '}
-                          {it.spu_name || ''}
+                          来源：{it.source === 'subscription' ? '订阅' : '订单'} {it.spu_name || ''}
                         </Text>
                       </Space>
                     </List.Item>

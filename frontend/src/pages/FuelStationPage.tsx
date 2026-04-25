@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Col, Empty, Radio, Row, Space, Spin, Tag, Typography, message } from 'antd';
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Empty,
+  Radio,
+  Row,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+  message,
+} from 'antd';
 import { RocketOutlined, ThunderboltOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { fuelStationService } from '@/services/fuelStation';
@@ -140,18 +153,29 @@ export default function FuelStationPage() {
                       <Radio.Group
                         value={selectedTier[section.code]}
                         onChange={(e) =>
-                          setSelectedTier((prev) => ({ ...prev, [section.code]: Number(e.target.value) }))
+                          setSelectedTier((prev) => ({
+                            ...prev,
+                            [section.code]: Number(e.target.value),
+                          }))
                         }
                       >
                         <Space direction="vertical">
                           {(section.tiers || []).map((tier) => {
                             const sku = skuMap[Number(tier.sku_id)];
                             return (
-                              <Radio key={`${section.code}-${tier.label}`} value={tier.sku_id} disabled={!sku}>
+                              <Radio
+                                key={`${section.code}-${tier.label}`}
+                                value={tier.sku_id}
+                                disabled={!sku}
+                              >
                                 <Space size={6}>
                                   <Text strong>{tier.label}</Text>
-                                  <Text>{sku ? `${sku.token_amount || 0} Token` : '未配置 SKU'}</Text>
-                                  <Text type="secondary">{sku ? `¥${Number(sku.retail_price || 0).toFixed(2)}` : ''}</Text>
+                                  <Text>
+                                    {sku ? `${sku.token_amount || 0} Token` : '未配置 SKU'}
+                                  </Text>
+                                  <Text type="secondary">
+                                    {sku ? `¥${Number(sku.retail_price || 0).toFixed(2)}` : ''}
+                                  </Text>
                                 </Space>
                               </Radio>
                             );

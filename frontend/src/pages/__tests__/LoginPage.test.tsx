@@ -155,7 +155,12 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('merchant@example.com', 'password123', true, undefined);
+        expect(mockLogin).toHaveBeenCalledWith(
+          'merchant@example.com',
+          'password123',
+          true,
+          undefined
+        );
       });
     });
 
@@ -362,7 +367,12 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('wrong@example.com', 'wrongpassword', true, undefined);
+        expect(mockLogin).toHaveBeenCalledWith(
+          'wrong@example.com',
+          'wrongpassword',
+          true,
+          undefined
+        );
       });
     });
 
@@ -432,7 +442,9 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       expect(screen.getByLabelText('邮箱')).toBeInTheDocument();
       expect(screen.getByLabelText('密码')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '密码登录' })).toBeInTheDocument();
-      expect(screen.getByText('首次使用可通过手机号验证码或邮箱魔法链接直接登录')).toBeInTheDocument();
+      expect(
+        screen.getByText('首次使用可通过手机号验证码或邮箱魔法链接直接登录')
+      ).toBeInTheDocument();
     });
 
     test('should have correct placeholder text', () => {
@@ -484,7 +496,9 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
           </Routes>
         </MemoryRouter>
       );
-      expect(screen.getByText('首次使用可通过手机号验证码或邮箱魔法链接直接登录')).toBeInTheDocument();
+      expect(
+        screen.getByText('首次使用可通过手机号验证码或邮箱魔法链接直接登录')
+      ).toBeInTheDocument();
     });
   });
 
@@ -595,7 +609,12 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('wrong@example.com', 'wrongpassword', true, undefined);
+        expect(mockLogin).toHaveBeenCalledWith(
+          'wrong@example.com',
+          'wrongpassword',
+          true,
+          undefined
+        );
       });
 
       await act(async () => {
@@ -605,7 +624,12 @@ describe('LoginPage Integration Tests - User Experience Flow', () => {
       });
 
       await waitFor(() => {
-        expect(mockLogin).toHaveBeenCalledWith('correct@example.com', 'correctpassword', true, undefined);
+        expect(mockLogin).toHaveBeenCalledWith(
+          'correct@example.com',
+          'correctpassword',
+          true,
+          undefined
+        );
       });
     });
   });

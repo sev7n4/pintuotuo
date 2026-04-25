@@ -56,7 +56,14 @@ export default function MerchantBYOKOverviewCard({ apiKeys }: Props) {
         background: 'linear-gradient(180deg, #fcfdff 0%, #f7fbff 100%)',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 12,
+        }}
+      >
         <Space>
           <ApiOutlined />
           <span style={{ fontWeight: 600 }}>秘钥链路概览（BYOK）</span>
@@ -78,8 +85,18 @@ export default function MerchantBYOKOverviewCard({ apiKeys }: Props) {
               justifyContent: 'space-between',
             }}
           >
-            <Statistic title="启用秘钥条数" value={agg.activeCount} suffix={`/ ${agg.totalCount}`} prefix={<KeyOutlined />} />
-            <Progress percent={activeRatio} showInfo={false} strokeColor={healthColor} size="small" />
+            <Statistic
+              title="启用秘钥条数"
+              value={agg.activeCount}
+              suffix={`/ ${agg.totalCount}`}
+              prefix={<KeyOutlined />}
+            />
+            <Progress
+              percent={activeRatio}
+              showInfo={false}
+              strokeColor={healthColor}
+              size="small"
+            />
           </div>
         </Col>
         <Col xs={24} sm={12} md={8}>
