@@ -182,18 +182,32 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 
 	candidatesJSON, _ := json.Marshal(decision.DecisionLayerCandidates)
 
+	var strategyLayerInput, strategyLayerOutput, decisionLayerOutput, executionLayerResult interface{}
+	if len(decision.StrategyLayerInput) > 0 {
+		strategyLayerInput = decision.StrategyLayerInput
+	}
+	if len(decision.StrategyLayerOutput) > 0 {
+		strategyLayerOutput = decision.StrategyLayerOutput
+	}
+	if len(decision.DecisionLayerOutput) > 0 {
+		decisionLayerOutput = decision.DecisionLayerOutput
+	}
+	if len(decision.ExecutionLayerResult) > 0 {
+		executionLayerResult = decision.ExecutionLayerResult
+	}
+
 	_, err := e.db.ExecContext(ctx, query,
 		decision.RequestID,
 		decision.MerchantID,
 		apiKeyID,
 		string(decision.StrategyLayerGoal),
 		decision.StrategyLayerReason,
-		decision.StrategyLayerInput,
-		decision.StrategyLayerOutput,
+		strategyLayerInput,
+		strategyLayerOutput,
 		candidatesJSON,
-		decision.DecisionLayerOutput,
+		decisionLayerOutput,
 		decision.RoutingMode,
-		decision.ExecutionLayerResult,
+		executionLayerResult,
 		decision.ExecutionSuccess,
 		decision.ExecutionStatusCode,
 		decision.ExecutionLatencyMs,
