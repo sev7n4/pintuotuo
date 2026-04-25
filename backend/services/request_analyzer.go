@@ -54,6 +54,7 @@ const (
 )
 
 type StrategyWeightsV2 struct {
+	StrategyCode      string  `json:"strategy_code,omitempty"`
 	LatencyWeight     float64 `json:"latency_weight"`
 	CostWeight        float64 `json:"cost_weight"`
 	ReliabilityWeight float64 `json:"reliability_weight"`

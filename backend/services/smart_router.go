@@ -10,6 +10,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/metrics"
 )
 
 type RoutingStrategy string
@@ -126,7 +127,11 @@ func (r *SmartRouter) SelectProviderWithStrategyOutput(ctx context.Context, mode
 		return filteredCandidates[i].Score > filteredCandidates[j].Score
 	})
 
-	return &filteredCandidates[0], filteredCandidates, nil
+	winner := &filteredCandidates[0]
+	metrics.RecordRoutingWinnerScore(strategyOutput.Weights.StrategyCode, winner.Provider, winner.Score)
+	metrics.RecordRoutingCandidatesCount(model, strategyOutput.Weights.StrategyCode, len(filteredCandidates))
+
+	return winner, filteredCandidates, nil
 }
 
 func (r *SmartRouter) FilterByRouteDecision(candidates []RoutingCandidate, decision *RouteDecision) []RoutingCandidate {
@@ -339,7 +344,17 @@ func (r *SmartRouter) CalculateScoresWithWeights(candidates []RoutingCandidate, 
 		candidates[i].Score = priceScore*weights.CostWeight +
 			latencyScore*weights.LatencyWeight +
 			successScore*weights.ReliabilityWeight
+
+		metrics.RecordRoutingScore("price", weights.StrategyCode, priceScore)
+		metrics.RecordRoutingScore("latency", weights.StrategyCode, latencyScore)
+		metrics.RecordRoutingScore("reliability", weights.StrategyCode, successScore)
 	}
+
+	metrics.SetRoutingWeightDistribution(weights.StrategyCode, "price", weights.CostWeight)
+	metrics.SetRoutingWeightDistribution(weights.StrategyCode, "latency", weights.LatencyWeight)
+	metrics.SetRoutingWeightDistribution(weights.StrategyCode, "reliability", weights.ReliabilityWeight)
+	metrics.SetRoutingWeightDistribution(weights.StrategyCode, "security", weights.SecurityWeight)
+	metrics.SetRoutingWeightDistribution(weights.StrategyCode, "load_balance", weights.LoadBalanceWeight)
 }
 
 func (r *SmartRouter) calculatePriceScore(c RoutingCandidate, minPrice, maxPrice float64) float64 {

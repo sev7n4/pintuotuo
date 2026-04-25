@@ -575,3 +575,149 @@ func RecordEndpointRequest(provider, endpointType string, durationSeconds float6
 func SetEndpointHealthStatus(provider, endpointType string, status float64) {
 	EndpointHealthStatus.WithLabelValues(provider, endpointType).Set(status)
 }
+
+// Token Estimation Metrics
+var (
+	TokenEstimationAccuracy = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "token_estimation_accuracy_ratio",
+			Help:    "Token estimation accuracy ratio (estimated/actual)",
+			Buckets: []float64{0.1, 0.25, 0.5, 0.75, 0.9, 1.0, 1.1, 1.25, 1.5, 2.0, 3.0, 5.0},
+		},
+		[]string{"model", "estimation_source"},
+	)
+
+	TokenEstimationTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "token_estimation_total",
+			Help: "Total number of token estimations",
+		},
+		[]string{"model", "estimation_source"},
+	)
+
+	TokenEstimationError = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "token_estimation_error_total",
+			Help: "Total number of token estimation errors",
+		},
+		[]string{"model", "error_type"},
+	)
+)
+
+// Cost Estimation Metrics
+var (
+	CostEstimationDeviation = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "cost_estimation_deviation_ratio",
+			Help:    "Cost estimation deviation ratio (estimated/actual)",
+			Buckets: []float64{0.1, 0.25, 0.5, 0.75, 0.9, 1.0, 1.1, 1.25, 1.5, 2.0, 3.0, 5.0},
+		},
+		[]string{"model", "merchant_id"},
+	)
+
+	CostEstimationTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "cost_estimation_total",
+			Help: "Total number of cost estimations",
+		},
+		[]string{"model", "strategy"},
+	)
+
+	CostSavingsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "routing_cost_savings_total_cents",
+			Help: "Total cost savings from routing decisions in cents",
+		},
+		[]string{"model", "strategy"},
+	)
+)
+
+// Five-Dimensional Scoring Metrics
+var (
+	RoutingScoreDistribution = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "routing_score_distribution",
+			Help:    "Distribution of routing scores by dimension",
+			Buckets: []float64{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
+		},
+		[]string{"dimension", "strategy"},
+	)
+
+	RoutingWinnerScore = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "routing_winner_score",
+			Help:    "Final score of winning candidate",
+			Buckets: []float64{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
+		},
+		[]string{"strategy", "provider"},
+	)
+
+	RoutingWeightDistribution = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "routing_weight_distribution",
+			Help: "Current weight distribution for routing strategies",
+		},
+		[]string{"strategy", "dimension"},
+	)
+
+	RoutingCandidatesCount = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "routing_candidates_count",
+			Help:    "Number of candidates evaluated per routing decision",
+			Buckets: []float64{1, 2, 3, 5, 10, 20, 50},
+		},
+		[]string{"model", "strategy"},
+	)
+)
+
+// RecordTokenEstimationAccuracy records token estimation accuracy
+func RecordTokenEstimationAccuracy(model, source string, estimatedTokens, actualTokens int) {
+	if actualTokens > 0 {
+		ratio := float64(estimatedTokens) / float64(actualTokens)
+		TokenEstimationAccuracy.WithLabelValues(model, source).Observe(ratio)
+	}
+	TokenEstimationTotal.WithLabelValues(model, source).Inc()
+}
+
+// RecordTokenEstimationError records a token estimation error
+func RecordTokenEstimationError(model, errorType string) {
+	TokenEstimationError.WithLabelValues(model, errorType).Inc()
+}
+
+// RecordCostEstimationDeviation records cost estimation deviation
+func RecordCostEstimationDeviation(model, merchantID string, estimatedCost, actualCost float64) {
+	if actualCost > 0 {
+		ratio := estimatedCost / actualCost
+		CostEstimationDeviation.WithLabelValues(model, merchantID).Observe(ratio)
+	}
+}
+
+// RecordCostEstimation records a cost estimation
+func RecordCostEstimation(model, strategy string) {
+	CostEstimationTotal.WithLabelValues(model, strategy).Inc()
+}
+
+// RecordCostSavings records cost savings from routing
+func RecordCostSavings(model, strategy string, savingsCents float64) {
+	CostSavingsTotal.WithLabelValues(model, strategy).Add(savingsCents)
+}
+
+// RecordRoutingScore records a routing score by dimension
+func RecordRoutingScore(dimension, strategy string, score float64) {
+	RoutingScoreDistribution.WithLabelValues(dimension, strategy).Observe(score)
+}
+
+// RecordRoutingWinnerScore records the winning candidate's score
+func RecordRoutingWinnerScore(strategy, provider string, score float64) {
+	RoutingWinnerScore.WithLabelValues(strategy, provider).Observe(score)
+}
+
+// SetRoutingWeightDistribution sets the weight distribution for a strategy
+func SetRoutingWeightDistribution(strategy, dimension string, weight float64) {
+	RoutingWeightDistribution.WithLabelValues(strategy, dimension).Set(weight)
+}
+
+// RecordRoutingCandidatesCount records the number of candidates evaluated
+func RecordRoutingCandidatesCount(model, strategy string, count int) {
+	RoutingCandidatesCount.WithLabelValues(model, strategy).Observe(float64(count))
+}

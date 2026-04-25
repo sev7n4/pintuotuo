@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/metrics"
 )
 
 type IUnifiedRoutingEngine interface {
@@ -123,6 +125,9 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 	decision.EstimatedOutputTokens = tokenEstimation.EstimatedOutputTokens
 	decision.TokenEstimationSource = tokenEstimation.Source
 
+	metrics.RecordTokenEstimationAccuracy(req.Model, tokenEstimation.Source,
+		int(tokenEstimation.EstimatedInputTokens+tokenEstimation.EstimatedOutputTokens), 0)
+
 	strategyInput := map[string]interface{}{
 		"request_id":   req.RequestID,
 		"merchant_id":  req.MerchantID,
@@ -195,6 +200,11 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 	decision.OutputTokenCost = candidate.OutputPrice
 	decision.RoutingMode = determineRoutingMode(candidate)
 	decision.DecisionResult = string(DecisionResultSuccess)
+
+	estimatedCost := (float64(tokenEstimation.EstimatedInputTokens)*candidate.InputPrice +
+		float64(tokenEstimation.EstimatedOutputTokens)*candidate.OutputPrice) / 1000000.0
+	metrics.RecordCostEstimation(req.Model, string(strategyOutput.Goal))
+	metrics.RecordCostEstimationDeviation(req.Model, strconv.Itoa(candidate.MerchantID), estimatedCost, 0)
 
 	decisionOutput := map[string]interface{}{
 		"api_key_id":        candidate.APIKeyID,

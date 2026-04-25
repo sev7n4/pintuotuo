@@ -139,6 +139,7 @@ func (e *RoutingStrategyEngine) getStrategyWeightsFromDB(strategy StrategyGoal) 
 	}
 
 	return &StrategyWeightsV2{
+		StrategyCode:      string(strategy),
 		CostWeight:        priceWeight,
 		LatencyWeight:     latencyWeight,
 		ReliabilityWeight: reliabilityWeight,
@@ -177,6 +178,7 @@ func (e *RoutingStrategyEngine) getDefaultStrategyWeights(strategy StrategyGoal)
 	switch strategy {
 	case GoalPerformanceFirst:
 		return &StrategyWeightsV2{
+			StrategyCode:      string(GoalPerformanceFirst),
 			LatencyWeight:     0.5,
 			CostWeight:        0.1,
 			ReliabilityWeight: 0.2,
@@ -186,6 +188,7 @@ func (e *RoutingStrategyEngine) getDefaultStrategyWeights(strategy StrategyGoal)
 
 	case GoalPriceFirst:
 		return &StrategyWeightsV2{
+			StrategyCode:      string(GoalPriceFirst),
 			LatencyWeight:     0.1,
 			CostWeight:        0.6,
 			ReliabilityWeight: 0.15,
@@ -195,6 +198,7 @@ func (e *RoutingStrategyEngine) getDefaultStrategyWeights(strategy StrategyGoal)
 
 	case GoalReliabilityFirst:
 		return &StrategyWeightsV2{
+			StrategyCode:      string(GoalReliabilityFirst),
 			LatencyWeight:     0.2,
 			CostWeight:        0.1,
 			ReliabilityWeight: 0.5,
@@ -204,6 +208,7 @@ func (e *RoutingStrategyEngine) getDefaultStrategyWeights(strategy StrategyGoal)
 
 	case GoalSecurityFirst:
 		return &StrategyWeightsV2{
+			StrategyCode:      string(GoalSecurityFirst),
 			LatencyWeight:     0.1,
 			CostWeight:        0.1,
 			ReliabilityWeight: 0.2,
@@ -213,6 +218,7 @@ func (e *RoutingStrategyEngine) getDefaultStrategyWeights(strategy StrategyGoal)
 
 	case GoalBalanced:
 		return &StrategyWeightsV2{
+			StrategyCode:      string(GoalBalanced),
 			LatencyWeight:     0.25,
 			CostWeight:        0.25,
 			ReliabilityWeight: 0.25,
@@ -222,6 +228,7 @@ func (e *RoutingStrategyEngine) getDefaultStrategyWeights(strategy StrategyGoal)
 
 	case GoalAuto:
 		return &StrategyWeightsV2{
+			StrategyCode:      string(GoalAuto),
 			LatencyWeight:     0.3,
 			CostWeight:        0.2,
 			ReliabilityWeight: 0.3,
@@ -236,6 +243,7 @@ func (e *RoutingStrategyEngine) getDefaultStrategyWeights(strategy StrategyGoal)
 
 func (e *RoutingStrategyEngine) DetermineAutoStrategyWeights(req *RoutingRequest) *StrategyWeightsV2 {
 	weights := &StrategyWeightsV2{
+		StrategyCode:      string(GoalAuto),
 		CostWeight:        0.25,
 		LatencyWeight:     0.25,
 		ReliabilityWeight: 0.25,
