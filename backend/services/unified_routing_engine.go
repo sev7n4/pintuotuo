@@ -105,22 +105,22 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 	startTime := time.Now()
 
 	decision := &RoutingDecision{
-		RequestID:         req.RequestID,
-		MerchantID:        req.MerchantID,
-		Model:             req.Model,
-		Provider:          req.Provider,
-		StrategyLayerGoal: strategyOutput.Goal,
+		RequestID:           req.RequestID,
+		MerchantID:          req.MerchantID,
+		Model:               req.Model,
+		Provider:            req.Provider,
+		StrategyLayerGoal:   strategyOutput.Goal,
 		StrategyLayerReason: strategyOutput.Reason,
-		Timestamp:         startTime,
+		Timestamp:           startTime,
 	}
 
 	strategyInput := map[string]interface{}{
-		"request_id":    req.RequestID,
-		"merchant_id":   req.MerchantID,
-		"model":         req.Model,
-		"provider":      req.Provider,
-		"allowed_keys":  req.AllowedKeyIDs,
-		"cost_budget":   req.CostBudget,
+		"request_id":   req.RequestID,
+		"merchant_id":  req.MerchantID,
+		"model":        req.Model,
+		"provider":     req.Provider,
+		"allowed_keys": req.AllowedKeyIDs,
+		"cost_budget":  req.CostBudget,
 	}
 	if inputBytes, err := json.Marshal(strategyInput); err == nil {
 		decision.StrategyLayerInput = inputBytes
@@ -168,6 +168,12 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 			SuccessScore:  c.SuccessScore,
 			Region:        c.Region,
 			SecurityLevel: c.SecurityLevel,
+			HealthStatus:  c.HealthStatus,
+			Verified:      c.Verified,
+			InputPrice:    c.InputPrice,
+			OutputPrice:   c.OutputPrice,
+			AvgLatencyMs:  c.AvgLatencyMs,
+			SuccessRate:   c.SuccessRate,
 		})
 	}
 	decision.DecisionLayerCandidates = candidateScores
@@ -182,18 +188,18 @@ func (e *UnifiedRoutingEngine) ExecuteWithStrategy(ctx context.Context, req *Rou
 	decision.DecisionResult = string(DecisionResultSuccess)
 
 	decisionOutput := map[string]interface{}{
-		"api_key_id":       candidate.APIKeyID,
-		"merchant_id":      candidate.MerchantID,
-		"provider":         candidate.Provider,
-		"model":            candidate.Model,
-		"score":            candidate.Score,
-		"price_score":      candidate.PriceScore,
-		"latency_score":    candidate.LatencyScore,
-		"success_score":    candidate.SuccessScore,
-		"region":           candidate.Region,
-		"security_level":   candidate.SecurityLevel,
-		"routing_mode":     decision.RoutingMode,
-		"input_token_cost": candidate.InputPrice,
+		"api_key_id":        candidate.APIKeyID,
+		"merchant_id":       candidate.MerchantID,
+		"provider":          candidate.Provider,
+		"model":             candidate.Model,
+		"score":             candidate.Score,
+		"price_score":       candidate.PriceScore,
+		"latency_score":     candidate.LatencyScore,
+		"success_score":     candidate.SuccessScore,
+		"region":            candidate.Region,
+		"security_level":    candidate.SecurityLevel,
+		"routing_mode":      decision.RoutingMode,
+		"input_token_cost":  candidate.InputPrice,
 		"output_token_cost": candidate.OutputPrice,
 	}
 
@@ -217,10 +223,10 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 			request_id, merchant_id, api_key_id,
 			strategy_layer_goal, strategy_layer_reason, strategy_layer_input, strategy_layer_output,
 			decision_layer_candidates, decision_layer_output, routing_mode,
-			execution_layer_result, execution_success, execution_status_code, execution_latency_ms, execution_error_message,
+			execution_layer_input, execution_layer_result, execution_success, execution_status_code, execution_latency_ms, execution_error_message,
 			decision_duration_ms, decision_result, error_message, created_at,
 			selected_merchant_id, input_token_cost, output_token_cost
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
 	`
 
 	var apiKeyID *int
@@ -240,7 +246,7 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 
 	candidatesJSON, _ := json.Marshal(decision.DecisionLayerCandidates)
 
-	var strategyLayerInput, strategyLayerOutput, decisionLayerOutput, executionLayerResult interface{}
+	var strategyLayerInput, strategyLayerOutput, decisionLayerOutput, executionLayerInput, executionLayerResult interface{}
 	if len(decision.StrategyLayerInput) > 0 {
 		strategyLayerInput = decision.StrategyLayerInput
 	}
@@ -249,6 +255,9 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 	}
 	if len(decision.DecisionLayerOutput) > 0 {
 		decisionLayerOutput = decision.DecisionLayerOutput
+	}
+	if len(decision.ExecutionLayerInput) > 0 {
+		executionLayerInput = decision.ExecutionLayerInput
 	}
 	if len(decision.ExecutionLayerResult) > 0 {
 		executionLayerResult = decision.ExecutionLayerResult
@@ -265,6 +274,7 @@ func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *Routin
 		candidatesJSON,
 		decisionLayerOutput,
 		decision.RoutingMode,
+		executionLayerInput,
 		executionLayerResult,
 		decision.ExecutionSuccess,
 		decision.ExecutionStatusCode,

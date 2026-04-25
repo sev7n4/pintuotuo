@@ -20,6 +20,7 @@ type RoutingDecision struct {
 	DecisionLayerOutput     json.RawMessage         `json:"decision_layer_output,omitempty"`
 	RoutingMode             string                  `json:"routing_mode,omitempty"`
 
+	ExecutionLayerInput   json.RawMessage `json:"execution_layer_input,omitempty"`
 	ExecutionLayerResult  json.RawMessage `json:"execution_layer_result,omitempty"`
 	ExecutionSuccess      bool            `json:"execution_success"`
 	ExecutionStatusCode   int             `json:"execution_status_code,omitempty"`
@@ -51,6 +52,12 @@ type RoutingCandidateScore struct {
 	SuccessScore  float64 `json:"success_score"`
 	Region        string  `json:"region"`
 	SecurityLevel string  `json:"security_level"`
+	HealthStatus  string  `json:"health_status"`
+	Verified      bool    `json:"verified"`
+	InputPrice    float64 `json:"input_price"`
+	OutputPrice   float64 `json:"output_price"`
+	AvgLatencyMs  int     `json:"avg_latency_ms"`
+	SuccessRate   float64 `json:"success_rate"`
 }
 
 type DecisionResult string
@@ -61,11 +68,26 @@ const (
 	DecisionResultTimeout DecisionResult = "timeout"
 )
 
+type ExecutionLayerInputData struct {
+	GatewayMode   string `json:"gateway_mode"`
+	EndpointURL   string `json:"endpoint_url"`
+	AuthMethod    string `json:"auth_method"`
+	ResolvedModel string `json:"resolved_model"`
+	RequestFormat string `json:"request_format"`
+}
+
 type ExecutionLayerResultData struct {
-	Success      bool   `json:"success"`
-	StatusCode   int    `json:"status_code,omitempty"`
-	LatencyMs    int    `json:"latency_ms,omitempty"`
-	ErrorMessage string `json:"error_message,omitempty"`
-	Model        string `json:"model,omitempty"`
-	Provider     string `json:"provider,omitempty"`
+	Success           bool   `json:"success"`
+	StatusCode        int    `json:"status_code,omitempty"`
+	LatencyMs         int    `json:"latency_ms,omitempty"`
+	ErrorMessage      string `json:"error_message,omitempty"`
+	Model             string `json:"model,omitempty"`
+	Provider          string `json:"provider,omitempty"`
+	ActualModel       string `json:"actual_model,omitempty"`
+	InputTokens       int    `json:"input_tokens,omitempty"`
+	OutputTokens      int    `json:"output_tokens,omitempty"`
+	FinishReason      string `json:"finish_reason,omitempty"`
+	ErrorType         string `json:"error_type,omitempty"`
+	UpstreamRequestID string `json:"upstream_request_id,omitempty"`
+	CacheHit          bool   `json:"cache_hit,omitempty"`
 }

@@ -22,6 +22,8 @@ type RoutingStrategyConfig struct {
 	PriceWeight             float64   `json:"price_weight"`
 	LatencyWeight           float64   `json:"latency_weight"`
 	ReliabilityWeight       float64   `json:"reliability_weight"`
+	SecurityWeight          float64   `json:"security_weight"`
+	LoadBalanceWeight       float64   `json:"load_balance_weight"`
 	MaxRetryCount           int       `json:"max_retry_count"`
 	RetryBackoffBase        int       `json:"retry_backoff_base"`
 	CircuitBreakerThreshold int       `json:"circuit_breaker_threshold"`
@@ -87,6 +89,7 @@ func (s *RoutingStrategyService) GetStrategies(page, pageSize int) ([]RoutingStr
 
 	query := `
 		SELECT id, name, code, description, price_weight, latency_weight, reliability_weight,
+		       COALESCE(security_weight, 0.1), COALESCE(load_balance_weight, 0.1),
 		       max_retry_count, retry_backoff_base, circuit_breaker_threshold, circuit_breaker_timeout,
 		       is_default, status, created_at, updated_at
 		FROM routing_strategies
@@ -107,6 +110,7 @@ func (s *RoutingStrategyService) GetStrategies(page, pageSize int) ([]RoutingStr
 		if err = rows.Scan(
 			&strategy.ID, &strategy.Name, &strategy.Code, &strategy.Description,
 			&strategy.PriceWeight, &strategy.LatencyWeight, &strategy.ReliabilityWeight,
+			&strategy.SecurityWeight, &strategy.LoadBalanceWeight,
 			&strategy.MaxRetryCount, &strategy.RetryBackoffBase,
 			&strategy.CircuitBreakerThreshold, &strategy.CircuitBreakerTimeout,
 			&strategy.IsDefault, &strategy.Status, &strategy.CreatedAt, &strategy.UpdatedAt,
@@ -128,6 +132,7 @@ func (s *RoutingStrategyService) GetStrategies(page, pageSize int) ([]RoutingStr
 func getStrategyByIDTx(tx *sql.Tx, id int) (*RoutingStrategyConfig, error) {
 	query := `
 		SELECT id, name, code, description, price_weight, latency_weight, reliability_weight,
+		       COALESCE(security_weight, 0.1), COALESCE(load_balance_weight, 0.1),
 		       max_retry_count, retry_backoff_base, circuit_breaker_threshold, circuit_breaker_timeout,
 		       is_default, status, created_at, updated_at
 		FROM routing_strategies
@@ -137,6 +142,7 @@ func getStrategyByIDTx(tx *sql.Tx, id int) (*RoutingStrategyConfig, error) {
 	err := tx.QueryRow(query, id).Scan(
 		&strategy.ID, &strategy.Name, &strategy.Code, &strategy.Description,
 		&strategy.PriceWeight, &strategy.LatencyWeight, &strategy.ReliabilityWeight,
+		&strategy.SecurityWeight, &strategy.LoadBalanceWeight,
 		&strategy.MaxRetryCount, &strategy.RetryBackoffBase,
 		&strategy.CircuitBreakerThreshold, &strategy.CircuitBreakerTimeout,
 		&strategy.IsDefault, &strategy.Status, &strategy.CreatedAt, &strategy.UpdatedAt,
@@ -153,6 +159,7 @@ func getStrategyByIDTx(tx *sql.Tx, id int) (*RoutingStrategyConfig, error) {
 func (s *RoutingStrategyService) GetStrategyByID(id int) (*RoutingStrategyConfig, error) {
 	query := `
 		SELECT id, name, code, description, price_weight, latency_weight, reliability_weight,
+		       COALESCE(security_weight, 0.1), COALESCE(load_balance_weight, 0.1),
 		       max_retry_count, retry_backoff_base, circuit_breaker_threshold, circuit_breaker_timeout,
 		       is_default, status, created_at, updated_at
 		FROM routing_strategies
@@ -163,6 +170,7 @@ func (s *RoutingStrategyService) GetStrategyByID(id int) (*RoutingStrategyConfig
 	err := s.db.QueryRow(query, id).Scan(
 		&strategy.ID, &strategy.Name, &strategy.Code, &strategy.Description,
 		&strategy.PriceWeight, &strategy.LatencyWeight, &strategy.ReliabilityWeight,
+		&strategy.SecurityWeight, &strategy.LoadBalanceWeight,
 		&strategy.MaxRetryCount, &strategy.RetryBackoffBase,
 		&strategy.CircuitBreakerThreshold, &strategy.CircuitBreakerTimeout,
 		&strategy.IsDefault, &strategy.Status, &strategy.CreatedAt, &strategy.UpdatedAt,

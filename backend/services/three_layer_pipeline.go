@@ -100,6 +100,39 @@ func (p *ThreeLayerRoutingPipeline) RecordExecutionResult(decision *RoutingDecis
 	}
 }
 
+func (p *ThreeLayerRoutingPipeline) RecordExecutionInput(decision *RoutingDecision, input *ExecutionLayerInputData) {
+	if input == nil {
+		return
+	}
+	if inputBytes, err := json.Marshal(input); err == nil {
+		decision.ExecutionLayerInput = inputBytes
+	}
+}
+
+func (p *ThreeLayerRoutingPipeline) RecordExecutionResultExtended(decision *RoutingDecision, result *ExecutionLayerResultData) {
+	if result == nil {
+		return
+	}
+
+	decision.ExecutionSuccess = result.Success
+	decision.ExecutionStatusCode = result.StatusCode
+	decision.ExecutionLatencyMs = result.LatencyMs
+	decision.ExecutionErrorMessage = result.ErrorMessage
+
+	if !result.Success {
+		decision.DecisionResult = string(DecisionResultFailed)
+		if result.ErrorMessage != "" {
+			decision.ErrorMessage = result.ErrorMessage
+		}
+	} else {
+		decision.DecisionResult = string(DecisionResultSuccess)
+	}
+
+	if resultBytes, err := json.Marshal(result); err == nil {
+		decision.ExecutionLayerResult = resultBytes
+	}
+}
+
 func (p *ThreeLayerRoutingPipeline) GetLayerMetrics() map[string]interface{} {
 	return map[string]interface{}{
 		"strategy_layer": map[string]interface{}{

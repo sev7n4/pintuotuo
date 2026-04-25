@@ -216,11 +216,7 @@ const AdminModelProviders = () => {
       render: (_: unknown, record: ModelProvider) => {
         const hasRouteConfig =
           record.route_strategy && Object.keys(record.route_strategy || {}).length > 0;
-        return hasRouteConfig ? (
-          <Tag color="blue">已配置</Tag>
-        ) : (
-          <Tag color="default">未配置</Tag>
-        );
+        return hasRouteConfig ? <Tag color="blue">已配置</Tag> : <Tag color="default">未配置</Tag>;
       },
     },
     {
@@ -269,7 +265,11 @@ const AdminModelProviders = () => {
             },
             {
               validator: async (_rule, value) => {
-                if (String(value || '').trim().toLowerCase() === fallbackCode) {
+                if (
+                  String(value || '')
+                    .trim()
+                    .toLowerCase() === fallbackCode
+                ) {
                   throw new Error('__default__ 为系统保留兜底代码，请勿新建');
                 }
               },
@@ -381,8 +381,18 @@ const AdminModelProviders = () => {
 
   const tabItems = [
     { key: 'basic', label: '基础信息', children: <BasicInfoTab /> },
-    { key: 'route', label: '路由策略', children: <RouteStrategyTab />, disabled: isFallbackEditing },
-    { key: 'endpoints', label: '端点配置', children: <EndpointsTab />, disabled: isFallbackEditing },
+    {
+      key: 'route',
+      label: '路由策略',
+      children: <RouteStrategyTab />,
+      disabled: isFallbackEditing,
+    },
+    {
+      key: 'endpoints',
+      label: '端点配置',
+      children: <EndpointsTab />,
+      disabled: isFallbackEditing,
+    },
   ];
 
   return (
@@ -438,11 +448,7 @@ const AdminModelProviders = () => {
         bodyStyle={{ maxHeight: '70vh', overflowY: 'auto' }}
       >
         <Form form={form} layout="vertical">
-          <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            items={tabItems}
-          />
+          <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
         </Form>
       </Modal>
     </div>
