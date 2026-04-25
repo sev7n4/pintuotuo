@@ -857,13 +857,46 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	if currentRoutingDecision != nil {
 		pipeline := services.NewThreeLayerRoutingPipeline()
+
+		gatewayMode := "direct"
+		active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
+		if active == llmGatewayLitellm {
+			gatewayMode = "litellm"
+		} else if active == "proxy" {
+			gatewayMode = "proxy"
+		}
+
+		execInput := &services.ExecutionLayerInputData{
+			GatewayMode:   gatewayMode,
+			EndpointURL:   fmt.Sprintf("%s/chat/completions", strings.TrimRight(providerCfg.APIBaseURL, "/")),
+			AuthMethod:    "bearer",
+			ResolvedModel: billModel,
+			RequestFormat: providerCfg.APIFormat,
+		}
+		pipeline.RecordExecutionInput(currentRoutingDecision, execInput)
+
 		execSuccess := resp.StatusCode >= 200 && resp.StatusCode < 300
 		execLatency := int(time.Since(decisionStart).Milliseconds())
 		var execErrMsg string
 		if !execSuccess {
 			execErrMsg = fmt.Sprintf("HTTP %d", resp.StatusCode)
 		}
-		pipeline.RecordExecutionResult(currentRoutingDecision, execSuccess, resp.StatusCode, execLatency, execErrMsg)
+
+		execResult := &services.ExecutionLayerResultData{
+			Success:      execSuccess,
+			StatusCode:   resp.StatusCode,
+			LatencyMs:    execLatency,
+			ErrorMessage: execErrMsg,
+			Model:        currentRoutingDecision.SelectedModel,
+			Provider:     currentRoutingDecision.SelectedProvider,
+			ActualModel:  apiResp.Model,
+			InputTokens:  apiResp.Usage.PromptTokens,
+			OutputTokens: apiResp.Usage.CompletionTokens,
+		}
+		if len(apiResp.Choices) > 0 {
+			execResult.FinishReason = apiResp.Choices[0].FinishReason
+		}
+		pipeline.RecordExecutionResultExtended(currentRoutingDecision, execResult)
 
 		engine := services.NewUnifiedRoutingEngine()
 		if logErr := engine.LogDecision(c.Request.Context(), currentRoutingDecision); logErr != nil {

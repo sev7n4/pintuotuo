@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+
+	"github.com/pintuotuo/backend/config"
 )
 
 type IStrategyEngine interface {
@@ -27,11 +30,13 @@ type RoutingCandidateV2 struct {
 }
 
 type RoutingStrategyEngine struct {
+	db              *sql.DB
 	defaultStrategy StrategyGoal
 }
 
 func NewRoutingStrategyEngine() *RoutingStrategyEngine {
 	return &RoutingStrategyEngine{
+		db:              config.GetDB(),
 		defaultStrategy: GoalBalanced,
 	}
 }
@@ -110,6 +115,39 @@ func (e *RoutingStrategyEngine) determineStrategy(reqCtx *RequestContext) Strate
 }
 
 func (e *RoutingStrategyEngine) GetStrategyWeights(strategy StrategyGoal) (*StrategyWeightsV2, error) {
+	if e.db != nil {
+		weights, err := e.getStrategyWeightsFromDB(strategy)
+		if err == nil {
+			return weights, nil
+		}
+	}
+
+	return e.getDefaultStrategyWeights(strategy)
+}
+
+func (e *RoutingStrategyEngine) getStrategyWeightsFromDB(strategy StrategyGoal) (*StrategyWeightsV2, error) {
+	var priceWeight, latencyWeight, reliabilityWeight, securityWeight, loadBalanceWeight float64
+	err := e.db.QueryRow(`
+		SELECT price_weight, latency_weight, reliability_weight,
+		       COALESCE(security_weight, 0.1), COALESCE(load_balance_weight, 0.1)
+		FROM routing_strategies 
+		WHERE code = $1 AND status = 'active'`,
+		string(strategy),
+	).Scan(&priceWeight, &latencyWeight, &reliabilityWeight, &securityWeight, &loadBalanceWeight)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get strategy weights from DB: %w", err)
+	}
+
+	return &StrategyWeightsV2{
+		CostWeight:        priceWeight,
+		LatencyWeight:     latencyWeight,
+		ReliabilityWeight: reliabilityWeight,
+		SecurityWeight:    securityWeight,
+		LoadBalanceWeight: loadBalanceWeight,
+	}, nil
+}
+
+func (e *RoutingStrategyEngine) getDefaultStrategyWeights(strategy StrategyGoal) (*StrategyWeightsV2, error) {
 	switch strategy {
 	case GoalPerformanceFirst:
 		return &StrategyWeightsV2{
