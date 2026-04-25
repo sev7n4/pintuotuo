@@ -107,9 +107,6 @@ func TestUpdateMerchantRouteConfig(t *testing.T) {
 	body := map[string]interface{}{
 		"merchant_type": "standard",
 		"region":        "domestic",
-		"route_preference": map[string]interface{}{
-			"preferred_mode": "litellm",
-		},
 	}
 	jsonBody, _ := json.Marshal(body)
 

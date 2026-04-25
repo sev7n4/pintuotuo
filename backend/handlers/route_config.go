@@ -276,20 +276,18 @@ func UpdateProviderRouteConfig(c *gin.Context) {
 }
 
 type MerchantRouteConfig struct {
-	ID              int                    `json:"id"`
-	Name            string                 `json:"name"`
-	MerchantType    string                 `json:"merchant_type"`
-	Region          string                 `json:"region"`
-	RoutePreference map[string]interface{} `json:"route_preference"`
-	Status          string                 `json:"status"`
-	CreatedAt       string                 `json:"created_at"`
-	UpdatedAt       string                 `json:"updated_at"`
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	MerchantType string `json:"merchant_type"`
+	Region       string `json:"region"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
 type UpdateMerchantRouteConfigRequest struct {
-	MerchantType    string                 `json:"merchant_type"`
-	Region          string                 `json:"region"`
-	RoutePreference map[string]interface{} `json:"route_preference"`
+	MerchantType string `json:"merchant_type"`
+	Region       string `json:"region"`
 }
 
 func GetMerchantRouteConfigs(c *gin.Context) {
@@ -308,7 +306,7 @@ func GetMerchantRouteConfigs(c *gin.Context) {
 	status := c.Query("status")
 
 	query := `SELECT id, name, COALESCE(merchant_type, 'standard'), COALESCE(region, 'domestic'),
-		COALESCE(route_preference, '{}'::jsonb), status, created_at, updated_at
+		status, created_at, updated_at
 		FROM merchants WHERE 1=1`
 	var args []interface{}
 	argPos := 1
@@ -342,22 +340,13 @@ func GetMerchantRouteConfigs(c *gin.Context) {
 	var configs []MerchantRouteConfig
 	for rows.Next() {
 		var cfg MerchantRouteConfig
-		var routePrefJSON []byte
 
 		err := rows.Scan(
 			&cfg.ID, &cfg.Name, &cfg.MerchantType, &cfg.Region,
-			&routePrefJSON, &cfg.Status, &cfg.CreatedAt, &cfg.UpdatedAt,
+			&cfg.Status, &cfg.CreatedAt, &cfg.UpdatedAt,
 		)
 		if err != nil {
 			continue
-		}
-
-		if len(routePrefJSON) > 0 {
-			json.Unmarshal(routePrefJSON, &cfg.RoutePreference)
-		}
-
-		if cfg.RoutePreference == nil {
-			cfg.RoutePreference = make(map[string]interface{})
 		}
 
 		configs = append(configs, cfg)
@@ -413,20 +402,6 @@ func UpdateMerchantRouteConfig(c *gin.Context) {
 	if req.Region == "" {
 		req.Region = "domestic"
 	}
-	if req.RoutePreference == nil {
-		req.RoutePreference = make(map[string]interface{})
-	}
-
-	routePrefJSON, err := json.Marshal(req.RoutePreference)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"INVALID_REQUEST",
-			"Invalid route_preference format",
-			http.StatusBadRequest,
-			err,
-		))
-		return
-	}
 
 	db := config.GetDB()
 	if db == nil {
@@ -436,9 +411,9 @@ func UpdateMerchantRouteConfig(c *gin.Context) {
 
 	result, err := db.Exec(
 		`UPDATE merchants 
-		SET merchant_type = $1, region = $2, route_preference = $3, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $4`,
-		req.MerchantType, req.Region, routePrefJSON, id,
+		SET merchant_type = $1, region = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $3`,
+		req.MerchantType, req.Region, id,
 	)
 
 	if err != nil {
@@ -523,13 +498,11 @@ func TestRouteDecision(c *gin.Context) {
 	json.Unmarshal(endpointsJSON, &endpoints)
 
 	var merchantType, region string
-	var routePrefJSON []byte
 	err = db.QueryRow(
-		`SELECT COALESCE(merchant_type, 'standard'), COALESCE(region, 'domestic'),
-		COALESCE(route_preference, '{}'::jsonb)
+		`SELECT COALESCE(merchant_type, 'standard'), COALESCE(region, 'domestic')
 		FROM merchants WHERE id = $1`,
 		req.MerchantID,
-	).Scan(&merchantType, &region, &routePrefJSON)
+	).Scan(&merchantType, &region)
 
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -545,9 +518,6 @@ func TestRouteDecision(c *gin.Context) {
 		return
 	}
 
-	var routePref map[string]interface{}
-	json.Unmarshal(routePrefJSON, &routePref)
-
 	router := services.NewUnifiedRouter(nil)
 	decision, err := router.DecideRoute(c.Request.Context(),
 		&services.ProviderConfig{
@@ -557,10 +527,9 @@ func TestRouteDecision(c *gin.Context) {
 			Endpoints:      endpoints,
 		},
 		&services.MerchantConfig{
-			ID:              req.MerchantID,
-			Type:            merchantType,
-			Region:          region,
-			RoutePreference: routePref,
+			ID:     req.MerchantID,
+			Type:   merchantType,
+			Region: region,
 		},
 	)
 
@@ -587,10 +556,9 @@ func TestRouteDecision(c *gin.Context) {
 			"endpoints":       endpoints,
 		},
 		MerchantConfig: map[string]interface{}{
-			"id":               req.MerchantID,
-			"merchant_type":    merchantType,
-			"region":           region,
-			"route_preference": routePref,
+			"id":            req.MerchantID,
+			"merchant_type": merchantType,
+			"region":        region,
 		},
 	}
 

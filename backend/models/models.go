@@ -222,7 +222,6 @@ type MerchantAPIKey struct {
 	MerchantRegion      string          `json:"merchant_region,omitempty"`  // domestic, overseas
 	Region              string          `json:"region,omitempty"`           // domestic, overseas (智能路由字段)
 	SecurityLevel       string          `json:"security_level,omitempty"`   // standard, high (智能路由字段)
-	RoutePreference     json.RawMessage `json:"route_preference,omitempty"` // JSONB: route preference config
 	HealthCheckInterval int             `json:"health_check_interval,omitempty"`
 	HealthCheckLevel    string          `json:"health_check_level,omitempty"`
 	EndpointURL         string          `json:"endpoint_url,omitempty"`

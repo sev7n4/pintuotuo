@@ -87,18 +87,6 @@ const STRATEGY_PRESETS: Record<
     circuitBreaker: { threshold: 5, timeout: 60 },
     description: '均衡考虑价格、延迟和可靠性，适合通用场景',
   },
-  performance_first: {
-    weights: { price: 10, latency: 50, reliability: 20 },
-    retry: { count: 2, backoff: 500 },
-    circuitBreaker: { threshold: 3, timeout: 30 },
-    description: '优先选择响应最快的Provider，适合对延迟敏感的场景',
-  },
-  security_first: {
-    weights: { price: 10, latency: 10, reliability: 20 },
-    retry: { count: 3, backoff: 1000 },
-    circuitBreaker: { threshold: 5, timeout: 60 },
-    description: '优先选择安全等级最高的Provider，适合对数据安全要求高的场景',
-  },
 };
 
 const AdminRoutingStrategies: React.FC = () => {

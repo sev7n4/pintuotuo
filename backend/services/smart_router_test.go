@@ -14,8 +14,6 @@ func TestRoutingStrategyConstants(t *testing.T) {
 		{"latency strategy", RoutingStrategyLatency, "latency_first"},
 		{"balanced strategy", RoutingStrategyBalanced, "balanced"},
 		{"reliability strategy", RoutingStrategyReliability, "reliability_first"},
-		{"performance strategy", RoutingStrategyPerformance, "performance_first"},
-		{"security strategy", RoutingStrategySecurity, "security_first"},
 	}
 
 	for _, tt := range tests {

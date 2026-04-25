@@ -498,6 +498,7 @@ func RegisterSettlementRoutes(router *gin.RouterGroup) {
 	{
 		adminAPIKeyStatus.GET("", handlers.GetAllAPIKeyStatus)
 		adminAPIKeyStatus.GET("/:id", handlers.GetAPIKeyStatus)
+		adminAPIKeyStatus.GET("/merchant", handlers.GetAPIKeyStatusByMerchantID)
 		adminAPIKeyStatus.POST("/batch", handlers.GetBatchAPIKeyStatus)
 		adminAPIKeyStatus.POST("/collect", handlers.TriggerStatusCollect)
 	}
