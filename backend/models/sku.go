@@ -24,9 +24,9 @@ type ModelProvider struct {
 	RouteStrategy  map[string]interface{} `json:"route_strategy,omitempty"`  // JSONB: route strategy config
 	Endpoints      map[string]interface{} `json:"endpoints,omitempty"`       // JSONB: endpoints config
 	Status         string                 `json:"status"`
-	SortOrder      int             `json:"sort_order"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
+	SortOrder      int                    `json:"sort_order"`
+	CreatedAt      time.Time              `json:"created_at"`
+	UpdatedAt      time.Time              `json:"updated_at"`
 }
 
 type SPU struct {
