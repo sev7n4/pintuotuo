@@ -24,9 +24,9 @@ type ExecutionLayerInput struct {
 }
 
 type ExecutionLayerOutput struct {
-	Result     *ExecutionResult  `json:"result"`
-	Decision   *RoutingDecision  `json:"decision"`
-	DurationMs int               `json:"duration_ms"`
+	Result     *ExecutionResult `json:"result"`
+	Decision   *RoutingDecision `json:"decision"`
+	DurationMs int              `json:"duration_ms"`
 }
 
 type ExecutionProviderConfig struct {
