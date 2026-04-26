@@ -8,14 +8,24 @@ import (
 )
 
 type ThreeLayerRoutingPipeline struct {
-	strategyEngine IStrategyEngine
-	decisionEngine IUnifiedRoutingEngine
+	strategyEngine  IStrategyEngine
+	decisionEngine  IUnifiedRoutingEngine
+	executionEngine *ExecutionEngine
 }
 
 func NewThreeLayerRoutingPipeline() *ThreeLayerRoutingPipeline {
 	return &ThreeLayerRoutingPipeline{
-		strategyEngine: NewRoutingStrategyEngine(),
-		decisionEngine: NewUnifiedRoutingEngine(),
+		strategyEngine:  NewRoutingStrategyEngine(),
+		decisionEngine:  NewUnifiedRoutingEngine(),
+		executionEngine: NewExecutionEngine(),
+	}
+}
+
+func NewThreeLayerRoutingPipelineWithEngines(strategy IStrategyEngine, decision IUnifiedRoutingEngine, execution *ExecutionEngine) *ThreeLayerRoutingPipeline {
+	return &ThreeLayerRoutingPipeline{
+		strategyEngine:  strategy,
+		decisionEngine:  decision,
+		executionEngine: execution,
 	}
 }
 
@@ -34,6 +44,13 @@ func (p *ThreeLayerRoutingPipeline) Execute(ctx context.Context, req *RoutingReq
 
 	decision.StrategyLayerReason = strategyOutput.Reason
 	decision.DecisionDurationMs = int(time.Since(startTime).Milliseconds())
+
+	if req.ExecuteImmediately {
+		decision, err = p.executeExecutionLayer(ctx, req, decision)
+		if err != nil {
+			return nil, fmt.Errorf("execution layer failed: %w", err)
+		}
+	}
 
 	return decision, nil
 }
@@ -70,6 +87,90 @@ func (p *ThreeLayerRoutingPipeline) executeDecisionLayer(ctx context.Context, re
 	}
 
 	return decision, nil
+}
+
+func (p *ThreeLayerRoutingPipeline) executeExecutionLayer(ctx context.Context, req *RoutingRequest, decision *RoutingDecision) (*RoutingDecision, error) {
+	if decision == nil {
+		return nil, fmt.Errorf("decision is required for execution")
+	}
+
+	if req.DecryptedAPIKey == "" {
+		return decision, nil
+	}
+
+	execInput := &ExecutionInput{
+		Provider:      decision.SelectedProvider,
+		Model:         decision.SelectedModel,
+		APIKey:        req.DecryptedAPIKey,
+		EndpointURL:   req.ProviderBaseURL,
+		RequestFormat: req.ProviderAPIFormat,
+		Stream:        req.Stream,
+	}
+
+	if req.RequestBody != nil {
+		bodyBytes, err := json.Marshal(req.RequestBody)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		execInput.RequestBody = bodyBytes
+
+		if messages, ok := req.RequestBody["messages"]; ok {
+			if msgBytes, err := json.Marshal(messages); err == nil {
+				var msgs []Message
+				if json.Unmarshal(msgBytes, &msgs) == nil {
+					execInput.Messages = msgs
+				}
+			}
+		}
+
+		if options, ok := req.RequestBody["options"]; ok {
+			if optBytes, err := json.Marshal(options); err == nil {
+				execInput.Options = optBytes
+			}
+		}
+	}
+
+	execLayer := NewExecutionLayer(nil, p.executionEngine)
+	layerInput := &ExecutionLayerInput{
+		RoutingDecision: decision,
+		ProviderConfig: &ExecutionProviderConfig{
+			Code:       decision.SelectedProvider,
+			APIBaseURL: req.ProviderBaseURL,
+			APIFormat:  req.ProviderAPIFormat,
+		},
+		DecryptedAPIKey: req.DecryptedAPIKey,
+		Stream:          req.Stream,
+	}
+
+	output, err := execLayer.Execute(ctx, layerInput)
+	if err != nil {
+		p.recordExecutionError(decision, err)
+		return decision, err
+	}
+
+	decision.ExecutionSuccess = output.Result.Success
+	decision.ExecutionStatusCode = output.Result.StatusCode
+	decision.ExecutionLatencyMs = output.Result.LatencyMs
+	if output.Result.ErrorMessage != "" {
+		decision.ExecutionErrorMessage = output.Result.ErrorMessage
+	}
+
+	if output.Result.Success {
+		decision.DecisionResult = string(DecisionResultSuccess)
+	} else {
+		decision.DecisionResult = string(DecisionResultFailed)
+		decision.ErrorMessage = output.Result.ErrorMessage
+	}
+
+	return decision, nil
+}
+
+func (p *ThreeLayerRoutingPipeline) recordExecutionError(decision *RoutingDecision, err error) {
+	decision.ExecutionSuccess = false
+	decision.ExecutionStatusCode = 500
+	decision.ExecutionErrorMessage = err.Error()
+	decision.DecisionResult = string(DecisionResultFailed)
+	decision.ErrorMessage = err.Error()
 }
 
 func (p *ThreeLayerRoutingPipeline) RecordExecutionResult(decision *RoutingDecision, success bool, statusCode int, latencyMs int, errMsg string) {
