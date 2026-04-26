@@ -2,24 +2,20 @@ package handlers
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/logger"
-	"github.com/pintuotuo/backend/metrics"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
@@ -578,168 +574,32 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
-	retryCount := retryCountTotal
-
-	var apiResp APIProxyResponse
-	if err := json.Unmarshal(body, &apiResp); err != nil {
-		traceSpan.SetStatusCode(resp.StatusCode)
-		traceSpan.SetErrorCode("UNMARSHAL_PROXY_RESPONSE_FAILED")
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		c.Data(resp.StatusCode, "application/json", body)
-		return
-	}
-
-	if sm := strings.TrimSpace(apiResp.Model); sm != "" && sm != strings.TrimSpace(billModel) {
-		logger.LogInfo(c.Request.Context(), "api_proxy", "upstream response model differs from request (e.g. gateway fallback)", map[string]interface{}{
-			"request_id": requestID, "requested_model": billModel, "response_model": sm,
-		})
-	}
-
-	latency := int(time.Since(startTime).Milliseconds())
-
-	var inputTokens, outputTokens int
-	var tokenUsage int64
-	var cost float64
-
-	if apiResp.Usage.TotalTokens > 0 {
-		inputTokens = apiResp.Usage.PromptTokens
-		outputTokens = apiResp.Usage.CompletionTokens
-		tokenUsage = billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
-		var cerr error
-		cost, cerr = calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
-		if cerr != nil {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			logger.LogError(context.Background(), "api_proxy", "Token cost resolution failed", cerr, map[string]interface{}{
-				"user_id": userIDInt, "provider": billProv, "model": billModel, "request_id": requestID,
-			})
-			middleware.RespondWithError(c, apperrors.ErrPricingSnapshotMiss)
-			return
-		}
-	}
-
-	if tokenUsage > 0 {
-		settleErr := billingEngine.SettlePreDeduct(userIDInt, requestID, tokenUsage)
-		if settleErr != nil {
-			logger.LogError(context.Background(), "api_proxy", "Settle pre-deduct failed", settleErr, map[string]interface{}{
-				"user_id":     userIDInt,
-				"token_usage": tokenUsage,
-				"request_id":  requestID,
-			})
-		}
-	} else {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
-	}
-
-	if cost > 0 {
-		billReq := req
-		billReq.Provider = billProv
-		billReq.Model = billModel
-		logMerchantSKUID, logProcurementCNY := resolveMerchantSKUProcurementForLog(db, billReq, winningKey.ID, merchantID, inputTokens, outputTokens)
-		tx, err := db.Begin()
-		if err == nil {
-			_, updateErr := tx.Exec(
-				"UPDATE merchant_api_keys SET quota_used = quota_used + $1, last_used_at = $2 WHERE id = $3",
-				cost, time.Now(), winningKey.ID,
-			)
-			err = updateErr
-			if err == nil {
-				_, err = tx.Exec(
-					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, token_usage, merchant_sku_id, procurement_cost_cny) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
-					userIDInt, winningKey.ID, requestID, billProv, billModel, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost, tokenUsage, nullInt64Arg(logMerchantSKUID), nullFloat64Arg(logProcurementCNY),
-				)
-			}
-
-			if err != nil {
-				tx.Rollback()
-				logger.LogError(context.Background(), "api_proxy", "Transaction rollback", err, map[string]interface{}{
-					"user_id":     userIDInt,
-					"provider":    billProv,
-					"model":       billModel,
-					"cost":        cost,
-					"token_usage": tokenUsage,
-					"request_id":  requestID,
-				})
-			} else {
-				tx.Commit()
-				logger.LogInfo(context.Background(), "api_proxy", "API request completed", map[string]interface{}{
-					"user_id":       userIDInt,
-					"provider":      billProv,
-					"model":         billModel,
-					"input_tokens":  inputTokens,
-					"output_tokens": outputTokens,
-					"token_usage":   tokenUsage,
-					"cost":          cost,
-					"latency_ms":    latency,
-					"status_code":   resp.StatusCode,
-					"request_id":    requestID,
-				})
-
-				metrics.RecordOrderCreation("completed", int64(cost*100), "USD")
-			}
-		}
-
-		ctx := context.Background()
-		cache.Delete(ctx, cache.TokenBalanceKey(userIDInt))
-		cache.Delete(ctx, cache.ComputePointBalanceKey(userIDInt))
-	}
-
-	if currentRoutingDecision != nil {
-		pipeline := services.NewThreeLayerRoutingPipeline()
-
-		gatewayMode := "direct"
-		active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-		if active == llmGatewayLitellm {
-			gatewayMode = "litellm"
-		} else if active == llmGatewayProxy {
-			gatewayMode = llmGatewayProxy
-		}
-
-		execInput := &services.ExecutionLayerInputData{
-			GatewayMode:   gatewayMode,
-			EndpointURL:   fmt.Sprintf("%s/chat/completions", strings.TrimRight(providerCfg.APIBaseURL, "/")),
-			AuthMethod:    "bearer",
-			ResolvedModel: billModel,
-			RequestFormat: providerCfg.APIFormat,
-		}
-		pipeline.RecordExecutionInput(currentRoutingDecision, execInput)
-
-		execSuccess := resp.StatusCode >= 200 && resp.StatusCode < 300
-		execLatency := int(time.Since(decisionStart).Milliseconds())
-		var execErrMsg string
-		if !execSuccess {
-			execErrMsg = fmt.Sprintf("HTTP %d", resp.StatusCode)
-		}
-
-		execResult := &services.ExecutionLayerResultData{
-			Success:      execSuccess,
-			StatusCode:   resp.StatusCode,
-			LatencyMs:    execLatency,
-			ErrorMessage: execErrMsg,
-			Model:        currentRoutingDecision.SelectedModel,
-			Provider:     currentRoutingDecision.SelectedProvider,
-			ActualModel:  apiResp.Model,
-			InputTokens:  apiResp.Usage.PromptTokens,
-			OutputTokens: apiResp.Usage.CompletionTokens,
-		}
-		if len(apiResp.Choices) > 0 {
-			execResult.FinishReason = apiResp.Choices[0].FinishReason
-		}
-		pipeline.RecordExecutionResultExtended(currentRoutingDecision, execResult)
-
-		engine := services.NewUnifiedRoutingEngine()
-		if logErr := engine.LogDecision(c.Request.Context(), currentRoutingDecision); logErr != nil {
-			logger.LogWarn(c.Request.Context(), "api_proxy", "Failed to log routing decision", map[string]interface{}{
-				"request_id": requestID,
-				"error":      logErr.Error(),
-			})
-		}
-	} else {
-		decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
-		_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, winningKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCount)
-	}
-
-	traceSpan.SetStatusCode(resp.StatusCode)
-	c.Data(resp.StatusCode, "application/json", body)
+	processResponseAndSettlement(responseSettlementParams{
+		C:                      c,
+		DB:                     db,
+		Req:                    req,
+		Resp:                   resp,
+		Body:                   body,
+		RequestID:              requestID,
+		UserIDInt:              userIDInt,
+		BillProv:               billProv,
+		BillModel:              billModel,
+		RequestPath:            requestPath,
+		StartTime:              startTime,
+		WinningKey:             winningKey,
+		MerchantID:             merchantID,
+		StrictPricingVID:       strictPricingVID,
+		SelectedStrategy:       selectedStrategy,
+		SmartCandidatesJSON:    smartCandidatesJSON,
+		EffectivePolicySource:  effectivePolicySource,
+		DecisionStart:          decisionStart,
+		TraceSpan:              traceSpan,
+		StrategySnapshot:       strategySnapshot,
+		RetryCount:             retryCountTotal,
+		BillingEngine:          billingEngine,
+		CurrentRoutingDecision: currentRoutingDecision,
+		ProviderCfg:            providerCfg,
+	})
 }
 
 func GetAPIProviders(c *gin.Context) {
