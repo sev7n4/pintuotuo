@@ -1252,20 +1252,6 @@ func resolveMerchantSKUProcurementForLog(db *sql.DB, req APIProxyRequest, apiKey
 	return sql.NullInt64{Int64: int64(msID), Valid: true}, sql.NullFloat64{Float64: proc, Valid: true}
 }
 
-func nullInt64Arg(n sql.NullInt64) interface{} {
-	if n.Valid {
-		return n.Int64
-	}
-	return nil
-}
-
-func nullFloat64Arg(n sql.NullFloat64) interface{} {
-	if n.Valid {
-		return n.Float64
-	}
-	return nil
-}
-
 func resolveMerchantIDByUser(db *sql.DB, userID int) (int, error) {
 	var merchantID int
 	err := db.QueryRow("SELECT id FROM merchants WHERE user_id = $1 AND "+sqlMerchantOperational+" LIMIT 1", userID).Scan(&merchantID)
