@@ -141,24 +141,19 @@ func ProxyAPIRequest(c *gin.Context) {
 	startTime := time.Now()
 	requestID := uuid.New().String()
 
-	userID, exists := c.Get("user_id")
-	if !exists {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-	userIDInt, ok := userID.(int)
-	if !ok {
+	userIDInt, err := authenticateUser(c)
+	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
 
-	var req APIProxyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	req, err := parseAPIProxyRequest(c)
+	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
 
-	proxyAPIRequestCore(c, userIDInt, requestID, startTime, req, c.Request.URL.Path)
+	proxyAPIRequestCore(c, userIDInt, requestID, startTime, *req, c.Request.URL.Path)
 }
 
 func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startTime time.Time, req APIProxyRequest, requestPath string) {
@@ -185,8 +180,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		strictPricingVID = &vid
 	}
 
-	var tokenBalance float64
-	err := db.QueryRow("SELECT balance FROM tokens WHERE user_id = $1", userIDInt).Scan(&tokenBalance)
+	tokenBalance, err := getTokenBalance(db, userIDInt)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrTokenNotFound)
 		return
