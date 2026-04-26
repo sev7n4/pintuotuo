@@ -210,3 +210,15 @@ func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request,
 	}
 	return nil, retryCount, err
 }
+
+func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeConfig, error) {
+	var cfg providerRuntimeConfig
+	err := db.QueryRow(
+		`SELECT code, name, COALESCE(api_base_url, ''), api_format
+		 FROM model_providers
+		 WHERE code = $1 AND status = 'active'
+		 LIMIT 1`,
+		providerCode,
+	).Scan(&cfg.Code, &cfg.Name, &cfg.APIBaseURL, &cfg.APIFormat)
+	return cfg, err
+}
