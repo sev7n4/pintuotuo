@@ -189,7 +189,7 @@ func (e *ExecutionEngine) buildHTTPRequest(ctx context.Context, input *Execution
 	}
 
 	if !strings.HasSuffix(endpoint, "/chat/completions") && !strings.HasSuffix(endpoint, "/messages") {
-		if input.RequestFormat == "anthropic" {
+		if input.RequestFormat == modelProviderAnthropic {
 			endpoint = strings.TrimRight(endpoint, "/") + "/messages"
 		} else {
 			endpoint = strings.TrimRight(endpoint, "/") + "/chat/completions"
@@ -208,7 +208,7 @@ func (e *ExecutionEngine) buildHTTPRequest(ctx context.Context, input *Execution
 	req.Header.Set("Content-Type", "application/json")
 
 	switch input.RequestFormat {
-	case "anthropic":
+	case modelProviderAnthropic:
 		req.Header.Set("x-api-key", input.APIKey)
 		req.Header.Set("anthropic-version", "2023-06-01")
 	default:

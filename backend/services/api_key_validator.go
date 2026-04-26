@@ -572,7 +572,7 @@ func selectProbeModel(provider string, models []string) string {
 		return "glm-4"
 	case modelProviderOpenAI:
 		return "gpt-4o-mini"
-	case "anthropic":
+	case modelProviderAnthropic:
 		return "claude-3-5-sonnet-20241022"
 	case "deepseek":
 		return "deepseek-chat"
