@@ -184,11 +184,11 @@ func TestExecutionLayer_RecordExecutionResult(t *testing.T) {
 
 	decision := &RoutingDecision{}
 	result := &ExecutionResult{
-		Success:      true,
-		StatusCode:   200,
-		LatencyMs:    150,
-		Provider:     "openai",
-		ActualModel:  "gpt-4",
+		Success:     true,
+		StatusCode:  200,
+		LatencyMs:   150,
+		Provider:    "openai",
+		ActualModel: "gpt-4",
 		Usage: &TokenUsage{
 			PromptTokens:     10,
 			CompletionTokens: 20,

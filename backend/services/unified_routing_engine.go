@@ -18,22 +18,22 @@ type IUnifiedRoutingEngine interface {
 }
 
 type RoutingRequest struct {
-	RequestID           string                 `json:"request_id"`
-	MerchantID          int                    `json:"merchant_id"`
-	Model               string                 `json:"model"`
-	Provider            string                 `json:"provider,omitempty"`
-	RequestBody         map[string]interface{} `json:"request_body"`
-	UserPrefs           map[string]interface{} `json:"user_preferences,omitempty"`
-	CostBudget          *float64               `json:"cost_budget,omitempty"`
-	ComplianceReqs      []string               `json:"compliance_requirements,omitempty"`
-	AllowedKeyIDs       []int                  `json:"allowed_key_ids,omitempty"`
-	Stream              bool                   `json:"stream,omitempty"`
-	MaxTokens           int                    `json:"max_tokens,omitempty"`
-	Priority            string                 `json:"priority,omitempty"`
-	ExecuteImmediately  bool                   `json:"execute_immediately"`
-	DecryptedAPIKey     string                 `json:"decrypted_api_key,omitempty"`
-	ProviderBaseURL     string                 `json:"provider_base_url,omitempty"`
-	ProviderAPIFormat   string                 `json:"provider_api_format,omitempty"`
+	RequestID          string                 `json:"request_id"`
+	MerchantID         int                    `json:"merchant_id"`
+	Model              string                 `json:"model"`
+	Provider           string                 `json:"provider,omitempty"`
+	RequestBody        map[string]interface{} `json:"request_body"`
+	UserPrefs          map[string]interface{} `json:"user_preferences,omitempty"`
+	CostBudget         *float64               `json:"cost_budget,omitempty"`
+	ComplianceReqs     []string               `json:"compliance_requirements,omitempty"`
+	AllowedKeyIDs      []int                  `json:"allowed_key_ids,omitempty"`
+	Stream             bool                   `json:"stream,omitempty"`
+	MaxTokens          int                    `json:"max_tokens,omitempty"`
+	Priority           string                 `json:"priority,omitempty"`
+	ExecuteImmediately bool                   `json:"execute_immediately"`
+	DecryptedAPIKey    string                 `json:"decrypted_api_key,omitempty"`
+	ProviderBaseURL    string                 `json:"provider_base_url,omitempty"`
+	ProviderAPIFormat  string                 `json:"provider_api_format,omitempty"`
 }
 
 type UnifiedRoutingEngine struct {
