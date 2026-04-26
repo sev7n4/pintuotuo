@@ -180,7 +180,7 @@ func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request,
 			}
 		}
 
-		resp, err = client.Do(req)
+		resp, err = client.Do(req) // #nosec G704 -- upstream URL from admin-configured model_providers.api_base_url, not user-supplied host
 		if err != nil {
 			info := services.MapProviderError(0, "", err.Error(), nil, err, "")
 			if !info.Retryable || i >= policy.MaxRetries {
