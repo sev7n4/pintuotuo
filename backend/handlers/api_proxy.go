@@ -690,8 +690,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
 		if active == llmGatewayLitellm {
 			gatewayMode = "litellm"
-		} else if active == "proxy" {
-			gatewayMode = "proxy"
+		} else if active == llmGatewayProxy {
+			gatewayMode = llmGatewayProxy
 		}
 
 		execInput := &services.ExecutionLayerInputData{

@@ -24,6 +24,7 @@ const (
 	providerAnthropic   = "anthropic"
 	apiFormatOpenAI     = "openai"
 	llmGatewayLitellm   = "litellm"
+	llmGatewayProxy     = "proxy"
 	policySourceEnv     = "env"
 	policySourceDB      = "db"
 	policySourceDefault = "default"
