@@ -166,19 +166,16 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	traceSpan := services.StartLLMTrace(requestID, userIDInt)
 	defer traceSpan.Finish(c.Request.Context())
 
-	var strictPricingVID *int
-	if services.EntitlementEnforcementStrict() {
-		vid, _, ok, entErr := services.ResolveChosenPricingVersion(db, userIDInt, req.Provider, req.Model)
-		if entErr != nil {
-			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-			return
-		}
-		if !ok {
-			middleware.RespondWithError(c, apperrors.ErrEntitlementDenied)
-			return
-		}
-		strictPricingVID = &vid
+	pricingResult, err := resolveStrictPricingVersion(db, userIDInt, req.Provider, req.Model)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
 	}
+	if !pricingResult.Found {
+		middleware.RespondWithError(c, apperrors.ErrEntitlementDenied)
+		return
+	}
+	strictPricingVID := pricingResult.PricingVID
 
 	tokenBalance, err := getTokenBalance(db, userIDInt)
 	if err != nil {
@@ -191,12 +188,12 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
-	inputTokensEstimate := estimateInputTokens(req.Messages)
-	billingEngine := billing.GetBillingEngine()
-	preDeductConfig := billingEngine.GetPreDeductConfig(0, 0, req.Provider)
-	estimatedUsage := billingEngine.EstimateTokenUsage(inputTokensEstimate, preDeductConfig)
+	usageResult, _ := estimateTokenUsage(req.Messages, req.Provider)
+	inputTokensEstimate := usageResult.InputTokensEstimate
+	estimatedUsage := usageResult.EstimatedUsage
+	preDeductConfig := usageResult.PreDeductConfig
 
-	if tokenBalance < float64(estimatedUsage) {
+	if !hasSufficientBalance(tokenBalance, estimatedUsage) {
 		logger.LogWarn(c.Request.Context(), "api_proxy", "Insufficient balance for pre-deduction", map[string]interface{}{
 			"user_id":         userIDInt,
 			"balance":         tokenBalance,
@@ -209,6 +206,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
+	billingEngine := billing.GetBillingEngine()
 	preDeductErr := billingEngine.PreDeductBalance(userIDInt, estimatedUsage, "API call pre-deduct", requestID)
 	if preDeductErr != nil {
 		logger.LogError(c.Request.Context(), "api_proxy", "Pre-deduction failed", preDeductErr, map[string]interface{}{

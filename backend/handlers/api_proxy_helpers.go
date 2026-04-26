@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pintuotuo/backend/billing"
+	"github.com/pintuotuo/backend/services"
 )
 
 var (
@@ -59,6 +61,50 @@ func getTokenBalance(db *sql.DB, userID int) (float64, error) {
 	}
 
 	return balance, nil
+}
+
+type StrictPricingResult struct {
+	PricingVID *int
+	Found      bool
+}
+
+func resolveStrictPricingVersion(db *sql.DB, userID int, provider, model string) (*StrictPricingResult, error) {
+	if !services.EntitlementEnforcementStrict() {
+		return &StrictPricingResult{PricingVID: nil, Found: true}, nil
+	}
+
+	vid, _, ok, entErr := services.ResolveChosenPricingVersion(db, userID, provider, model)
+	if entErr != nil {
+		return nil, fmt.Errorf("failed to resolve pricing version: %w", entErr)
+	}
+	if !ok {
+		return &StrictPricingResult{PricingVID: nil, Found: false}, nil
+	}
+
+	return &StrictPricingResult{PricingVID: &vid, Found: true}, nil
+}
+
+type EstimatedUsageResult struct {
+	InputTokensEstimate int
+	EstimatedUsage      int64
+	PreDeductConfig     *billing.PreDeductConfig
+}
+
+func estimateTokenUsage(messages []ChatMessage, provider string) (*EstimatedUsageResult, error) {
+	inputTokensEstimate := estimateInputTokens(messages)
+	billingEngine := billing.GetBillingEngine()
+	preDeductConfig := billingEngine.GetPreDeductConfig(0, 0, provider)
+	estimatedUsage := billingEngine.EstimateTokenUsage(inputTokensEstimate, preDeductConfig)
+
+	return &EstimatedUsageResult{
+		InputTokensEstimate: inputTokensEstimate,
+		EstimatedUsage:      estimatedUsage,
+		PreDeductConfig:     preDeductConfig,
+	}, nil
+}
+
+func hasSufficientBalance(balance float64, estimatedUsage int64) bool {
+	return balance >= float64(estimatedUsage)
 }
 
 func nullInt64Arg(n sql.NullInt64) interface{} {
