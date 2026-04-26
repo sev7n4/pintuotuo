@@ -85,7 +85,16 @@ jobs:
           for migration_file in backend/migrations/*.sql; do
             filename=$(basename "$migration_file")
             echo "Checking migration: $filename"
-            docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 -f "/docker-entrypoint-initdb.d/$filename" 2>&1 || echo "Migration $filename may have already been applied or had non-fatal errors"
+            # Extract SQL between "-- +goose Up" and "-- +goose Down" for goose-formatted migrations
+            # If no goose markers, execute the entire file
+            migration_sql=$(sed -n '/-- +goose Up/,/-- +goose Down/p' "$migration_file" | sed '1d;$d' | sed '/-- +goose StatementBegin/d' | sed '/-- +goose StatementEnd/d')
+            if [ -n "$migration_sql" ]; then
+              echo "Executing goose-formatted migration: $filename"
+              echo "$migration_sql" | docker exec -i pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 2>&1 || echo "Migration $filename may have already been applied or had non-fatal errors"
+            else
+              echo "Executing plain SQL migration: $filename"
+              docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 -f "/docker-entrypoint-initdb.d/$filename" 2>&1 || echo "Migration $filename may have already been applied or had non-fatal errors"
+            fi
           done
           echo "Migrations completed"
           echo "Pruning dangling images to keep disk stable..."
