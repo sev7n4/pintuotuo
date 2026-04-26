@@ -15,7 +15,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
@@ -107,138 +106,34 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	traceSpan := services.StartLLMTrace(requestID, userIDInt)
 	defer traceSpan.Finish(c.Request.Context())
 
-	pricingResult, err := resolveStrictPricingVersion(db, userIDInt, req.Provider, req.Model)
+	prepareResult, err := validateAndPrepareRequest(c, db, userIDInt, req, requestID)
 	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-	if !pricingResult.Found {
-		middleware.RespondWithError(c, apperrors.ErrEntitlementDenied)
-		return
-	}
-	strictPricingVID := pricingResult.PricingVID
-
-	tokenBalance, err := getTokenBalance(db, userIDInt)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrTokenNotFound)
-		return
-	}
-
-	if tokenBalance <= 0 {
-		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
-		return
-	}
-
-	usageResult, _ := estimateTokenUsage(req.Messages, req.Provider)
-	inputTokensEstimate := usageResult.InputTokensEstimate
-	estimatedUsage := usageResult.EstimatedUsage
-	preDeductConfig := usageResult.PreDeductConfig
-
-	if !hasSufficientBalance(tokenBalance, estimatedUsage) {
-		logger.LogWarn(c.Request.Context(), "api_proxy", "Insufficient balance for pre-deduction", map[string]interface{}{
-			"user_id":         userIDInt,
-			"balance":         tokenBalance,
-			"estimated_usage": estimatedUsage,
-			"input_estimate":  inputTokensEstimate,
-			"multiplier":      preDeductConfig.Multiplier,
-			"request_id":      requestID,
-		})
-		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
-		return
-	}
-
-	billingEngine := billing.GetBillingEngine()
-	preDeductErr := billingEngine.PreDeductBalance(userIDInt, estimatedUsage, "API call pre-deduct", requestID)
-	if preDeductErr != nil {
-		logger.LogError(c.Request.Context(), "api_proxy", "Pre-deduction failed", preDeductErr, map[string]interface{}{
-			"user_id":         userIDInt,
-			"estimated_usage": estimatedUsage,
-			"request_id":      requestID,
-		})
-		// PreDeductBalance wraps many failures; only true short-balance cases should map to 409.
-		if strings.Contains(preDeductErr.Error(), "insufficient balance") {
-			middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
+		var appErr *apperrors.AppError
+		if errors.As(err, &appErr) {
+			middleware.RespondWithError(c, appErr)
 		} else {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		}
 		return
 	}
 
-	logger.LogInfo(c.Request.Context(), "api_proxy", "Pre-deduction successful", map[string]interface{}{
-		"user_id":         userIDInt,
-		"estimated_usage": estimatedUsage,
-		"request_id":      requestID,
-	})
+	strictPricingVID := prepareResult.StrictPricingVID
+	merchantID := prepareResult.MerchantID
+	entCtx := prepareResult.EntCtx
+	billingEngine := prepareResult.BillingEngine
 
-	merchantID, merchantErr := resolveMerchantIDByUser(db, userIDInt)
-	if merchantErr != nil {
-		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
+	routingResult := resolveRoutingSelection(req, userIDInt, requestID, merchantID, entCtx)
+	if routingResult.APIKeyID != nil {
+		req.APIKeyID = routingResult.APIKeyID
 	}
-
-	var entCtx *services.EntitlementRoutingContext
-	if services.EntitlementEnforcementStrict() {
-		var entErr error
-		entCtx, entErr = services.ResolveEntitlementRoutingContext(db, userIDInt, req.Provider, req.Model)
-		if entErr != nil {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-			return
-		}
-		if req.APIKeyID != nil && *req.APIKeyID > 0 && !entCtx.AllowsAPIKey(*req.APIKeyID) {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"API_KEY_NOT_AUTHORIZED",
-				"api_key_id is not allowed for your entitlement",
-				http.StatusForbidden,
-				nil,
-			))
-			return
-		}
-		if req.MerchantSKUID != nil && *req.MerchantSKUID > 0 && !entCtx.AllowsMerchantSKU(*req.MerchantSKUID) {
-			billingEngine.CancelPreDeduct(userIDInt, requestID)
-			middleware.RespondWithError(c, apperrors.NewAppError(
-				"API_KEY_NOT_AUTHORIZED",
-				"merchant_sku_id is not allowed for your entitlement",
-				http.StatusForbidden,
-				nil,
-			))
-			return
-		}
+	if routingResult.MerchantSKUID != nil {
+		req.MerchantSKUID = routingResult.MerchantSKUID
 	}
-
-	keyFilter := entitlementKeyFilterForRouter(services.EntitlementEnforcementStrict(), entCtx)
-
-	selectedStrategy := "legacy_fallback"
-	effectivePolicySource := ""
-	var smartCandidatesJSON []byte
-	var currentRoutingDecision *services.RoutingDecision
+	selectedStrategy := routingResult.SelectedStrategy
+	effectivePolicySource := routingResult.EffectivePolicySource
+	smartCandidatesJSON := routingResult.SmartCandidatesJSON
+	currentRoutingDecision := routingResult.CurrentRoutingDecision
 	decisionStart := time.Now()
-	if req.APIKeyID == nil && req.MerchantSKUID == nil && shouldUseSmartRouting(userIDInt, requestID) {
-		strategyCode, policySrc := routingStrategyWithSource()
-		if smartReq := trySelectAPIKeyWithSmartRouter(req, strategyCode, keyFilter, requestID, merchantID); smartReq.APIKeyID != nil {
-			req.APIKeyID = smartReq.APIKeyID
-			if entCtx != nil {
-				if msid, ok := entCtx.MerchantSKUForAPIKey(*req.APIKeyID); ok && req.MerchantSKUID == nil {
-					req.MerchantSKUID = &msid
-				}
-			}
-			selectedStrategy = strategyCode
-			smartCandidatesJSON = smartReq.CandidatesJSON
-			effectivePolicySource = policySrc
-			currentRoutingDecision = smartReq.RoutingDecision
-		}
-	}
-	if req.APIKeyID == nil && req.MerchantSKUID == nil && services.EntitlementEnforcementStrict() && entCtx != nil && len(entCtx.AllowedAPIKeyIDs) > 0 {
-		if pick, msid := pickDeterministicEntitledKey(entCtx); pick > 0 {
-			p := pick
-			req.APIKeyID = &p
-			if req.MerchantSKUID == nil && msid > 0 {
-				req.MerchantSKUID = &msid
-			}
-		}
-	}
 
 	var apiKey models.MerchantAPIKey
 	err = selectAPIKeyForRequest(db, userIDInt, merchantID, req, &apiKey, entCtx)
@@ -795,8 +690,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
 		if active == llmGatewayLitellm {
 			gatewayMode = "litellm"
-		} else if active == "proxy" {
-			gatewayMode = "proxy"
+		} else if active == llmGatewayProxy {
+			gatewayMode = llmGatewayProxy
 		}
 
 		execInput := &services.ExecutionLayerInputData{
