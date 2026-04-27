@@ -1,157 +1,92 @@
 package services
 
 import (
-	"strconv"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
-	APIKeyLatency = promauto.NewHistogramVec(
+	RouteDecisionCounter = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "route_decision_total",
+			Help: "Total number of route decisions",
+		},
+		[]string{"provider", "mode", "merchant_type", "region"},
+	)
+
+	ExecutionLayerLatency = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "api_key_latency_seconds",
-			Help:    "API Key latency in seconds",
-			Buckets: []float64{.01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
+			Name:    "execution_layer_latency_ms",
+			Help:    "Execution layer latency in milliseconds",
+			Buckets: []float64{1, 5, 10, 25, 50, 100, 250, 500, 1000},
 		},
-		[]string{"api_key_id", "provider"},
+		[]string{"provider", "mode", "success"},
 	)
 
-	APIKeyErrorRate = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "api_key_error_rate",
-			Help: "API Key error rate",
-		},
-		[]string{"api_key_id", "provider"},
-	)
-
-	APIKeySuccessRate = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "api_key_success_rate",
-			Help: "API Key success rate",
-		},
-		[]string{"api_key_id", "provider"},
-	)
-
-	RateLimiterTokensRemaining = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "rate_limiter_tokens_remaining",
-			Help: "Remaining tokens in rate limiter",
-		},
-		[]string{"key"},
-	)
-
-	RequestQueueLength = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "request_queue_length",
-			Help: "Length of request queue",
-		},
-		[]string{"priority"},
-	)
-
-	ConnectionPoolActive = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "connection_pool_active",
-			Help: "Number of active connections in pool",
-		},
-		[]string{"api_key_id"},
-	)
-
-	ConnectionPoolSize = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "connection_pool_size",
-			Help: "Total size of connection pool",
-		},
-		[]string{"api_key_id"},
-	)
-
-	RouteAwarenessUpdateTotal = promauto.NewCounterVec(
+	RouteDecisionSourceCounter = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "route_awareness_update_total",
-			Help: "Total number of route awareness updates",
+			Name: "route_decision_source_total",
+			Help: "Total number of route decisions by source",
 		},
-		[]string{"api_key_id", "status"},
+		[]string{"source"},
 	)
 
-	StatusCollectorRunsTotal = promauto.NewCounterVec(
+	RouteCacheResultCounter = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "status_collector_runs_total",
-			Help: "Total number of status collector runs",
+			Name: "route_cache_result_total",
+			Help: "Total number of route cache results",
 		},
-		[]string{"status"},
+		[]string{"result"},
 	)
 
-	RoutingDecisionDurationByStrategy = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "routing_decision_duration_by_strategy_seconds",
-			Help:    "Routing decision duration by strategy in seconds",
-			Buckets: []float64{.00001, .00005, .0001, .0005, .001, .005, .01},
-		},
-		[]string{"strategy", "provider"},
-	)
-
-	RoutingDecisionTotalByStrategy = promauto.NewCounterVec(
+	ExecutionLayerErrorsCounter = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "routing_decision_total_by_strategy",
-			Help: "Total number of routing decisions by strategy",
+			Name: "execution_layer_errors_total",
+			Help: "Total number of execution layer errors",
 		},
-		[]string{"strategy", "provider", "result"},
+		[]string{"provider", "mode", "error_type"},
 	)
 )
 
-type MetricsRecorder struct{}
+//nolint:unused // Will be used in Phase 3 Part 2
+func categorizeError(err error) string {
+	if err == nil {
+		return "none"
+	}
 
-func NewMetricsRecorder() *MetricsRecorder {
-	return &MetricsRecorder{}
+	errStr := err.Error()
+
+	switch {
+	case stringsContains(errStr, "timeout"):
+		return "timeout"
+	case stringsContains(errStr, "connection refused"):
+		return "connection_refused"
+	case stringsContains(errStr, "ECONNREFUSED"):
+		return "connection_refused"
+	case stringsContains(errStr, "rate limit"):
+		return "rate_limit"
+	case stringsContains(errStr, "429"):
+		return "rate_limit"
+	case stringsContains(errStr, "context canceled"):
+		return "context_canceled"
+	case stringsContains(errStr, "context deadline"):
+		return "timeout"
+	default:
+		return "unknown"
+	}
 }
 
-func (m *MetricsRecorder) RecordAPIKeyLatency(apiKeyID int, provider string, latencySeconds float64) {
-	APIKeyLatency.WithLabelValues(
-		strconv.Itoa(apiKeyID),
-		provider,
-	).Observe(latencySeconds)
+//nolint:unused // Will be used in Phase 3 Part 2
+func stringsContains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && stringsContainsHelper(s, substr))
 }
 
-func (m *MetricsRecorder) UpdateAPIKeyErrorRate(apiKeyID int, provider string, errorRate float64) {
-	APIKeyErrorRate.WithLabelValues(
-		strconv.Itoa(apiKeyID),
-		provider,
-	).Set(errorRate)
-}
-
-func (m *MetricsRecorder) UpdateAPIKeySuccessRate(apiKeyID int, provider string, successRate float64) {
-	APIKeySuccessRate.WithLabelValues(
-		strconv.Itoa(apiKeyID),
-		provider,
-	).Set(successRate)
-}
-
-func (m *MetricsRecorder) UpdateRateLimiterTokens(key string, remaining float64) {
-	RateLimiterTokensRemaining.WithLabelValues(key).Set(remaining)
-}
-
-func (m *MetricsRecorder) UpdateRequestQueueLength(priority string, length float64) {
-	RequestQueueLength.WithLabelValues(priority).Set(length)
-}
-
-func (m *MetricsRecorder) UpdateConnectionPool(apiKeyID int, active, size float64) {
-	apiKeyIDStr := strconv.Itoa(apiKeyID)
-	ConnectionPoolActive.WithLabelValues(apiKeyIDStr).Set(active)
-	ConnectionPoolSize.WithLabelValues(apiKeyIDStr).Set(size)
-}
-
-func (m *MetricsRecorder) RecordRouteAwarenessUpdate(apiKeyID int, status string) {
-	RouteAwarenessUpdateTotal.WithLabelValues(
-		strconv.Itoa(apiKeyID),
-		status,
-	).Inc()
-}
-
-func (m *MetricsRecorder) RecordStatusCollectorRun(status string) {
-	StatusCollectorRunsTotal.WithLabelValues(status).Inc()
-}
-
-func (m *MetricsRecorder) RecordRoutingDecisionByStrategy(strategy, provider string, durationSeconds float64, result string) {
-	RoutingDecisionDurationByStrategy.WithLabelValues(strategy, provider).Observe(durationSeconds)
-	RoutingDecisionTotalByStrategy.WithLabelValues(strategy, provider, result).Inc()
+//nolint:unused // Will be used in Phase 3 Part 2
+func stringsContainsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

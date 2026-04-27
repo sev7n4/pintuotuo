@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -45,6 +46,18 @@ type APIProxyRequest struct {
 type ChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+//nolint:unused // Will be used in Phase 3 Part 2
+func shouldUseExecutionLayer() bool {
+	val := os.Getenv("USE_EXECUTION_LAYER")
+	return val == envTrue || val == "1"
+}
+
+//nolint:unused // Will be used in Phase 3 Part 2
+func shouldUseConfigDrivenRouting() bool {
+	val := os.Getenv("USE_CONFIG_DRIVEN_ROUTING")
+	return val == envTrue || val == "1"
 }
 
 type APIProxyResponse struct {
