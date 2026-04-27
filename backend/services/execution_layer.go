@@ -30,11 +30,14 @@ type ExecutionLayerOutput struct {
 }
 
 type ExecutionProviderConfig struct {
-	Code        string `json:"code"`
-	Name        string `json:"name"`
-	APIBaseURL  string `json:"api_base_url"`
-	APIFormat   string `json:"api_format"`
-	GatewayMode string `json:"gateway_mode"`
+	Code           string                 `json:"code"`
+	Name           string                 `json:"name"`
+	APIBaseURL     string                 `json:"api_base_url"`
+	APIFormat      string                 `json:"api_format"`
+	GatewayMode    string                 `json:"gateway_mode"`
+	ProviderRegion string                 `json:"provider_region"`
+	RouteStrategy  map[string]interface{} `json:"route_strategy"`
+	Endpoints      map[string]interface{} `json:"endpoints"`
 }
 
 func NewExecutionLayer(db *sql.DB, engine *ExecutionEngine) *ExecutionLayer {
