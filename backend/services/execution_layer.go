@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -212,4 +213,105 @@ func (l *ExecutionLayer) GetProviderConfig(ctx context.Context, providerCode str
 	}
 
 	return &cfg, nil
+}
+
+func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
+	if cfg == nil {
+		return ""
+	}
+
+	switch cfg.GatewayMode {
+	case "litellm":
+		if cfg.Endpoints != nil {
+			if litellmEndpoints, ok := cfg.Endpoints["litellm"].(map[string]interface{}); ok {
+				region := cfg.ProviderRegion
+				if region == "" {
+					region = "domestic"
+				}
+				if url, ok := litellmEndpoints[region].(string); ok && url != "" {
+					return url
+				}
+			}
+		}
+		litellmURL := os.Getenv("LLM_GATEWAY_LITELLM_URL")
+		if litellmURL != "" {
+			return litellmURL + "/v1"
+		}
+		return cfg.APIBaseURL
+
+	case "proxy":
+		if cfg.Endpoints != nil {
+			if proxyEndpoints, ok := cfg.Endpoints["proxy"].(map[string]interface{}); ok {
+				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
+					return gaapURL
+				}
+				for _, v := range proxyEndpoints {
+					if url, ok := v.(string); ok && url != "" {
+						return url
+					}
+				}
+			}
+		}
+		proxyURL := os.Getenv("LLM_GATEWAY_PROXY_URL")
+		if proxyURL != "" {
+			return proxyURL
+		}
+		return cfg.APIBaseURL
+
+	default:
+		if cfg.Endpoints != nil {
+			if directEndpoints, ok := cfg.Endpoints["direct"].(map[string]interface{}); ok {
+				region := cfg.ProviderRegion
+				if region == "" {
+					region = "overseas"
+				}
+				if url, ok := directEndpoints[region].(string); ok && url != "" {
+					return url
+				}
+			}
+		}
+		return cfg.APIBaseURL
+	}
+}
+
+func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, originalAPIKey string) string {
+	if cfg == nil {
+		return originalAPIKey
+	}
+
+	switch cfg.GatewayMode {
+	case "litellm":
+		masterKey := os.Getenv("LITELLM_MASTER_KEY")
+		if masterKey != "" {
+			return masterKey
+		}
+		return originalAPIKey
+
+	case "proxy":
+		proxyToken := os.Getenv("LLM_GATEWAY_PROXY_TOKEN")
+		if proxyToken != "" {
+			return proxyToken
+		}
+		return originalAPIKey
+
+	default:
+		return originalAPIKey
+	}
+}
+
+func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) string {
+	if cfg == nil {
+		return "direct"
+	}
+
+	if cfg.GatewayMode != "" {
+		return cfg.GatewayMode
+	}
+
+	envMode := os.Getenv("LLM_GATEWAY_ACTIVE")
+	if envMode != "" && envMode != "none" {
+		return envMode
+	}
+
+	return "direct"
 }

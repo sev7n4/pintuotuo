@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -422,4 +423,141 @@ func TestExecutionProviderConfig_Endpoints_Nil(t *testing.T) {
 	}
 
 	assert.Nil(t, cfg.Endpoints)
+}
+
+func TestExecutionLayer_ResolveEndpoint_DirectMode(t *testing.T) {
+	layer := NewExecutionLayer(nil, nil)
+
+	cfg := &ExecutionProviderConfig{
+		Code:           "openai",
+		APIBaseURL:     "https://api.openai.com/v1",
+		GatewayMode:    "direct",
+		ProviderRegion: "overseas",
+	}
+
+	endpoint := layer.resolveEndpoint(cfg)
+	assert.Equal(t, "https://api.openai.com/v1", endpoint)
+}
+
+func TestExecutionLayer_ResolveEndpoint_LitellmMode(t *testing.T) {
+	layer := NewExecutionLayer(nil, nil)
+
+	cfg := &ExecutionProviderConfig{
+		Code:           "openai",
+		APIBaseURL:     "https://api.openai.com/v1",
+		GatewayMode:    "litellm",
+		ProviderRegion: "domestic",
+		Endpoints: map[string]interface{}{
+			"litellm": map[string]interface{}{
+				"domestic": "http://litellm-domestic:4000/v1",
+				"overseas": "http://litellm-overseas:4000/v1",
+			},
+		},
+	}
+
+	endpoint := layer.resolveEndpoint(cfg)
+	assert.Equal(t, "http://litellm-domestic:4000/v1", endpoint)
+}
+
+func TestExecutionLayer_ResolveEndpoint_ProxyMode(t *testing.T) {
+	layer := NewExecutionLayer(nil, nil)
+
+	cfg := &ExecutionProviderConfig{
+		Code:           "openai",
+		APIBaseURL:     "https://api.openai.com/v1",
+		GatewayMode:    "proxy",
+		ProviderRegion: "domestic",
+		Endpoints: map[string]interface{}{
+			"proxy": map[string]interface{}{
+				"gaap": "https://openai-gaap.example.com",
+			},
+		},
+	}
+
+	endpoint := layer.resolveEndpoint(cfg)
+	assert.Equal(t, "https://openai-gaap.example.com", endpoint)
+}
+
+func TestExecutionLayer_ResolveEndpoint_FallbackToAPIBaseURL(t *testing.T) {
+	layer := NewExecutionLayer(nil, nil)
+
+	cfg := &ExecutionProviderConfig{
+		Code:           "openai",
+		APIBaseURL:     "https://api.openai.com/v1",
+		GatewayMode:    "direct",
+		ProviderRegion: "overseas",
+		Endpoints:      nil,
+	}
+
+	endpoint := layer.resolveEndpoint(cfg)
+	assert.Equal(t, "https://api.openai.com/v1", endpoint)
+}
+
+func TestExecutionLayer_ResolveAuthToken_DirectMode(t *testing.T) {
+	layer := NewExecutionLayer(nil, nil)
+
+	cfg := &ExecutionProviderConfig{
+		Code:        "openai",
+		GatewayMode: "direct",
+	}
+
+	token := layer.resolveAuthToken(cfg, "sk-original-key")
+	assert.Equal(t, "sk-original-key", token)
+}
+
+func TestExecutionLayer_ResolveAuthToken_LitellmMode(t *testing.T) {
+	layer := NewExecutionLayer(nil, nil)
+
+	cfg := &ExecutionProviderConfig{
+		Code:        "openai",
+		GatewayMode: "litellm",
+	}
+
+	os.Setenv("LITELLM_MASTER_KEY", "sk-litellm-master-key")
+	defer os.Unsetenv("LITELLM_MASTER_KEY")
+
+	token := layer.resolveAuthToken(cfg, "sk-original-key")
+	assert.Equal(t, "sk-litellm-master-key", token)
+}
+
+func TestExecutionLayer_ResolveAuthToken_ProxyMode(t *testing.T) {
+	layer := NewExecutionLayer(nil, nil)
+
+	cfg := &ExecutionProviderConfig{
+		Code:        "openai",
+		GatewayMode: "proxy",
+	}
+
+	os.Setenv("LLM_GATEWAY_PROXY_TOKEN", "sk-proxy-token")
+	defer os.Unsetenv("LLM_GATEWAY_PROXY_TOKEN")
+
+	token := layer.resolveAuthToken(cfg, "sk-original-key")
+	assert.Equal(t, "sk-proxy-token", token)
+}
+
+func TestExecutionLayer_DetermineGatewayMode_FromConfig(t *testing.T) {
+	layer := NewExecutionLayer(nil, nil)
+
+	cfg := &ExecutionProviderConfig{
+		Code:        "openai",
+		GatewayMode: "litellm",
+		RouteStrategy: map[string]interface{}{
+			"domestic_users": map[string]interface{}{"mode": "litellm"},
+		},
+	}
+
+	mode := layer.determineGatewayMode(cfg)
+	assert.Equal(t, "litellm", mode)
+}
+
+func TestExecutionLayer_DetermineGatewayMode_EmptyConfig(t *testing.T) {
+	layer := NewExecutionLayer(nil, nil)
+
+	cfg := &ExecutionProviderConfig{
+		Code:        "openai",
+		GatewayMode: "",
+	}
+
+	mode := layer.determineGatewayMode(cfg)
+	assert.Equal(t, "direct", mode)
 }
