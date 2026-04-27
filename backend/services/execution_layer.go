@@ -60,9 +60,51 @@ func NewExecutionLayer(db *sql.DB, engine *ExecutionEngine) *ExecutionLayer {
 func (l *ExecutionLayer) Execute(ctx context.Context, input *ExecutionLayerInput) (*ExecutionLayerOutput, error) {
 	startTime := time.Now()
 
-	execInput, err := l.prepareExecutionInput(input)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare execution input: %w", err)
+	if input.ProviderConfig == nil {
+		return nil, fmt.Errorf("provider config is required")
+	}
+
+	if input.DecryptedAPIKey == "" {
+		return nil, fmt.Errorf("decrypted API key is required")
+	}
+
+	gatewayMode := l.determineGatewayMode(input.ProviderConfig)
+	input.ProviderConfig.GatewayMode = gatewayMode
+
+	endpointURL := l.resolveEndpoint(input.ProviderConfig)
+	if endpointURL == "" {
+		return nil, fmt.Errorf("failed to resolve endpoint URL")
+	}
+
+	authToken := l.resolveAuthToken(input.ProviderConfig, input.DecryptedAPIKey)
+
+	model := ""
+	if input.RoutingDecision != nil {
+		model = input.RoutingDecision.SelectedModel
+	}
+
+	if model == "" && len(input.RequestBody) > 0 {
+		var req struct {
+			Model string `json:"model"`
+		}
+		if err := json.Unmarshal(input.RequestBody, &req); err == nil {
+			model = req.Model
+		}
+	}
+
+	execInput := &ExecutionInput{
+		Provider:        input.ProviderConfig.Code,
+		Model:           model,
+		APIKey:          authToken,
+		EndpointURL:     endpointURL,
+		RequestFormat:   input.ProviderConfig.APIFormat,
+		RequestBody:     input.RequestBody,
+		Messages:        input.Messages,
+		Stream:          input.Stream,
+		Options:         input.Options,
+		OriginalAPIKey:  input.DecryptedAPIKey,
+		GatewayMode:     gatewayMode,
+		ProviderBaseURL: input.ProviderConfig.APIBaseURL,
 	}
 
 	result, err := l.engine.ExecuteWithRetry(ctx, execInput)
@@ -81,47 +123,6 @@ func (l *ExecutionLayer) Execute(ctx context.Context, input *ExecutionLayerInput
 		Result:     result,
 		Decision:   input.RoutingDecision,
 		DurationMs: int(time.Since(startTime).Milliseconds()),
-	}, nil
-}
-
-func (l *ExecutionLayer) prepareExecutionInput(input *ExecutionLayerInput) (*ExecutionInput, error) {
-	if input.ProviderConfig == nil {
-		return nil, fmt.Errorf("provider config is required")
-	}
-
-	if input.DecryptedAPIKey == "" {
-		return nil, fmt.Errorf("decrypted API key is required")
-	}
-
-	endpointURL := input.ProviderConfig.APIBaseURL
-	if endpointURL == "" {
-		return nil, fmt.Errorf("API base URL is required")
-	}
-
-	model := ""
-	if input.RoutingDecision != nil {
-		model = input.RoutingDecision.SelectedModel
-	}
-
-	if model == "" && len(input.RequestBody) > 0 {
-		var req struct {
-			Model string `json:"model"`
-		}
-		if err := json.Unmarshal(input.RequestBody, &req); err == nil {
-			model = req.Model
-		}
-	}
-
-	return &ExecutionInput{
-		Provider:      input.ProviderConfig.Code,
-		Model:         model,
-		APIKey:        input.DecryptedAPIKey,
-		EndpointURL:   endpointURL,
-		RequestFormat: input.ProviderConfig.APIFormat,
-		RequestBody:   input.RequestBody,
-		Messages:      input.Messages,
-		Stream:        input.Stream,
-		Options:       input.Options,
 	}, nil
 }
 
@@ -221,7 +222,6 @@ func (l *ExecutionLayer) GetProviderConfig(ctx context.Context, providerCode str
 	return &cfg, nil
 }
 
-//nolint:unused // Will be used in Phase 2
 func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 	if cfg == nil {
 		return ""
@@ -281,7 +281,6 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 	}
 }
 
-//nolint:unused // Will be used in Phase 2
 func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, originalAPIKey string) string {
 	if cfg == nil {
 		return originalAPIKey
@@ -307,7 +306,6 @@ func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, original
 	}
 }
 
-//nolint:unused // Will be used in Phase 2
 func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) string {
 	if cfg == nil {
 		return GatewayModeDirect
