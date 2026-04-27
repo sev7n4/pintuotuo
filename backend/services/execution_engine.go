@@ -17,16 +17,20 @@ type ExecutionEngine struct {
 }
 
 type ExecutionInput struct {
-	Provider      string            `json:"provider"`
-	Model         string            `json:"model"`
-	APIKey        string            `json:"api_key"`
-	EndpointURL   string            `json:"endpoint_url"`
-	RequestFormat string            `json:"request_format"`
-	RequestBody   []byte            `json:"request_body"`
-	Headers       map[string]string `json:"headers"`
-	Messages      []Message         `json:"messages"`
-	Stream        bool              `json:"stream"`
-	Options       json.RawMessage   `json:"options"`
+	Provider        string            `json:"provider"`
+	Model           string            `json:"model"`
+	APIKey          string            `json:"api_key"`
+	EndpointURL     string            `json:"endpoint_url"`
+	RequestFormat   string            `json:"request_format"`
+	RequestBody     []byte            `json:"request_body"`
+	Headers         map[string]string `json:"headers"`
+	Messages        []Message         `json:"messages"`
+	Stream          bool              `json:"stream"`
+	Options         json.RawMessage   `json:"options"`
+	OriginalAPIKey  string            `json:"original_api_key"`
+	GatewayMode     string            `json:"gateway_mode"`
+	ProviderBaseURL string            `json:"provider_base_url"`
+	FallbackURL     string            `json:"fallback_url"`
 }
 
 type ExecutionResult struct {

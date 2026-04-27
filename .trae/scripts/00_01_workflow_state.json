@@ -1,8 +1,8 @@
 {
-  "workflow_id": "intelligent-routing-phase2",
-  "created_at": "2026-04-23T00:00:00Z",
-  "current_step": 2,
-  "branch": "",
+  "workflow_id": "execution-layer-unified-outbound",
+  "created_at": "2026-04-27T00:00:00Z",
+  "current_step": 4,
+  "branch": "enhancement/execution-layer-unified-outbound",
   "pr_number": null,
   "current_fix_cases": [],
   "retry_count": 0,
@@ -13,24 +13,43 @@
     "e2e": "",
     "deploy": ""
   },
-  "local_validation": "",
+  "local_validation": "passed",
   "merged": false,
   "issue": {
-    "type": "feature",
-    "title": "智能路由 Phase 2 - 路由策略层建设",
-    "description": "实现请求分析器和策略引擎",
-    "tasks": [
-      "P2-001: 实现 RequestAnalysis 数据结构",
-      "P2-002: 实现 RequestAnalyzer 核心逻辑",
-      "P2-003: 实现 Token 估算算法",
-      "P2-004: 实现 StrategyGoal 数据结构",
-      "P2-005: 实现 RoutingStrategyEngine 核心逻辑",
-      "P2-006: 扩展策略类型",
-      "P2-007: 实现成本预算控制",
-      "P2-008: 实现合规区域约束",
-      "P2-009: 实现策略配置管理 API",
-      "P2-010: RequestAnalyzer 单元测试",
-      "P2-011: RoutingStrategyEngine 单元测试"
-    ]
+    "type": "enhancement",
+    "title": "三层路由架构执行层统一出站演进",
+    "description": "将执行层改造为统一的出站入口，整合 Gateway 选择、认证、HTTP 执行等逻辑，实现配置驱动路由",
+    "spec_file": ".trae/specs/execution-layer-spec/spec.md",
+    "tasks_file": ".trae/specs/execution-layer-spec/tasks.md",
+    "checklist_file": ".trae/specs/execution-layer-spec/checklist.md",
+    "phases": [
+      {
+        "name": "Phase 1: 基础设施准备",
+        "tasks": ["P1.1", "P1.2", "P1.3", "P1.4", "P1.5", "P1.6", "P1.7", "P1.8"],
+        "status": "pending"
+      },
+      {
+        "name": "Phase 2: 执行层能力增强",
+        "tasks": ["P2.1", "P2.2", "P2.3", "P2.4", "P2.5", "P2.6"],
+        "status": "pending"
+      },
+      {
+        "name": "Phase 2.5: 配置驱动路由集成",
+        "tasks": ["P2.5.1", "P2.5.2", "P2.5.3", "P2.5.4", "P2.5.5", "P2.5.6", "P2.5.7", "P2.5.8", "P2.5.9", "P2.5.10"],
+        "status": "pending"
+      },
+      {
+        "name": "Phase 3: 主流程切换",
+        "tasks": ["P3.1", "P3.2", "P3.3", "P3.4", "P3.5", "P3.5.1", "P3.5.2", "P3.5.3", "P3.6", "P3.7", "P3.8", "P3.9", "P3.10"],
+        "status": "pending"
+      },
+      {
+        "name": "Phase 4: 清理与优化",
+        "tasks": ["P4.1", "P4.2", "P4.3", "P4.4", "P4.5", "P4.6", "P4.7", "P4.8", "P4.9"],
+        "status": "pending"
+      }
+    ],
+    "current_phase": 1,
+    "current_task": "P1.1"
   }
 }

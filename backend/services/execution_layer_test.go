@@ -359,3 +359,67 @@ func TestExecutionLayer_Execute_WithMessages(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, output.Result.Success)
 }
+
+func TestExecutionProviderConfig_NewFields(t *testing.T) {
+	cfg := &ExecutionProviderConfig{
+		Code:           "openai",
+		Name:           "OpenAI",
+		APIBaseURL:     "https://api.openai.com/v1",
+		APIFormat:      "openai",
+		GatewayMode:    "litellm",
+		ProviderRegion: "overseas",
+		RouteStrategy: map[string]interface{}{
+			"domestic_users": map[string]interface{}{"mode": "litellm"},
+			"overseas_users": map[string]interface{}{"mode": "direct"},
+		},
+		Endpoints: map[string]interface{}{
+			"direct": map[string]interface{}{
+				"overseas": "https://api.openai.com/v1",
+			},
+			"litellm": map[string]interface{}{
+				"domestic": "http://litellm:4000/v1",
+			},
+		},
+	}
+
+	assert.Equal(t, "openai", cfg.Code)
+	assert.Equal(t, "litellm", cfg.GatewayMode)
+	assert.Equal(t, "overseas", cfg.ProviderRegion)
+	assert.NotNil(t, cfg.RouteStrategy)
+	assert.NotNil(t, cfg.Endpoints)
+
+	domesticUsers, ok := cfg.RouteStrategy["domestic_users"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "litellm", domesticUsers["mode"])
+
+	overseasUsers, ok := cfg.RouteStrategy["overseas_users"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "direct", overseasUsers["mode"])
+}
+
+func TestExecutionProviderConfig_ProviderRegion_Default(t *testing.T) {
+	cfg := &ExecutionProviderConfig{
+		Code:       "openai",
+		APIBaseURL: "https://api.openai.com/v1",
+	}
+
+	assert.Equal(t, "", cfg.ProviderRegion)
+}
+
+func TestExecutionProviderConfig_RouteStrategy_Nil(t *testing.T) {
+	cfg := &ExecutionProviderConfig{
+		Code:       "openai",
+		APIBaseURL: "https://api.openai.com/v1",
+	}
+
+	assert.Nil(t, cfg.RouteStrategy)
+}
+
+func TestExecutionProviderConfig_Endpoints_Nil(t *testing.T) {
+	cfg := &ExecutionProviderConfig{
+		Code:       "openai",
+		APIBaseURL: "https://api.openai.com/v1",
+	}
+
+	assert.Nil(t, cfg.Endpoints)
+}

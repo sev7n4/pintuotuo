@@ -347,3 +347,38 @@ func TestExecutionEngine_Execute_ContextCancellation(t *testing.T) {
 	assert.Error(t, err)
 	assert.False(t, result.Success)
 }
+
+func TestExecutionInput_NewFields(t *testing.T) {
+	input := &ExecutionInput{
+		Provider:        "openai",
+		Model:           "gpt-4",
+		APIKey:          "gateway-key",
+		EndpointURL:     "http://litellm:4000/v1/chat/completions",
+		RequestFormat:   "openai",
+		OriginalAPIKey:  "original-provider-key",
+		GatewayMode:     "litellm",
+		ProviderBaseURL: "https://api.openai.com/v1",
+		FallbackURL:     "http://proxy:8080/v1/chat/completions",
+		Messages:        []Message{{Role: "user", Content: "Hello"}},
+	}
+
+	assert.Equal(t, "openai", input.Provider)
+	assert.Equal(t, "gateway-key", input.APIKey)
+	assert.Equal(t, "original-provider-key", input.OriginalAPIKey)
+	assert.Equal(t, "litellm", input.GatewayMode)
+	assert.Equal(t, "https://api.openai.com/v1", input.ProviderBaseURL)
+	assert.Equal(t, "http://proxy:8080/v1/chat/completions", input.FallbackURL)
+}
+
+func TestExecutionInput_NewFields_Default(t *testing.T) {
+	input := &ExecutionInput{
+		Provider:    "openai",
+		APIKey:      "test-key",
+		EndpointURL: "https://api.openai.com/v1/chat/completions",
+	}
+
+	assert.Equal(t, "", input.OriginalAPIKey)
+	assert.Equal(t, "", input.GatewayMode)
+	assert.Equal(t, "", input.ProviderBaseURL)
+	assert.Equal(t, "", input.FallbackURL)
+}
