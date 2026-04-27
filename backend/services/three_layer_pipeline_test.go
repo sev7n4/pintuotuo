@@ -109,16 +109,16 @@ func TestThreeLayerRoutingPipeline_RecordExecutionResultExtended(t *testing.T) {
 	}
 
 	result := &ExecutionLayerResultData{
-		Success:       false,
-		StatusCode:    500,
-		LatencyMs:     50,
-		ErrorMessage:  "internal error",
-		Model:         "gpt-4",
-		Provider:      "openai",
-		ActualModel:   "gpt-4-turbo",
-		InputTokens:   20,
-		OutputTokens:  10,
-		FinishReason:  "stop",
+		Success:      false,
+		StatusCode:   500,
+		LatencyMs:    50,
+		ErrorMessage: "internal error",
+		Model:        "gpt-4",
+		Provider:     "openai",
+		ActualModel:  "gpt-4-turbo",
+		InputTokens:  20,
+		OutputTokens: 10,
+		FinishReason: "stop",
 	}
 
 	p.RecordExecutionResultExtended(decision, result)
