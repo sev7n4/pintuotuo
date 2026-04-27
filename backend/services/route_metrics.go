@@ -48,6 +48,7 @@ var (
 	)
 )
 
+//nolint:unused // Will be used in Phase 3 Part 2
 func categorizeError(err error) string {
 	if err == nil {
 		return "none"
@@ -75,10 +76,12 @@ func categorizeError(err error) string {
 	}
 }
 
+//nolint:unused // Will be used in Phase 3 Part 2
 func stringsContains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && stringsContainsHelper(s, substr))
 }
 
+//nolint:unused // Will be used in Phase 3 Part 2
 func stringsContainsHelper(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
