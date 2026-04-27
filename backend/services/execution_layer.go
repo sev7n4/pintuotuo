@@ -126,47 +126,6 @@ func (l *ExecutionLayer) Execute(ctx context.Context, input *ExecutionLayerInput
 	}, nil
 }
 
-func (l *ExecutionLayer) prepareExecutionInput(input *ExecutionLayerInput) (*ExecutionInput, error) {
-	if input.ProviderConfig == nil {
-		return nil, fmt.Errorf("provider config is required")
-	}
-
-	if input.DecryptedAPIKey == "" {
-		return nil, fmt.Errorf("decrypted API key is required")
-	}
-
-	endpointURL := input.ProviderConfig.APIBaseURL
-	if endpointURL == "" {
-		return nil, fmt.Errorf("API base URL is required")
-	}
-
-	model := ""
-	if input.RoutingDecision != nil {
-		model = input.RoutingDecision.SelectedModel
-	}
-
-	if model == "" && len(input.RequestBody) > 0 {
-		var req struct {
-			Model string `json:"model"`
-		}
-		if err := json.Unmarshal(input.RequestBody, &req); err == nil {
-			model = req.Model
-		}
-	}
-
-	return &ExecutionInput{
-		Provider:      input.ProviderConfig.Code,
-		Model:         model,
-		APIKey:        input.DecryptedAPIKey,
-		EndpointURL:   endpointURL,
-		RequestFormat: input.ProviderConfig.APIFormat,
-		RequestBody:   input.RequestBody,
-		Messages:      input.Messages,
-		Stream:        input.Stream,
-		Options:       input.Options,
-	}, nil
-}
-
 func (l *ExecutionLayer) recordExecutionResult(decision *RoutingDecision, result *ExecutionResult) {
 	if decision == nil || result == nil {
 		return
