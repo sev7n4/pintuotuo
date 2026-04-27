@@ -26,6 +26,7 @@ const (
 	apiFormatOpenAI     = "openai"
 	llmGatewayLitellm   = "litellm"
 	llmGatewayProxy     = "proxy"
+	llmGatewayNone      = "none"
 	policySourceEnv     = "env"
 	policySourceDB      = "db"
 	policySourceDefault = "default"
@@ -88,7 +89,7 @@ func applyProxyUpstreamHeaders(c *gin.Context, httpReq *http.Request, requestID 
 
 func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
 	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == "none" {
+	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == llmGatewayNone {
 		return cfg
 	}
 	switch active {
@@ -102,7 +103,7 @@ func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
 
 func resolveGatewayAuthToken(cfg providerRuntimeConfig, fallbackToken string) string {
 	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == "none" {
+	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == llmGatewayNone {
 		return fallbackToken
 	}
 	switch active {

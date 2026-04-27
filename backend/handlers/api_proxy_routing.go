@@ -522,7 +522,7 @@ func fallbackToEnvDecision(cfg *providerRuntimeConfig) *services.RouteDecision {
 //nolint:unused // Will be used in Phase 3
 func determineGatewayModeFromEnv() string {
 	envMode := os.Getenv("LLM_GATEWAY_ACTIVE")
-	if envMode != "" && envMode != "none" {
+	if envMode != "" && envMode != llmGatewayNone {
 		return envMode
 	}
 	return services.GatewayModeDirect
