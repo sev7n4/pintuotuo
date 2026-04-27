@@ -97,3 +97,75 @@ func parseOpenAIModels(body []byte) ([]string, error) {
 	}
 	return models, nil
 }
+
+type ProbeURLResult struct {
+	Success    bool
+	StatusCode int
+	LatencyMs  int
+	ErrorCode  string
+	ErrorMsg   string
+}
+
+func ProbeEndpointURL(ctx context.Context, url string, apiKey string, timeoutMs int) *ProbeURLResult {
+	client := &http.Client{
+		Timeout: time.Duration(timeoutMs) * time.Millisecond,
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
+	if err != nil {
+		return &ProbeURLResult{
+			Success:  false,
+			ErrorMsg: fmt.Sprintf("failed to create request: %v", err),
+		}
+	}
+
+	if apiKey != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	start := time.Now()
+	resp, err := client.Do(req)
+	latencyMs := int(time.Since(start).Milliseconds())
+
+	if err != nil {
+		errMsg := err.Error()
+		var errCode string
+		if strings.Contains(errMsg, "timeout") {
+			errCode = "TIMEOUT"
+			errMsg = fmt.Sprintf("connection timeout after %dms", timeoutMs)
+		} else if strings.Contains(errMsg, "connection refused") {
+			errCode = "CONNECTION_REFUSED"
+		} else if strings.Contains(errMsg, "no such host") || strings.Contains(errMsg, "lookup") {
+			errCode = "DNS_ERROR"
+		} else {
+			errCode = "CONNECTION_ERROR"
+		}
+		return &ProbeURLResult{
+			Success:   false,
+			LatencyMs: latencyMs,
+			ErrorCode: errCode,
+			ErrorMsg:  errMsg,
+		}
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	_ = body
+
+	result := &ProbeURLResult{
+		StatusCode: resp.StatusCode,
+		LatencyMs:  latencyMs,
+	}
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		result.Success = true
+	} else {
+		result.Success = false
+		result.ErrorCode = fmt.Sprintf("HTTP_%d", resp.StatusCode)
+		result.ErrorMsg = fmt.Sprintf("endpoint returned status %d", resp.StatusCode)
+	}
+
+	return result
+}
