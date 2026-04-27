@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -179,50 +178,4 @@ func TestProviderRuntimeConfig_EmptyFields(t *testing.T) {
 	assert.Nil(t, cfg.Endpoints)
 }
 
-func TestShouldUseExecutionLayer(t *testing.T) {
-	tests := []struct {
-		name     string
-		envValue string
-		expected bool
-	}{
-		{"true", "true", true},
-		{"1", "1", true},
-		{"false", "false", false},
-		{"empty", "", false},
-		{"invalid", "invalid", false},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("USE_EXECUTION_LAYER", tt.envValue)
-			defer os.Unsetenv("USE_EXECUTION_LAYER")
-
-			result := shouldUseExecutionLayer()
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestShouldUseConfigDrivenRouting(t *testing.T) {
-	tests := []struct {
-		name     string
-		envValue string
-		expected bool
-	}{
-		{"true", "true", true},
-		{"1", "1", true},
-		{"false", "false", false},
-		{"empty", "", false},
-		{"invalid", "invalid", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("USE_CONFIG_DRIVEN_ROUTING", tt.envValue)
-			defer os.Unsetenv("USE_CONFIG_DRIVEN_ROUTING")
-
-			result := shouldUseConfigDrivenRouting()
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}

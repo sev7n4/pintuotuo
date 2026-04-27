@@ -115,6 +115,5 @@ func resolveProxyAttemptRuntime(
 		}
 		return models.MerchantAPIKey{}, "", providerRuntimeConfig{}, false, fatalErr
 	}
-	pcfg = applyGatewayOverride(pcfg)
 	return pk, decryptedKey, pcfg, false, nil
 }

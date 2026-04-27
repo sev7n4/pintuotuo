@@ -1,15 +1,11 @@
 package handlers
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -253,7 +249,6 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
-	strictPricingVID := prepareResult.StrictPricingVID
 	merchantID := prepareResult.MerchantID
 	entCtx := prepareResult.EntCtx
 	billingEngine := prepareResult.BillingEngine
@@ -266,10 +261,6 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		req.MerchantSKUID = routingResult.MerchantSKUID
 	}
 	selectedStrategy := routingResult.SelectedStrategy
-	effectivePolicySource := routingResult.EffectivePolicySource
-	smartCandidatesJSON := routingResult.SmartCandidatesJSON
-	currentRoutingDecision := routingResult.CurrentRoutingDecision
-	decisionStart := time.Now()
 
 	var apiKey models.MerchantAPIKey
 	err = selectAPIKeyForRequest(db, userIDInt, merchantID, req, &apiKey, entCtx)
