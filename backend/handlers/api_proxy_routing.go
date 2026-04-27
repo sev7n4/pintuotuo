@@ -528,6 +528,7 @@ func determineGatewayModeFromEnv() string {
 	return services.GatewayModeDirect
 }
 
+//nolint:unused // Will be used in Phase 3
 func resolveEndpointFromEnv(mode string, cfg *providerRuntimeConfig) string {
 	switch mode {
 	case services.GatewayModeLitellm:
