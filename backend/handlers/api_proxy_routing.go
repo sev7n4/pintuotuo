@@ -9,10 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/pintuotuo/backend/logger"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
 	"github.com/pintuotuo/backend/utils"
@@ -81,39 +78,6 @@ func scanMerchantAPIKeyQuotaRow(row *sql.Row, apiKey *models.MerchantAPIKey) err
 	}
 	apiKey.QuotaLimit = utils.NullFloat64Ptr(qLim)
 	return nil
-}
-
-func resolveMerchantSKUProcurementForLog(db *sql.DB, req APIProxyRequest, apiKeyID int, merchantID int, inputTokens, outputTokens int) (sql.NullInt64, sql.NullFloat64) {
-	var msID int
-	var inRate, outRate float64
-	var err error
-	if req.MerchantSKUID != nil && *req.MerchantSKUID > 0 && merchantID > 0 {
-		err = db.QueryRow(
-			`SELECT ms.id, ms.cost_input_rate, ms.cost_output_rate
-			 FROM merchant_skus ms
-			 WHERE ms.id = $1 AND ms.api_key_id = $2 AND ms.merchant_id = $3 AND ms.status = 'active'`,
-			*req.MerchantSKUID, apiKeyID, merchantID,
-		).Scan(&msID, &inRate, &outRate)
-	} else {
-		err = db.QueryRow(
-			`SELECT ms.id, ms.cost_input_rate, ms.cost_output_rate
-			 FROM merchant_skus ms
-			 WHERE ms.api_key_id = $1 AND ms.status = 'active'
-			 LIMIT 1`,
-			apiKeyID,
-		).Scan(&msID, &inRate, &outRate)
-	}
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return sql.NullInt64{}, sql.NullFloat64{}
-		}
-		logger.LogWarn(context.Background(), "api_proxy", "resolve procurement merchant_sku failed", map[string]interface{}{
-			"error": err.Error(), "api_key_id": apiKeyID, "merchant_id": merchantID,
-		})
-		return sql.NullInt64{}, sql.NullFloat64{}
-	}
-	proc := services.ProcurementCostCNY(inRate, outRate, inputTokens, outputTokens)
-	return sql.NullInt64{Int64: int64(msID), Valid: true}, sql.NullFloat64{Float64: proc, Valid: true}
 }
 
 func resolveMerchantIDByUser(db *sql.DB, userID int) (int, error) {
@@ -209,110 +173,6 @@ func shouldUseSmartRouting(userID int, requestID string) bool {
 		slot = -slot
 	}
 	return slot < percent
-}
-
-func recordHealthCheckerProxyOutcome(c *gin.Context, apiKeyID int, success bool, startTime time.Time) {
-	if apiKeyID <= 0 {
-		return
-	}
-	latencyMs := int(time.Since(startTime).Milliseconds())
-	if err := services.NewHealthChecker().RecordRequestResult(c.Request.Context(), apiKeyID, success, latencyMs); err != nil {
-		logger.LogError(c.Request.Context(), "api_proxy", "RecordRequestResult failed", err, map[string]interface{}{
-			"api_key_id": apiKeyID,
-		})
-	}
-}
-
-func insertRoutingDecision(db *sql.DB, requestID string, userID int, req APIProxyRequest, strategy string, candidatesJSON []byte, selectedAPIKeyID int, latencyMs int, retryCount int) error {
-	if db == nil {
-		return nil
-	}
-	wasRetry := retryCount > 0
-	_, err := db.Exec(
-		`INSERT INTO routing_decisions
-		(request_id, user_id, model_requested, strategy_used, candidates, selected_provider, selected_api_key_id, decision_latency_ms, was_retry, retry_count)
-		VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8, $9)`,
-		requestID, userID, req.Model, strategy, candidatesJSON, selectedAPIKeyID, latencyMs, wasRetry, retryCount,
-	)
-	return err
-}
-
-func buildRetryPolicy(snapshot strategyRuntimeSnapshot) *services.RetryPolicy {
-	policy := *services.DefaultRetryPolicy
-	if snapshot.MaxRetries > 0 {
-		policy.MaxRetries = snapshot.MaxRetries
-	}
-	if snapshot.InitialDelayMs > 0 {
-		policy.InitialDelay = time.Duration(snapshot.InitialDelayMs) * time.Millisecond
-	}
-	return &policy
-}
-
-func applyCircuitBreakerConfig(apiKeyID int, snapshot strategyRuntimeSnapshot) {
-	if apiKeyID <= 0 {
-		return
-	}
-	threshold := snapshot.CircuitThreshold
-	if threshold <= 0 {
-		threshold = 5
-	}
-	timeoutSeconds := snapshot.CircuitTimeoutSec
-	if timeoutSeconds <= 0 {
-		timeoutSeconds = 60
-	}
-	services.GetSmartRouter().ConfigureCircuitBreaker(apiKeyID, threshold, time.Duration(timeoutSeconds)*time.Second)
-}
-
-func buildStrategyRuntimeSnapshot(strategyCode string) strategyRuntimeSnapshot {
-	snapshot := strategyRuntimeSnapshot{
-		StrategyCode:      strategyCode,
-		MaxRetries:        services.DefaultRetryPolicy.MaxRetries,
-		InitialDelayMs:    int(services.DefaultRetryPolicy.InitialDelay / time.Millisecond),
-		CircuitThreshold:  5,
-		CircuitTimeoutSec: 60,
-	}
-	if strategyCode == "" {
-		return snapshot
-	}
-	cfg, ok := services.GetSmartRouter().GetStrategyConfig(strategyCode)
-	if !ok {
-		return snapshot
-	}
-	if cfg.MaxRetryCount > 0 {
-		snapshot.MaxRetries = cfg.MaxRetryCount
-	}
-	if cfg.RetryBackoffBase > 0 {
-		snapshot.InitialDelayMs = cfg.RetryBackoffBase
-	}
-	if cfg.CircuitBreakerThreshold > 0 {
-		snapshot.CircuitThreshold = cfg.CircuitBreakerThreshold
-	}
-	if cfg.CircuitBreakerTimeout > 0 {
-		snapshot.CircuitTimeoutSec = cfg.CircuitBreakerTimeout
-	}
-	return snapshot
-}
-
-func buildRoutingDecisionPayload(candidatesJSON []byte, snapshot strategyRuntimeSnapshot, effectivePolicySource string) []byte {
-	var candidates any = []any{}
-	if len(candidatesJSON) > 0 {
-		var parsed []map[string]any
-		if err := json.Unmarshal(candidatesJSON, &parsed); err == nil {
-			candidates = parsed
-		}
-	}
-	body := map[string]any{
-		"candidates":       candidates,
-		"strategy_runtime": snapshot,
-	}
-	if strings.TrimSpace(effectivePolicySource) != "" {
-		body["effective_policy_source"] = strings.TrimSpace(effectivePolicySource)
-	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return candidatesJSON
-	}
-	return payload
 }
 
 func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequest, apiKey *models.MerchantAPIKey, ent *services.EntitlementRoutingContext) error {
@@ -453,7 +313,7 @@ func getMerchantRouteInfo(db *sql.DB, merchantID int) (*MerchantRouteInfo, error
 
 	var merchantType, region string
 	err := db.QueryRow(
-		`SELECT COALESCE(type, 'regular'), COALESCE(region, 'domestic')
+		`SELECT COALESCE(merchant_type, 'regular'), COALESCE(region, 'domestic')
 		 FROM merchants
 		 WHERE id = $1
 		 LIMIT 1`,
