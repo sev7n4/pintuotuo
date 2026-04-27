@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Card,
   Form,
@@ -10,8 +10,16 @@ import {
   Row,
   Col,
   Typography,
+  Alert,
 } from 'antd';
-import { QuestionCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import {
+  QuestionCircleOutlined,
+  InfoCircleOutlined,
+  CheckCircleOutlined,
+  WarningOutlined,
+  CloseCircleOutlined,
+} from '@ant-design/icons';
+import { validateRouteStrategy } from '@utils/routeConfigValidation';
 
 const { Text } = Typography;
 
@@ -47,6 +55,10 @@ const RouteStrategyConfig: React.FC<RouteStrategyConfigProps> = ({
   onChange,
   providerRegion,
 }) => {
+  const validationResult = useMemo(() => {
+    return validateRouteStrategy(value);
+  }, [value]);
+
   const handleStrategyChange = (userType: string, field: string, fieldValue: any) => {
     const newStrategy = {
       ...value,
@@ -75,6 +87,54 @@ const RouteStrategyConfig: React.FC<RouteStrategyConfigProps> = ({
       }
       style={{ marginBottom: 16 }}
     >
+      {validationResult.errors.length > 0 && (
+        <Alert
+          message="配置验证失败"
+          description={
+            <div>
+              {validationResult.errors.map((error, index) => (
+                <div key={index}>
+                  <CloseCircleOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
+                  {error}
+                </div>
+              ))}
+            </div>
+          }
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
+      {validationResult.warnings.length > 0 && (
+        <Alert
+          message="配置警告"
+          description={
+            <div>
+              {validationResult.warnings.map((warning, index) => (
+                <div key={index}>
+                  <WarningOutlined style={{ color: '#faad14', marginRight: 8 }} />
+                  {warning}
+                </div>
+              ))}
+            </div>
+          }
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
+      {validationResult.valid && validationResult.errors.length === 0 && (
+        <Alert
+          message="配置验证通过"
+          type="success"
+          showIcon
+          icon={<CheckCircleOutlined />}
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       <Row gutter={[16, 16]}>
         {userTypes.map((userType) => (
           <Col xs={24} sm={24} md={12} key={userType.value}>

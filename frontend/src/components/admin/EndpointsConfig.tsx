@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Card,
   Form,
@@ -12,6 +12,7 @@ import {
   Tag,
   message,
   Spin,
+  Alert,
 } from 'antd';
 import {
   PlusOutlined,
@@ -23,7 +24,9 @@ import {
   GlobalOutlined,
   ApiOutlined,
   ThunderboltOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
+import { validateEndpoints } from '@utils/routeConfigValidation';
 
 const { Text } = Typography;
 
@@ -46,6 +49,19 @@ const routeTypes = [
 
 const EndpointsConfig: React.FC<EndpointsConfigProps> = ({ value = {}, onChange }) => {
   const [testingEndpoint, setTestingEndpoint] = useState<string | null>(null);
+
+  const validationResult = useMemo(() => {
+    const endpoints: Record<string, { url: string }> = {};
+    Object.entries(value).forEach(([key, config]) => {
+      if (config.domestic) {
+        endpoints[`${key}_domestic`] = { url: config.domestic };
+      }
+      if (config.overseas) {
+        endpoints[`${key}_overseas`] = { url: config.overseas };
+      }
+    });
+    return validateEndpoints(endpoints);
+  }, [value]);
 
   const handleAddEndpoint = () => {
     const newKey = `endpoint_${Date.now()}`;
@@ -112,6 +128,44 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({ value = {}, onChange 
       }
       style={{ marginBottom: 16 }}
     >
+      {validationResult.errors.length > 0 && (
+        <Alert
+          message="端点配置验证失败"
+          description={
+            <div>
+              {validationResult.errors.map((error, index) => (
+                <div key={index}>
+                  <CloseCircleOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
+                  {error}
+                </div>
+              ))}
+            </div>
+          }
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
+      {validationResult.warnings.length > 0 && (
+        <Alert
+          message="端点配置警告"
+          description={
+            <div>
+              {validationResult.warnings.map((warning, index) => (
+                <div key={index}>
+                  <WarningOutlined style={{ color: '#faad14', marginRight: 8 }} />
+                  {warning}
+                </div>
+              ))}
+            </div>
+          }
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       <Row gutter={[16, 16]}>
         {Object.entries(value).map(([key, endpoints]) => {
           const routeType = routeTypes.find((t) => t.value === key) || {
