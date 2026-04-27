@@ -382,3 +382,95 @@ func TestExecutionInput_NewFields_Default(t *testing.T) {
 	assert.Equal(t, "", input.ProviderBaseURL)
 	assert.Equal(t, "", input.FallbackURL)
 }
+
+func TestExecutionEngine_ExecuteStream_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "text/event-stream", r.Header.Get("Accept"))
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("data: {\"content\": \"Hello\"}\n\n"))
+	}))
+	defer server.Close()
+
+	engine := NewExecutionEngine()
+	input := &ExecutionInput{
+		Provider:      "openai",
+		Model:         "gpt-4",
+		APIKey:        "test-api-key",
+		EndpointURL:   server.URL,
+		RequestFormat: "openai",
+		Stream:        true,
+	}
+
+	result, err := engine.ExecuteStream(context.Background(), input)
+
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 200, result.StatusCode)
+	assert.NotNil(t, result.Body)
+	defer result.Body.Close()
+}
+
+func TestExecutionEngine_ExecuteStream_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("internal server error"))
+	}))
+	defer server.Close()
+
+	engine := NewExecutionEngine()
+	input := &ExecutionInput{
+		Provider:      "openai",
+		Model:         "gpt-4",
+		APIKey:        "test-api-key",
+		EndpointURL:   server.URL,
+		RequestFormat: "openai",
+		Stream:        true,
+	}
+
+	result, err := engine.ExecuteStream(context.Background(), input)
+
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "500")
+}
+
+func TestExecutionEngine_ExecuteStreamWithRetry_Success(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts < 2 {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("data: {\"content\": \"Hello\"}\n\n"))
+	}))
+	defer server.Close()
+
+	engine := NewExecutionEngine(WithExecutionRetryPolicy(&RetryPolicy{
+		MaxRetries:    3,
+		InitialDelay:  10 * time.Millisecond,
+		MaxDelay:      100 * time.Millisecond,
+		BackoffFactor: 1.0,
+	}))
+
+	input := &ExecutionInput{
+		Provider:      "openai",
+		Model:         "gpt-4",
+		APIKey:        "test-api-key",
+		EndpointURL:   server.URL,
+		RequestFormat: "openai",
+		Stream:        true,
+	}
+
+	result, err := engine.ExecuteStreamWithRetry(context.Background(), input)
+
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 200, result.StatusCode)
+	assert.Equal(t, 2, attempts)
+	result.Body.Close()
+}

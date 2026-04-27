@@ -561,3 +561,141 @@ func TestExecutionLayer_DetermineGatewayMode_EmptyConfig(t *testing.T) {
 	mode := layer.determineGatewayMode(cfg)
 	assert.Equal(t, "direct", mode)
 }
+
+func TestExecutionLayer_Execute_WithGatewayMode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer sk-litellm-master", r.Header.Get("Authorization"))
+
+		response := map[string]interface{}{
+			"id":      "test-id",
+			"model":   "gpt-4",
+			"choices": []interface{}{},
+			"usage": map[string]int{
+				"prompt_tokens":     10,
+				"completion_tokens": 20,
+				"total_tokens":      30,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	os.Setenv("LITELLM_MASTER_KEY", "sk-litellm-master")
+	defer os.Unsetenv("LITELLM_MASTER_KEY")
+
+	engine := NewExecutionEngine()
+	layer := NewExecutionLayer(nil, engine)
+
+	input := &ExecutionLayerInput{
+		ProviderConfig: &ExecutionProviderConfig{
+			Code:           "openai",
+			Name:           "OpenAI",
+			APIBaseURL:     "https://api.openai.com/v1",
+			APIFormat:      "openai",
+			GatewayMode:    GatewayModeLitellm,
+			ProviderRegion: "domestic",
+			Endpoints: map[string]interface{}{
+				GatewayModeLitellm: map[string]interface{}{
+					"domestic": server.URL,
+				},
+			},
+		},
+		DecryptedAPIKey: "sk-original-key",
+		Messages: []Message{
+			{Role: "user", Content: "Hello"},
+		},
+	}
+
+	output, err := layer.Execute(context.Background(), input)
+
+	require.NoError(t, err)
+	assert.NotNil(t, output)
+	assert.True(t, output.Result.Success)
+	assert.Equal(t, 200, output.Result.StatusCode)
+}
+
+func TestExecutionLayer_Execute_DirectMode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer sk-original-key", r.Header.Get("Authorization"))
+
+		response := map[string]interface{}{
+			"id":      "test-id",
+			"model":   "gpt-4",
+			"choices": []interface{}{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	engine := NewExecutionEngine()
+	layer := NewExecutionLayer(nil, engine)
+
+	input := &ExecutionLayerInput{
+		ProviderConfig: &ExecutionProviderConfig{
+			Code:           "openai",
+			Name:           "OpenAI",
+			APIBaseURL:     server.URL,
+			APIFormat:      "openai",
+			GatewayMode:    GatewayModeDirect,
+			ProviderRegion: "overseas",
+		},
+		DecryptedAPIKey: "sk-original-key",
+		Messages: []Message{
+			{Role: "user", Content: "Hello"},
+		},
+	}
+
+	output, err := layer.Execute(context.Background(), input)
+
+	require.NoError(t, err)
+	assert.NotNil(t, output)
+	assert.True(t, output.Result.Success)
+}
+
+func TestExecutionLayer_Execute_ProxyMode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer sk-proxy-token", r.Header.Get("Authorization"))
+
+		response := map[string]interface{}{
+			"id":      "test-id",
+			"model":   "gpt-4",
+			"choices": []interface{}{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	os.Setenv("LLM_GATEWAY_PROXY_TOKEN", "sk-proxy-token")
+	defer os.Unsetenv("LLM_GATEWAY_PROXY_TOKEN")
+
+	engine := NewExecutionEngine()
+	layer := NewExecutionLayer(nil, engine)
+
+	input := &ExecutionLayerInput{
+		ProviderConfig: &ExecutionProviderConfig{
+			Code:        "openai",
+			Name:        "OpenAI",
+			APIBaseURL:  "https://api.openai.com/v1",
+			APIFormat:   "openai",
+			GatewayMode: GatewayModeProxy,
+			Endpoints: map[string]interface{}{
+				GatewayModeProxy: map[string]interface{}{
+					"gaap": server.URL,
+				},
+			},
+		},
+		DecryptedAPIKey: "sk-original-key",
+		Messages: []Message{
+			{Role: "user", Content: "Hello"},
+		},
+	}
+
+	output, err := layer.Execute(context.Background(), input)
+
+	require.NoError(t, err)
+	assert.NotNil(t, output)
+	assert.True(t, output.Result.Success)
+}

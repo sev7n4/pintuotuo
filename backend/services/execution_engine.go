@@ -279,7 +279,77 @@ type StreamExecutionInput struct {
 	Flusher http.Flusher
 }
 
-func (e *ExecutionEngine) ExecuteStream(ctx context.Context, input *StreamExecutionInput) error {
+type StreamResult struct {
+	StatusCode int
+	Headers    map[string]string
+	Body       io.ReadCloser
+}
+
+func (e *ExecutionEngine) ExecuteStream(ctx context.Context, input *ExecutionInput) (*StreamResult, error) {
+	req, err := e.buildHTTPRequest(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build stream request: %w", err)
+	}
+
+	req.Header.Set("Accept", "text/event-stream")
+
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("stream request failed: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("stream request returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	result := &StreamResult{
+		StatusCode: resp.StatusCode,
+		Headers:    make(map[string]string),
+		Body:       resp.Body,
+	}
+
+	for key, values := range resp.Header {
+		if len(values) > 0 {
+			result.Headers[key] = values[0]
+		}
+	}
+
+	return result, nil
+}
+
+func (e *ExecutionEngine) ExecuteStreamWithRetry(ctx context.Context, input *ExecutionInput) (*StreamResult, error) {
+	var lastResult *StreamResult
+	var lastErr error
+
+	for attempt := 0; attempt <= e.retryPolicy.MaxRetries; attempt++ {
+		if attempt > 0 {
+			delay := e.retryPolicy.DelayForAttempt(attempt - 1)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+
+		result, err := e.ExecuteStream(ctx, input)
+		lastResult = result
+		lastErr = err
+
+		if err == nil {
+			return result, nil
+		}
+
+		if !e.shouldRetry(0, err) {
+			return result, err
+		}
+	}
+
+	return lastResult, lastErr
+}
+
+func (e *ExecutionEngine) ExecuteStreamToWriter(ctx context.Context, input *StreamExecutionInput) error {
 	req, err := e.buildHTTPRequest(ctx, &input.ExecutionInput)
 	if err != nil {
 		return fmt.Errorf("failed to build stream request: %w", err)
