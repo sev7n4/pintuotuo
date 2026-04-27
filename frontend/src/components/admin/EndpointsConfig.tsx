@@ -13,6 +13,8 @@ import {
   message,
   Spin,
   Alert,
+  Modal,
+  Descriptions,
 } from 'antd';
 import {
   PlusOutlined,
@@ -25,8 +27,10 @@ import {
   ApiOutlined,
   ThunderboltOutlined,
   WarningOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import { validateEndpoints } from '@utils/routeConfigValidation';
+import { adminService, ProbeEndpointResponse } from '@services/admin';
 
 const { Text } = Typography;
 
@@ -39,6 +43,8 @@ interface EndpointConfig {
 interface EndpointsConfigProps {
   value?: Record<string, EndpointConfig>;
   onChange?: (value: Record<string, EndpointConfig>) => void;
+  providerCode?: string;
+  apiKey?: string;
 }
 
 const routeTypes = [
@@ -47,8 +53,10 @@ const routeTypes = [
   { value: 'direct', label: '直连', icon: <ApiOutlined />, color: 'orange' },
 ];
 
-const EndpointsConfig: React.FC<EndpointsConfigProps> = ({ value = {}, onChange }) => {
+const EndpointsConfig: React.FC<EndpointsConfigProps> = ({ value = {}, onChange, providerCode, apiKey }) => {
   const [testingEndpoint, setTestingEndpoint] = useState<string | null>(null);
+  const [probeResult, setProbeResult] = useState<ProbeEndpointResponse | null>(null);
+  const [resultModalVisible, setResultModalVisible] = useState(false);
 
   const validationResult = useMemo(() => {
     const endpoints: Record<string, { url: string }> = {};
@@ -96,15 +104,40 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({ value = {}, onChange 
     }
 
     setTestingEndpoint(endpoint);
+    setProbeResult(null);
     try {
-      const response = await fetch(endpoint, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
-      if (response.ok) {
-        message.success('端点连接正常');
+      if (providerCode) {
+        const response = await adminService.probeEndpoint(providerCode, endpoint, apiKey);
+        const resultData = response.data.data;
+        if (response.data.code === 0 && resultData) {
+          setProbeResult(resultData);
+          setResultModalVisible(true);
+          if (resultData.success) {
+            message.success('端点连接正常');
+          } else {
+            message.warning(`端点响应异常: ${resultData.error_msg || resultData.status_code}`);
+          }
+        } else {
+          message.error(`探测失败: ${response.data.message || 'Unknown error'}`);
+        }
       } else {
-        message.warning(`端点响应异常: ${response.status}`);
+        const response = await fetch(endpoint, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+        if (response.ok) {
+          message.success('端点连接正常');
+        } else {
+          message.warning(`端点响应异常: ${response.status}`);
+        }
       }
     } catch (error) {
       message.error('端点连接失败');
+      const result: ProbeEndpointResponse = {
+        success: false,
+        status_code: 0,
+        latency_ms: 0,
+        error_msg: error instanceof Error ? error.message : 'Unknown error',
+      };
+      setProbeResult(result);
+      setResultModalVisible(true);
     } finally {
       setTestingEndpoint(null);
     }
@@ -269,6 +302,61 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({ value = {}, onChange 
           </Col>
         )}
       </Row>
+
+      <Modal
+        title="端点探测结果"
+        open={resultModalVisible}
+        onCancel={() => setResultModalVisible(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setResultModalVisible(false)}>
+            关闭
+          </Button>,
+        ]}
+      >
+        {probeResult && (
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label="探测状态">
+              {probeResult.success ? (
+                <Tag color="success" icon={<CheckCircleOutlined />}>连接成功</Tag>
+              ) : (
+                <Tag color="error" icon={<CloseCircleOutlined />}>连接失败</Tag>
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="响应状态码">
+              {probeResult.status_code > 0 ? (
+                <Tag color={probeResult.status_code >= 200 && probeResult.status_code < 300 ? 'success' : 'warning'}>
+                  {probeResult.status_code}
+                </Tag>
+              ) : (
+                <Tag>N/A</Tag>
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="延迟">
+              {probeResult.latency_ms > 0 ? (
+                <Space>
+                  <ClockCircleOutlined />
+                  {probeResult.latency_ms} ms
+                  {probeResult.latency_ms < 100 && <Tag color="success">优秀</Tag>}
+                  {probeResult.latency_ms >= 100 && probeResult.latency_ms < 500 && <Tag color="warning">正常</Tag>}
+                  {probeResult.latency_ms >= 500 && <Tag color="error">较慢</Tag>}
+                </Space>
+              ) : (
+                <Tag>N/A</Tag>
+              )}
+            </Descriptions.Item>
+            {probeResult.error_code && (
+              <Descriptions.Item label="错误代码">
+                <Tag color="error">{probeResult.error_code}</Tag>
+              </Descriptions.Item>
+            )}
+            {probeResult.error_msg && (
+              <Descriptions.Item label="错误信息">
+                <Text type="danger">{probeResult.error_msg}</Text>
+              </Descriptions.Item>
+            )}
+          </Descriptions>
+        )}
+      </Modal>
     </Card>
   );
 };
