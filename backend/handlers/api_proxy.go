@@ -60,6 +60,68 @@ func shouldUseConfigDrivenRouting() bool {
 	return val == envTrue || val == "1"
 }
 
+//nolint:unused // Will be fully implemented in Phase 4
+func executeViaExecutionLayer(
+	c *gin.Context,
+	db *sql.DB,
+	userIDInt int,
+	merchantID int,
+	req APIProxyRequest,
+	providerCfg providerRuntimeConfig,
+	decryptedKey string,
+	requestID string,
+	traceSpan *services.LLMTraceSpan,
+) (*services.ExecutionLayerOutput, error) {
+	engine := services.NewExecutionEngine()
+	layer := services.NewExecutionLayer(db, engine)
+
+	routeDecision, err := resolveRouteDecision(db, &providerCfg, merchantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve route decision: %w", err)
+	}
+
+	execProviderCfg := &services.ExecutionProviderConfig{
+		Code:           providerCfg.Code,
+		Name:           providerCfg.Name,
+		APIBaseURL:     providerCfg.APIBaseURL,
+		APIFormat:      providerCfg.APIFormat,
+		GatewayMode:    routeDecision.Mode,
+		ProviderRegion: providerCfg.ProviderRegion,
+		RouteStrategy:  providerCfg.RouteStrategy,
+		Endpoints:      providerCfg.Endpoints,
+	}
+
+	messages := make([]services.Message, len(req.Messages))
+	for i, msg := range req.Messages {
+		messages[i] = services.Message{
+			Role:    msg.Role,
+			Content: msg.Content,
+		}
+	}
+
+	routingDecision := &services.RoutingDecision{
+		RequestID:        requestID,
+		MerchantID:       merchantID,
+		Model:            req.Model,
+		Provider:         req.Provider,
+		SelectedProvider: providerCfg.Code,
+		SelectedModel:    req.Model,
+		RoutingMode:      routeDecision.Mode,
+		Timestamp:        time.Now(),
+	}
+
+	input := &services.ExecutionLayerInput{
+		ProviderConfig:  execProviderCfg,
+		DecryptedAPIKey: decryptedKey,
+		Messages:        messages,
+		Stream:          req.Stream,
+		Options:         req.Options,
+		RoutingDecision: routingDecision,
+	}
+
+	return layer.Execute(c.Request.Context(), input)
+}
+
 type APIProxyResponse struct {
 	ID      string      `json:"id"`
 	Object  string      `json:"object"`
