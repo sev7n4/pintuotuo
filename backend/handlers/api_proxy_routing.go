@@ -453,7 +453,7 @@ func getMerchantRouteInfo(db *sql.DB, merchantID int) (*MerchantRouteInfo, error
 
 	var merchantType, region string
 	err := db.QueryRow(
-		`SELECT COALESCE(type, 'regular'), COALESCE(region, 'domestic')
+		`SELECT COALESCE(merchant_type, 'regular'), COALESCE(region, 'domestic')
 		 FROM merchants
 		 WHERE id = $1
 		 LIMIT 1`,

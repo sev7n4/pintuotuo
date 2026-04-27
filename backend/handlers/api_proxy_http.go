@@ -87,34 +87,6 @@ func applyProxyUpstreamHeaders(c *gin.Context, httpReq *http.Request, requestID 
 	}
 }
 
-func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
-	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == llmGatewayNone {
-		return cfg
-	}
-	switch active {
-	case llmGatewayLitellm:
-		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
-			cfg.APIBaseURL = strings.TrimRight(base, "/") + "/v1"
-		}
-	}
-	return cfg
-}
-
-func resolveGatewayAuthToken(cfg providerRuntimeConfig, fallbackToken string) string {
-	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == llmGatewayNone {
-		return fallbackToken
-	}
-	switch active {
-	case llmGatewayLitellm:
-		if token := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY")); token != "" {
-			return token
-		}
-	}
-	return fallbackToken
-}
-
 func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTokens, outputTokens int, strictPricingVID *int) (float64, error) {
 	if strictPricingVID != nil {
 		cost, ok := services.CalculateCostFromPricingVersion(db, *strictPricingVID, provider, model, inputTokens, outputTokens)
@@ -162,55 +134,6 @@ func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTok
 	})
 
 	return cost, nil
-}
-
-func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request, policy *services.RetryPolicy) (*http.Response, int, error) {
-	if policy == nil {
-		policy = services.DefaultRetryPolicy
-	}
-	var (
-		resp       *http.Response
-		err        error
-		retryCount int
-	)
-	ctx := baseReq.Context()
-	for i := 0; i <= policy.MaxRetries; i++ {
-		req := baseReq.Clone(ctx)
-		if baseReq.GetBody != nil {
-			body, bodyErr := baseReq.GetBody()
-			if bodyErr == nil {
-				req.Body = body
-			}
-		}
-
-		resp, err = client.Do(req) // #nosec G704 -- upstream URL from admin-configured model_providers.api_base_url, not user-supplied host
-		if err != nil {
-			info := services.MapProviderError(0, "", err.Error(), nil, err, "")
-			if !info.Retryable || i >= policy.MaxRetries {
-				return nil, retryCount, err
-			}
-			retryCount++
-			time.Sleep(policy.DelayForAttempt(i))
-			continue
-		}
-
-		if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < http.StatusInternalServerError {
-			return resp, retryCount, nil
-		}
-
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, upstreamErrorBodyPeek))
-		_ = resp.Body.Close()
-		status := resp.StatusCode
-		headers := resp.Header
-		retryable := services.HTTPUpstreamRetryable(status, b, headers)
-		if !retryable || i >= policy.MaxRetries {
-			resp.Body = io.NopCloser(bytes.NewReader(b))
-			return resp, retryCount, nil
-		}
-		retryCount++
-		time.Sleep(policy.DelayForAttempt(i))
-	}
-	return nil, retryCount, err
 }
 
 func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeConfig, error) {
