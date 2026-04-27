@@ -9,6 +9,12 @@ import (
 	"time"
 )
 
+const (
+	GatewayModeDirect  = "direct"
+	GatewayModeLitellm = "litellm"
+	GatewayModeProxy   = "proxy"
+)
+
 type ExecutionLayer struct {
 	engine *ExecutionEngine
 	db     *sql.DB
@@ -215,15 +221,16 @@ func (l *ExecutionLayer) GetProviderConfig(ctx context.Context, providerCode str
 	return &cfg, nil
 }
 
+//nolint:unused // Will be used in Phase 2
 func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 	if cfg == nil {
 		return ""
 	}
 
 	switch cfg.GatewayMode {
-	case "litellm":
+	case GatewayModeLitellm:
 		if cfg.Endpoints != nil {
-			if litellmEndpoints, ok := cfg.Endpoints["litellm"].(map[string]interface{}); ok {
+			if litellmEndpoints, ok := cfg.Endpoints[GatewayModeLitellm].(map[string]interface{}); ok {
 				region := cfg.ProviderRegion
 				if region == "" {
 					region = "domestic"
@@ -239,9 +246,9 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 		}
 		return cfg.APIBaseURL
 
-	case "proxy":
+	case GatewayModeProxy:
 		if cfg.Endpoints != nil {
-			if proxyEndpoints, ok := cfg.Endpoints["proxy"].(map[string]interface{}); ok {
+			if proxyEndpoints, ok := cfg.Endpoints[GatewayModeProxy].(map[string]interface{}); ok {
 				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
 					return gaapURL
 				}
@@ -260,7 +267,7 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 
 	default:
 		if cfg.Endpoints != nil {
-			if directEndpoints, ok := cfg.Endpoints["direct"].(map[string]interface{}); ok {
+			if directEndpoints, ok := cfg.Endpoints[GatewayModeDirect].(map[string]interface{}); ok {
 				region := cfg.ProviderRegion
 				if region == "" {
 					region = "overseas"
@@ -274,20 +281,21 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 	}
 }
 
+//nolint:unused // Will be used in Phase 2
 func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, originalAPIKey string) string {
 	if cfg == nil {
 		return originalAPIKey
 	}
 
 	switch cfg.GatewayMode {
-	case "litellm":
+	case GatewayModeLitellm:
 		masterKey := os.Getenv("LITELLM_MASTER_KEY")
 		if masterKey != "" {
 			return masterKey
 		}
 		return originalAPIKey
 
-	case "proxy":
+	case GatewayModeProxy:
 		proxyToken := os.Getenv("LLM_GATEWAY_PROXY_TOKEN")
 		if proxyToken != "" {
 			return proxyToken
@@ -299,9 +307,10 @@ func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, original
 	}
 }
 
+//nolint:unused // Will be used in Phase 2
 func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) string {
 	if cfg == nil {
-		return "direct"
+		return GatewayModeDirect
 	}
 
 	if cfg.GatewayMode != "" {
@@ -313,5 +322,5 @@ func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) stri
 		return envMode
 	}
 
-	return "direct"
+	return GatewayModeDirect
 }
