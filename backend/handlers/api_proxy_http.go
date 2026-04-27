@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -213,12 +214,34 @@ func executeProviderRequestWithRetry(client *http.Client, baseReq *http.Request,
 
 func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeConfig, error) {
 	var cfg providerRuntimeConfig
+	var routeStrategyJSON, endpointsJSON []byte
+
 	err := db.QueryRow(
-		`SELECT code, name, COALESCE(api_base_url, ''), api_format
+		`SELECT code, name, COALESCE(api_base_url, ''), api_format,
+		        COALESCE(provider_region, ''), 
+		        route_strategy, endpoints
 		 FROM model_providers
 		 WHERE code = $1 AND status = 'active'
 		 LIMIT 1`,
 		providerCode,
-	).Scan(&cfg.Code, &cfg.Name, &cfg.APIBaseURL, &cfg.APIFormat)
-	return cfg, err
+	).Scan(&cfg.Code, &cfg.Name, &cfg.APIBaseURL, &cfg.APIFormat,
+		&cfg.ProviderRegion, &routeStrategyJSON, &endpointsJSON)
+
+	if err != nil {
+		return cfg, err
+	}
+
+	if len(routeStrategyJSON) > 0 {
+		if err := json.Unmarshal(routeStrategyJSON, &cfg.RouteStrategy); err != nil {
+			cfg.RouteStrategy = nil
+		}
+	}
+
+	if len(endpointsJSON) > 0 {
+		if err := json.Unmarshal(endpointsJSON, &cfg.Endpoints); err != nil {
+			cfg.Endpoints = nil
+		}
+	}
+
+	return cfg, nil
 }

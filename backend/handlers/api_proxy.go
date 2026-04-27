@@ -23,10 +23,13 @@ import (
 )
 
 type providerRuntimeConfig struct {
-	Code       string
-	Name       string
-	APIBaseURL string
-	APIFormat  string
+	Code           string
+	Name           string
+	APIBaseURL     string
+	APIFormat      string
+	ProviderRegion string
+	RouteStrategy  map[string]interface{}
+	Endpoints      map[string]interface{}
 }
 
 type APIProxyRequest struct {
