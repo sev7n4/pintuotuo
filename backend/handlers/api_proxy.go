@@ -374,5 +374,4 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	processExecutionLayerOutput(c, db, req, output, requestID, userIDInt, merchantID,
 		startTime, billingEngine, traceSpan)
-	return
 }
