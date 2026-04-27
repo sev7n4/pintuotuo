@@ -568,3 +568,98 @@ func TestRouteDecision(c *gin.Context) {
 		"data":    result,
 	})
 }
+
+type ProbeEndpointRequest struct {
+	URL        string `json:"url" binding:"required"`
+	APIKey     string `json:"api_key"`
+	TimeoutMs  int    `json:"timeout_ms"`
+}
+
+type ProbeEndpointResponse struct {
+	Success    bool   `json:"success"`
+	StatusCode int    `json:"status_code,omitempty"`
+	LatencyMs  int    `json:"latency_ms"`
+	ErrorMsg   string `json:"error_msg,omitempty"`
+	ErrorCode  string `json:"error_code,omitempty"`
+}
+
+func ProbeEndpoint(c *gin.Context) {
+	if !ensureAdmin(c) {
+		return
+	}
+
+	code := c.Param("code")
+	if code == "" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_REQUEST",
+			"Provider code is required",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	var req ProbeEndpointRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	if req.URL == "" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"INVALID_REQUEST",
+			"URL is required",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	timeoutMs := 5000
+	if req.TimeoutMs > 0 && req.TimeoutMs <= 30000 {
+		timeoutMs = req.TimeoutMs
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var apiKeySecret string
+	err := db.QueryRow(
+		`SELECT COALESCE(api_secret_decrypted, '') FROM model_providers WHERE code = $1`,
+		code,
+	).Scan(&apiKeySecret)
+
+	if err != nil && err != sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	apiKeyToUse := req.APIKey
+	if apiKeyToUse == "" && apiKeySecret != "" {
+		apiKeyToUse = apiKeySecret
+	}
+
+	probeResult := services.ProbeEndpointURL(c.Request.Context(), req.URL, apiKeyToUse, timeoutMs)
+
+	response := ProbeEndpointResponse{
+		Success:   probeResult.Success,
+		StatusCode: probeResult.StatusCode,
+		LatencyMs: probeResult.LatencyMs,
+	}
+
+	if probeResult.ErrorMsg != "" {
+		response.ErrorMsg = probeResult.ErrorMsg
+	}
+	if probeResult.ErrorCode != "" {
+		response.ErrorCode = probeResult.ErrorCode
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    response,
+	})
+}

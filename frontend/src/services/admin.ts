@@ -15,6 +15,21 @@ export interface AdminStats {
   cancellation_rate: number;
 }
 
+export interface ProbeEndpointResponse {
+  success: boolean;
+  status_code: number;
+  latency_ms: number;
+  error_msg?: string;
+  error_code?: string;
+}
+
 export const adminService = {
   getStats: () => api.get<APIResponse<AdminStats>>('/admin/stats'),
+
+  probeEndpoint: (providerCode: string, url: string, apiKey?: string, timeoutMs?: number) =>
+    api.post<APIResponse<ProbeEndpointResponse>>(`/admin/route-configs/providers/${providerCode}/probe-endpoint`, {
+      url,
+      api_key: apiKey,
+      timeout_ms: timeoutMs,
+    }),
 };

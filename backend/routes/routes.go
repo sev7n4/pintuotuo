@@ -320,6 +320,7 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.GET("/route-configs/providers", handlers.GetProviderRouteConfigs)
 		admin.GET("/route-configs/providers/:code", handlers.GetProviderRouteConfig)
 		admin.PUT("/route-configs/providers/:code", handlers.UpdateProviderRouteConfig)
+		admin.POST("/route-configs/providers/:code/probe-endpoint", handlers.ProbeEndpoint)
 		admin.GET("/route-configs/merchants", handlers.GetMerchantRouteConfigs)
 		admin.PUT("/route-configs/merchants/:id", handlers.UpdateMerchantRouteConfig)
 		admin.POST("/route-configs/test", handlers.TestRouteDecision)

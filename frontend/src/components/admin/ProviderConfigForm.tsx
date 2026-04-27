@@ -135,7 +135,7 @@ const ProviderConfigForm: React.FC<ProviderConfigFormProps> = ({
             </Divider>
 
             <Form.Item name="endpoints" noStyle>
-              <EndpointsConfig />
+              <EndpointsConfig providerCode={provider?.code} />
             </Form.Item>
           </TabPane>
 
