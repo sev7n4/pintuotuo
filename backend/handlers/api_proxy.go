@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -45,6 +46,16 @@ type APIProxyRequest struct {
 type ChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+func shouldUseExecutionLayer() bool {
+	val := os.Getenv("USE_EXECUTION_LAYER")
+	return val == "true" || val == "1"
+}
+
+func shouldUseConfigDrivenRouting() bool {
+	val := os.Getenv("USE_CONFIG_DRIVEN_ROUTING")
+	return val == "true" || val == "1"
 }
 
 type APIProxyResponse struct {
