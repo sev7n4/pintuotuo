@@ -1,75 +1,157 @@
-# LLM 网关主方案收敛与灰度切换 Runbook
+# ExecutionLayer 统一出站入口灰度发布 Runbook
 
-## 0. 双轨网关部署与联调（跑通 checklist）
+> 更新时间: 2026-04-27
+> 版本: v2.0
 
-### 0.1 部署行为
+## 概述
 
-- 生产部署采用「CI 预构建镜像 + 服务器拉取启动」：使用 **`docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway`**，会拉起 **LiteLLM**（`pintuotuo-litellm`）与 **OneAPI**（`pintuotuo-oneapi`）。部署流水线在启动后会检查这两个容器处于 **running**。
-- `backend`/`frontend` 由 CI 推送到 GHCR（按 commit SHA 打 tag）；流程会自动清理历史镜像 tag，仅保留最近 2 个版本。
-- `litellm`/`oneapi` 使用公开镜像源（Docker Hub），避免服务器对第三方 GHCR 拉取权限依赖。
-- 服务器项目目录下的 **`.env`** 需与 `docker-compose.prod.yml` 对齐（说明见仓库根目录 `.env.example`），至少关注：
-  - **`LLM_GATEWAY_ACTIVE`**：`none` | `litellm` | `oneapi`（切网关前可保持 `none`，仅先验证容器与冒烟脚本）。
-  - **`LLM_GATEWAY_LITELLM_URL` / `LLM_GATEWAY_ONEAPI_URL`**：Compose 默认 `http://litellm:4000`、`http://oneapi:3000` 即可。
-  - **路径 A（平台 Key → 网关）**：在 `.env` 中配置 **`LITELLM_MASTER_KEY`** 和/或 **`ONEAPI_ACCESS_TOKEN`**（已注入 **backend** 容器，对应 `api_proxy` 的 `resolveGatewayAuthToken`）。
-  - **路径 B（BYOK）**：不配上述平台 Key 时，对 **OpenAI 格式** 出站请求使用 **商户库内解密的 Key** 作为 `Authorization: Bearer`。
-  - LiteLLM / OneAPI **服务容器**自身的环境变量（如 `OPENAI_API_KEY`、`ONEAPI_SQL_DSN` 等）按各镜像要求填写，否则网关进程虽起但上游调用会失败。
+ExecutionLayer 是三层路由架构的执行层，作为统一出站入口，负责：
+- 统一 HTTP 请求执行
+- 重试与熔断机制
+- 路由模式切换 (direct/litellm/proxy)
+- 降级链路管理
 
-### 0.2 主机上冒烟（容器 + 可选 Master Key）
+## 0. 灰度开关配置
 
-在服务器项目根目录执行：
+### 0.1 环境变量
+
+| 环境变量 | 默认值 | 说明 |
+|---------|--------|------|
+| `USE_EXECUTION_LAYER` | `false` | 启用 ExecutionLayer 统一出站入口 |
+| `USE_CONFIG_DRIVEN_ROUTING` | `false` | 启用配置驱动路由（从数据库读取路由策略） |
+
+### 0.2 配置方式
 
 ```bash
-chmod +x scripts/verify_llm_gateway_smoke.sh
-set -a && source .env && set +a
-./scripts/verify_llm_gateway_smoke.sh
+# .env 文件
+
+# 灰度开启 ExecutionLayer 统一出站
+USE_EXECUTION_LAYER=true
+
+# 灰度开启配置驱动路由（可选）
+USE_CONFIG_DRIVEN_ROUTING=true
 ```
 
-若已设置 `LITELLM_MASTER_KEY`，脚本会请求本机 `http://127.0.0.1:4000/v1/models` 做最小验证。
+### 0.3 路由模式说明
 
-### 0.3 业务侧 BYOK 联调
+| 模式 | 说明 | 适用场景 |
+|------|------|---------|
+| `direct` | 直连 Provider API | 海外用户、低延迟需求 |
+| `litellm` | 通过 LiteLLM 网关 | 国内用户访问海外 Provider |
+| `proxy` | 通过代理服务器 | 网关故障降级 |
 
-- 使用 **`POST /api/v1/proxy/chat`** 或 **`POST /api/v1/openai/v1/chat/completions`**（鉴权以现有 `AuthMiddleware` / `APIKeyOrJWTAuthMiddleware` 为准），在 **清空或未设置** 后端环境变量 `LITELLM_MASTER_KEY`（及 OneAPI 对应 token）时，确认出站走 **商户 Key**。
+### 0.4 降级链路
 
-## 1. 选型收敛规则
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           降级链路                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. 配置驱动路由失败 → 降级到环境变量驱动                                      │
+│     ┌─────────────────────────────────────────────────────────────────┐     │
+│     │ resolveRouteDecision() 失败 → 使用 LLM_GATEWAY_ACTIVE           │     │
+│     └─────────────────────────────────────────────────────────────────┘     │
+│                                                                              │
+│  2. LiteLLM 故障 → 降级到 Proxy                                              │
+│     ┌─────────────────────────────────────────────────────────────────┐     │
+│     │ RouteDecision.FallbackMode = "proxy"                            │     │
+│     └─────────────────────────────────────────────────────────────────┘     │
+│                                                                              │
+│  3. 环境变量缺失 → 降级到 Direct                                              │
+│     ┌─────────────────────────────────────────────────────────────────┐     │
+│     │ LLM_GATEWAY_ACTIVE 未设置 → 直连 Provider                       │     │
+│     └─────────────────────────────────────────────────────────────────┘     │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
-在连续 7 天观测窗口内对 LiteLLM 与 OneAPI 进行评分，按 `docs/llm_supplychain_dod.md` 权重计算总分。
+## 1. 发布前检查
 
-- 总分更高者作为主方案。
-- 另一路保留为灾备通道，不下线配置。
+- [ ] 单元测试通过：`go test ./services/... -v`
+- [ ] E2E 测试通过：`go test ./services/... -run TestE2E -v`
+- [ ] 编译检查通过：`go build ./...`
+- [ ] 告警链路可触发且通知可达
+- [ ] Promptfoo 最近一次回归通过率 >= 80%
 
-## 2. 发布前检查
+## 2. 灰度步骤
 
-- 双轨均可完成代表模型调用。
-- 告警链路可触发且通知可达。
-- Promptfoo 最近一次回归通过率 >= 80%。
-- 熔断/重试指标已接入并可查询。
+### 2.1 阶段一：开启 ExecutionLayer (5% 流量)
 
-## 3. 灰度步骤
+```bash
+# .env 配置
+USE_EXECUTION_LAYER=true
+```
 
-1. 5% 灰度（24h）
-   - 设置 `SMART_ROUTING_GRAY_PERCENT=5`
-   - 设置 `LLM_GATEWAY_ACTIVE=<winner>`
-2. 25% 灰度（24h）
-3. 50% 灰度（24h）
-4. 100% 切换（24h）
+观察指标 (24h)：
+- 成功率变化
+- 5xx 错误率
+- P95 延迟
+- Token 成本
 
-每个阶段都需检查：
-- 成功率、5xx、429、P95 延迟
-- 关键业务接口错误率
-- token 成本是否异常上升
+### 2.2 阶段二：开启配置驱动路由 (可选)
 
-## 4. 回滚策略
+```bash
+# .env 配置
+USE_EXECUTION_LAYER=true
+USE_CONFIG_DRIVEN_ROUTING=true
+```
+
+观察指标 (24h)：
+- 路由决策正确性
+- 降级触发次数
+- 各路由模式分布
+
+### 2.3 阶段三：全量切换
+
+确认以下指标正常后全量切换：
+- 5xx 错误率 < 1%
+- P95 延迟 < 2s
+- 无关键业务接口错误
+
+## 3. 回滚策略
 
 满足任一条件立即回滚：
 - 5xx 错误率 > 5% 持续 10 分钟
 - P95 延迟 > 3 秒持续 10 分钟
 - 关键链路可用性 < 99%
 
-回滚动作：
+**回滚动作**：
 
-1. `LLM_GATEWAY_ACTIVE=none`（退回原有直连）
-2. `SMART_ROUTING_GRAY_PERCENT=0`
-3. 保留故障时段 trace 与告警记录，进入复盘
+```bash
+# 立即关闭 ExecutionLayer
+USE_EXECUTION_LAYER=false
+
+# 重启服务
+docker-compose -f docker-compose.prod.yml restart backend
+```
+
+## 4. 监控指标
+
+### 4.1 Prometheus 指标
+
+| 指标名称 | 说明 |
+|---------|------|
+| `route_decision_counter` | 路由决策计数 |
+| `execution_layer_latency` | ExecutionLayer 延迟 |
+| `execution_layer_requests_total` | ExecutionLayer 请求总数 |
+
+### 4.2 关键日志
+
+```
+# 路由决策日志
+logger.LogInfo(c.Request.Context(), "api_proxy", "Route decision", map[string]interface{}{
+    "mode": decision.Mode,
+    "endpoint": decision.Endpoint,
+    "fallback_mode": decision.FallbackMode,
+})
+
+# ExecutionLayer 执行日志
+logger.LogInfo(c.Request.Context(), "execution_layer", "Request executed", map[string]interface{}{
+    "provider": result.Provider,
+    "status_code": result.StatusCode,
+    "latency_ms": result.LatencyMs,
+})
+```
 
 ## 5. 复盘输出
 
@@ -77,3 +159,16 @@ set -a && source .env && set +a
 - 根因分类（上游限流/网络/配置/代码）
 - 修复项与防复发动作
 - 是否恢复灰度及下一次窗口
+
+## 6. 架构参考
+
+详细架构说明见：[docs/llm-request-flow.md](llm-request-flow.md)
+
+关键组件：
+
+| 组件 | 文件 | 职责 |
+|------|------|------|
+| ExecutionLayer | `services/execution_layer.go` | 统一出站入口 |
+| ExecutionEngine | `services/execution_engine.go` | HTTP 请求执行 |
+| UnifiedRouter | `services/unified_router.go` | 配置驱动路由决策 |
+| RouteCache | `services/route_cache.go` | 路由决策缓存 |
