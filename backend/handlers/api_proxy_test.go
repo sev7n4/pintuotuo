@@ -3,6 +3,9 @@ package handlers
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/pintuotuo/backend/services"
 )
 
@@ -131,4 +134,46 @@ func TestRouteDecisionIntegration(t *testing.T) {
 	if decision.FallbackEndpoint == "" {
 		t.Error("expected fallback endpoint to be set")
 	}
+}
+
+func TestProviderRuntimeConfig_NewFields(t *testing.T) {
+	cfg := providerRuntimeConfig{
+		Code:           "openai",
+		Name:           "OpenAI",
+		APIBaseURL:     "https://api.openai.com/v1",
+		APIFormat:      "openai",
+		ProviderRegion: "overseas",
+		RouteStrategy: map[string]interface{}{
+			"domestic_users": map[string]interface{}{"mode": "litellm"},
+			"overseas_users": map[string]interface{}{"mode": "direct"},
+		},
+		Endpoints: map[string]interface{}{
+			"direct": map[string]interface{}{
+				"overseas": "https://api.openai.com/v1",
+			},
+			"litellm": map[string]interface{}{
+				"domestic": "http://litellm:4000/v1",
+			},
+		},
+	}
+
+	assert.Equal(t, "openai", cfg.Code)
+	assert.Equal(t, "overseas", cfg.ProviderRegion)
+	assert.NotNil(t, cfg.RouteStrategy)
+	assert.NotNil(t, cfg.Endpoints)
+
+	domesticUsers, ok := cfg.RouteStrategy["domestic_users"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "litellm", domesticUsers["mode"])
+}
+
+func TestProviderRuntimeConfig_EmptyFields(t *testing.T) {
+	cfg := providerRuntimeConfig{
+		Code:       "openai",
+		APIBaseURL: "https://api.openai.com/v1",
+	}
+
+	assert.Equal(t, "", cfg.ProviderRegion)
+	assert.Nil(t, cfg.RouteStrategy)
+	assert.Nil(t, cfg.Endpoints)
 }
