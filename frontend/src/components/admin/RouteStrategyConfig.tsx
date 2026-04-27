@@ -11,7 +11,6 @@ import {
   Col,
   Typography,
   Alert,
-  Tag,
 } from 'antd';
 import {
   QuestionCircleOutlined,

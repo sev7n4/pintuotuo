@@ -11,7 +11,6 @@ import {
 } from 'antd';
 import {
   CheckCircleOutlined,
-  CloseCircleOutlined,
   GlobalOutlined,
   ApiOutlined,
   ThunderboltOutlined,
