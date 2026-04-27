@@ -445,6 +445,7 @@ type MerchantRouteInfo struct {
 	Region string
 }
 
+//nolint:unused // Will be used in Phase 3
 func getMerchantRouteInfo(db *sql.DB, merchantID int) (*MerchantRouteInfo, error) {
 	if db == nil {
 		return &MerchantRouteInfo{Type: "regular", Region: "domestic"}, nil
@@ -469,6 +470,7 @@ func getMerchantRouteInfo(db *sql.DB, merchantID int) (*MerchantRouteInfo, error
 	return &MerchantRouteInfo{Type: merchantType, Region: region}, nil
 }
 
+//nolint:unused // Will be used in Phase 3
 func resolveRouteDecision(
 	db *sql.DB,
 	providerCfg *providerRuntimeConfig,
@@ -479,7 +481,7 @@ func resolveRouteDecision(
 		return nil, err
 	}
 
-	if providerCfg.RouteStrategy != nil && len(providerCfg.RouteStrategy) > 0 {
+	if len(providerCfg.RouteStrategy) > 0 {
 		providerConfig := &services.ProviderConfig{
 			Code:           providerCfg.Code,
 			ProviderRegion: providerCfg.ProviderRegion,
@@ -494,7 +496,7 @@ func resolveRouteDecision(
 		}
 
 		router := services.NewUnifiedRouter(nil)
-		decision, err := router.DecideRoute(nil, providerConfig, merchantConfig)
+		decision, err := router.DecideRoute(context.TODO(), providerConfig, merchantConfig)
 		if err != nil {
 			return fallbackToEnvDecision(providerCfg), nil
 		}
@@ -505,6 +507,7 @@ func resolveRouteDecision(
 	return fallbackToEnvDecision(providerCfg), nil
 }
 
+//nolint:unused // Will be used in Phase 3
 func fallbackToEnvDecision(cfg *providerRuntimeConfig) *services.RouteDecision {
 	mode := determineGatewayModeFromEnv()
 	endpoint := resolveEndpointFromEnv(mode, cfg)
@@ -516,6 +519,7 @@ func fallbackToEnvDecision(cfg *providerRuntimeConfig) *services.RouteDecision {
 	}
 }
 
+//nolint:unused // Will be used in Phase 3
 func determineGatewayModeFromEnv() string {
 	envMode := os.Getenv("LLM_GATEWAY_ACTIVE")
 	if envMode != "" && envMode != "none" {
