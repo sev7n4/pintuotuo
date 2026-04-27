@@ -1,19 +1,14 @@
 package models
 
-import (
-	"encoding/json"
-	"time"
-)
+import "time"
 
 // User represents a user in the system
 type User struct {
 	ID             int       `json:"id"`
 	Email          string    `json:"email"`
 	Name           string    `json:"name"`
-	Phone          *string   `json:"phone,omitempty"`
 	Password       string    `json:"-"`
 	Role           string    `json:"role"` // user, merchant, admin
-	MFAEnabled     bool      `json:"mfa_enabled,omitempty"`
 	ReferralCode   string    `json:"referral_code,omitempty"`
 	ReferredBy     int       `json:"referred_by,omitempty"`
 	TotalReferrals int       `json:"total_referrals,omitempty"`
@@ -41,41 +36,17 @@ type Product struct {
 
 // Order represents a user's order
 type Order struct {
-	ID          int         `json:"id"`
-	UserID      int         `json:"user_id"`
-	ProductID   *int        `json:"product_id,omitempty"` // NULL for SKU-only orders (migration 020)
-	SKUID       int         `json:"sku_id,omitempty"`
-	SPUID       int         `json:"spu_id,omitempty"`
-	GroupID     interface{} `json:"group_id"`               // Can be NULL
-	GroupStatus string      `json:"group_status,omitempty"` // from groups.status when group_id set
-	Quantity    int         `json:"quantity"`
-	UnitPrice   float64     `json:"unit_price"`
-	TotalPrice  float64     `json:"total_price"`
-	Status      string      `json:"status"` // pending, paid, completed, failed
-	Items       []OrderItem `json:"items,omitempty"`
+	ID         int         `json:"id"`
+	UserID     int         `json:"user_id"`
+	ProductID  *int        `json:"product_id,omitempty"` // NULL for SKU-only orders (migration 020)
+	SKUID      int         `json:"sku_id,omitempty"`
+	SPUID      int         `json:"spu_id,omitempty"`
+	GroupID    interface{} `json:"group_id"` // Can be NULL
+	Quantity   int         `json:"quantity"`
+	UnitPrice  float64     `json:"unit_price"`
+	TotalPrice float64     `json:"total_price"`
+	Status     string      `json:"status"` // pending, paid, completed, failed
 	// PricingVersionID binds retail usage pricing to order time; nil = legacy / not set (migration 045).
-	PricingVersionID *int `json:"pricing_version_id,omitempty"`
-	// EntitlementPackageID set when order was created from a bundle checkout (migration 058).
-	EntitlementPackageID *int      `json:"entitlement_package_id,omitempty"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
-}
-
-// OrderItem represents one SKU line within an order.
-type OrderItem struct {
-	ID               int       `json:"id"`
-	OrderID          int       `json:"order_id"`
-	SKUID            int       `json:"sku_id"`
-	SPUID            int       `json:"spu_id"`
-	Quantity         int       `json:"quantity"`
-	UnitPrice        float64   `json:"unit_price"`
-	TotalPrice       float64   `json:"total_price"`
-	SKUType          string    `json:"sku_type,omitempty"`
-	SPUName          string    `json:"spu_name,omitempty"`
-	SKUCode          string    `json:"sku_code,omitempty"`
-	TokenAmount      *int64    `json:"token_amount,omitempty"`
-	ComputePoints    *float64  `json:"compute_points,omitempty"`
-	FulfilledAt      time.Time `json:"fulfilled_at,omitempty"`
 	PricingVersionID *int      `json:"pricing_version_id,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
@@ -182,9 +153,6 @@ type Merchant struct {
 	BusinessCategory   *string    `json:"business_category,omitempty"` // 经营类目
 	AdminNotes         *string    `json:"admin_notes,omitempty"`       // 管理员内部备注
 	Status             string     `json:"status"`                      // pending, reviewing, active, suspended, rejected
-	LifecycleStatus    string     `json:"lifecycle_status,omitempty"`  // trial | active | suspended (ops lifecycle)
-	MerchantType       string     `json:"merchant_type,omitempty"`     // standard, enterprise, premium
-	Region             string     `json:"region,omitempty"`            // domestic, overseas
 	ReviewedAt         *time.Time `json:"reviewed_at,omitempty"`
 	ReviewNote         *string    `json:"review_note,omitempty"`
 	RejectionReason    *string    `json:"rejection_reason,omitempty"`
@@ -219,17 +187,10 @@ type MerchantAPIKey struct {
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 
-	MerchantRegion      string     `json:"merchant_region,omitempty"` // domestic, overseas
-	Region              string     `json:"region,omitempty"`          // domestic, overseas (智能路由字段)
-	SecurityLevel       string     `json:"security_level,omitempty"`  // standard, high (智能路由字段)
 	HealthCheckInterval int        `json:"health_check_interval,omitempty"`
 	HealthCheckLevel    string     `json:"health_check_level,omitempty"`
 	EndpointURL         string     `json:"endpoint_url,omitempty"`
 	HealthStatus        string     `json:"health_status,omitempty"`
-	HealthErrorMessage  string     `json:"health_error_message,omitempty"`
-	HealthErrorCategory string     `json:"health_error_category,omitempty"`
-	HealthErrorCode     string     `json:"health_error_code,omitempty"`
-	HealthRequestID     string     `json:"health_provider_request_id,omitempty"`
 	LastHealthCheckAt   *time.Time `json:"last_health_check_at,omitempty"`
 	ConsecutiveFailures int        `json:"consecutive_failures,omitempty"`
 
@@ -241,9 +202,12 @@ type MerchantAPIKey struct {
 	CostInputRate  float64 `json:"cost_input_rate,omitempty"`
 	CostOutputRate float64 `json:"cost_output_rate,omitempty"`
 	ProfitMargin   float64 `json:"profit_margin,omitempty"`
+
+	Region        string `json:"region,omitempty"`
+	SecurityLevel string `json:"security_level,omitempty"`
 }
 
-// APIKeyRealtimeStatus represents real-time status of an API Key
+// APIKeyRealtimeStatus represents real-time status of an API key
 type APIKeyRealtimeStatus struct {
 	APIKeyID             int        `json:"api_key_id"`
 	LatencyP50           int        `json:"latency_p50"`
@@ -262,20 +226,17 @@ type APIKeyRealtimeStatus struct {
 
 // RoutingDecisionLog represents a routing decision log entry
 type RoutingDecisionLog struct {
-	ID                      int             `json:"id"`
-	RequestID               string          `json:"request_id"`
-	MerchantID              int             `json:"merchant_id"`
-	APIKeyID                *int            `json:"api_key_id,omitempty"`
-	StrategyLayerGoal       string          `json:"strategy_layer_goal"`
-	StrategyLayerInput      json.RawMessage `json:"strategy_layer_input,omitempty"`
-	StrategyLayerOutput     json.RawMessage `json:"strategy_layer_output,omitempty"`
-	DecisionLayerCandidates json.RawMessage `json:"decision_layer_candidates,omitempty"`
-	DecisionLayerOutput     json.RawMessage `json:"decision_layer_output,omitempty"`
-	ExecutionLayerResult    json.RawMessage `json:"execution_layer_result,omitempty"`
-	DecisionDurationMs      int             `json:"decision_duration_ms"`
-	DecisionResult          string          `json:"decision_result"`
-	ErrorMessage            string          `json:"error_message,omitempty"`
-	CreatedAt               time.Time       `json:"created_at"`
+	ID               int       `json:"id"`
+	RequestID        string    `json:"request_id"`
+	MerchantID       int       `json:"merchant_id"`
+	StrategyInput    string    `json:"strategy_input"`
+	StrategyOutput   string    `json:"strategy_output"`
+	DecisionOutput   string    `json:"decision_output"`
+	SelectedAPIKeyID *int      `json:"selected_api_key_id"`
+	ExecutionResult  string    `json:"execution_result"`
+	LatencyMs        int       `json:"latency_ms"`
+	ErrorMessage     string    `json:"error_message,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 // MerchantSettlement represents a merchant's settlement record
@@ -285,9 +246,6 @@ type MerchantSettlement struct {
 	PeriodStart         time.Time  `json:"period_start"`
 	PeriodEnd           time.Time  `json:"period_end"`
 	TotalSales          float64    `json:"total_sales"`
-	TotalSalesCNY       float64    `json:"total_sales_cny"`
-	TotalTokens         int64      `json:"total_tokens"`
-	TotalProcurementCNY *float64   `json:"total_procurement_cny,omitempty"`
 	PlatformFee         float64    `json:"platform_fee"`
 	SettlementAmount    float64    `json:"settlement_amount"`
 	Status              string     `json:"status"` // pending, processing, completed
@@ -358,28 +316,6 @@ type FavoriteResponse struct {
 	SKUID     int     `json:"sku_id"`
 	Product   Product `json:"product"`
 	CreatedAt string  `json:"created_at"`
-}
-
-// EntitlementPackageFavoriteBrief is a minimal package card for 我的收藏.
-type EntitlementPackageFavoriteBrief struct {
-	ID            int    `json:"id"`
-	PackageCode   string `json:"package_code"`
-	Name          string `json:"name"`
-	MarketingLine string `json:"marketing_line,omitempty"`
-	Status        string `json:"status"`
-}
-
-// UnifiedFavoriteResponse merges SKU favorites and entitlement package favorites (sorted by收藏时间).
-type UnifiedFavoriteResponse struct {
-	ItemType string `json:"item_type"` // "sku" | "entitlement_package"
-	ID       int    `json:"id"`        // favorites.id 或 entitlement_package_favorites.id
-	// SKU branch
-	SKUID   *int     `json:"sku_id,omitempty"`
-	Product *Product `json:"product,omitempty"`
-	// Entitlement package branch
-	EntitlementPackageID *int                             `json:"entitlement_package_id,omitempty"`
-	EntitlementPackage   *EntitlementPackageFavoriteBrief `json:"entitlement_package,omitempty"`
-	CreatedAt            string                           `json:"created_at"`
 }
 
 // BrowseHistory represents a user's browse history

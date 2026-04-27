@@ -107,7 +107,7 @@ export function validateEndpoints(
     return { valid: false, errors, warnings };
   }
 
-  const validModes = ['direct', 'litellm', 'proxy'];
+  const validModes = ['direct', 'litellm', 'proxy', 'direct_domestic', 'litellm_domestic', 'proxy_domestic', 'direct_overseas', 'litellm_overseas', 'proxy_overseas'];
   const modes = Object.keys(endpoints);
 
   if (modes.length === 0) {
@@ -118,7 +118,8 @@ export function validateEndpoints(
   const urlPattern = /^https?:\/\/.+/;
 
   for (const mode of modes) {
-    if (!validModes.includes(mode)) {
+    const baseMode = mode.replace(/_domestic$|_overseas$/, '');
+    if (!validModes.includes(mode) && !['direct', 'litellm', 'proxy'].includes(baseMode)) {
       errors.push(`无效的网关模式: ${mode}`);
       continue;
     }
