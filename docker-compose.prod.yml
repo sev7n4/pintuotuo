@@ -64,6 +64,9 @@ services:
       - FRONTEND_ORIGIN=${FRONTEND_ORIGIN:-}
       # LLM 上游聚合网关（仅 LiteLLM）
       - LLM_GATEWAY_ACTIVE=${LLM_GATEWAY_ACTIVE:-none}
+      # Execution Layer 灰度开关（Phase 3）
+      - USE_EXECUTION_LAYER=${USE_EXECUTION_LAYER:-false}
+      - USE_CONFIG_DRIVEN_ROUTING=${USE_CONFIG_DRIVEN_ROUTING:-false}
       # 与网关 router num_retries 叠加时限制业务层 HTTP 重试上限（MaxRetries，默认 1）
       - API_PROXY_LITELLM_MAX_RETRIES=${API_PROXY_LITELLM_MAX_RETRIES:-1}
       - LLM_GATEWAY_LITELLM_URL=${LLM_GATEWAY_LITELLM_URL:-http://litellm:4000}
