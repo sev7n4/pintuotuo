@@ -620,27 +620,7 @@ func ProbeEndpoint(c *gin.Context) {
 		timeoutMs = req.TimeoutMs
 	}
 
-	db := config.GetDB()
-	if db == nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
-	var apiKeySecret string
-	err := db.QueryRow(
-		`SELECT COALESCE(api_secret_decrypted, '') FROM model_providers WHERE code = $1`,
-		code,
-	).Scan(&apiKeySecret)
-
-	if err != nil && err != sql.ErrNoRows {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
-	}
-
 	apiKeyToUse := req.APIKey
-	if apiKeyToUse == "" && apiKeySecret != "" {
-		apiKeyToUse = apiKeySecret
-	}
 
 	probeResult := services.ProbeEndpointURL(c.Request.Context(), req.URL, apiKeyToUse, timeoutMs)
 
