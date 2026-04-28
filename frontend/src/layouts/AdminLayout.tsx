@@ -89,6 +89,11 @@ const menuItems = [
     label: 'API Key 状态',
   },
   {
+    key: '/admin/byok-routing',
+    icon: <ApiOutlined />,
+    label: 'BYOK 路由管理',
+  },
+  {
     key: '/admin/route-decision-logs',
     icon: <ClockCircleOutlined />,
     label: '决策日志',
