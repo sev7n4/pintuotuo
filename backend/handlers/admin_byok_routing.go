@@ -114,7 +114,6 @@ func GetBYOKRoutingList(c *gin.Context) {
 	if healthStatus != "" {
 		conditions = append(conditions, "LOWER(mak.health_status) = $"+strconv.Itoa(argIndex))
 		args = append(args, healthStatus)
-		argIndex++
 	}
 
 	whereClause := strings.Join(conditions, " AND ")
@@ -211,7 +210,7 @@ func UpdateBYOKRouteConfig(c *gin.Context) {
 	}
 
 	var req UpdateBYOKRouteConfigRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
@@ -219,7 +218,7 @@ func UpdateBYOKRouteConfig(c *gin.Context) {
 	routeMode := strings.ToLower(strings.TrimSpace(req.RouteMode))
 	if routeMode != "" {
 		switch routeMode {
-		case "auto", "direct", "litellm", "proxy":
+		case routeModeAuto, routeModeDirect, routeModeLitellm, routeModeProxy:
 		default:
 			middleware.RespondWithError(c, apperrors.NewAppError(
 				"INVALID_ROUTE_MODE",

@@ -30,6 +30,10 @@ const (
 	byokTypeOfficial        = "official"
 	byokTypeReseller        = "reseller"
 	byokTypeSelfHosted      = "self_hosted"
+	routeModeAuto           = "auto"
+	routeModeDirect         = "direct"
+	routeModeLitellm        = "litellm"
+	routeModeProxy          = "proxy"
 )
 
 func CreateMerchantAPIKey(c *gin.Context) {
