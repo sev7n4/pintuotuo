@@ -11,6 +11,7 @@ import (
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/services"
+	"github.com/pintuotuo/backend/utils"
 )
 
 type ProviderRouteConfig struct {
@@ -621,6 +622,23 @@ func ProbeEndpoint(c *gin.Context) {
 	}
 
 	apiKeyToUse := req.APIKey
+
+	if apiKeyToUse == "" {
+		db := config.GetDB()
+		if db != nil {
+			var encryptedKey string
+			err := db.QueryRow(
+				`SELECT api_key_encrypted FROM merchant_api_keys WHERE provider = $1 AND status = 'active' LIMIT 1`,
+				code,
+			).Scan(&encryptedKey)
+			if err == nil && encryptedKey != "" {
+				decryptedKey, decErr := utils.Decrypt(encryptedKey)
+				if decErr == nil && decryptedKey != "" {
+					apiKeyToUse = decryptedKey
+				}
+			}
+		}
+	}
 
 	probeResult := services.ProbeEndpointURL(c.Request.Context(), req.URL, apiKeyToUse, timeoutMs)
 
