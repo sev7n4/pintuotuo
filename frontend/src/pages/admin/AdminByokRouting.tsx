@@ -12,7 +12,6 @@ import {
   Select,
   Input,
   Tooltip,
-  Popconfirm,
   Spin,
   Descriptions,
   Result,
@@ -28,7 +27,6 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   SyncOutlined,
-  InfoCircleOutlined,
 } from '@ant-design/icons';
 import {
   adminByokRoutingService,
@@ -37,7 +35,7 @@ import {
 } from '@/services/adminByokRouting';
 import styles from './AdminByokRouting.module.css';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 const byokTypeTag = (byokType: string) => {
   const colorMap: Record<string, string> = {
