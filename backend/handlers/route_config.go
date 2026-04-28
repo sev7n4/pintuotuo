@@ -570,9 +570,9 @@ func TestRouteDecision(c *gin.Context) {
 }
 
 type ProbeEndpointRequest struct {
-	URL        string `json:"url" binding:"required"`
-	APIKey     string `json:"api_key"`
-	TimeoutMs  int    `json:"timeout_ms"`
+	URL       string `json:"url" binding:"required"`
+	APIKey    string `json:"api_key"`
+	TimeoutMs int    `json:"timeout_ms"`
 }
 
 type ProbeEndpointResponse struct {
@@ -645,9 +645,9 @@ func ProbeEndpoint(c *gin.Context) {
 	probeResult := services.ProbeEndpointURL(c.Request.Context(), req.URL, apiKeyToUse, timeoutMs)
 
 	response := ProbeEndpointResponse{
-		Success:   probeResult.Success,
+		Success:    probeResult.Success,
 		StatusCode: probeResult.StatusCode,
-		LatencyMs: probeResult.LatencyMs,
+		LatencyMs:  probeResult.LatencyMs,
 	}
 
 	if probeResult.ErrorMsg != "" {

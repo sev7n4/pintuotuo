@@ -38,22 +38,22 @@ type Product struct {
 
 // Order represents a user's order
 type Order struct {
-	ID                  int           `json:"id"`
-	UserID              int           `json:"user_id"`
-	ProductID           *int          `json:"product_id,omitempty"` // NULL for SKU-only orders (migration 020)
-	SKUID               int           `json:"sku_id,omitempty"`
-	SPUID               int           `json:"spu_id,omitempty"`
-	GroupID             interface{}   `json:"group_id"` // Can be NULL
-	Quantity            int           `json:"quantity"`
-	UnitPrice           float64       `json:"unit_price"`
-	TotalPrice          float64       `json:"total_price"`
-	Status              string        `json:"status"` // pending, paid, completed, failed
-	EntitlementPackageID *int         `json:"entitlement_package_id,omitempty"`
-	Items               []OrderItem   `json:"items,omitempty"`
-	GroupStatus         string        `json:"group_status,omitempty"`
-	PricingVersionID    *int          `json:"pricing_version_id,omitempty"`
-	CreatedAt           time.Time     `json:"created_at"`
-	UpdatedAt           time.Time     `json:"updated_at"`
+	ID                   int         `json:"id"`
+	UserID               int         `json:"user_id"`
+	ProductID            *int        `json:"product_id,omitempty"` // NULL for SKU-only orders (migration 020)
+	SKUID                int         `json:"sku_id,omitempty"`
+	SPUID                int         `json:"spu_id,omitempty"`
+	GroupID              interface{} `json:"group_id"` // Can be NULL
+	Quantity             int         `json:"quantity"`
+	UnitPrice            float64     `json:"unit_price"`
+	TotalPrice           float64     `json:"total_price"`
+	Status               string      `json:"status"` // pending, paid, completed, failed
+	EntitlementPackageID *int        `json:"entitlement_package_id,omitempty"`
+	Items                []OrderItem `json:"items,omitempty"`
+	GroupStatus          string      `json:"group_status,omitempty"`
+	PricingVersionID     *int        `json:"pricing_version_id,omitempty"`
+	CreatedAt            time.Time   `json:"created_at"`
+	UpdatedAt            time.Time   `json:"updated_at"`
 }
 
 // OrderItem represents an item within an order
@@ -371,13 +371,13 @@ type BrowseHistoryResponse struct {
 
 // UnifiedFavoriteResponse represents a unified favorite response for both SKU and entitlement packages
 type UnifiedFavoriteResponse struct {
-	ItemType             string                        `json:"item_type"`
-	ID                   int                           `json:"id"`
-	SKUID                *int                          `json:"sku_id,omitempty"`
-	Product              *Product                      `json:"product,omitempty"`
-	EntitlementPackageID *int                          `json:"entitlement_package_id,omitempty"`
+	ItemType             string                           `json:"item_type"`
+	ID                   int                              `json:"id"`
+	SKUID                *int                             `json:"sku_id,omitempty"`
+	Product              *Product                         `json:"product,omitempty"`
+	EntitlementPackageID *int                             `json:"entitlement_package_id,omitempty"`
 	EntitlementPackage   *EntitlementPackageFavoriteBrief `json:"entitlement_package,omitempty"`
-	CreatedAt            string                        `json:"created_at"`
+	CreatedAt            string                           `json:"created_at"`
 }
 
 // EntitlementPackageFavoriteBrief represents brief info for entitlement package favorites
