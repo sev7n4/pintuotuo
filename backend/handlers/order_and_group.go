@@ -344,7 +344,8 @@ func CreateOrder(c *gin.Context) {
 			item.PricingVersionID = &v
 		}
 		if fulfilledAt.Valid {
-			item.FulfilledAt = fulfilledAt.Time
+			t := fulfilledAt.Time
+			item.FulfilledAt = &t
 		}
 		order.Items = append(order.Items, item)
 	}
@@ -406,7 +407,8 @@ func loadOrderItems(db *sql.DB, orderID int) ([]models.OrderItem, error) {
 			item.ComputePoints = &v
 		}
 		if fulfilledAt.Valid {
-			item.FulfilledAt = fulfilledAt.Time
+			t := fulfilledAt.Time
+			item.FulfilledAt = &t
 		}
 		if pricingVID.Valid {
 			v := int(pricingVID.Int64)
