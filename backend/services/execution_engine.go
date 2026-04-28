@@ -219,6 +219,10 @@ func (e *ExecutionEngine) buildHTTPRequest(ctx context.Context, input *Execution
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", input.APIKey))
 	}
 
+	if input.GatewayMode == GatewayModeLitellm && input.OriginalAPIKey != "" {
+		req.Header.Set("x-api-key", input.OriginalAPIKey)
+	}
+
 	for key, value := range input.Headers {
 		req.Header.Set(key, value)
 	}

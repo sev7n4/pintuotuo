@@ -474,3 +474,93 @@ func TestExecutionEngine_ExecuteStreamWithRetry_Success(t *testing.T) {
 	assert.Equal(t, 2, attempts)
 	result.Body.Close()
 }
+
+func TestExecutionEngine_LitellmBYOK(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		assert.Equal(t, "Bearer sk-master-key", auth)
+
+		apiKey := r.Header.Get("x-api-key")
+		assert.Equal(t, "sk-original-key", apiKey)
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer server.Close()
+
+	engine := NewExecutionEngine()
+	input := &ExecutionInput{
+		Provider:       "openai",
+		Model:          "gpt-4",
+		APIKey:         "sk-master-key",
+		OriginalAPIKey: "sk-original-key",
+		EndpointURL:    server.URL,
+		RequestFormat:  "openai",
+		GatewayMode:    GatewayModeLitellm,
+		Messages:       []Message{{Role: "user", Content: "Hello"}},
+	}
+
+	result, err := engine.Execute(context.Background(), input)
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+}
+
+func TestExecutionEngine_LitellmBYOK_EmptyKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		assert.Equal(t, "Bearer sk-master-key", auth)
+
+		apiKey := r.Header.Get("x-api-key")
+		assert.Empty(t, apiKey)
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer server.Close()
+
+	engine := NewExecutionEngine()
+	input := &ExecutionInput{
+		Provider:       "openai",
+		Model:          "gpt-4",
+		APIKey:         "sk-master-key",
+		OriginalAPIKey: "",
+		EndpointURL:    server.URL,
+		RequestFormat:  "openai",
+		GatewayMode:    GatewayModeLitellm,
+		Messages:       []Message{{Role: "user", Content: "Hello"}},
+	}
+
+	result, err := engine.Execute(context.Background(), input)
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+}
+
+func TestExecutionEngine_DirectMode_Unchanged(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		assert.Equal(t, "Bearer sk-provider-key", auth)
+
+		apiKey := r.Header.Get("x-api-key")
+		assert.Empty(t, apiKey)
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer server.Close()
+
+	engine := NewExecutionEngine()
+	input := &ExecutionInput{
+		Provider:       "openai",
+		Model:          "gpt-4",
+		APIKey:         "sk-provider-key",
+		OriginalAPIKey: "sk-original-key",
+		EndpointURL:    server.URL,
+		RequestFormat:  "openai",
+		GatewayMode:    GatewayModeDirect,
+		Messages:       []Message{{Role: "user", Content: "Hello"}},
+	}
+
+	result, err := engine.Execute(context.Background(), input)
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+}
