@@ -13,6 +13,8 @@ type User struct {
 	ReferredBy     int       `json:"referred_by,omitempty"`
 	TotalReferrals int       `json:"total_referrals,omitempty"`
 	TotalRewards   float64   `json:"total_rewards,omitempty"`
+	Phone          *string   `json:"phone,omitempty"`
+	MFAEnabled     bool      `json:"mfa_enabled"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -36,20 +38,42 @@ type Product struct {
 
 // Order represents a user's order
 type Order struct {
-	ID         int         `json:"id"`
-	UserID     int         `json:"user_id"`
-	ProductID  *int        `json:"product_id,omitempty"` // NULL for SKU-only orders (migration 020)
-	SKUID      int         `json:"sku_id,omitempty"`
-	SPUID      int         `json:"spu_id,omitempty"`
-	GroupID    interface{} `json:"group_id"` // Can be NULL
-	Quantity   int         `json:"quantity"`
-	UnitPrice  float64     `json:"unit_price"`
-	TotalPrice float64     `json:"total_price"`
-	Status     string      `json:"status"` // pending, paid, completed, failed
-	// PricingVersionID binds retail usage pricing to order time; nil = legacy / not set (migration 045).
-	PricingVersionID *int      `json:"pricing_version_id,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID                   int         `json:"id"`
+	UserID               int         `json:"user_id"`
+	ProductID            *int        `json:"product_id,omitempty"` // NULL for SKU-only orders (migration 020)
+	SKUID                int         `json:"sku_id,omitempty"`
+	SPUID                int         `json:"spu_id,omitempty"`
+	GroupID              interface{} `json:"group_id"` // Can be NULL
+	Quantity             int         `json:"quantity"`
+	UnitPrice            float64     `json:"unit_price"`
+	TotalPrice           float64     `json:"total_price"`
+	Status               string      `json:"status"` // pending, paid, completed, failed
+	EntitlementPackageID *int        `json:"entitlement_package_id,omitempty"`
+	Items                []OrderItem `json:"items,omitempty"`
+	GroupStatus          string      `json:"group_status,omitempty"`
+	PricingVersionID     *int        `json:"pricing_version_id,omitempty"`
+	CreatedAt            time.Time   `json:"created_at"`
+	UpdatedAt            time.Time   `json:"updated_at"`
+}
+
+// OrderItem represents an item within an order
+type OrderItem struct {
+	ID               int        `json:"id"`
+	OrderID          int        `json:"order_id"`
+	SKUID            int        `json:"sku_id"`
+	SPUID            int        `json:"spu_id,omitempty"`
+	Quantity         int        `json:"quantity"`
+	UnitPrice        float64    `json:"unit_price"`
+	TotalPrice       float64    `json:"total_price"`
+	TokenAmount      *int64     `json:"token_amount,omitempty"`
+	ComputePoints    *float64   `json:"compute_points,omitempty"`
+	SKUType          string     `json:"sku_type,omitempty"`
+	SPUName          string     `json:"spu_name,omitempty"`
+	SKUCode          string     `json:"sku_code,omitempty"`
+	PricingVersionID *int       `json:"pricing_version_id,omitempty"`
+	FulfilledAt      *time.Time `json:"fulfilled_at,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at,omitempty"`
 }
 
 // Group represents a group purchase
@@ -153,6 +177,7 @@ type Merchant struct {
 	BusinessCategory   *string    `json:"business_category,omitempty"` // 经营类目
 	AdminNotes         *string    `json:"admin_notes,omitempty"`       // 管理员内部备注
 	Status             string     `json:"status"`                      // pending, reviewing, active, suspended, rejected
+	LifecycleStatus    string     `json:"lifecycle_status,omitempty"`  // trial, active, suspended, churned
 	ReviewedAt         *time.Time `json:"reviewed_at,omitempty"`
 	ReviewNote         *string    `json:"review_note,omitempty"`
 	RejectionReason    *string    `json:"rejection_reason,omitempty"`
@@ -191,6 +216,10 @@ type MerchantAPIKey struct {
 	HealthCheckLevel    string     `json:"health_check_level,omitempty"`
 	EndpointURL         string     `json:"endpoint_url,omitempty"`
 	HealthStatus        string     `json:"health_status,omitempty"`
+	HealthErrorMessage  string     `json:"health_error_message,omitempty"`
+	HealthErrorCategory string     `json:"health_error_category,omitempty"`
+	HealthErrorCode     string     `json:"health_error_code,omitempty"`
+	HealthRequestID     string     `json:"health_request_id,omitempty"`
 	LastHealthCheckAt   *time.Time `json:"last_health_check_at,omitempty"`
 	ConsecutiveFailures int        `json:"consecutive_failures,omitempty"`
 
@@ -246,6 +275,9 @@ type MerchantSettlement struct {
 	PeriodStart         time.Time  `json:"period_start"`
 	PeriodEnd           time.Time  `json:"period_end"`
 	TotalSales          float64    `json:"total_sales"`
+	TotalSalesCNY       float64    `json:"total_sales_cny,omitempty"`
+	TotalTokens         int64      `json:"total_tokens,omitempty"`
+	TotalProcurementCNY *float64   `json:"total_procurement_cny,omitempty"`
 	PlatformFee         float64    `json:"platform_fee"`
 	SettlementAmount    float64    `json:"settlement_amount"`
 	Status              string     `json:"status"` // pending, processing, completed
@@ -335,4 +367,24 @@ type BrowseHistoryResponse struct {
 	Product   Product `json:"product"`
 	ViewCount int     `json:"view_count"`
 	ViewedAt  string  `json:"viewed_at"`
+}
+
+// UnifiedFavoriteResponse represents a unified favorite response for both SKU and entitlement packages
+type UnifiedFavoriteResponse struct {
+	ItemType             string                           `json:"item_type"`
+	ID                   int                              `json:"id"`
+	SKUID                *int                             `json:"sku_id,omitempty"`
+	Product              *Product                         `json:"product,omitempty"`
+	EntitlementPackageID *int                             `json:"entitlement_package_id,omitempty"`
+	EntitlementPackage   *EntitlementPackageFavoriteBrief `json:"entitlement_package,omitempty"`
+	CreatedAt            string                           `json:"created_at"`
+}
+
+// EntitlementPackageFavoriteBrief represents brief info for entitlement package favorites
+type EntitlementPackageFavoriteBrief struct {
+	ID            int    `json:"id"`
+	PackageCode   string `json:"package_code"`
+	Name          string `json:"name"`
+	MarketingLine string `json:"marketing_line"`
+	Status        string `json:"status"`
 }

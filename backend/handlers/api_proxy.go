@@ -49,6 +49,7 @@ const (
 	apiFormatOpenAI   = "openai"
 	// llmGatewayLitellm 与 LLM_GATEWAY_ACTIVE=litellm 对齐（goconst）
 	llmGatewayLitellm = "litellm"
+	llmGatewayNone    = "none"
 )
 
 // 路由策略来源（trace / 落库 effective_policy_source，与 JSON 对外字段一致）
@@ -59,10 +60,13 @@ const (
 )
 
 type providerRuntimeConfig struct {
-	Code       string
-	Name       string
-	APIBaseURL string
-	APIFormat  string
+	Code           string
+	Name           string
+	APIBaseURL     string
+	APIFormat      string
+	ProviderRegion string
+	RouteStrategy  map[string]interface{}
+	Endpoints      map[string]interface{}
 }
 
 func legacyProviderList() []map[string]interface{} {
