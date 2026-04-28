@@ -32,6 +32,7 @@ import {
   adminByokRoutingService,
   BYOKRoutingItem,
   UpdateRouteConfigRequest,
+  VerificationResult,
 } from '@/services/adminByokRouting';
 import styles from './AdminByokRouting.module.css';
 
@@ -165,6 +166,10 @@ const AdminByokRouting = () => {
 
   const [resultModalVisible, setResultModalVisible] = useState(false);
   const [operationResults, setOperationResults] = useState<Map<number, OperationResult>>(new Map());
+
+  const [verificationModalVisible, setVerificationModalVisible] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const [verificationLoading, setVerificationLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -333,6 +338,73 @@ const AdminByokRouting = () => {
     }
   };
 
+  const handleDeepVerify = async (record: BYOKRoutingItem) => {
+    setVerificationModalVisible(true);
+    setVerificationLoading(true);
+    setVerificationResult(null);
+
+    try {
+      await adminByokRoutingService.triggerDeepVerify(record.id);
+      message.success('深度验证已启动，正在后台执行...');
+      await pollVerificationResult(record.id);
+    } catch (error) {
+      message.error('启动深度验证失败');
+      setVerificationLoading(false);
+    }
+  };
+
+  const pollVerificationResult = async (id: number) => {
+    const maxAttempts = 30;
+    const interval = 2000;
+    let attempts = 0;
+
+    const poll = async (): Promise<void> => {
+      try {
+        const response = await adminByokRoutingService.getVerificationDetails(id);
+        const history = response.data.history;
+        const latest = history?.[0];
+
+        if (latest) {
+          setVerificationResult(latest);
+
+          if (latest.status === 'pending' || latest.status === 'in_progress') {
+            attempts++;
+            if (attempts < maxAttempts) {
+              await new Promise((resolve) => setTimeout(resolve, interval));
+              await poll();
+            } else {
+              message.warning('验证超时，请稍后查看结果');
+              setVerificationLoading(false);
+            }
+          } else {
+            setVerificationLoading(false);
+            fetchData();
+          }
+        } else {
+          attempts++;
+          if (attempts < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, interval));
+            await poll();
+          } else {
+            message.error('获取验证结果失败');
+            setVerificationLoading(false);
+          }
+        }
+      } catch (error) {
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, interval));
+          await poll();
+        } else {
+          message.error('获取验证结果失败');
+          setVerificationLoading(false);
+        }
+      }
+    };
+
+    await poll();
+  };
+
   const resetFilters = () => {
     setByokTypeFilter('');
     setProviderFilter('');
@@ -342,7 +414,7 @@ const AdminByokRouting = () => {
     setKeywordFilter('');
   };
 
-  const renderOperationButton = (record: BYOKRoutingItem, type: 'probe' | 'verify') => {
+  const renderOperationButton = (record: BYOKRoutingItem, type: 'probe' | 'verify' | 'deep-verify') => {
     const result = operationResults.get(record.id);
     const isLoading = result?.status === 'loading' && result?.type === type;
     const isSuccess = result?.status === 'success' && result?.type === type;
@@ -363,6 +435,21 @@ const AdminByokRouting = () => {
             loading={isLoading}
           >
             探测
+          </Button>
+        </Tooltip>
+      );
+    }
+
+    if (type === 'deep-verify') {
+      return (
+        <Tooltip title="深度验证（包含配额探测）">
+          <Button
+            size="small"
+            icon={isLoading ? <SyncOutlined spin /> : <SafetyCertificateOutlined />}
+            onClick={() => handleDeepVerify(record)}
+            loading={isLoading}
+          >
+            深验
           </Button>
         </Tooltip>
       );
@@ -474,7 +561,7 @@ const AdminByokRouting = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 180,
+      width: 220,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small" wrap>
@@ -483,6 +570,7 @@ const AdminByokRouting = () => {
           </Button>
           {renderOperationButton(record, 'probe')}
           {renderOperationButton(record, 'verify')}
+          {renderOperationButton(record, 'deep-verify')}
         </Space>
       ),
     },
@@ -700,6 +788,84 @@ const AdminByokRouting = () => {
               </Descriptions.Item>
             </Descriptions>
           </div>
+        )}
+      </Modal>
+
+      <Modal
+        title="API Key 验证"
+        open={verificationModalVisible}
+        onCancel={() => {
+          setVerificationModalVisible(false);
+          setVerificationResult(null);
+        }}
+        footer={null}
+        width={600}
+      >
+        {verificationLoading && (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <Spin size="large" />
+            <p style={{ marginTop: 16 }}>正在验证 API Key...</p>
+          </div>
+        )}
+
+        {verificationResult && (
+          <Descriptions bordered column={1}>
+            <Descriptions.Item label="验证状态">
+              {verificationResult.status === 'success' ? (
+                <Tag color="success" icon={<CheckCircleOutlined />}>
+                  验证成功
+                </Tag>
+              ) : verificationResult.status === 'failed' ? (
+                <Tag color="error" icon={<ExclamationCircleOutlined />}>
+                  验证失败
+                </Tag>
+              ) : (
+                <Tag color="processing" icon={<SyncOutlined spin />}>
+                  验证中
+                </Tag>
+              )}
+            </Descriptions.Item>
+
+            <Descriptions.Item label="连接测试">
+              {verificationResult.connection_test ? (
+                <Tag color="success">成功 ({verificationResult.connection_latency_ms}ms)</Tag>
+              ) : (
+                <Tag color="error">失败</Tag>
+              )}
+            </Descriptions.Item>
+
+            {verificationResult.models_found && verificationResult.models_found.length > 0 && (
+              <Descriptions.Item label="支持的模型">
+                <Space wrap>
+                  {verificationResult.models_found.map((model) => (
+                    <Tag key={model}>{model}</Tag>
+                  ))}
+                </Space>
+              </Descriptions.Item>
+            )}
+
+            <Descriptions.Item label="定价验证">
+              {verificationResult.pricing_verified ? (
+                <Tag color="success">已验证</Tag>
+              ) : (
+                <Tag color="warning">未验证</Tag>
+              )}
+            </Descriptions.Item>
+
+            {verificationResult.error_code && (
+              <Descriptions.Item label="错误码">
+                <Tag color="volcano">{verificationResult.error_code}</Tag>
+              </Descriptions.Item>
+            )}
+
+            {verificationResult.error_message && (
+              <Descriptions.Item label="错误信息">
+                <span style={{ color: '#ff4d4f' }}>{verificationResult.error_message}</span>
+              </Descriptions.Item>
+            )}
+
+            <Descriptions.Item label="重试次数">{verificationResult.retry_count}</Descriptions.Item>
+          </Descriptions>
         )}
       </Modal>
     </div>

@@ -31,7 +31,14 @@ type BYOKRoutingListItem struct {
 	FallbackEndpointURL string                 `json:"fallback_endpoint_url"`
 	RouteConfig         map[string]interface{} `json:"route_config"`
 	HealthStatus        string                 `json:"health_status"`
+	HealthErrorMessage  string                 `json:"health_error_message"`
+	HealthErrorCategory string                 `json:"health_error_category"`
+	HealthErrorCode     string                 `json:"health_error_code"`
+	LastHealthCheckAt   *string                `json:"last_health_check_at"`
 	VerificationResult  string                 `json:"verification_result"`
+	VerificationMessage string                 `json:"verification_message"`
+	ModelsSupported     []string               `json:"models_supported"`
+	VerifiedAt          *string                `json:"verified_at"`
 	Status              string                 `json:"status"`
 	CreatedAt           string                 `json:"created_at"`
 	UpdatedAt           string                 `json:"updated_at"`
@@ -131,7 +138,32 @@ func GetBYOKRoutingList(c *gin.Context) {
 		COALESCE(mak.endpoint_url, ''), COALESCE(mak.fallback_endpoint_url, ''),
 		COALESCE(mak.route_config, '{}'::jsonb),
 		COALESCE(NULLIF(TRIM(mak.health_status), ''), 'unknown'),
+		COALESCE((
+			SELECT h.error_message
+			FROM api_key_health_history h
+			WHERE h.api_key_id = mak.id
+			ORDER BY h.created_at DESC
+			LIMIT 1
+		), ''),
+		COALESCE((
+			SELECT h.error_category
+			FROM api_key_health_history h
+			WHERE h.api_key_id = mak.id
+			ORDER BY h.created_at DESC
+			LIMIT 1
+		), ''),
+		COALESCE((
+			SELECT h.provider_error_code
+			FROM api_key_health_history h
+			WHERE h.api_key_id = mak.id
+			ORDER BY h.created_at DESC
+			LIMIT 1
+		), ''),
+		mak.last_health_check_at,
 		COALESCE(NULLIF(TRIM(mak.verification_result), ''), 'pending'),
+		COALESCE(mak.verification_message, ''),
+		mak.models_supported,
+		mak.verified_at,
 		mak.status, mak.created_at, mak.updated_at
 		FROM merchant_api_keys mak
 		LEFT JOIN merchants m ON m.id = mak.merchant_id
@@ -149,13 +181,21 @@ func GetBYOKRoutingList(c *gin.Context) {
 		var item BYOKRoutingListItem
 		var routeConfigBytes []byte
 		var createdAt, updatedAt sql.NullTime
+		var lastHealthCheckAt sql.NullTime
+		var verifiedAt sql.NullTime
+		var modelsJSON []byte
 		if err := rows.Scan(
 			&item.ID, &item.MerchantID, &item.CompanyName,
 			&item.BYOKType, &item.Provider, &item.Name,
 			&item.Region, &item.RouteMode,
 			&item.EndpointURL, &item.FallbackEndpointURL,
 			&routeConfigBytes,
-			&item.HealthStatus, &item.VerificationResult,
+			&item.HealthStatus,
+			&item.HealthErrorMessage, &item.HealthErrorCategory, &item.HealthErrorCode,
+			&lastHealthCheckAt,
+			&item.VerificationResult, &item.VerificationMessage,
+			&modelsJSON,
+			&verifiedAt,
 			&item.Status, &createdAt, &updatedAt,
 		); err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -164,11 +204,22 @@ func GetBYOKRoutingList(c *gin.Context) {
 		if len(routeConfigBytes) > 0 {
 			_ = json.Unmarshal(routeConfigBytes, &item.RouteConfig)
 		}
+		if len(modelsJSON) > 0 {
+			_ = json.Unmarshal(modelsJSON, &item.ModelsSupported)
+		}
 		if createdAt.Valid {
 			item.CreatedAt = createdAt.Time.Format("2006-01-02 15:04:05")
 		}
 		if updatedAt.Valid {
 			item.UpdatedAt = updatedAt.Time.Format("2006-01-02 15:04:05")
+		}
+		if lastHealthCheckAt.Valid {
+			t := lastHealthCheckAt.Time.Format("2006-01-02 15:04:05")
+			item.LastHealthCheckAt = &t
+		}
+		if verifiedAt.Valid {
+			t := verifiedAt.Time.Format("2006-01-02 15:04:05")
+			item.VerifiedAt = &t
 		}
 		items = append(items, item)
 	}
@@ -467,5 +518,82 @@ func DeepVerifyBYOK(c *gin.Context) {
 		"message":           "Deep verification started",
 		"api_key_id":        apiKey.ID,
 		"verification_type": "admin_deep",
+	})
+}
+
+func GetBYOKVerificationDetails(c *gin.Context) {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != roleAdmin {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Admin access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return
+	}
+
+	keyIDStr := c.Param("id")
+	keyID, err := strconv.Atoi(keyIDStr)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var apiKey models.MerchantAPIKey
+	var verificationResult, verificationMsg sql.NullString
+	var verifiedAt sql.NullTime
+	var modelsJSON []byte
+	err = db.QueryRow(
+		`SELECT id, merchant_id, provider, verification_result, verified_at, models_supported, verification_message
+		 FROM merchant_api_keys
+		 WHERE id = $1`,
+		keyID,
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &verificationResult, &verifiedAt, &modelsJSON, &verificationMsg)
+
+	if err == sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"API key not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	} else if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	if verificationResult.Valid {
+		apiKey.VerificationResult = verificationResult.String
+	}
+	if verificationMsg.Valid {
+		apiKey.VerificationMsg = verificationMsg.String
+	}
+	if verifiedAt.Valid {
+		t := verifiedAt.Time
+		apiKey.VerifiedAt = &t
+	}
+	if len(modelsJSON) > 0 {
+		_ = json.Unmarshal(modelsJSON, &apiKey.ModelsSupported)
+	}
+
+	validator := services.GetAPIKeyValidator()
+	history, err := validator.GetVerificationHistory(keyID, 10)
+	if err != nil {
+		logger.LogError(context.Background(), "admin_byok_routing", "Failed to get verification history", err, map[string]interface{}{
+			"api_key_id": keyID,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"api_key": apiKey,
+		"history": history,
 	})
 }
