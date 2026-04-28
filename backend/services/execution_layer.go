@@ -37,14 +37,18 @@ type ExecutionLayerOutput struct {
 }
 
 type ExecutionProviderConfig struct {
-	Code           string                 `json:"code"`
-	Name           string                 `json:"name"`
-	APIBaseURL     string                 `json:"api_base_url"`
-	APIFormat      string                 `json:"api_format"`
-	GatewayMode    string                 `json:"gateway_mode"`
-	ProviderRegion string                 `json:"provider_region"`
-	RouteStrategy  map[string]interface{} `json:"route_strategy"`
-	Endpoints      map[string]interface{} `json:"endpoints"`
+	Code               string                 `json:"code"`
+	Name               string                 `json:"name"`
+	APIBaseURL         string                 `json:"api_base_url"`
+	APIFormat          string                 `json:"api_format"`
+	GatewayMode        string                 `json:"gateway_mode"`
+	ProviderRegion     string                 `json:"provider_region"`
+	RouteStrategy      map[string]interface{} `json:"route_strategy"`
+	Endpoints          map[string]interface{} `json:"endpoints"`
+	BYOKEndpointURL    string                 `json:"byok_endpoint_url"`
+	BYOKRouteMode      string                 `json:"byok_route_mode"`
+	BYOKRouteConfig    map[string]interface{} `json:"byok_route_config"`
+	BYOKFallbackURL    string                 `json:"byok_fallback_url"`
 }
 
 func NewExecutionLayer(db *sql.DB, engine *ExecutionEngine) *ExecutionLayer {
@@ -227,6 +231,32 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 		return ""
 	}
 
+	if cfg.BYOKEndpointURL != "" {
+		return cfg.BYOKEndpointURL
+	}
+
+	if cfg.BYOKRouteConfig != nil {
+		if endpoints, ok := cfg.BYOKRouteConfig["endpoints"].(map[string]interface{}); ok {
+			region := cfg.ProviderRegion
+			if region == "" {
+				region = "overseas"
+			}
+			if url, ok := endpoints[region].(string); ok && url != "" {
+				return url
+			}
+			if defaultURL, ok := endpoints["default"].(string); ok && defaultURL != "" {
+				return defaultURL
+			}
+		}
+		if baseURL, ok := cfg.BYOKRouteConfig["base_url"].(string); ok && baseURL != "" {
+			return baseURL
+		}
+	}
+
+	if cfg.BYOKFallbackURL != "" {
+		return cfg.BYOKFallbackURL
+	}
+
 	switch cfg.GatewayMode {
 	case GatewayModeLitellm:
 		if cfg.Endpoints != nil {
@@ -309,6 +339,10 @@ func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, original
 func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) string {
 	if cfg == nil {
 		return GatewayModeDirect
+	}
+
+	if cfg.BYOKRouteMode != "" && cfg.BYOKRouteMode != "auto" {
+		return cfg.BYOKRouteMode
 	}
 
 	if cfg.GatewayMode != "" {

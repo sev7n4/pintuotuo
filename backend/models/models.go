@@ -234,6 +234,12 @@ type MerchantAPIKey struct {
 
 	Region        string `json:"region,omitempty"`
 	SecurityLevel string `json:"security_level,omitempty"`
+
+	// BYOK 路由配置
+	BYOKType            string                 `json:"byok_type,omitempty"`
+	RouteMode           string                 `json:"route_mode,omitempty"`
+	FallbackEndpointURL string                 `json:"fallback_endpoint_url,omitempty"`
+	RouteConfig         map[string]interface{} `json:"route_config,omitempty"`
 }
 
 // APIKeyRealtimeStatus represents real-time status of an API key

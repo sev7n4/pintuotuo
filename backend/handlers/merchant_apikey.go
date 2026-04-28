@@ -27,6 +27,9 @@ const (
 	regionOverseas          = "overseas"
 	securityLevelStandard   = "standard"
 	securityLevelHigh       = "high"
+	byokTypeOfficial        = "official"
+	byokTypeReseller        = "reseller"
+	byokTypeSelfHosted      = "self_hosted"
 )
 
 func CreateMerchantAPIKey(c *gin.Context) {
@@ -50,6 +53,8 @@ func CreateMerchantAPIKey(c *gin.Context) {
 		QuotaLimit       *float64 `json:"quota_limit"`
 		HealthCheckLevel *string  `json:"health_check_level"`
 		EndpointURL      *string  `json:"endpoint_url"`
+		BYOKType         *string  `json:"byok_type"`
+		Region           *string  `json:"region"`
 	}
 
 	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
@@ -122,17 +127,54 @@ func CreateMerchantAPIKey(c *gin.Context) {
 		epStr = strings.TrimSpace(*req.EndpointURL)
 	}
 
+	byokType := byokTypeOfficial
+	if req.BYOKType != nil && strings.TrimSpace(*req.BYOKType) != "" {
+		v := strings.ToLower(strings.TrimSpace(*req.BYOKType))
+		switch v {
+		case byokTypeOfficial, byokTypeReseller, byokTypeSelfHosted:
+			byokType = v
+		default:
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_BYOK_TYPE",
+				"byok_type must be official, reseller, or self_hosted",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+	}
+
+	regionStr := regionDomestic
+	if req.Region != nil && strings.TrimSpace(*req.Region) != "" {
+		v := strings.ToLower(strings.TrimSpace(*req.Region))
+		switch v {
+		case regionDomestic, regionOverseas:
+			regionStr = v
+		default:
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_REGION",
+				"region must be domestic or overseas",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+	}
+
 	var apiKey models.MerchantAPIKey
 	var quotaReturned sql.NullFloat64
 	err = db.QueryRow(
-		`INSERT INTO merchant_api_keys (merchant_id, name, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status, health_check_level, endpoint_url) 
-		 VALUES ($1, $2, $3, $4, $5, $6, 0, 'active', $7, NULLIF(TRIM($8::text), '')::varchar(500)) 
+		`INSERT INTO merchant_api_keys (merchant_id, name, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status, health_check_level, endpoint_url, byok_type, region) 
+		 VALUES ($1, $2, $3, $4, $5, $6, 0, 'active', $7, NULLIF(TRIM($8::text), '')::varchar(500), $9, $10) 
 		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, created_at, updated_at,
-			COALESCE(NULLIF(TRIM(health_check_level), ''), $9),
-			COALESCE(endpoint_url, '')`,
-		merchantID, req.Name, req.Provider, apiKeyEncrypted, apiSecretEncrypted, quota, hcl, epStr, defaultHealthCheckLevel,
+			COALESCE(NULLIF(TRIM(health_check_level), ''), $11),
+			COALESCE(endpoint_url, ''),
+			COALESCE(byok_type, $12),
+			COALESCE(region, $13)`,
+		merchantID, req.Name, req.Provider, apiKeyEncrypted, apiSecretEncrypted, quota, hcl, epStr, byokType, regionStr,
+		defaultHealthCheckLevel, byokTypeOfficial, regionDomestic,
 	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaReturned, &apiKey.QuotaUsed, &apiKey.Status, &apiKey.CreatedAt, &apiKey.UpdatedAt,
-		&apiKey.HealthCheckLevel, &apiKey.EndpointURL)
+		&apiKey.HealthCheckLevel, &apiKey.EndpointURL, &apiKey.BYOKType, &apiKey.Region)
 	apiKey.QuotaLimit = utils.NullFloat64Ptr(quotaReturned)
 
 	if err != nil {
@@ -182,10 +224,26 @@ func ListMerchantAPIKeys(c *gin.Context) {
 		return
 	}
 
+	byokTypeFilter := c.Query("byok_type")
+	if byokTypeFilter != "" {
+		byokTypeFilter = strings.ToLower(strings.TrimSpace(byokTypeFilter))
+		switch byokTypeFilter {
+		case byokTypeOfficial, byokTypeReseller, byokTypeSelfHosted, "":
+		default:
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_BYOK_TYPE_FILTER",
+				"byok_type filter must be official, reseller, or self_hosted",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+	}
+
 	ctx := context.Background()
 	cacheKey := cache.MerchantAPIKeysKey(merchantID)
 
-	if cachedKeys, cacheErr := cache.Get(ctx, cacheKey); cacheErr == nil {
+	if cachedKeys, cacheErr := cache.Get(ctx, cacheKey); cacheErr == nil && byokTypeFilter == "" {
 		var apiKeys []models.MerchantAPIKey
 		if unmarshalErr := json.Unmarshal([]byte(cachedKeys), &apiKeys); unmarshalErr == nil {
 			c.JSON(http.StatusOK, gin.H{"data": apiKeys})
@@ -193,53 +251,58 @@ func ListMerchantAPIKeys(c *gin.Context) {
 		}
 	}
 
-	rows, err := db.Query(
-		`SELECT id, merchant_id, name, provider, quota_limit, quota_used, status, last_used_at, created_at, updated_at,
-			COALESCE(NULLIF(TRIM(health_check_level), ''), 'medium'),
-			COALESCE(endpoint_url, ''),
-			COALESCE(NULLIF(TRIM(health_status), ''), 'unknown'),
-			COALESCE((
-				SELECT h.error_message
-				FROM api_key_health_history h
-				WHERE h.api_key_id = merchant_api_keys.id
-				ORDER BY h.created_at DESC
-				LIMIT 1
-			), ''),
-			COALESCE((
-				SELECT h.error_category
-				FROM api_key_health_history h
-				WHERE h.api_key_id = merchant_api_keys.id
-				ORDER BY h.created_at DESC
-				LIMIT 1
-			), ''),
-			COALESCE((
-				SELECT h.provider_error_code
-				FROM api_key_health_history h
-				WHERE h.api_key_id = merchant_api_keys.id
-				ORDER BY h.created_at DESC
-				LIMIT 1
-			), ''),
-			COALESCE((
-				SELECT h.provider_request_id
-				FROM api_key_health_history h
-				WHERE h.api_key_id = merchant_api_keys.id
-				ORDER BY h.created_at DESC
-				LIMIT 1
-			), ''),
-			last_health_check_at,
-			COALESCE(consecutive_failures, 0),
-			verified_at,
-			COALESCE(NULLIF(TRIM(verification_result), ''), 'pending'),
-			COALESCE(verification_message, ''),
-			models_supported,
-			COALESCE(cost_input_rate, 0),
-			COALESCE(cost_output_rate, 0),
-			COALESCE(profit_margin, 0),
-			COALESCE(region, 'domestic'),
-			COALESCE(security_level, 'standard')
-		 FROM merchant_api_keys WHERE merchant_id = $1 ORDER BY created_at DESC`,
-		merchantID,
-	)
+	baseQuery := `SELECT id, merchant_id, name, provider, quota_limit, quota_used, status, last_used_at, created_at, updated_at,
+		COALESCE(NULLIF(TRIM(health_check_level), ''), 'medium'),
+		COALESCE(endpoint_url, ''),
+		COALESCE(NULLIF(TRIM(health_status), ''), 'unknown'),
+		COALESCE((
+			SELECT h.error_message
+			FROM api_key_health_history h
+			WHERE h.api_key_id = merchant_api_keys.id
+			ORDER BY h.created_at DESC
+			LIMIT 1
+		), ''),
+		COALESCE((
+			SELECT h.error_category
+			FROM api_key_health_history h
+			WHERE h.api_key_id = merchant_api_keys.id
+			ORDER BY h.created_at DESC
+			LIMIT 1
+		), ''),
+		COALESCE((
+			SELECT h.provider_error_code
+			FROM api_key_health_history h
+			WHERE h.api_key_id = merchant_api_keys.id
+			ORDER BY h.created_at DESC
+			LIMIT 1
+		), ''),
+		COALESCE((
+			SELECT h.provider_request_id
+			FROM api_key_health_history h
+			WHERE h.api_key_id = merchant_api_keys.id
+			ORDER BY h.created_at DESC
+			LIMIT 1
+		), ''),
+		last_health_check_at,
+		COALESCE(consecutive_failures, 0),
+		verified_at,
+		COALESCE(NULLIF(TRIM(verification_result), ''), 'pending'),
+		COALESCE(verification_message, ''),
+		models_supported,
+		COALESCE(cost_input_rate, 0),
+		COALESCE(cost_output_rate, 0),
+		COALESCE(profit_margin, 0),
+		COALESCE(region, 'domestic'),
+		COALESCE(security_level, 'standard'),
+		COALESCE(byok_type, 'official')
+		FROM merchant_api_keys WHERE merchant_id = $1`
+
+	var rows *sql.Rows
+	if byokTypeFilter != "" {
+		rows, err = db.Query(baseQuery+" AND byok_type = $2 ORDER BY created_at DESC", merchantID, byokTypeFilter)
+	} else {
+		rows, err = db.Query(baseQuery+" ORDER BY created_at DESC", merchantID)
+	}
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -260,7 +323,7 @@ func ListMerchantAPIKeys(c *gin.Context) {
 			&key.HealthCheckLevel, &key.EndpointURL, &key.HealthStatus, &key.HealthErrorMessage, &key.HealthErrorCategory, &key.HealthErrorCode, &key.HealthRequestID, &lastHealth, &key.ConsecutiveFailures,
 			&verifiedAt, &key.VerificationResult, &key.VerificationMsg, &modelsJSON,
 			&key.CostInputRate, &key.CostOutputRate, &key.ProfitMargin,
-			&key.Region, &key.SecurityLevel,
+			&key.Region, &key.SecurityLevel, &key.BYOKType,
 		)
 		key.QuotaLimit = utils.NullFloat64Ptr(qLim)
 		if scanErr != nil {
@@ -288,7 +351,7 @@ func ListMerchantAPIKeys(c *gin.Context) {
 		return
 	}
 
-	if apiKeysJSON, err := json.Marshal(apiKeys); err == nil {
+	if apiKeysJSON, err := json.Marshal(apiKeys); err == nil && byokTypeFilter == "" {
 		cache.Set(ctx, cacheKey, string(apiKeysJSON), cache.MerchantCacheTTL)
 	}
 
@@ -479,6 +542,27 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		}
 	}
 
+	patchBYOKType := false
+	byokTypeStr := ""
+	if raw, has := patch["byok_type"]; has {
+		patchBYOKType = true
+		_ = json.Unmarshal(raw, &byokTypeStr)
+		byokTypeStr = strings.ToLower(strings.TrimSpace(byokTypeStr))
+		if byokTypeStr != "" {
+			switch byokTypeStr {
+			case byokTypeOfficial, byokTypeReseller, byokTypeSelfHosted:
+			default:
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"INVALID_BYOK_TYPE",
+					"byok_type must be official, reseller, or self_hosted",
+					http.StatusBadRequest,
+					nil,
+				))
+				return
+			}
+		}
+	}
+
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -516,8 +600,9 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		 profit_margin = CASE WHEN $14::bool THEN $15::numeric ELSE profit_margin END,
 		 region = CASE WHEN $16::bool THEN $17::varchar(20) ELSE region END,
 		 security_level = CASE WHEN $18::bool THEN $19::varchar(20) ELSE security_level END,
+		 byok_type = CASE WHEN $20::bool THEN $21::varchar(20) ELSE byok_type END,
 		 updated_at = CURRENT_TIMESTAMP
-		 WHERE id = $20 AND merchant_id = $21
+		 WHERE id = $22 AND merchant_id = $23
 		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, last_used_at, created_at, updated_at,
 			COALESCE(NULLIF(TRIM(health_check_level), ''), 'medium'),
 			COALESCE(endpoint_url, ''),
@@ -532,7 +617,8 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 			COALESCE(cost_output_rate, 0),
 			COALESCE(profit_margin, 0),
 			COALESCE(region, 'domestic'),
-			COALESCE(security_level, 'standard')`,
+			COALESCE(security_level, 'standard'),
+			COALESCE(byok_type, 'official')`,
 		name, status, patchQuota, unlimitedQuota, quotaVal,
 		patchEndpoint, endpointStr,
 		patchHCL, hclStr,
@@ -541,13 +627,14 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		patchPM, pmVal,
 		patchRegion, regionStr,
 		patchSecurityLevel, securityLevelStr,
+		patchBYOKType, byokTypeStr,
 		keyID, merchantID,
 	).Scan(
 		&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaAfter, &apiKey.QuotaUsed, &apiKey.Status, &lastUsedAt, &apiKey.CreatedAt, &apiKey.UpdatedAt,
 		&apiKey.HealthCheckLevel, &apiKey.EndpointURL, &apiKey.HealthStatus, &lastHealth, &apiKey.ConsecutiveFailures,
 		&verifiedAt, &apiKey.VerificationResult, &apiKey.VerificationMsg, &modelsJSON,
 		&apiKey.CostInputRate, &apiKey.CostOutputRate, &apiKey.ProfitMargin,
-		&apiKey.Region, &apiKey.SecurityLevel,
+		&apiKey.Region, &apiKey.SecurityLevel, &apiKey.BYOKType,
 	)
 	apiKey.QuotaLimit = utils.NullFloat64Ptr(quotaAfter)
 
