@@ -71,6 +71,7 @@ import AdminRouteDecisionLogs from '@pages/admin/AdminRouteDecisionLogs';
 import AdminGatewayStats from '@pages/admin/AdminGatewayStats';
 import AdminRateLimiter from '@pages/admin/AdminRateLimiter';
 import AdminQueueConfig from '@pages/admin/AdminQueueConfig';
+import AdminByokRouting from '@pages/admin/AdminByokRouting';
 
 function LegacyProductDetailRedirect() {
   const { id } = useParams();
@@ -183,6 +184,7 @@ function App() {
             <Route path="gateway-stats" element={<AdminGatewayStats />} />
             <Route path="rate-limiter" element={<AdminRateLimiter />} />
             <Route path="queue-config" element={<AdminQueueConfig />} />
+            <Route path="byok-routing" element={<AdminByokRouting />} />
             <Route path="reconciliation" element={<AdminReconciliation />} />
             <Route path="flash-sales" element={<AdminFlashSales />} />
             <Route path="fuel-station" element={<AdminFuelStation />} />
