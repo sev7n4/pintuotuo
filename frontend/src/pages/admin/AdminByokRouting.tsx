@@ -193,15 +193,6 @@ const AdminByokRouting = () => {
     }
   };
 
-  const handleDeepVerify = async (id: number) => {
-    try {
-      await adminByokRoutingService.triggerDeepVerify(id);
-      message.success('深度验证已触发');
-    } catch {
-      message.error('触发深度验证失败');
-    }
-  };
-
   const resetFilters = () => {
     setByokTypeFilter('');
     setProviderFilter('');
@@ -337,14 +328,14 @@ const AdminByokRouting = () => {
     <div style={{ padding: 24 }}>
       <Card>
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
-          <Space justify="space-between" style={{ width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
             <Title level={4} style={{ margin: 0 }}>
               BYOK 路由管理
             </Title>
             <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
               刷新
             </Button>
-          </Space>
+          </div>
 
           <Space wrap size={12}>
             <Input
