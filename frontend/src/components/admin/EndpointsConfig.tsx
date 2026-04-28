@@ -103,30 +103,26 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({ value = {}, onChange,
       return;
     }
 
+    if (!providerCode) {
+      message.warning('请先保存厂商配置后再测试端点');
+      return;
+    }
+
     setTestingEndpoint(endpoint);
     setProbeResult(null);
     try {
-      if (providerCode) {
-        const response = await adminService.probeEndpoint(providerCode, endpoint, apiKey);
-        const resultData = response.data.data;
-        if (response.data.code === 0 && resultData) {
-          setProbeResult(resultData);
-          setResultModalVisible(true);
-          if (resultData.success) {
-            message.success('端点连接正常');
-          } else {
-            message.warning(`端点响应异常: ${resultData.error_msg || resultData.status_code}`);
-          }
-        } else {
-          message.error(`探测失败: ${response.data.message || 'Unknown error'}`);
-        }
-      } else {
-        const response = await fetch(endpoint, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
-        if (response.ok) {
+      const response = await adminService.probeEndpoint(providerCode, endpoint, apiKey);
+      const resultData = response.data.data;
+      if (response.data.code === 0 && resultData) {
+        setProbeResult(resultData);
+        setResultModalVisible(true);
+        if (resultData.success) {
           message.success('端点连接正常');
         } else {
-          message.warning(`端点响应异常: ${response.status}`);
+          message.warning(`端点响应异常: ${resultData.error_msg || resultData.status_code}`);
         }
+      } else {
+        message.error(`探测失败: ${response.data.message || 'Unknown error'}`);
       }
     } catch (error) {
       message.error('端点连接失败');

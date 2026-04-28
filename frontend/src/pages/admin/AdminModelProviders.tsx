@@ -374,7 +374,7 @@ const AdminModelProviders = () => {
         style={{ marginBottom: 16 }}
       />
       <Form.Item name="endpoints" noStyle>
-        <EndpointsConfig />
+        <EndpointsConfig providerCode={editing?.code} />
       </Form.Item>
     </>
   );
