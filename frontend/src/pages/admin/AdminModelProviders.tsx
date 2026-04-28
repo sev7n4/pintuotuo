@@ -367,8 +367,16 @@ const AdminModelProviders = () => {
   const EndpointsTab = () => (
     <>
       <Alert
-        message="端点配置"
-        description="配置不同路由模式的端点地址，支持直连、LiteLLM、代理等多种模式。"
+        message="端点配置（默认模板）"
+        description={
+          <div>
+            <p>此配置为<strong>厂商级默认模板</strong>，用于生成 LiteLLM YAML 配置和作为商户 API Key 的回退端点。</p>
+            <p style={{ marginTop: 8 }}>
+              <InfoCircleOutlined style={{ marginRight: 4 }} />
+              商户上传的 API Key 可通过 BYOK 路由管理页面配置独立端点，优先级高于此默认模板。
+            </p>
+          </div>
+        }
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
