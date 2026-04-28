@@ -12,8 +12,10 @@ import {
   Select,
   Input,
   Tooltip,
-  Popconfirm,
   Spin,
+  Descriptions,
+  Result,
+  Divider,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -22,12 +24,16 @@ import {
   ThunderboltOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import {
   adminByokRoutingService,
   BYOKRoutingItem,
   UpdateRouteConfigRequest,
 } from '@/services/adminByokRouting';
+import styles from './AdminByokRouting.module.css';
 
 const { Title } = Typography;
 
@@ -61,22 +67,6 @@ const routeModeTag = (routeMode: string) => {
   return <Tag color={colorMap[routeMode] || 'default'}>{labelMap[routeMode] || routeMode}</Tag>;
 };
 
-const healthStatusTag = (healthStatus: string) => {
-  const colorMap: Record<string, string> = {
-    healthy: 'success',
-    degraded: 'warning',
-    unhealthy: 'error',
-    unknown: 'default',
-  };
-  const labelMap: Record<string, string> = {
-    healthy: '健康',
-    degraded: '降级',
-    unhealthy: '不健康',
-    unknown: '未知',
-  };
-  return <Tag color={colorMap[healthStatus] || 'default'}>{labelMap[healthStatus] || healthStatus}</Tag>;
-};
-
 const regionTag = (region: string) => {
   const colorMap: Record<string, string> = {
     domestic: 'green',
@@ -88,6 +78,73 @@ const regionTag = (region: string) => {
   };
   return <Tag color={colorMap[region] || 'default'}>{labelMap[region] || region}</Tag>;
 };
+
+function healthDotClass(status?: string): string {
+  const s = (status || 'unknown').toLowerCase();
+  if (s === 'healthy') return styles.statusDotHealthy;
+  if (s === 'degraded') return styles.statusDotDegraded;
+  if (s === 'unhealthy') return styles.statusDotUnhealthy;
+  return styles.statusDotUnknown;
+}
+
+function healthLabel(status?: string): string {
+  const s = (status || 'unknown').toLowerCase();
+  if (s === 'healthy') return '健康';
+  if (s === 'degraded') return '降级';
+  if (s === 'unhealthy') return '不健康';
+  return '未知';
+}
+
+function healthTooltipDesc(status?: string): string {
+  const s = (status || 'unknown').toLowerCase();
+  const base = `当前健康状态：${healthLabel(status)}。`;
+  if (s === 'healthy' || s === 'degraded') {
+    return `${base}可作为路由候选。`;
+  }
+  if (s === 'unhealthy') {
+    return `${base}请检查上游 Key 或网络。`;
+  }
+  return `${base}尚未探测或仍为初始值。`;
+}
+
+function verificationDotClass(result?: string): string {
+  const r = (result || '').toLowerCase();
+  if (r === 'verified' || r === 'success') return styles.statusDotVerified;
+  if (r === 'failed') return styles.statusDotVerifyFailed;
+  if (r === 'in_progress') return styles.statusDotInProgress;
+  return styles.statusDotVerifyPending;
+}
+
+function verificationLabel(result?: string): string {
+  const r = (result || '').toLowerCase();
+  if (r === 'verified' || r === 'success') return '已验证';
+  if (r === 'failed') return '验证失败';
+  if (r === 'in_progress') return '验证中';
+  return '未验证';
+}
+
+function verificationTooltipDesc(result?: string): string {
+  const r = (result || '').toLowerCase();
+  const base = `验证结果：${verificationLabel(result)}。`;
+  if (r === 'verified' || r === 'success') {
+    return `${base}已通过上游验证。`;
+  }
+  if (r === 'failed') {
+    return `${base}请修正 Key 或配置后重新验证。`;
+  }
+  if (r === 'in_progress') {
+    return `${base}正在验证中，请稍后刷新。`;
+  }
+  return `${base}请完成验证。`;
+}
+
+interface OperationResult {
+  type: 'probe' | 'verify' | 'config';
+  status: 'success' | 'failed' | 'loading';
+  message: string;
+  details?: string;
+  timestamp: Date;
+}
 
 const AdminByokRouting = () => {
   const [data, setData] = useState<BYOKRoutingItem[]>([]);
@@ -105,6 +162,9 @@ const AdminByokRouting = () => {
   const [configLoading, setConfigLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<BYOKRoutingItem | null>(null);
   const [configForm] = Form.useForm();
+
+  const [resultModalVisible, setResultModalVisible] = useState(false);
+  const [operationResults, setOperationResults] = useState<Map<number, OperationResult>>(new Map());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -144,6 +204,22 @@ const AdminByokRouting = () => {
     return Array.from(providers).sort();
   }, [data]);
 
+  const setOperationResult = (id: number, result: OperationResult) => {
+    setOperationResults((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(id, result);
+      return newMap;
+    });
+  };
+
+  const clearOperationResult = (id: number) => {
+    setOperationResults((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(id);
+      return newMap;
+    });
+  };
+
   const handleOpenConfig = (record: BYOKRoutingItem) => {
     setSelectedItem(record);
     configForm.setFieldsValue({
@@ -158,6 +234,12 @@ const AdminByokRouting = () => {
     if (!selectedItem) return;
     const values = await configForm.validateFields();
     setConfigLoading(true);
+    setOperationResult(selectedItem.id, {
+      type: 'config',
+      status: 'loading',
+      message: '正在保存配置...',
+      timestamp: new Date(),
+    });
     try {
       const payload: UpdateRouteConfigRequest = {
         route_mode: values.route_mode,
@@ -165,31 +247,89 @@ const AdminByokRouting = () => {
         fallback_endpoint_url: values.fallback_endpoint_url?.trim() || '',
       };
       await adminByokRoutingService.updateRouteConfig(selectedItem.id, payload);
-      message.success('路由配置更新成功');
+      setOperationResult(selectedItem.id, {
+        type: 'config',
+        status: 'success',
+        message: '路由配置更新成功',
+        timestamp: new Date(),
+      });
       setConfigModalVisible(false);
       fetchData();
-    } catch {
-      message.error('更新路由配置失败');
+      setTimeout(() => clearOperationResult(selectedItem.id), 5000);
+    } catch (err) {
+      setOperationResult(selectedItem.id, {
+        type: 'config',
+        status: 'failed',
+        message: '更新路由配置失败',
+        details: String(err),
+        timestamp: new Date(),
+      });
     } finally {
       setConfigLoading(false);
     }
   };
 
-  const handleTriggerProbe = async (id: number) => {
+  const handleTriggerProbe = async (record: BYOKRoutingItem) => {
+    setOperationResult(record.id, {
+      type: 'probe',
+      status: 'loading',
+      message: '正在触发探测...',
+      timestamp: new Date(),
+    });
     try {
-      await adminByokRoutingService.triggerProbe(id);
-      message.success('探测已触发');
-    } catch {
-      message.error('触发探测失败');
+      await adminByokRoutingService.triggerProbe(record.id);
+      setOperationResult(record.id, {
+        type: 'probe',
+        status: 'success',
+        message: '探测已触发',
+        details: '请稍后刷新查看健康状态更新',
+        timestamp: new Date(),
+      });
+      setSelectedItem(record);
+      setResultModalVisible(true);
+      setTimeout(() => fetchData(), 3000);
+    } catch (err) {
+      setOperationResult(record.id, {
+        type: 'probe',
+        status: 'failed',
+        message: '触发探测失败',
+        details: String(err),
+        timestamp: new Date(),
+      });
+      setSelectedItem(record);
+      setResultModalVisible(true);
     }
   };
 
-  const handleLightVerify = async (id: number) => {
+  const handleLightVerify = async (record: BYOKRoutingItem) => {
+    setOperationResult(record.id, {
+      type: 'verify',
+      status: 'loading',
+      message: '正在触发轻量验证...',
+      timestamp: new Date(),
+    });
     try {
-      await adminByokRoutingService.triggerLightVerify(id);
-      message.success('轻量验证已触发');
-    } catch {
-      message.error('触发轻量验证失败');
+      await adminByokRoutingService.triggerLightVerify(record.id);
+      setOperationResult(record.id, {
+        type: 'verify',
+        status: 'success',
+        message: '轻量验证已触发',
+        details: '请稍后刷新查看验证状态更新',
+        timestamp: new Date(),
+      });
+      setSelectedItem(record);
+      setResultModalVisible(true);
+      setTimeout(() => fetchData(), 3000);
+    } catch (err) {
+      setOperationResult(record.id, {
+        type: 'verify',
+        status: 'failed',
+        message: '触发轻量验证失败',
+        details: String(err),
+        timestamp: new Date(),
+      });
+      setSelectedItem(record);
+      setResultModalVisible(true);
     }
   };
 
@@ -202,152 +342,222 @@ const AdminByokRouting = () => {
     setKeywordFilter('');
   };
 
+  const renderOperationButton = (record: BYOKRoutingItem, type: 'probe' | 'verify') => {
+    const result = operationResults.get(record.id);
+    const isLoading = result?.status === 'loading' && result?.type === type;
+    const isSuccess = result?.status === 'success' && result?.type === type;
+    const isFailed = result?.status === 'failed' && result?.type === type;
+
+    let btnClass = '';
+    if (isSuccess) btnClass = styles.actionBtnSuccess;
+    if (isFailed) btnClass = styles.actionBtnError;
+
+    if (type === 'probe') {
+      return (
+        <Tooltip title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : ''}>
+          <Button
+            size="small"
+            icon={isLoading ? <SyncOutlined spin /> : <ThunderboltOutlined />}
+            onClick={() => handleTriggerProbe(record)}
+            className={btnClass}
+            loading={isLoading}
+          >
+            探测
+          </Button>
+        </Tooltip>
+      );
+    }
+
+    return (
+      <Tooltip title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : ''}>
+        <Button
+          size="small"
+          icon={isLoading ? <SyncOutlined spin /> : <SafetyCertificateOutlined />}
+          onClick={() => handleLightVerify(record)}
+          className={btnClass}
+          loading={isLoading}
+        >
+          轻验
+        </Button>
+      </Tooltip>
+    );
+  };
+
   const columns: ColumnsType<BYOKRoutingItem> = [
     {
       title: '商户',
       dataIndex: 'company_name',
       key: 'company_name',
-      width: 150,
+      width: 120,
       ellipsis: true,
+      responsive: ['md'],
     },
     {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      width: 120,
+      width: 100,
       ellipsis: true,
     },
     {
       title: '提供商',
       dataIndex: 'provider',
       key: 'provider',
-      width: 80,
+      width: 70,
       render: (provider: string) => <Tag color="blue">{provider.toUpperCase()}</Tag>,
+      responsive: ['lg'],
     },
     {
-      title: 'BYOK类型',
+      title: 'BYOK',
       dataIndex: 'byok_type',
       key: 'byok_type',
-      width: 90,
+      width: 80,
       render: (byokType: string) => byokTypeTag(byokType),
+      responsive: ['md'],
     },
     {
       title: '区域',
       dataIndex: 'region',
       key: 'region',
-      width: 70,
+      width: 60,
       render: (region: string) => regionTag(region),
+      responsive: ['lg'],
     },
     {
-      title: '路由模式',
+      title: '路由',
       dataIndex: 'route_mode',
       key: 'route_mode',
-      width: 90,
+      width: 70,
       render: (routeMode: string) => routeModeTag(routeMode),
+      responsive: ['md'],
     },
     {
-      title: '端点URL',
-      dataIndex: 'endpoint_url',
-      key: 'endpoint_url',
-      width: 180,
-      ellipsis: true,
-      render: (url: string) =>
-        url ? (
-          <Tooltip title={url}>
-            <span style={{ fontSize: 12 }}>{url}</span>
-          </Tooltip>
-        ) : (
-          <span style={{ color: '#999' }}>—</span>
-        ),
-    },
-    {
-      title: '健康状态',
+      title: '健康',
       dataIndex: 'health_status',
       key: 'health_status',
-      width: 90,
-      render: (status: string) => healthStatusTag(status),
+      width: 80,
+      render: (status: string) => (
+        <Tooltip title={healthTooltipDesc(status)}>
+          <span className={styles.statusLightRow}>
+            <span className={healthDotClass(status)} />
+            <span className={styles.statusLightLabel}>{healthLabel(status)}</span>
+          </span>
+        </Tooltip>
+      ),
     },
     {
-      title: '验证状态',
+      title: '验证',
       dataIndex: 'verification_result',
       key: 'verification_result',
-      width: 90,
-      render: (result: string) => {
-        const colorMap: Record<string, string> = {
-          success: 'success',
-          failed: 'error',
-          in_progress: 'processing',
-          pending: 'default',
-        };
-        const labelMap: Record<string, string> = {
-          success: '已验证',
-          failed: '失败',
-          in_progress: '验证中',
-          pending: '未验证',
-        };
-        return <Tag color={colorMap[result] || 'default'}>{labelMap[result] || result}</Tag>;
-      },
+      width: 80,
+      render: (result: string) => (
+        <Tooltip title={verificationTooltipDesc(result)}>
+          <span className={styles.statusLightRow}>
+            <span className={verificationDotClass(result)} />
+            <span className={styles.statusLightLabel}>{verificationLabel(result)}</span>
+          </span>
+        </Tooltip>
+      ),
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 70,
+      width: 60,
       render: (status: string) => (
         <Tag color={status === 'active' ? 'green' : 'red'}>
           {status === 'active' ? '启用' : '禁用'}
         </Tag>
       ),
+      responsive: ['lg'],
     },
     {
       title: '操作',
       key: 'actions',
-      width: 200,
+      width: 180,
       fixed: 'right',
       render: (_, record) => (
-        <Space size="small">
+        <Space size="small" wrap>
           <Button size="small" icon={<SettingOutlined />} onClick={() => handleOpenConfig(record)}>
             配置
           </Button>
-          <Popconfirm title="确定触发探测？" onConfirm={() => handleTriggerProbe(record.id)}>
-            <Button size="small" icon={<ThunderboltOutlined />}>
-              探测
-            </Button>
-          </Popconfirm>
-          <Popconfirm title="确定触发轻量验证？" onConfirm={() => handleLightVerify(record.id)}>
-            <Button size="small" icon={<SafetyCertificateOutlined />}>
-              轻验
-            </Button>
-          </Popconfirm>
+          {renderOperationButton(record, 'probe')}
+          {renderOperationButton(record, 'verify')}
         </Space>
       ),
     },
   ];
 
-  return (
-    <div style={{ padding: 24 }}>
-      <Card>
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-            <Title level={4} style={{ margin: 0 }}>
-              BYOK 路由管理
-            </Title>
-            <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
-              刷新
-            </Button>
-          </div>
+  const renderMobileItem = (record: BYOKRoutingItem) => (
+    <div className={styles.mobileItem} key={record.id}>
+      <div className={styles.mobileRow}>
+        <span className={styles.mobileLabel}>商户</span>
+        <span className={styles.mobileValue}>{record.company_name}</span>
+      </div>
+      <div className={styles.mobileRow}>
+        <span className={styles.mobileLabel}>名称</span>
+        <span className={styles.mobileValue}>{record.name}</span>
+      </div>
+      <div className={styles.mobileRow}>
+        <span className={styles.mobileLabel}>提供商</span>
+        <Tag color="blue">{record.provider.toUpperCase()}</Tag>
+      </div>
+      <div className={styles.mobileRow}>
+        <span className={styles.mobileLabel}>BYOK</span>
+        {byokTypeTag(record.byok_type)}
+      </div>
+      <div className={styles.mobileRow}>
+        <span className={styles.mobileLabel}>健康</span>
+        <Tooltip title={healthTooltipDesc(record.health_status)}>
+          <span className={styles.statusLightRow}>
+            <span className={healthDotClass(record.health_status)} />
+            <span className={styles.statusLightLabel}>{healthLabel(record.health_status)}</span>
+          </span>
+        </Tooltip>
+      </div>
+      <div className={styles.mobileRow}>
+        <span className={styles.mobileLabel}>验证</span>
+        <Tooltip title={verificationTooltipDesc(record.verification_result)}>
+          <span className={styles.statusLightRow}>
+            <span className={verificationDotClass(record.verification_result)} />
+            <span className={styles.statusLightLabel}>{verificationLabel(record.verification_result)}</span>
+          </span>
+        </Tooltip>
+      </div>
+      <div className={styles.mobileActions}>
+        <Button size="small" icon={<SettingOutlined />} onClick={() => handleOpenConfig(record)}>
+          配置
+        </Button>
+        {renderOperationButton(record, 'probe')}
+        {renderOperationButton(record, 'verify')}
+      </div>
+    </div>
+  );
 
+  return (
+    <div className={styles.byokRouting} style={{ padding: 24 }}>
+      <Card>
+        <div className={styles.header}>
+          <Title level={4} className={styles.pageTitle}>
+            BYOK 路由管理
+          </Title>
+          <Button icon={<ReloadOutlined />} onClick={fetchData} loading={loading}>
+            刷新
+          </Button>
+        </div>
+
+        <div className={styles.filterRow}>
           <Space wrap size={12}>
             <Input
               allowClear
-              style={{ width: 180 }}
+              style={{ width: 160 }}
               placeholder="搜索商户/名称/提供商"
               prefix={<SearchOutlined />}
               value={keywordFilter}
               onChange={(e) => setKeywordFilter(e.target.value)}
             />
             <Select
-              style={{ width: 130 }}
+              style={{ width: 110 }}
               value={byokTypeFilter}
               onChange={setByokTypeFilter}
               allowClear
@@ -359,7 +569,7 @@ const AdminByokRouting = () => {
               ]}
             />
             <Select
-              style={{ width: 120 }}
+              style={{ width: 100 }}
               value={providerFilter}
               onChange={setProviderFilter}
               allowClear
@@ -367,7 +577,7 @@ const AdminByokRouting = () => {
               options={providerOptions.map((p) => ({ value: p.toLowerCase(), label: p.toUpperCase() }))}
             />
             <Select
-              style={{ width: 100 }}
+              style={{ width: 90 }}
               value={regionFilter}
               onChange={setRegionFilter}
               allowClear
@@ -378,20 +588,7 @@ const AdminByokRouting = () => {
               ]}
             />
             <Select
-              style={{ width: 110 }}
-              value={routeModeFilter}
-              onChange={setRouteModeFilter}
-              allowClear
-              placeholder="路由模式"
-              options={[
-                { value: 'auto', label: '自动' },
-                { value: 'direct', label: '直连' },
-                { value: 'litellm', label: 'LiteLLM' },
-                { value: 'proxy', label: '代理' },
-              ]}
-            />
-            <Select
-              style={{ width: 110 }}
+              style={{ width: 100 }}
               value={healthFilter}
               onChange={setHealthFilter}
               allowClear
@@ -403,15 +600,18 @@ const AdminByokRouting = () => {
                 { value: 'unknown', label: '未知' },
               ]}
             />
-            <Button onClick={resetFilters}>重置筛选</Button>
+            <Button onClick={resetFilters}>重置</Button>
           </Space>
+        </div>
 
+        <div className={styles.desktopTable}>
           <Table
             columns={columns}
             dataSource={data}
             rowKey="id"
             loading={loading}
-            scroll={{ x: 1400 }}
+            scroll={{ x: 1000 }}
+            size="small"
             pagination={{
               total,
               pageSize: 20,
@@ -419,7 +619,15 @@ const AdminByokRouting = () => {
               showTotal: (t) => `共 ${t} 条`,
             }}
           />
-        </Space>
+        </div>
+
+        <div className={styles.mobileCard}>
+          {loading ? (
+            <Spin />
+          ) : (
+            data.map((item) => renderMobileItem(item))
+          )}
+        </div>
       </Card>
 
       <Modal
@@ -448,6 +656,51 @@ const AdminByokRouting = () => {
             </Form.Item>
           </Form>
         </Spin>
+      </Modal>
+
+      <Modal
+        title="操作结果"
+        open={resultModalVisible}
+        onCancel={() => setResultModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setResultModalVisible(false)}>
+            关闭
+          </Button>,
+          <Button key="refresh" type="primary" onClick={() => { setResultModalVisible(false); fetchData(); }}>
+            刷新数据
+          </Button>,
+        ]}
+        width={500}
+      >
+        {selectedItem && operationResults.get(selectedItem.id) && (
+          <div className={styles.resultCard}>
+            <Result
+              icon={operationResults.get(selectedItem.id)?.status === 'success' 
+                ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> 
+                : <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              title={operationResults.get(selectedItem.id)?.message}
+              subTitle={operationResults.get(selectedItem.id)?.details}
+            />
+            <Divider />
+            <Descriptions column={1} size="small">
+              <Descriptions.Item label="商户">{selectedItem.company_name}</Descriptions.Item>
+              <Descriptions.Item label="API Key">{selectedItem.name}</Descriptions.Item>
+              <Descriptions.Item label="提供商">{selectedItem.provider.toUpperCase()}</Descriptions.Item>
+              <Descriptions.Item label="当前健康状态">
+                <span className={styles.statusLightRow}>
+                  <span className={healthDotClass(selectedItem.health_status)} />
+                  <span className={styles.statusLightLabel}>{healthLabel(selectedItem.health_status)}</span>
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="当前验证状态">
+                <span className={styles.statusLightRow}>
+                  <span className={verificationDotClass(selectedItem.verification_result)} />
+                  <span className={styles.statusLightLabel}>{verificationLabel(selectedItem.verification_result)}</span>
+                </span>
+              </Descriptions.Item>
+            </Descriptions>
+          </div>
+        )}
       </Modal>
     </div>
   );
