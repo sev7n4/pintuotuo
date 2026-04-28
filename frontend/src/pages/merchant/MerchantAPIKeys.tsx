@@ -202,6 +202,7 @@ const MerchantAPIKeys = () => {
   const [merchantSKUs, setMerchantSKUs] = useState<MerchantSKUDetail[]>([]);
   const [keyword, setKeyword] = useState('');
   const [providerFilter, setProviderFilter] = useState<string>('all');
+  const [byokTypeFilter, setByokTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [healthFilter, setHealthFilter] = useState<string>('all');
   const [verifyFilter, setVerifyFilter] = useState<string>('all');
@@ -274,7 +275,7 @@ const MerchantAPIKeys = () => {
   const handleAdd = () => {
     setEditingKey(null);
     form.resetFields();
-    form.setFieldsValue({ unlimited_quota: true, health_check_level: 'medium' });
+    form.setFieldsValue({ unlimited_quota: true, health_check_level: 'medium', byok_type: 'official' });
     setModalVisible(true);
   };
 
@@ -305,6 +306,7 @@ const MerchantAPIKeys = () => {
       profit_margin: record.profit_margin ?? fallbackMargin,
       region: record.region || 'domestic',
       security_level: record.security_level || 'standard',
+      byok_type: record.byok_type || 'official',
     });
     setModalVisible(true);
   };
@@ -333,6 +335,7 @@ const MerchantAPIKeys = () => {
           quota_limit: unlimited ? null : (values.quota_limit as number),
           region: values.region as 'domestic' | 'overseas' | undefined,
           security_level: values.security_level as 'standard' | 'high' | undefined,
+          byok_type: values.byok_type as 'official' | 'reseller' | 'self_hosted' | undefined,
         };
         const success = await updateAPIKey(editingKey.id, patch);
         if (!success) {
@@ -356,6 +359,7 @@ const MerchantAPIKeys = () => {
         endpoint_url: (values.endpoint_url as string | undefined)?.trim() || undefined,
         region: (values.region as 'domestic' | 'overseas') || 'domestic',
         security_level: (values.security_level as 'standard' | 'high') || 'standard',
+        byok_type: (values.byok_type as 'official' | 'reseller' | 'self_hosted') || 'official',
       };
       const success = await createAPIKey(payload);
       if (!success) {
@@ -485,6 +489,25 @@ const MerchantAPIKeys = () => {
       dataIndex: 'provider',
       key: 'provider',
       render: (provider: string) => <Tag color="blue">{provider.toUpperCase()}</Tag>,
+    },
+    {
+      title: 'BYOK类型',
+      dataIndex: 'byok_type',
+      key: 'byok_type',
+      render: (byokType?: string) => {
+        const type = byokType || 'official';
+        const colorMap: Record<string, string> = {
+          official: 'blue',
+          reseller: 'orange',
+          self_hosted: 'purple',
+        };
+        const labelMap: Record<string, string> = {
+          official: '官方',
+          reseller: '代理商',
+          self_hosted: '自建商',
+        };
+        return <Tag color={colorMap[type] || 'default'}>{labelMap[type] || type}</Tag>;
+      },
     },
     {
       title: '区域',
@@ -721,6 +744,9 @@ const MerchantAPIKeys = () => {
       if (providerFilter !== 'all' && (k.provider || '').toLowerCase() !== providerFilter) {
         return false;
       }
+      if (byokTypeFilter !== 'all' && (k.byok_type || 'official') !== byokTypeFilter) {
+        return false;
+      }
       if (statusFilter !== 'all' && (k.status || '') !== statusFilter) {
         return false;
       }
@@ -763,6 +789,7 @@ const MerchantAPIKeys = () => {
     });
   }, [
     apiKeys,
+    byokTypeFilter,
     healthFilter,
     keyword,
     providerFilter,
@@ -776,6 +803,7 @@ const MerchantAPIKeys = () => {
   const resetFilters = () => {
     setKeyword('');
     setProviderFilter('all');
+    setByokTypeFilter('all');
     setStatusFilter('all');
     setHealthFilter('all');
     setVerifyFilter('all');
@@ -858,6 +886,17 @@ const MerchantAPIKeys = () => {
             options={[
               { value: 'all', label: '供应商：全部' },
               ...providerOptions.map((p) => ({ value: p, label: `供应商：${p.toUpperCase()}` })),
+            ]}
+          />
+          <Select
+            style={{ width: 130 }}
+            value={byokTypeFilter}
+            onChange={setByokTypeFilter}
+            options={[
+              { value: 'all', label: 'BYOK类型：全部' },
+              { value: 'official', label: 'BYOK类型：官方' },
+              { value: 'reseller', label: 'BYOK类型：代理商' },
+              { value: 'self_hosted', label: 'BYOK类型：自建商' },
             ]}
           />
           <Select
@@ -1010,6 +1049,14 @@ const MerchantAPIKeys = () => {
           </Form.Item>
 
           <Divider>智能路由配置</Divider>
+
+          <Form.Item name="byok_type" label="BYOK类型">
+            <Select placeholder="选择 API Key 来源类型">
+              <Select.Option value="official">官方（官方渠道获取）</Select.Option>
+              <Select.Option value="reseller">代理商（代理商渠道获取）</Select.Option>
+              <Select.Option value="self_hosted">自建商（自建服务）</Select.Option>
+            </Select>
+          </Form.Item>
 
           <Form.Item name="region" label="区域">
             <Select placeholder="选择 API Key 区域（用于智能路由）">

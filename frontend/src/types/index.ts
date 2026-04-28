@@ -484,6 +484,7 @@ export interface MerchantAPIKey {
   region?: 'domestic' | 'overseas';
   security_level?: 'standard' | 'high';
   route_preference?: Record<string, unknown>;
+  byok_type?: 'official' | 'reseller' | 'self_hosted';
 }
 
 export interface HealthStatus {
