@@ -13,6 +13,8 @@ const (
 	GatewayModeDirect  = "direct"
 	GatewayModeLitellm = "litellm"
 	GatewayModeProxy   = "proxy"
+	regionDomestic     = "domestic"
+	regionOverseas     = "overseas"
 )
 
 type ExecutionLayer struct {
@@ -239,7 +241,7 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 		if endpoints, ok := cfg.BYOKRouteConfig["endpoints"].(map[string]interface{}); ok {
 			region := cfg.ProviderRegion
 			if region == "" {
-				region = "overseas"
+				region = regionOverseas
 			}
 			if url, ok := endpoints[region].(string); ok && url != "" {
 				return url
@@ -300,7 +302,7 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 			if directEndpoints, ok := cfg.Endpoints[GatewayModeDirect].(map[string]interface{}); ok {
 				region := cfg.ProviderRegion
 				if region == "" {
-					region = "overseas"
+					region = regionOverseas
 				}
 				if url, ok := directEndpoints[region].(string); ok && url != "" {
 					return url
