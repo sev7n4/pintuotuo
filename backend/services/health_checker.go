@@ -474,11 +474,11 @@ func (s *HealthChecker) resolveEndpoint(ctx context.Context, apiKey *models.Merc
 
 func (s *HealthChecker) resolveEndpointWithRouteMode(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
 	switch apiKey.RouteMode {
-	case "direct":
+	case GatewayModeDirect:
 		return s.resolveDirectEndpoint(ctx, apiKey)
-	case "litellm":
+	case GatewayModeLitellm:
 		return s.resolveLitellmEndpoint(ctx, apiKey)
-	case "proxy":
+	case GatewayModeProxy:
 		return s.resolveProxyEndpoint(ctx, apiKey)
 	case "auto":
 		return s.resolveAutoEndpoint(ctx, apiKey)
@@ -493,10 +493,10 @@ func (s *HealthChecker) resolveDirectEndpoint(ctx context.Context, apiKey *model
 	}
 
 	if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
-		if directEndpoints, ok := endpoints["direct"].(map[string]interface{}); ok {
+		if directEndpoints, ok := endpoints[GatewayModeDirect].(map[string]interface{}); ok {
 			region := apiKey.Region
 			if region == "" {
-				region = "overseas"
+				region = regionOverseas
 			}
 			if url, ok := directEndpoints[region].(string); ok && url != "" {
 				return url, nil
@@ -518,10 +518,10 @@ func (s *HealthChecker) resolveDirectEndpoint(ctx context.Context, apiKey *model
 
 func (s *HealthChecker) resolveLitellmEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
 	if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
-		if litellmEndpoints, ok := endpoints["litellm"].(map[string]interface{}); ok {
+		if litellmEndpoints, ok := endpoints[GatewayModeLitellm].(map[string]interface{}); ok {
 			region := apiKey.Region
 			if region == "" {
-				region = "domestic"
+				region = regionDomestic
 			}
 			if url, ok := litellmEndpoints[region].(string); ok && url != "" {
 				return url, nil
@@ -543,7 +543,7 @@ func (s *HealthChecker) resolveLitellmEndpoint(ctx context.Context, apiKey *mode
 
 func (s *HealthChecker) resolveProxyEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
 	if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
-		if proxyEndpoints, ok := endpoints["proxy"].(map[string]interface{}); ok {
+		if proxyEndpoints, ok := endpoints[GatewayModeProxy].(map[string]interface{}); ok {
 			if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
 				return gaapURL, nil
 			}

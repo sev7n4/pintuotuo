@@ -685,8 +685,8 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 	metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(probe.Models)))
 
 	if isDeepVerification(verificationType) {
-		providerConfig, err := v.getProviderConfig(provider)
-		if err == nil {
+		providerConfig, providerErr := v.getProviderConfig(provider)
+		if providerErr == nil {
 			apiFmt := strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
 			probeSupported := apiFmt == modelProviderOpenAI
 			result.PricingVerified = probeSupported
@@ -745,11 +745,11 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 
 func (v *APIKeyValidator) resolveEndpointByRouteMode(ctx context.Context, provider, routeMode string, routeConfig map[string]interface{}, region string) (string, error) {
 	switch routeMode {
-	case "direct":
+	case GatewayModeDirect:
 		return v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
-	case "litellm":
+	case GatewayModeLitellm:
 		return v.resolveLitellmEndpoint(ctx, routeConfig, region)
-	case "proxy":
+	case GatewayModeProxy:
 		return v.resolveProxyEndpoint(ctx, routeConfig)
 	case "auto":
 		return v.resolveAutoEndpoint(ctx, provider, routeConfig, region)
@@ -764,9 +764,9 @@ func (v *APIKeyValidator) resolveDirectEndpoint(ctx context.Context, provider st
 	}
 
 	if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
-		if directEndpoints, ok := endpoints["direct"].(map[string]interface{}); ok {
+		if directEndpoints, ok := endpoints[GatewayModeDirect].(map[string]interface{}); ok {
 			if region == "" {
-				region = "overseas"
+				region = regionOverseas
 			}
 			if url, ok := directEndpoints[region].(string); ok && url != "" {
 				return url, nil
@@ -789,9 +789,9 @@ func (v *APIKeyValidator) resolveDirectEndpoint(ctx context.Context, provider st
 
 func (v *APIKeyValidator) resolveLitellmEndpoint(ctx context.Context, routeConfig map[string]interface{}, region string) (string, error) {
 	if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
-		if litellmEndpoints, ok := endpoints["litellm"].(map[string]interface{}); ok {
+		if litellmEndpoints, ok := endpoints[GatewayModeLitellm].(map[string]interface{}); ok {
 			if region == "" {
-				region = "domestic"
+				region = regionDomestic
 			}
 			if url, ok := litellmEndpoints[region].(string); ok && url != "" {
 				return url, nil
@@ -813,7 +813,7 @@ func (v *APIKeyValidator) resolveLitellmEndpoint(ctx context.Context, routeConfi
 
 func (v *APIKeyValidator) resolveProxyEndpoint(ctx context.Context, routeConfig map[string]interface{}) (string, error) {
 	if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
-		if proxyEndpoints, ok := endpoints["proxy"].(map[string]interface{}); ok {
+		if proxyEndpoints, ok := endpoints[GatewayModeProxy].(map[string]interface{}); ok {
 			if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
 				return gaapURL, nil
 			}
