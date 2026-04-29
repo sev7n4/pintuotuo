@@ -463,8 +463,8 @@ func TestExecutionLayer_DetermineGatewayMode_FromConfig(t *testing.T) {
 	layer := NewExecutionLayer(nil, nil)
 
 	cfg := &ExecutionProviderConfig{
-		Code:        "openai",
-		GatewayMode: "litellm",
+		Code:          "openai",
+		BYOKRouteMode: "litellm",
 		RouteStrategy: map[string]interface{}{
 			"domestic_users": map[string]interface{}{"mode": "litellm"},
 		},
@@ -517,7 +517,7 @@ func TestExecutionLayer_Execute_WithGatewayMode(t *testing.T) {
 			Name:           "OpenAI",
 			APIBaseURL:     "https://api.openai.com/v1",
 			APIFormat:      "openai",
-			GatewayMode:    GatewayModeLitellm,
+			BYOKRouteMode:  GatewayModeLitellm,
 			ProviderRegion: "domestic",
 			Endpoints: map[string]interface{}{
 				GatewayModeLitellm: map[string]interface{}{
@@ -600,11 +600,11 @@ func TestExecutionLayer_Execute_ProxyMode(t *testing.T) {
 
 	input := &ExecutionLayerInput{
 		ProviderConfig: &ExecutionProviderConfig{
-			Code:        "openai",
-			Name:        "OpenAI",
-			APIBaseURL:  "https://api.openai.com/v1",
-			APIFormat:   "openai",
-			GatewayMode: GatewayModeProxy,
+			Code:          "openai",
+			Name:          "OpenAI",
+			APIBaseURL:    "https://api.openai.com/v1",
+			APIFormat:     "openai",
+			BYOKRouteMode: GatewayModeProxy,
 			Endpoints: map[string]interface{}{
 				GatewayModeProxy: map[string]interface{}{
 					"gaap": server.URL,
