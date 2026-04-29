@@ -291,10 +291,6 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 				}
 			}
 		}
-		proxyURL := os.Getenv("LLM_GATEWAY_PROXY_URL")
-		if proxyURL != "" {
-			return proxyURL
-		}
 		return cfg.APIBaseURL
 
 	default:
@@ -323,13 +319,6 @@ func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, original
 		masterKey := os.Getenv("LITELLM_MASTER_KEY")
 		if masterKey != "" {
 			return masterKey
-		}
-		return originalAPIKey
-
-	case GatewayModeProxy:
-		proxyToken := os.Getenv("LLM_GATEWAY_PROXY_TOKEN")
-		if proxyToken != "" {
-			return proxyToken
 		}
 		return originalAPIKey
 
