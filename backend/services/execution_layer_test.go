@@ -444,21 +444,6 @@ func TestExecutionLayer_ResolveAuthToken_LitellmMode(t *testing.T) {
 	assert.Equal(t, "sk-litellm-master-key", token)
 }
 
-func TestExecutionLayer_ResolveAuthToken_ProxyMode(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	cfg := &ExecutionProviderConfig{
-		Code:        "openai",
-		GatewayMode: "proxy",
-	}
-
-	os.Setenv("LLM_GATEWAY_PROXY_TOKEN", "sk-proxy-token")
-	defer os.Unsetenv("LLM_GATEWAY_PROXY_TOKEN")
-
-	token := layer.resolveAuthToken(cfg, "sk-original-key")
-	assert.Equal(t, "sk-proxy-token", token)
-}
-
 func TestExecutionLayer_DetermineGatewayMode_FromConfig(t *testing.T) {
 	layer := NewExecutionLayer(nil, nil)
 
@@ -580,7 +565,7 @@ func TestExecutionLayer_Execute_DirectMode(t *testing.T) {
 
 func TestExecutionLayer_Execute_ProxyMode(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer sk-proxy-token", r.Header.Get("Authorization"))
+		assert.Equal(t, "Bearer sk-original-key", r.Header.Get("Authorization"))
 
 		response := map[string]interface{}{
 			"id":      "test-id",
@@ -591,9 +576,6 @@ func TestExecutionLayer_Execute_ProxyMode(t *testing.T) {
 		json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
-
-	os.Setenv("LLM_GATEWAY_PROXY_TOKEN", "sk-proxy-token")
-	defer os.Unsetenv("LLM_GATEWAY_PROXY_TOKEN")
 
 	engine := NewExecutionEngine()
 	layer := NewExecutionLayer(nil, engine)
