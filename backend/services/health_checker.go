@@ -480,7 +480,7 @@ func (s *HealthChecker) resolveEndpointWithRouteMode(ctx context.Context, apiKey
 		return s.resolveLitellmEndpoint(ctx, apiKey)
 	case GatewayModeProxy:
 		return s.resolveProxyEndpoint(ctx, apiKey)
-	case "auto":
+	case string(GoalAuto):
 		return s.resolveAutoEndpoint(ctx, apiKey)
 	default:
 		return s.resolveDirectEndpoint(ctx, apiKey)
@@ -563,18 +563,18 @@ func (s *HealthChecker) resolveProxyEndpoint(ctx context.Context, apiKey *models
 }
 
 func (s *HealthChecker) resolveAutoEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
-	priority := []string{"direct", "litellm", "proxy"}
+	priority := []string{GatewayModeDirect, GatewayModeLitellm, GatewayModeProxy}
 
 	for _, mode := range priority {
 		var endpoint string
 		var err error
 
 		switch mode {
-		case "direct":
+		case GatewayModeDirect:
 			endpoint, err = s.resolveDirectEndpoint(ctx, apiKey)
-		case "litellm":
+		case GatewayModeLitellm:
 			endpoint, err = s.resolveLitellmEndpoint(ctx, apiKey)
-		case "proxy":
+		case GatewayModeProxy:
 			endpoint, err = s.resolveProxyEndpoint(ctx, apiKey)
 		}
 

@@ -751,7 +751,7 @@ func (v *APIKeyValidator) resolveEndpointByRouteMode(ctx context.Context, provid
 		return v.resolveLitellmEndpoint(ctx, routeConfig, region)
 	case GatewayModeProxy:
 		return v.resolveProxyEndpoint(ctx, routeConfig)
-	case "auto":
+	case string(GoalAuto):
 		return v.resolveAutoEndpoint(ctx, provider, routeConfig, region)
 	default:
 		return v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
@@ -833,18 +833,18 @@ func (v *APIKeyValidator) resolveProxyEndpoint(ctx context.Context, routeConfig 
 }
 
 func (v *APIKeyValidator) resolveAutoEndpoint(ctx context.Context, provider string, routeConfig map[string]interface{}, region string) (string, error) {
-	priority := []string{"direct", "litellm", "proxy"}
+	priority := []string{GatewayModeDirect, GatewayModeLitellm, GatewayModeProxy}
 
 	for _, mode := range priority {
 		var endpoint string
 		var err error
 
 		switch mode {
-		case "direct":
+		case GatewayModeDirect:
 			endpoint, err = v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
-		case "litellm":
+		case GatewayModeLitellm:
 			endpoint, err = v.resolveLitellmEndpoint(ctx, routeConfig, region)
-		case "proxy":
+		case GatewayModeProxy:
 			endpoint, err = v.resolveProxyEndpoint(ctx, routeConfig)
 		}
 
