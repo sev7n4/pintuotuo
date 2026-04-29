@@ -47,9 +47,6 @@ func proxyHTTPClient(timeout time.Duration) *http.Client {
 const (
 	providerAnthropic = "anthropic"
 	apiFormatOpenAI   = "openai"
-	// llmGatewayLitellm 与 LLM_GATEWAY_ACTIVE=litellm 对齐（goconst）
-	llmGatewayLitellm = "litellm"
-	llmGatewayNone    = "none"
 )
 
 // 路由策略来源（trace / 落库 effective_policy_source，与 JSON 对外字段一致）
@@ -372,7 +369,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
-	providerCfg = applyGatewayOverride(providerCfg)
+	providerCfg = applyAPIKeyRouteConfig(providerCfg, &apiKey)
 	traceSpan.SetRoute(req.Provider, req.Model)
 
 	baseURL := strings.TrimRight(providerCfg.APIBaseURL, "/")
@@ -403,7 +400,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		}
 		streamClient := proxyHTTPClient(15 * time.Minute)
 		retryPolicyStream := buildRetryPolicy(strategySnapshot)
-		retryPolicyStream = applyLitellmGatewayRetryCap(retryPolicyStream)
+		retryPolicyStream = applyLitellmGatewayRetryCap(retryPolicyStream, resolveRouteMode(&apiKey))
 		streamAttempts := buildProxyCatalogAttempts(c.Request.Context(), db, req)
 		var retryCountStream int
 		for attemptIdx, att := range streamAttempts {
@@ -500,7 +497,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				return io.NopCloser(bytes.NewReader(jb)), nil
 			}
 			hreq.Header.Set("Content-Type", "application/json")
-			authToken := resolveGatewayAuthToken(pcfg, dk)
+			authToken := resolveAuthTokenFromRouteMode(resolveRouteMode(&pk), dk)
 			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 			hreq.Header.Set("Accept", "text/event-stream")
 			applyProxyUpstreamHeaders(c, hreq, requestID)
@@ -568,7 +565,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	client := proxyHTTPClient(60 * time.Second)
 	retryPolicy := buildRetryPolicy(strategySnapshot)
-	retryPolicy = applyLitellmGatewayRetryCap(retryPolicy)
+	retryPolicy = applyLitellmGatewayRetryCap(retryPolicy, resolveRouteMode(&apiKey))
 	attempts := buildProxyCatalogAttempts(c.Request.Context(), db, req)
 
 	var (
@@ -669,7 +666,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			hreq.Header.Set("x-api-key", dk)
 			hreq.Header.Set("anthropic-version", "2023-06-01")
 		default:
-			authToken := resolveGatewayAuthToken(pcfg, dk)
+			authToken := resolveAuthTokenFromRouteMode(resolveRouteMode(&pk), dk)
 			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 		}
 		applyProxyUpstreamHeaders(c, hreq, requestID)
@@ -862,13 +859,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	if currentRoutingDecision != nil {
 		pipeline := services.NewThreeLayerRoutingPipeline()
 
-		gatewayMode := "direct"
-		active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-		if active == llmGatewayLitellm {
-			gatewayMode = "litellm"
-		} else if active == "proxy" {
-			gatewayMode = "proxy"
-		}
+		gatewayMode := resolveRouteMode(&apiKey)
 
 		execInput := &services.ExecutionLayerInputData{
 			GatewayMode:   gatewayMode,
@@ -922,12 +913,11 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 // 见 deploy/litellm/README.md 与 LiteLLM reliability 文档。
 // applyLitellmGatewayRetryCap 在走 LiteLLM 网关时限制业务层 HTTP 重试次数，避免与网关 router num_retries 叠加放大。
 // 环境变量 API_PROXY_LITELLM_MAX_RETRIES 表示 MaxRetries 上限（默认 1，即最多 2 次出站尝试）。
-func applyLitellmGatewayRetryCap(policy *services.RetryPolicy) *services.RetryPolicy {
+func applyLitellmGatewayRetryCap(policy *services.RetryPolicy, routeMode string) *services.RetryPolicy {
 	if policy == nil {
 		return policy
 	}
-	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if active != llmGatewayLitellm {
+	if routeMode != routeModeLitellm {
 		return policy
 	}
 	cap := 1
@@ -948,7 +938,6 @@ func applyProxyUpstreamHeaders(c *gin.Context, httpReq *http.Request, requestID 
 	if strings.TrimSpace(requestID) != "" {
 		httpReq.Header.Set("X-Request-ID", requestID)
 	}
-	// W3C：启用 OTLP 时由 otelhttp 注入 traceparent；未启用时透传入口头以保持旧行为。
 	if tracing.Enabled() {
 		for _, h := range []string{"tracestate", "baggage"} {
 			if v := strings.TrimSpace(c.GetHeader(h)); v != "" {
@@ -964,27 +953,57 @@ func applyProxyUpstreamHeaders(c *gin.Context, httpReq *http.Request, requestID 
 	}
 }
 
-func applyGatewayOverride(cfg providerRuntimeConfig) providerRuntimeConfig {
-	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == "none" {
-		return cfg
+func resolveRouteMode(apiKey *models.MerchantAPIKey) string {
+	if apiKey == nil {
+		return routeModeDirect
 	}
-	switch active {
-	case llmGatewayLitellm:
-		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
-			cfg.APIBaseURL = strings.TrimRight(base, "/") + "/v1"
+	mode := strings.TrimSpace(strings.ToLower(apiKey.RouteMode))
+	switch mode {
+	case routeModeDirect, routeModeLitellm, routeModeProxy:
+		return mode
+	case routeModeAuto, "":
+		return routeModeDirect
+	default:
+		return routeModeDirect
+	}
+}
+
+func resolveEndpointURL(routeMode string, apiKey *models.MerchantAPIKey, providerBaseURL string) string {
+	switch routeMode {
+	case routeModeDirect:
+		if apiKey != nil && apiKey.EndpointURL != "" {
+			return strings.TrimRight(apiKey.EndpointURL, "/")
 		}
+		return strings.TrimRight(providerBaseURL, "/")
+	case routeModeLitellm:
+		if apiKey != nil && apiKey.EndpointURL != "" {
+			return strings.TrimRight(apiKey.EndpointURL, "/")
+		}
+		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
+			return strings.TrimRight(base, "/") + "/v1"
+		}
+		return ""
+	case routeModeProxy:
+		if apiKey != nil && apiKey.FallbackEndpointURL != "" {
+			return strings.TrimRight(apiKey.FallbackEndpointURL, "/")
+		}
+		return ""
+	default:
+		return strings.TrimRight(providerBaseURL, "/")
+	}
+}
+
+func applyAPIKeyRouteConfig(cfg providerRuntimeConfig, apiKey *models.MerchantAPIKey) providerRuntimeConfig {
+	routeMode := resolveRouteMode(apiKey)
+	endpointURL := resolveEndpointURL(routeMode, apiKey, cfg.APIBaseURL)
+	if endpointURL != "" {
+		cfg.APIBaseURL = endpointURL
 	}
 	return cfg
 }
 
-func resolveGatewayAuthToken(cfg providerRuntimeConfig, fallbackToken string) string {
-	active := strings.TrimSpace(strings.ToLower(os.Getenv("LLM_GATEWAY_ACTIVE")))
-	if cfg.APIFormat != apiFormatOpenAI || active == "" || active == "none" {
-		return fallbackToken
-	}
-	switch active {
-	case llmGatewayLitellm:
+func resolveAuthTokenFromRouteMode(routeMode string, fallbackToken string) string {
+	if routeMode == routeModeLitellm {
 		if token := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY")); token != "" {
 			return token
 		}
@@ -1090,16 +1109,38 @@ func pickDeterministicEntitledKey(ent *services.EntitlementRoutingContext) (apiK
 
 func scanMerchantAPIKeyQuotaRow(row *sql.Row, apiKey *models.MerchantAPIKey) error {
 	var qLim sql.NullFloat64
-	if err := row.Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted, &qLim, &apiKey.QuotaUsed, &apiKey.Status); err != nil {
+	var endpointURL, fallbackEndpointURL, routeMode sql.NullString
+	var routeConfigBytes []byte
+	if err := row.Scan(
+		&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.APISecretEncrypted,
+		&qLim, &apiKey.QuotaUsed, &apiKey.Status,
+		&endpointURL, &fallbackEndpointURL, &routeMode, &routeConfigBytes,
+	); err != nil {
 		return err
 	}
 	apiKey.QuotaLimit = utils.NullFloat64Ptr(qLim)
+	if endpointURL.Valid {
+		apiKey.EndpointURL = endpointURL.String
+	}
+	if fallbackEndpointURL.Valid {
+		apiKey.FallbackEndpointURL = fallbackEndpointURL.String
+	}
+	if routeMode.Valid {
+		apiKey.RouteMode = routeMode.String
+	}
+	if len(routeConfigBytes) > 0 {
+		_ = json.Unmarshal(routeConfigBytes, &apiKey.RouteConfig)
+	}
 	return nil
 }
 
 func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequest, apiKey *models.MerchantAPIKey, ent *services.EntitlementRoutingContext) error {
 	if req.APIKeyID != nil && *req.APIKeyID > 0 {
-		keyPick := `SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
+		keyPick := `SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status,
+			 COALESCE(mak.endpoint_url, '') as endpoint_url,
+			 COALESCE(mak.fallback_endpoint_url, '') as fallback_endpoint_url,
+			 COALESCE(mak.route_mode, 'auto') as route_mode,
+			 COALESCE(mak.route_config, '{}'::jsonb) as route_config
 			 FROM merchant_api_keys mak
 			 INNER JOIN merchants m ON m.id = mak.merchant_id
 			 WHERE mak.id = $1 AND mak.provider = $2 AND mak.status = 'active'
@@ -1138,7 +1179,11 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 			if ent != nil && ent.AllowsMerchantSKU(*req.MerchantSKUID) {
 				err := scanMerchantAPIKeyQuotaRow(
 					db.QueryRow(
-						`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
+						`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status,
+						 COALESCE(mak.endpoint_url, '') as endpoint_url,
+						 COALESCE(mak.fallback_endpoint_url, '') as fallback_endpoint_url,
+						 COALESCE(mak.route_mode, 'auto') as route_mode,
+						 COALESCE(mak.route_config, '{}'::jsonb) as route_config
 						 FROM merchant_skus ms
 						 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
 						 JOIN merchants m ON m.id = ms.merchant_id
@@ -1164,7 +1209,11 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 		}
 		err := scanMerchantAPIKeyQuotaRow(
 			db.QueryRow(
-				`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
+				`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status,
+				 COALESCE(mak.endpoint_url, '') as endpoint_url,
+				 COALESCE(mak.fallback_endpoint_url, '') as fallback_endpoint_url,
+				 COALESCE(mak.route_mode, 'auto') as route_mode,
+				 COALESCE(mak.route_config, '{}'::jsonb) as route_config
 				 FROM merchant_skus ms
 				 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
 				 JOIN merchants m ON m.id = ms.merchant_id
@@ -1189,7 +1238,11 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 	if merchantID > 0 {
 		return scanMerchantAPIKeyQuotaRow(
 			db.QueryRow(
-				`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status
+				`SELECT id, merchant_id, provider, api_key_encrypted, api_secret_encrypted, quota_limit, quota_used, status,
+				 COALESCE(endpoint_url, '') as endpoint_url,
+				 COALESCE(fallback_endpoint_url, '') as fallback_endpoint_url,
+				 COALESCE(route_mode, 'auto') as route_mode,
+				 COALESCE(route_config, '{}'::jsonb) as route_config
 				 FROM merchant_api_keys
 				 WHERE provider = $1 AND status = 'active'
 				   AND merchant_id = $2
@@ -1205,7 +1258,11 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 
 	return scanMerchantAPIKeyQuotaRow(
 		db.QueryRow(
-			`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status
+			`SELECT mak.id, mak.merchant_id, mak.provider, mak.api_key_encrypted, mak.api_secret_encrypted, mak.quota_limit, mak.quota_used, mak.status,
+			 COALESCE(mak.endpoint_url, '') as endpoint_url,
+			 COALESCE(mak.fallback_endpoint_url, '') as fallback_endpoint_url,
+			 COALESCE(mak.route_mode, 'auto') as route_mode,
+			 COALESCE(mak.route_config, '{}'::jsonb) as route_config
 			 FROM merchant_api_keys mak
 			 INNER JOIN merchants m ON m.id = mak.merchant_id
 			 WHERE mak.provider = $1 AND mak.status = 'active'
