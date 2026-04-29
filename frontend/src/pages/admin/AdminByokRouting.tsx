@@ -34,6 +34,12 @@ import {
   UpdateRouteConfigRequest,
   VerificationResult,
 } from '@/services/adminByokRouting';
+import {
+  getRouteModeLabel,
+  getRouteModeColor,
+  getErrorCategoryLabel,
+  getErrorCategoryColor,
+} from '@/utils/byokRouteMode';
 import styles from './AdminByokRouting.module.css';
 
 const { Title } = Typography;
@@ -821,6 +827,22 @@ const AdminByokRouting = () => {
               )}
             </Descriptions.Item>
 
+            {verificationResult.route_mode && (
+              <Descriptions.Item label="路由模式">
+                <Tag color={getRouteModeColor(verificationResult.route_mode)}>
+                  {getRouteModeLabel(verificationResult.route_mode)}
+                </Tag>
+              </Descriptions.Item>
+            )}
+
+            {verificationResult.endpoint_used && (
+              <Descriptions.Item label="使用端点">
+                <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                  {verificationResult.endpoint_used}
+                </span>
+              </Descriptions.Item>
+            )}
+
             {verificationResult.models_found && verificationResult.models_found.length > 0 && (
               <Descriptions.Item label="支持的模型">
                 <Space wrap>
@@ -838,6 +860,14 @@ const AdminByokRouting = () => {
                 <Tag color="warning">未验证</Tag>
               )}
             </Descriptions.Item>
+
+            {verificationResult.error_category && (
+              <Descriptions.Item label="错误分类">
+                <Tag color={getErrorCategoryColor(verificationResult.error_category)}>
+                  {getErrorCategoryLabel(verificationResult.error_category)}
+                </Tag>
+              </Descriptions.Item>
+            )}
 
             {verificationResult.error_code && (
               <Descriptions.Item label="错误码">
