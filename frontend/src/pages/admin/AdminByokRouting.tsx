@@ -426,46 +426,40 @@ const AdminByokRouting = () => {
 
     if (type === 'probe') {
       return (
-        <Tooltip title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : ''}>
+        <Tooltip title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : '立即探测'}>
           <Button
             size="small"
             icon={isLoading ? <SyncOutlined spin /> : <ThunderboltOutlined />}
             onClick={() => handleTriggerProbe(record)}
             className={btnClass}
             loading={isLoading}
-          >
-            探测
-          </Button>
+          />
         </Tooltip>
       );
     }
 
     if (type === 'deep-verify') {
       return (
-        <Tooltip title="深度验证（包含配额探测）">
+        <Tooltip title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : '深度验证（包含配额探测）'}>
           <Button
             size="small"
             icon={isLoading ? <SyncOutlined spin /> : <SafetyCertificateOutlined />}
             onClick={() => handleDeepVerify(record)}
             loading={isLoading}
-          >
-            深验
-          </Button>
+          />
         </Tooltip>
       );
     }
 
     return (
-      <Tooltip title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : ''}>
+      <Tooltip title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : '轻量验证'}>
         <Button
           size="small"
           icon={isLoading ? <SyncOutlined spin /> : <SafetyCertificateOutlined />}
           onClick={() => handleLightVerify(record)}
           className={btnClass}
           loading={isLoading}
-        >
-          轻验
-        </Button>
+        />
       </Tooltip>
     );
   };
@@ -522,13 +516,10 @@ const AdminByokRouting = () => {
       title: '健康',
       dataIndex: 'health_status',
       key: 'health_status',
-      width: 80,
+      width: 60,
       render: (status: string) => (
         <Tooltip title={healthTooltipDesc(status)}>
-          <span className={styles.statusLightRow}>
-            <span className={healthDotClass(status)} />
-            <span className={styles.statusLightLabel}>{healthLabel(status)}</span>
-          </span>
+          <span className={healthDotClass(status)} />
         </Tooltip>
       ),
     },
@@ -536,13 +527,10 @@ const AdminByokRouting = () => {
       title: '验证',
       dataIndex: 'verification_result',
       key: 'verification_result',
-      width: 80,
+      width: 60,
       render: (result: string) => (
         <Tooltip title={verificationTooltipDesc(result)}>
-          <span className={styles.statusLightRow}>
-            <span className={verificationDotClass(result)} />
-            <span className={styles.statusLightLabel}>{verificationLabel(result)}</span>
-          </span>
+          <span className={verificationDotClass(result)} />
         </Tooltip>
       ),
     },
@@ -565,9 +553,9 @@ const AdminByokRouting = () => {
       fixed: 'right',
       render: (_, record) => (
         <Space size="small" wrap>
-          <Button size="small" icon={<SettingOutlined />} onClick={() => handleOpenConfig(record)}>
-            配置
-          </Button>
+          <Tooltip title="路由配置">
+            <Button size="small" icon={<SettingOutlined />} onClick={() => handleOpenConfig(record)} />
+          </Tooltip>
           {renderOperationButton(record, 'probe')}
           {renderOperationButton(record, 'verify')}
           {renderOperationButton(record, 'deep-verify')}
@@ -595,29 +583,28 @@ const AdminByokRouting = () => {
         {byokTypeTag(record.byok_type)}
       </div>
       <div className={styles.mobileRow}>
+        <span className={styles.mobileLabel}>路由</span>
+        {routeModeTag(record.route_mode)}
+      </div>
+      <div className={styles.mobileRow}>
         <span className={styles.mobileLabel}>健康</span>
         <Tooltip title={healthTooltipDesc(record.health_status)}>
-          <span className={styles.statusLightRow}>
-            <span className={healthDotClass(record.health_status)} />
-            <span className={styles.statusLightLabel}>{healthLabel(record.health_status)}</span>
-          </span>
+          <span className={healthDotClass(record.health_status)} />
         </Tooltip>
       </div>
       <div className={styles.mobileRow}>
         <span className={styles.mobileLabel}>验证</span>
         <Tooltip title={verificationTooltipDesc(record.verification_result)}>
-          <span className={styles.statusLightRow}>
-            <span className={verificationDotClass(record.verification_result)} />
-            <span className={styles.statusLightLabel}>{verificationLabel(record.verification_result)}</span>
-          </span>
+          <span className={verificationDotClass(record.verification_result)} />
         </Tooltip>
       </div>
       <div className={styles.mobileActions}>
-        <Button size="small" icon={<SettingOutlined />} onClick={() => handleOpenConfig(record)}>
-          配置
-        </Button>
+        <Tooltip title="路由配置">
+          <Button size="small" icon={<SettingOutlined />} onClick={() => handleOpenConfig(record)} />
+        </Tooltip>
         {renderOperationButton(record, 'probe')}
         {renderOperationButton(record, 'verify')}
+        {renderOperationButton(record, 'deep-verify')}
       </div>
     </div>
   );
