@@ -37,7 +37,7 @@ else
 fi
 
 echo "=== 路径 B（BYOK）==="
-echo "当 LLM_GATEWAY_ACTIVE 为 litellm 但未配置平台 Key 时，后端对 OpenAI 格式请求会使用商户库内解密的 Key 作为 Bearer。"
+echo "当 merchant_api_keys.route_mode = 'litellm' 但未配置平台 Key 时，后端对 OpenAI 格式请求会使用商户库内解密的 Key 作为 Bearer。"
 echo "请在业务环境调用 POST /api/v1/proxy/chat 或 POST /api/v1/openai/v1/chat/completions，并携带已授权商户/平台 API Key 做联调。"
 
 echo "=== 完成 ==="

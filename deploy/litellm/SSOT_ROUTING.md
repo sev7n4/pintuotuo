@@ -11,7 +11,7 @@
 | **2b. 可选 JSON 覆盖** | [`provider_gateway_map.json`](./provider_gateway_map.json) | 与 DB **合并**：`litellm-catalog-sync -map <path>` 时 **同名 `code` 以文件为准**（应急、本地对照）；**不设 `-map` 时仅以 DB 为准** |
 | **3. LiteLLM 运行时** | [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml) `model_list` | 实际加载的模型表（含手搓 P0 与目录应对照项） |
 | **4. 密钥注入** | 宿主机 `.env` → `docker-compose.prod.yml` → `pintuotuo-litellm` | 与 **`litellm_gateway_api_key_env`** / JSON `api_key_env` 一致（`os.environ/XXX`） |
-| **5. 直连 / BYOK** | `merchant_api_keys`、SmartRouter | **未**走 `LLM_GATEWAY_ACTIVE=litellm` 时的另一条链路；**不**参与 `litellm-catalog-sync -verify` |
+| **5. 直连 / BYOK** | `merchant_api_keys`、SmartRouter | 当 `merchant_api_keys.route_mode = 'direct'` 或 `'proxy'` 时的链路；**不**参与 `litellm-catalog-sync -verify` |
 
 ## 维护流程（改厂商或模型时）
 

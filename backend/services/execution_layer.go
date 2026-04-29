@@ -347,14 +347,5 @@ func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) stri
 		return cfg.BYOKRouteMode
 	}
 
-	if cfg.GatewayMode != "" {
-		return cfg.GatewayMode
-	}
-
-	envMode := os.Getenv("LLM_GATEWAY_ACTIVE")
-	if envMode != "" && envMode != "none" {
-		return envMode
-	}
-
 	return GatewayModeDirect
 }

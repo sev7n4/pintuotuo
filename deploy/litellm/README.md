@@ -7,7 +7,7 @@
 ## 运行时环境
 
 - Docker：`docker-compose.prod.yml` 中 `litellm` 服务；配置挂载 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml)。
-- 后端：`LLM_GATEWAY_ACTIVE=litellm`、`LLM_GATEWAY_LITELLM_URL`（指向网关 `/v1` 根）、`LITELLM_MASTER_KEY`（与网关一致）。见 [`backend/handlers/api_proxy.go`](../../backend/handlers/api_proxy.go) 中 `applyGatewayOverride` / `resolveGatewayAuthToken`。
+- 后端：路由模式由数据库 **`merchant_api_keys.route_mode`** 字段控制（SSOT）。当 `route_mode = 'litellm'` 时，使用 `LLM_GATEWAY_LITELLM_URL`（指向网关 `/v1` 根）、`LITELLM_MASTER_KEY`（与网关一致）。见 [`backend/handlers/api_proxy.go`](../../backend/handlers/api_proxy.go) 中 `resolveRouteMode` / `applyAPIKeyRouteConfig` / `resolveAuthTokenFromRouteMode`。
 - **`API_PROXY_LITELLM_MAX_RETRIES`**（默认 `1`）：在启用 LiteLLM 网关时限制业务层 `api_proxy` 的 HTTP `MaxRetries`，避免与网关 `router_settings.num_retries` 叠加导致重试风暴。见 `applyLitellmGatewayRetryCap`。
 
 ## 目录与 model_list（SSOT）
@@ -34,7 +34,7 @@
 
 ## 网关与厂商侧排查（400 / `no healthy deployments` / Invalid model）
 
-业务侧 `api_proxy` 在 `LLM_GATEWAY_ACTIVE=litellm` 时把请求转到 **LiteLLM**，请求体里的 `model` 为「目录短名」（例如 `glm-5`、`step-1-8k`），须与 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml) 中 **`model_name`** 一致；上游真实路由由 `litellm_params.model` + 各厂商 `api_key` 决定。
+业务侧 `api_proxy` 在 `merchant_api_keys.route_mode = 'litellm'` 时把请求转到 **LiteLLM**，请求体里的 `model` 为「目录短名」（例如 `glm-5`、`step-1-8k`），须与 [`litellm_proxy_config.yaml`](./litellm_proxy_config.yaml) 中 **`model_name`** 一致；上游真实路由由 `litellm_params.model` + 各厂商 `api_key` 决定。
 
 | 现象 | 含义 | 运维动作 |
 |------|------|----------|
