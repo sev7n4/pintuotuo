@@ -507,6 +507,9 @@ export interface VerificationResult {
   pricing_info?: Record<string, unknown>;
   error_code?: string;
   error_message?: string;
+  route_mode?: string;
+  endpoint_used?: string;
+  error_category?: string;
   started_at: string;
   completed_at?: string;
   retry_count: number;
