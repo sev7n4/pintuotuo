@@ -688,10 +688,12 @@ func (s *HealthChecker) TriggerActiveCheck(ctx context.Context, apiKeyID int) er
 
 	var key models.MerchantAPIKey
 	err := db.QueryRowContext(ctx, `
-		SELECT id, merchant_id, provider, api_key_encrypted, COALESCE(endpoint_url, ''), health_check_level
+		SELECT id, merchant_id, provider, api_key_encrypted, COALESCE(endpoint_url, ''), health_check_level, 
+		       COALESCE(route_mode, ''), route_config, COALESCE(region, '')
 		FROM merchant_api_keys WHERE id = $1`,
 		apiKeyID,
-	).Scan(&key.ID, &key.MerchantID, &key.Provider, &key.APIKeyEncrypted, &key.EndpointURL, &key.HealthCheckLevel)
+	).Scan(&key.ID, &key.MerchantID, &key.Provider, &key.APIKeyEncrypted, &key.EndpointURL, &key.HealthCheckLevel,
+	      &key.RouteMode, &key.RouteConfig, &key.Region)
 
 	if err != nil {
 		return err

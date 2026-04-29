@@ -21,6 +21,9 @@ services:
       - DB_CONN_MAX_IDLE_TIME=10m
       # Execution Layer 灰度开关（Phase 3）
       - USE_EXECUTION_LAYER=${USE_EXECUTION_LAYER:-false}
+      # LiteLLM Gateway Configuration
+      - LLM_GATEWAY_LITELLM_URL=${LLM_GATEWAY_LITELLM_URL:-}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
       # OpenTelemetry → Grafana Tempo（OTLP gRPC）；未设置 endpoint 时后端为 noop；OTEL_SDK_DISABLED=true 关闭导出
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4317}
       - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-pintuotuo-backend}
