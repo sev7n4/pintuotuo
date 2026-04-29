@@ -414,11 +414,11 @@ func LightVerifyBYOK(c *gin.Context) {
 
 	var apiKey models.MerchantAPIKey
 	err = db.QueryRow(
-		`SELECT id, merchant_id, provider, api_key_encrypted
+		`SELECT id, merchant_id, provider, api_key_encrypted, route_mode, route_config, region
 		 FROM merchant_api_keys
 		 WHERE id = $1 AND status = 'active'`,
 		keyID,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted)
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.RouteMode, &apiKey.RouteConfig, &apiKey.Region)
 
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -434,7 +434,10 @@ func LightVerifyBYOK(c *gin.Context) {
 	}
 
 	validator := services.GetAPIKeyValidator()
-	err = validator.ValidateAsync(apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "admin_light")
+	err = validator.ValidateAsyncWithRouteMode(
+		apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "admin_light",
+		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region,
+	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"VERIFICATION_FAILED",
@@ -481,11 +484,11 @@ func DeepVerifyBYOK(c *gin.Context) {
 
 	var apiKey models.MerchantAPIKey
 	err = db.QueryRow(
-		`SELECT id, merchant_id, provider, api_key_encrypted
+		`SELECT id, merchant_id, provider, api_key_encrypted, route_mode, route_config, region
 		 FROM merchant_api_keys
 		 WHERE id = $1 AND status = 'active'`,
 		keyID,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted)
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.RouteMode, &apiKey.RouteConfig, &apiKey.Region)
 
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -501,7 +504,10 @@ func DeepVerifyBYOK(c *gin.Context) {
 	}
 
 	validator := services.GetAPIKeyValidator()
-	err = validator.ValidateAsync(apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "admin_deep")
+	err = validator.ValidateAsyncWithRouteMode(
+		apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "admin_deep",
+		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region,
+	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"VERIFICATION_FAILED",

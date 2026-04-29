@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -468,6 +469,41 @@ func (s *HealthChecker) SaveHealthCheckResult(ctx context.Context, apiKeyID int,
 }
 
 func (s *HealthChecker) resolveEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
+	return s.resolveEndpointWithRouteMode(ctx, apiKey)
+}
+
+func (s *HealthChecker) resolveEndpointWithRouteMode(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
+	switch apiKey.RouteMode {
+	case GatewayModeDirect:
+		return s.resolveDirectEndpoint(ctx, apiKey)
+	case GatewayModeLitellm:
+		return s.resolveLitellmEndpoint(ctx, apiKey)
+	case GatewayModeProxy:
+		return s.resolveProxyEndpoint(ctx, apiKey)
+	case string(GoalAuto):
+		return s.resolveAutoEndpoint(ctx, apiKey)
+	default:
+		return s.resolveDirectEndpoint(ctx, apiKey)
+	}
+}
+
+func (s *HealthChecker) resolveDirectEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
+	if endpoint, ok := apiKey.RouteConfig["endpoint_url"].(string); ok && endpoint != "" {
+		return endpoint, nil
+	}
+
+	if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
+		if directEndpoints, ok := endpoints[GatewayModeDirect].(map[string]interface{}); ok {
+			region := apiKey.Region
+			if region == "" {
+				region = regionOverseas
+			}
+			if url, ok := directEndpoints[region].(string); ok && url != "" {
+				return url, nil
+			}
+		}
+	}
+
 	if ep := strings.TrimSpace(apiKey.EndpointURL); ep != "" {
 		return ep, nil
 	}
@@ -478,6 +514,76 @@ func (s *HealthChecker) resolveEndpoint(ctx context.Context, apiKey *models.Merc
 		return ep, nil
 	}
 	return "", fmt.Errorf("provider endpoint not configured for code=%s and fallback=%s", strings.TrimSpace(apiKey.Provider), fallbackProviderCode)
+}
+
+func (s *HealthChecker) resolveLitellmEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
+	if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
+		if litellmEndpoints, ok := endpoints[GatewayModeLitellm].(map[string]interface{}); ok {
+			region := apiKey.Region
+			if region == "" {
+				region = regionDomestic
+			}
+			if url, ok := litellmEndpoints[region].(string); ok && url != "" {
+				return url, nil
+			}
+		}
+	}
+
+	if baseURL, ok := apiKey.RouteConfig["base_url"].(string); ok && baseURL != "" {
+		return baseURL, nil
+	}
+
+	litellmURL := os.Getenv("LLM_GATEWAY_LITELLM_URL")
+	if litellmURL != "" {
+		return litellmURL + "/v1", nil
+	}
+
+	return "", fmt.Errorf("LiteLLM endpoint not configured")
+}
+
+func (s *HealthChecker) resolveProxyEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
+	if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
+		if proxyEndpoints, ok := endpoints[GatewayModeProxy].(map[string]interface{}); ok {
+			if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
+				return gaapURL, nil
+			}
+			for _, v := range proxyEndpoints {
+				if url, ok := v.(string); ok && url != "" {
+					return url, nil
+				}
+			}
+		}
+	}
+
+	if proxyURL, ok := apiKey.RouteConfig["proxy_url"].(string); ok && proxyURL != "" {
+		return proxyURL, nil
+	}
+
+	return "", fmt.Errorf("Proxy endpoint not configured")
+}
+
+func (s *HealthChecker) resolveAutoEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
+	priority := []string{GatewayModeDirect, GatewayModeLitellm, GatewayModeProxy}
+
+	for _, mode := range priority {
+		var endpoint string
+		var err error
+
+		switch mode {
+		case GatewayModeDirect:
+			endpoint, err = s.resolveDirectEndpoint(ctx, apiKey)
+		case GatewayModeLitellm:
+			endpoint, err = s.resolveLitellmEndpoint(ctx, apiKey)
+		case GatewayModeProxy:
+			endpoint, err = s.resolveProxyEndpoint(ctx, apiKey)
+		}
+
+		if err == nil && endpoint != "" {
+			return endpoint, nil
+		}
+	}
+
+	return "", fmt.Errorf("no available endpoint for auto mode")
 }
 
 func (s *HealthChecker) getProviderBaseURL(ctx context.Context, provider string) (string, bool) {
