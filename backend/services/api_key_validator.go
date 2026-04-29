@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -579,4 +580,343 @@ func selectProbeModel(provider string, models []string) string {
 	default:
 		return ""
 	}
+}
+
+func (v *APIKeyValidator) ValidateAsyncWithRouteMode(
+	apiKeyID int,
+	provider, encryptedKey, verificationType, routeMode string,
+	routeConfig map[string]interface{},
+	region string,
+) error {
+	if apiKeyID <= 0 {
+		return fmt.Errorf("invalid API key ID")
+	}
+	if provider == "" {
+		return fmt.Errorf("provider cannot be empty")
+	}
+	if encryptedKey == "" {
+		return fmt.Errorf("encrypted key cannot be empty")
+	}
+
+	go v.performVerificationWithRouteMode(apiKeyID, provider, encryptedKey, verificationType, routeMode, routeConfig, region, 0)
+
+	return nil
+}
+
+func (v *APIKeyValidator) performVerificationWithRouteMode(
+	apiKeyID int,
+	provider, encryptedKey, verificationType, routeMode string,
+	routeConfig map[string]interface{},
+	region string,
+	retryCount int,
+) {
+	ctx := context.Background()
+	startTime := time.Now()
+
+	metrics.ActiveVerifications.WithLabelValues(provider).Inc()
+	defer metrics.ActiveVerifications.WithLabelValues(provider).Dec()
+
+	result := VerificationResult{
+		APIKeyID:         apiKeyID,
+		VerificationType: verificationType,
+		Status:           "in_progress",
+		StartedAt:        startTime,
+		RetryCount:       retryCount,
+	}
+
+	verificationID, err := v.createVerificationRecord(apiKeyID, verificationType)
+	if err != nil {
+		logger.LogError(ctx, "api_key_validator", "Failed to create verification record", err, map[string]interface{}{
+			"api_key_id": apiKeyID,
+		})
+		return
+	}
+	result.ID = verificationID
+
+	decryptedKey, err := utils.Decrypt(encryptedKey)
+	if err != nil {
+		v.handleVerificationError(ctx, verificationID, apiKeyID, "DECRYPTION_FAILED", "Failed to decrypt API key", startTime)
+		return
+	}
+
+	endpoint, err := v.resolveEndpointByRouteMode(ctx, provider, routeMode, routeConfig, region)
+	if err != nil {
+		v.handleVerificationError(ctx, verificationID, apiKeyID, "ENDPOINT_RESOLVE_FAILED", err.Error(), startTime)
+		return
+	}
+
+	authToken := v.resolveAuthToken(routeMode, decryptedKey)
+
+	baseURL := strings.TrimRight(endpoint, "/")
+	modelsURL := baseURL + "/models"
+
+	var probe *ProbeModelsResult
+	var probeErr error
+	for attempt := retryCount; ; attempt++ {
+		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, authToken)
+		if probeErr == nil && probe != nil && probe.Success {
+			result.RetryCount = attempt
+			break
+		}
+		if attempt >= v.maxRetries || !shouldRetryVerificationAttempt(probe, probeErr) {
+			msg := "connection test failed"
+			if probeErr != nil {
+				msg = probeErr.Error()
+			}
+			code := "CONNECTION_FAILED"
+			if probe != nil && strings.TrimSpace(probe.ErrorCode) != "" {
+				code = probe.ErrorCode
+			}
+			if probe != nil && strings.TrimSpace(probe.ErrorMsg) != "" {
+				msg = firstNonEmpty(msg, probe.ErrorMsg)
+			}
+			v.handleVerificationError(ctx, verificationID, apiKeyID, code, msg, startTime)
+			return
+		}
+		metrics.VerificationRetries.WithLabelValues(provider, fmt.Sprintf("%d", attempt+1)).Inc()
+		time.Sleep(v.retryDelay * time.Duration(1<<attempt))
+	}
+
+	result.ConnectionTest = true
+	result.ConnectionLatency = probe.LatencyMs
+	metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(probe.LatencyMs))
+	result.ModelsFound = probe.Models
+	result.ModelsCount = len(probe.Models)
+	metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(probe.Models)))
+
+	if isDeepVerification(verificationType) {
+		providerConfig, err := v.getProviderConfig(provider)
+		if err == nil {
+			apiFmt := strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
+			probeSupported := apiFmt == modelProviderOpenAI
+			result.PricingVerified = probeSupported
+			if probeSupported {
+				quotaOK, quotaCode, quotaMsg := v.probeQuotaWithEndpoint(endpoint, provider, authToken, result.ModelsFound)
+				if !quotaOK {
+					v.handleVerificationError(ctx, verificationID, apiKeyID, quotaCode, quotaMsg, startTime)
+					return
+				}
+			}
+		}
+	}
+
+	result.Status = verificationStatusSuccess
+	result.CompletedAt = time.Now()
+
+	duration := result.CompletedAt.Sub(startTime).Seconds()
+	metrics.VerificationDuration.WithLabelValues(provider, verificationType).Observe(duration)
+	metrics.VerificationTotal.WithLabelValues(provider, verificationType, verificationStatusSuccess).Inc()
+
+	err = v.updateVerificationRecord(verificationID, result)
+	if err != nil {
+		logger.LogError(ctx, "api_key_validator", "Failed to update verification record", err, map[string]interface{}{
+			"verification_id": verificationID,
+		})
+		return
+	}
+
+	err = v.updateAPIKeyVerificationStatus(apiKeyID, result)
+	if err != nil {
+		logger.LogError(ctx, "api_key_validator", "Failed to update API key verification status", err, map[string]interface{}{
+			"api_key_id": apiKeyID,
+		})
+		return
+	}
+
+	err = v.cacheVerificationResult(ctx, result)
+	if err != nil {
+		logger.LogError(ctx, "api_key_validator", "Failed to cache verification result", err, map[string]interface{}{
+			"api_key_id": apiKeyID,
+		})
+	}
+
+	logger.LogInfo(ctx, "api_key_validator", "API key verification with route mode completed", map[string]interface{}{
+		"api_key_id":         apiKeyID,
+		"verification_id":    verificationID,
+		"status":             result.Status,
+		"connection_test":    result.ConnectionTest,
+		"models_count":       result.ModelsCount,
+		"connection_latency": result.ConnectionLatency,
+		"retry_count":        result.RetryCount,
+		"route_mode":         routeMode,
+		"endpoint_used":      endpoint,
+	})
+}
+
+func (v *APIKeyValidator) resolveEndpointByRouteMode(ctx context.Context, provider, routeMode string, routeConfig map[string]interface{}, region string) (string, error) {
+	switch routeMode {
+	case "direct":
+		return v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
+	case "litellm":
+		return v.resolveLitellmEndpoint(ctx, routeConfig, region)
+	case "proxy":
+		return v.resolveProxyEndpoint(ctx, routeConfig)
+	case "auto":
+		return v.resolveAutoEndpoint(ctx, provider, routeConfig, region)
+	default:
+		return v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
+	}
+}
+
+func (v *APIKeyValidator) resolveDirectEndpoint(ctx context.Context, provider string, routeConfig map[string]interface{}, region string) (string, error) {
+	if endpoint, ok := routeConfig["endpoint_url"].(string); ok && endpoint != "" {
+		return endpoint, nil
+	}
+
+	if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
+		if directEndpoints, ok := endpoints["direct"].(map[string]interface{}); ok {
+			if region == "" {
+				region = "overseas"
+			}
+			if url, ok := directEndpoints[region].(string); ok && url != "" {
+				return url, nil
+			}
+		}
+	}
+
+	providerConfig, err := v.getProviderConfig(provider)
+	if err != nil {
+		return "", fmt.Errorf("provider configuration not found: %w", err)
+	}
+
+	baseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
+	if baseURL == "" {
+		return "", fmt.Errorf("provider api_base_url is empty")
+	}
+
+	return baseURL, nil
+}
+
+func (v *APIKeyValidator) resolveLitellmEndpoint(ctx context.Context, routeConfig map[string]interface{}, region string) (string, error) {
+	if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
+		if litellmEndpoints, ok := endpoints["litellm"].(map[string]interface{}); ok {
+			if region == "" {
+				region = "domestic"
+			}
+			if url, ok := litellmEndpoints[region].(string); ok && url != "" {
+				return url, nil
+			}
+		}
+	}
+
+	if baseURL, ok := routeConfig["base_url"].(string); ok && baseURL != "" {
+		return baseURL, nil
+	}
+
+	litellmURL := os.Getenv("LLM_GATEWAY_LITELLM_URL")
+	if litellmURL != "" {
+		return litellmURL + "/v1", nil
+	}
+
+	return "", fmt.Errorf("LiteLLM endpoint not configured")
+}
+
+func (v *APIKeyValidator) resolveProxyEndpoint(ctx context.Context, routeConfig map[string]interface{}) (string, error) {
+	if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
+		if proxyEndpoints, ok := endpoints["proxy"].(map[string]interface{}); ok {
+			if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
+				return gaapURL, nil
+			}
+			for _, v := range proxyEndpoints {
+				if url, ok := v.(string); ok && url != "" {
+					return url, nil
+				}
+			}
+		}
+	}
+
+	if proxyURL, ok := routeConfig["proxy_url"].(string); ok && proxyURL != "" {
+		return proxyURL, nil
+	}
+
+	return "", fmt.Errorf("Proxy endpoint not configured")
+}
+
+func (v *APIKeyValidator) resolveAutoEndpoint(ctx context.Context, provider string, routeConfig map[string]interface{}, region string) (string, error) {
+	priority := []string{"direct", "litellm", "proxy"}
+
+	for _, mode := range priority {
+		var endpoint string
+		var err error
+
+		switch mode {
+		case "direct":
+			endpoint, err = v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
+		case "litellm":
+			endpoint, err = v.resolveLitellmEndpoint(ctx, routeConfig, region)
+		case "proxy":
+			endpoint, err = v.resolveProxyEndpoint(ctx, routeConfig)
+		}
+
+		if err == nil && endpoint != "" {
+			logger.LogInfo(ctx, "api_key_validator", "Auto mode selected endpoint", map[string]interface{}{
+				"selected_mode": mode,
+				"endpoint":      endpoint,
+			})
+			return endpoint, nil
+		}
+	}
+
+	return "", fmt.Errorf("no available endpoint for auto mode")
+}
+
+func (v *APIKeyValidator) resolveAuthToken(routeMode string, originalAPIKey string) string {
+	switch routeMode {
+	case "litellm":
+		masterKey := os.Getenv("LITELLM_MASTER_KEY")
+		if masterKey != "" {
+			return masterKey
+		}
+		return originalAPIKey
+	default:
+		return originalAPIKey
+	}
+}
+
+func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey string, models []string) (bool, string, string) {
+	baseURL := strings.TrimRight(endpoint, "/")
+	if baseURL == "" {
+		return false, "QUOTA_PROBE_CONFIG_ERROR", "endpoint is empty"
+	}
+	model := selectProbeModel(provider, models)
+	if model == "" {
+		return false, "QUOTA_PROBE_MODEL_MISSING", "no model available for quota probe"
+	}
+
+	chatEndpoint := baseURL + "/chat/completions"
+	body := map[string]interface{}{
+		"model": model,
+		"messages": []map[string]string{
+			{"role": "user", "content": "ping"},
+		},
+		"max_tokens": 1,
+	}
+
+	jsonBody, _ := json.Marshal(body)
+	req, err := http.NewRequest("POST", chatEndpoint, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return false, "QUOTA_PROBE_REQUEST_BUILD_FAILED", err.Error()
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return false, "QUOTA_PROBE_NETWORK_ERROR", err.Error()
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return true, "", ""
+	}
+
+	rawBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	code, msg := ExtractProviderError(rawBody)
+	if code == "" {
+		code = fmt.Sprintf("HTTP_%d", resp.StatusCode)
+	}
+	if msg == "" {
+		msg = strings.TrimSpace(string(rawBody))
+	}
+	return false, code, msg
 }
