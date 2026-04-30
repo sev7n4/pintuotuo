@@ -1,55 +1,31 @@
 {
-  "workflow_id": "execution-layer-unified-outbound",
-  "created_at": "2026-04-27T00:00:00Z",
-  "current_step": 4,
-  "branch": "enhancement/execution-layer-unified-outbound",
+  "workflow_id": "byok-route-mode-tests",
+  "created_at": "2026-04-30T00:00:00Z",
+  "current_step": 1,
+  "issue_description": "完成BYOK路由模式支持的剩余任务：集成测试、E2E测试、文档更新",
+  "current_fix_cases": [
+    "T4.2.1: 测试Direct模式验证",
+    "T4.2.2: 测试LiteLLM模式验证",
+    "T4.2.3: 测试Proxy模式验证",
+    "T4.2.4: 测试Auto模式验证",
+    "T4.2.5: 测试错误持久化",
+    "T4.3.1: 测试用户流程",
+    "T4.3.2: 测试前端展示",
+    "T4.3.3: 测试错误信息展示",
+    "T5.3.1: 更新API文档",
+    "T5.3.2: 更新开发文档",
+    "T5.3.3: 更新部署文档"
+  ],
+  "branch_name": "feature/byok-route-mode-tests",
   "pr_number": null,
-  "current_fix_cases": [],
+  "merged": false,
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "",
-    "integration": "",
-    "e2e": "",
-    "deploy": ""
+    "cicd": "pending",
+    "integration": "pending",
+    "e2e": "pending",
+    "deploy": "pending"
   },
-  "local_validation": "passed",
-  "merged": false,
-  "issue": {
-    "type": "enhancement",
-    "title": "三层路由架构执行层统一出站演进",
-    "description": "将执行层改造为统一的出站入口，整合 Gateway 选择、认证、HTTP 执行等逻辑，实现配置驱动路由",
-    "spec_file": ".trae/specs/execution-layer-spec/spec.md",
-    "tasks_file": ".trae/specs/execution-layer-spec/tasks.md",
-    "checklist_file": ".trae/specs/execution-layer-spec/checklist.md",
-    "phases": [
-      {
-        "name": "Phase 1: 基础设施准备",
-        "tasks": ["P1.1", "P1.2", "P1.3", "P1.4", "P1.5", "P1.6", "P1.7", "P1.8"],
-        "status": "pending"
-      },
-      {
-        "name": "Phase 2: 执行层能力增强",
-        "tasks": ["P2.1", "P2.2", "P2.3", "P2.4", "P2.5", "P2.6"],
-        "status": "pending"
-      },
-      {
-        "name": "Phase 2.5: 配置驱动路由集成",
-        "tasks": ["P2.5.1", "P2.5.2", "P2.5.3", "P2.5.4", "P2.5.5", "P2.5.6", "P2.5.7", "P2.5.8", "P2.5.9", "P2.5.10"],
-        "status": "pending"
-      },
-      {
-        "name": "Phase 3: 主流程切换",
-        "tasks": ["P3.1", "P3.2", "P3.3", "P3.4", "P3.5", "P3.5.1", "P3.5.2", "P3.5.3", "P3.6", "P3.7", "P3.8", "P3.9", "P3.10"],
-        "status": "pending"
-      },
-      {
-        "name": "Phase 4: 清理与优化",
-        "tasks": ["P4.1", "P4.2", "P4.3", "P4.4", "P4.5", "P4.6", "P4.7", "P4.8", "P4.9"],
-        "status": "pending"
-      }
-    ],
-    "current_phase": 1,
-    "current_task": "P1.1"
-  }
+  "local_validation": "pending"
 }

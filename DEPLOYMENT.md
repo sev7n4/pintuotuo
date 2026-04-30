@@ -108,6 +108,58 @@ kubectl create secret generic pintuotuo-secrets \
 | `REDIS_URL` | 全部 | Redis 连接 | redis://localhost:6379 |
 | `KAFKA_BROKERS` | 全部 | Kafka 代理 | localhost:9092 |
 
+### BYOK路由模式环境变量
+
+BYOK (Bring Your Own Key) 路由模式需要以下环境变量配置：
+
+| 变量 | 环境 | 说明 | 示例 |
+|------|------|------|------|
+| `LLM_GATEWAY_LITELLM_URL` | 生产 | LiteLLM网关地址 | http://litellm:4000 |
+| `LITELLM_MASTER_KEY` | 生产 | LiteLLM认证密钥 | sk-litellm-master-key |
+
+**配置示例**：
+```bash
+# .env.production
+LLM_GATEWAY_LITELLM_URL=http://litellm:4000
+LITELLM_MASTER_KEY=sk-litellm-master-key
+```
+
+**Docker Compose配置**：
+```yaml
+# docker-compose.prod.yml
+services:
+  backend:
+    environment:
+      - LLM_GATEWAY_LITELLM_URL=http://litellm:4000
+      - LITELLM_MASTER_KEY=sk-litellm-master-key
+```
+
+**Kubernetes配置**：
+```yaml
+# k8s/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: byok-config
+data:
+  LLM_GATEWAY_LITELLM_URL: "http://litellm:4000"
+---
+# k8s/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: byok-secrets
+type: Opaque
+stringData:
+  LITELLM_MASTER_KEY: "sk-litellm-master-key"
+```
+
+**配置优先级**：
+1. `route_config.endpoints.{mode}.{region}` - 最高优先级
+2. `route_config.base_url` 或 `route_config.endpoint_url`
+3. 环境变量配置
+4. `model_providers.api_base_url` - 最低优先级
+
 ### PgBouncer 与连接池（可选）
 
 后端使用 `database/sql` + `lib/pq`，`DATABASE_URL` 指向 **PostgreSQL 直连**（或 **PgBouncer**）均可。应用侧已通过 `SetMaxOpenConns` / `SetMaxIdleConns` 限制连接数。
