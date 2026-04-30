@@ -1,13 +1,13 @@
 {
-  "workflow_id": "byok-verify-jsonb-scan",
-  "created_at": "2026-04-30T09:00:00Z",
+  "workflow_id": "byok-verify-result-display",
+  "created_at": "2026-04-30T09:30:00Z",
   "current_step": 9,
-  "issue_description": "BYOK验证API返回DATABASE_ERROR，JSONB字段Scan失败",
+  "issue_description": "BYOK验证结果展示完善：轻量验证显示详情、立即探测显示错误信息",
   "current_fix_cases": [
-    "BUG: 修复LightVerifyBYOK中JSONB Scan错误",
-    "BUG: 修复DeepVerifyBYOK中JSONB Scan错误"
+    "FEATURE: 轻量验证添加轮询逻辑显示验证结果详情",
+    "FEATURE: 立即探测显示健康错误信息"
   ],
-  "branch_name": "bugfix/byok-verify-jsonb-scan",
+  "branch_name": "feature/byok-verify-result-display",
   "pr_number": 0,
   "merged": false,
   "retry_count": 0,

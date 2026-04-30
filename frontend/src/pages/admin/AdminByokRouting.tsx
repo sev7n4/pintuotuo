@@ -313,34 +313,17 @@ const AdminByokRouting = () => {
   };
 
   const handleLightVerify = async (record: BYOKRoutingItem) => {
-    setOperationResult(record.id, {
-      type: 'verify',
-      status: 'loading',
-      message: '正在触发轻量验证...',
-      timestamp: new Date(),
-    });
+    setVerificationModalVisible(true);
+    setVerificationLoading(true);
+    setVerificationResult(null);
+
     try {
       await adminByokRoutingService.triggerLightVerify(record.id);
-      setOperationResult(record.id, {
-        type: 'verify',
-        status: 'success',
-        message: '轻量验证已触发',
-        details: '请稍后刷新查看验证状态更新',
-        timestamp: new Date(),
-      });
-      setSelectedItem(record);
-      setResultModalVisible(true);
-      setTimeout(() => fetchData(), 3000);
-    } catch (err) {
-      setOperationResult(record.id, {
-        type: 'verify',
-        status: 'failed',
-        message: '触发轻量验证失败',
-        details: String(err),
-        timestamp: new Date(),
-      });
-      setSelectedItem(record);
-      setResultModalVisible(true);
+      message.success('轻量验证已启动，正在后台执行...');
+      await pollVerificationResult(record.id);
+    } catch (error) {
+      message.error('启动轻量验证失败');
+      setVerificationLoading(false);
     }
   };
 
@@ -779,6 +762,23 @@ const AdminByokRouting = () => {
                   <span className={styles.statusLightLabel}>{verificationLabel(selectedItem.verification_result)}</span>
                 </span>
               </Descriptions.Item>
+              {selectedItem.health_error_category && (
+                <Descriptions.Item label="健康错误分类">
+                  <Tag color={getErrorCategoryColor(selectedItem.health_error_category)}>
+                    {getErrorCategoryLabel(selectedItem.health_error_category)}
+                  </Tag>
+                </Descriptions.Item>
+              )}
+              {selectedItem.health_error_code && (
+                <Descriptions.Item label="健康错误码">
+                  <Tag color="volcano">{selectedItem.health_error_code}</Tag>
+                </Descriptions.Item>
+              )}
+              {selectedItem.health_error_message && (
+                <Descriptions.Item label="健康错误信息">
+                  <span style={{ color: '#ff4d4f' }}>{selectedItem.health_error_message}</span>
+                </Descriptions.Item>
+              )}
             </Descriptions>
           </div>
         )}
