@@ -2,7 +2,7 @@
   "workflow_id": "byok-route-mode-tests",
   "created_at": "2026-04-30T00:00:00Z",
   "current_step": 10,
-  "issue_description": "完成BYOK路由模式支持的剩余任务：集成测试、E2E测试、文档更新",
+  "issue_description": "完成BYOK路由模式支持的剩余任务：集成测试、E2E测试、文档更新，修复routeConfig为nil导致的500错误",
   "current_fix_cases": [
     "T4.2.1: 测试Direct模式验证",
     "T4.2.2: 测试LiteLLM模式验证",
@@ -14,7 +14,9 @@
     "T4.3.3: 测试错误信息展示",
     "T5.3.1: 更新API文档",
     "T5.3.2: 更新开发文档",
-    "T5.3.3: 更新部署文档"
+    "T5.3.3: 更新部署文档",
+    "BUG: 修复routeConfig为nil导致的500错误",
+    "BUG: 修复E2E测试标题匹配问题"
   ],
   "branch_name": "feature/byok-route-mode-tests",
   "pr_number": 398,
