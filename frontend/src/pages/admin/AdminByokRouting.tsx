@@ -233,10 +233,20 @@ const AdminByokRouting = () => {
 
   const handleOpenConfig = (record: BYOKRoutingItem) => {
     setSelectedItem(record);
+    const routeConfig = record.route_config || {};
+    const endpoints = (routeConfig.endpoints || {}) as Record<string, unknown>;
+    
+    const litellmEndpoints = (endpoints.litellm || {}) as Record<string, unknown>;
+    const proxyEndpoints = (endpoints.proxy || {}) as Record<string, unknown>;
+    
     configForm.setFieldsValue({
       route_mode: record.route_mode || 'auto',
       endpoint_url: record.endpoint_url || '',
       fallback_endpoint_url: record.fallback_endpoint_url || '',
+      litellm_domestic: (litellmEndpoints.domestic as string) || '',
+      litellm_overseas: (litellmEndpoints.overseas as string) || '',
+      proxy_url: (routeConfig.proxy_url as string) || '',
+      proxy_gaap: (proxyEndpoints.gaap as string) || '',
     });
     setConfigModalVisible(true);
   };
@@ -252,10 +262,39 @@ const AdminByokRouting = () => {
       timestamp: new Date(),
     });
     try {
+      const routeConfig: Record<string, unknown> = {};
+      const endpoints: Record<string, unknown> = {};
+      
+      if (values.litellm_domestic || values.litellm_overseas) {
+        const litellmEndpoints: Record<string, string> = {};
+        if (values.litellm_domestic?.trim()) {
+          litellmEndpoints.domestic = values.litellm_domestic.trim();
+        }
+        if (values.litellm_overseas?.trim()) {
+          litellmEndpoints.overseas = values.litellm_overseas.trim();
+        }
+        if (Object.keys(litellmEndpoints).length > 0) {
+          endpoints.litellm = litellmEndpoints;
+        }
+      }
+      
+      if (values.proxy_gaap?.trim()) {
+        endpoints.proxy = { gaap: values.proxy_gaap.trim() };
+      }
+      
+      if (Object.keys(endpoints).length > 0) {
+        routeConfig.endpoints = endpoints;
+      }
+      
+      if (values.proxy_url?.trim()) {
+        routeConfig.proxy_url = values.proxy_url.trim();
+      }
+      
       const payload: UpdateRouteConfigRequest = {
         route_mode: values.route_mode,
         endpoint_url: values.endpoint_url?.trim() || '',
         fallback_endpoint_url: values.fallback_endpoint_url?.trim() || '',
+        route_config: Object.keys(routeConfig).length > 0 ? routeConfig : undefined,
       };
       await adminByokRoutingService.updateRouteConfig(selectedItem.id, payload);
       setOperationResult(selectedItem.id, {
@@ -700,7 +739,7 @@ const AdminByokRouting = () => {
         onCancel={() => setConfigModalVisible(false)}
         onOk={handleSaveConfig}
         confirmLoading={configLoading}
-        width={500}
+        width={600}
       >
         <Spin spinning={configLoading}>
           <Form form={configForm} layout="vertical">
@@ -712,11 +751,27 @@ const AdminByokRouting = () => {
                 <Select.Option value="proxy">代理（通过代理访问）</Select.Option>
               </Select>
             </Form.Item>
-            <Form.Item name="endpoint_url" label="端点URL">
+            <Form.Item name="endpoint_url" label="端点URL" extra="直连模式使用的端点地址">
               <Input placeholder="自定义端点URL（可选）" />
             </Form.Item>
-            <Form.Item name="fallback_endpoint_url" label="备用端点URL">
+            <Form.Item name="fallback_endpoint_url" label="备用端点URL" extra="主端点不可用时的备用地址">
               <Input placeholder="备用端点URL（可选）" />
+            </Form.Item>
+            
+            <Divider orientation="left" plain>LiteLLM 配置</Divider>
+            <Form.Item name="litellm_domestic" label="LiteLLM 国内端点" extra="LiteLLM模式国内区域使用的端点">
+              <Input placeholder="https://litellm-cn.example.com/v1" />
+            </Form.Item>
+            <Form.Item name="litellm_overseas" label="LiteLLM 海外端点" extra="LiteLLM模式海外区域使用的端点">
+              <Input placeholder="https://litellm-global.example.com/v1" />
+            </Form.Item>
+            
+            <Divider orientation="left" plain>代理配置</Divider>
+            <Form.Item name="proxy_url" label="代理URL" extra="代理模式使用的通用代理地址">
+              <Input placeholder="https://proxy.example.com" />
+            </Form.Item>
+            <Form.Item name="proxy_gaap" label="GAAP代理端点" extra="代理模式使用的GAAP加速端点">
+              <Input placeholder="https://gaap.example.com" />
             </Form.Item>
           </Form>
         </Spin>
