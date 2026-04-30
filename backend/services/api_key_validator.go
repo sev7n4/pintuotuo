@@ -788,19 +788,21 @@ func (v *APIKeyValidator) resolveDirectEndpoint(ctx context.Context, provider st
 }
 
 func (v *APIKeyValidator) resolveLitellmEndpoint(ctx context.Context, routeConfig map[string]interface{}, region string) (string, error) {
-	if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
-		if litellmEndpoints, ok := endpoints[GatewayModeLitellm].(map[string]interface{}); ok {
-			if region == "" {
-				region = regionDomestic
-			}
-			if url, ok := litellmEndpoints[region].(string); ok && url != "" {
-				return url, nil
+	if routeConfig != nil {
+		if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
+			if litellmEndpoints, ok := endpoints[GatewayModeLitellm].(map[string]interface{}); ok {
+				if region == "" {
+					region = regionDomestic
+				}
+				if url, ok := litellmEndpoints[region].(string); ok && url != "" {
+					return url, nil
+				}
 			}
 		}
-	}
 
-	if baseURL, ok := routeConfig["base_url"].(string); ok && baseURL != "" {
-		return baseURL, nil
+		if baseURL, ok := routeConfig["base_url"].(string); ok && baseURL != "" {
+			return baseURL, nil
+		}
 	}
 
 	litellmURL := os.Getenv("LLM_GATEWAY_LITELLM_URL")
@@ -812,21 +814,23 @@ func (v *APIKeyValidator) resolveLitellmEndpoint(ctx context.Context, routeConfi
 }
 
 func (v *APIKeyValidator) resolveProxyEndpoint(ctx context.Context, routeConfig map[string]interface{}) (string, error) {
-	if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
-		if proxyEndpoints, ok := endpoints[GatewayModeProxy].(map[string]interface{}); ok {
-			if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
-				return gaapURL, nil
-			}
-			for _, v := range proxyEndpoints {
-				if url, ok := v.(string); ok && url != "" {
-					return url, nil
+	if routeConfig != nil {
+		if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
+			if proxyEndpoints, ok := endpoints[GatewayModeProxy].(map[string]interface{}); ok {
+				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
+					return gaapURL, nil
+				}
+				for _, v := range proxyEndpoints {
+					if url, ok := v.(string); ok && url != "" {
+						return url, nil
+					}
 				}
 			}
 		}
-	}
 
-	if proxyURL, ok := routeConfig["proxy_url"].(string); ok && proxyURL != "" {
-		return proxyURL, nil
+		if proxyURL, ok := routeConfig["proxy_url"].(string); ok && proxyURL != "" {
+			return proxyURL, nil
+		}
 	}
 
 	return "", fmt.Errorf("Proxy endpoint not configured")

@@ -15,7 +15,7 @@ test.describe('Admin BYOK Routing Management', () => {
     await expect(page).toHaveURL(/.*admin/);
     
     await page.goto('/admin/byok-routing');
-    await expect(page.getByRole('heading', { name: /BYOK路由管理/ })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /BYOK.*路由管理/ })).toBeVisible({ timeout: 10000 });
   });
 
   test('should display BYOK routing list', async ({ page }) => {
