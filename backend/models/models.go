@@ -301,7 +301,7 @@ func (k *MerchantAPIKey) GetAuthTokenForMode(mode string) string {
 }
 
 func (k *MerchantAPIKey) HasRouteConfig() bool {
-	return k.RouteConfig != nil && len(k.RouteConfig) > 0
+	return len(k.RouteConfig) > 0
 }
 
 func (k *MerchantAPIKey) GetEndpoints() map[string]interface{} {
