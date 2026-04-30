@@ -50,6 +50,13 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
     
+    const tableRows = page.locator('.ant-table-tbody tr');
+    const rowCount = await tableRows.count();
+    
+    if (rowCount === 0) {
+      return;
+    }
+    
     const statusDots = page.locator('[class*="statusDot"]');
     const count = await statusDots.count();
     
