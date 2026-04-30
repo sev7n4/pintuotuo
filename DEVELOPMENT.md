@@ -217,6 +217,227 @@ make test-frontend
 - **后端**：>80% 代码覆盖率
 - **前端**：>70% 覆盖率
 
+### BYOK路由模式测试
+
+BYOK路由模式功能包含完整的测试覆盖：
+
+**后端单元测试**：
+- `backend/services/api_key_validator_route_mode_test.go` - 路由模式解析测试
+- `backend/services/api_key_validator_error_mapping_test.go` - 错误映射测试
+- `backend/models/models_byok_test.go` - 模型方法测试
+
+**后端集成测试**：
+- `backend/handlers/admin_byok_routing_test.go` - API端点测试
+
+**前端E2E测试**：
+- `frontend/e2e/byok-routing.spec.ts` - 端到端流程测试
+
+运行BYOK相关测试：
+```bash
+# 后端路由模式测试
+cd backend && go test ./services -run "TestResolveEndpointByRouteMode" -v
+
+# 后端集成测试
+cd backend && go test ./handlers -run "TestBYOK" -v
+
+# 前端E2E测试
+cd frontend && npx playwright test byok-routing.spec.ts
+```
+
+## BYOK路由模式开发指南
+
+### 架构概述
+
+BYOK路由模式支持四种路由方式：Direct、LiteLLM、Proxy、Auto。核心实现位于：
+
+- **模型层**：`backend/models/models.go` - MerchantAPIKey模型
+- **服务层**：`backend/services/api_key_validator.go` - 验证和路由逻辑
+- **健康检查**：`backend/services/health_checker.go` - 健康检查逻辑
+- **API层**：`backend/handlers/admin_byok_routing.go` - 管理接口
+- **前端**：`frontend/src/pages/admin/AdminByokRouting.tsx` - 管理界面
+
+### 路由模式实现
+
+#### 1. Direct模式
+
+直接访问上游API，性能最优。
+
+**实现文件**：
+- `backend/services/api_key_validator.go` - `resolveDirectEndpoint()`
+- `backend/services/health_checker.go` - `resolveDirectEndpoint()`
+
+**Endpoint优先级**：
+1. `route_config.endpoint_url`
+2. `route_config.endpoints.direct.{region}`
+3. `model_providers.api_base_url`
+
+**开发要点**：
+- 支持region选择（domestic/overseas）
+- 默认使用overseas region
+- 错误处理使用`MapProviderError`
+
+#### 2. LiteLLM模式
+
+通过LiteLLM网关访问，支持负载均衡。
+
+**实现文件**：
+- `backend/services/api_key_validator.go` - `resolveLitellmEndpoint()`
+- `backend/services/health_checker.go` - `resolveLitellmEndpoint()`
+
+**Endpoint优先级**：
+1. `route_config.endpoints.litellm.{region}`
+2. `route_config.base_url`
+3. 环境变量 `LLM_GATEWAY_LITELLM_URL`
+
+**认证Token处理**：
+- 使用环境变量 `LITELLM_MASTER_KEY`
+- 如果没有master key，使用原始API key
+
+**开发要点**：
+- 默认使用domestic region
+- 需要配置LiteLLM环境变量
+- 支持master key认证
+
+#### 3. Proxy模式
+
+通过代理服务器访问，适用于网络限制场景。
+
+**实现文件**：
+- `backend/services/api_key_validator.go` - `resolveProxyEndpoint()`
+- `backend/services/health_checker.go` - `resolveProxyEndpoint()`
+
+**Endpoint优先级**：
+1. `route_config.endpoints.proxy.{type}` (优先gaap)
+2. `route_config.proxy_url`
+
+**开发要点**：
+- 支持多种代理类型（gaap、cdn等）
+- 优先使用gaap类型
+- 需要配置代理服务器地址
+
+#### 4. Auto模式
+
+根据系统配置自动选择最佳路由。
+
+**实现文件**：
+- `backend/services/api_key_validator.go` - `resolveAutoEndpoint()`
+- `backend/services/health_checker.go` - `resolveAutoEndpoint()`
+
+**降级策略**：
+- Direct → LiteLLM → Proxy
+- 按顺序尝试，直到找到可用的endpoint
+
+**开发要点**：
+- 实现endpoint可用性检查
+- 支持自定义降级顺序
+- 记录降级决策日志
+
+### 错误处理规范
+
+所有路由模式必须使用统一的错误处理机制：
+
+**错误映射函数**：`MapProviderError()` in `backend/services/provider_error_mapper.go`
+
+**错误分类**：
+- `AUTH_INVALID_KEY` - API密钥无效
+- `AUTH_PERMISSION_DENIED` - 权限被拒绝
+- `QUOTA_INSUFFICIENT` - 配额不足
+- `RATE_LIMITED` - 速率限制
+- `MODEL_NOT_FOUND` - 模型不存在
+- `SERVICE_UNAVAILABLE` - 服务不可用
+- `NETWORK_TIMEOUT` - 网络超时
+- `UNKNOWN` - 未知错误
+
+**重试机制**：
+- 使用`ProviderErrorInfo.Retryable`字段判断是否重试
+- 最大重试次数：3次
+- 重试间隔：指数退避（1s, 2s, 4s）
+
+### 数据库迁移
+
+BYOK路由模式相关的数据库迁移：
+
+**迁移文件**：
+- `backend/migrations/074_byok_routing_ssot.sql` - 基础字段
+- `backend/migrations/075_byok_route_mode_support.sql` - 验证表扩展
+
+**关键字段**：
+- `merchant_api_keys.route_mode` - 路由模式
+- `merchant_api_keys.route_config` - 路由配置（JSONB）
+- `api_key_verifications.route_mode` - 验证时使用的路由模式
+- `api_key_verifications.endpoint_used` - 验证时使用的endpoint
+- `api_key_verifications.error_category` - 错误分类
+
+### 环境变量配置
+
+**必需的环境变量**：
+```bash
+# LiteLLM配置
+LLM_GATEWAY_LITELLM_URL=http://litellm:4000
+LITELLM_MASTER_KEY=sk-litellm-master-key
+```
+
+**配置位置**：
+- `.env.example` - 示例配置
+- `docker-compose.yml` - Docker环境配置
+- `docker-compose.prod.yml` - 生产环境配置
+
+### 前端开发
+
+**关键组件**：
+- `frontend/src/pages/admin/AdminByokRouting.tsx` - BYOK路由管理页面
+- `frontend/src/services/adminByokRouting.ts` - API服务层
+- `frontend/src/utils/byokRouteMode.ts` - 辅助函数
+
+**功能实现**：
+1. 路由模式显示和编辑
+2. 验证结果展示（轻验、深验）
+3. 健康状态指示器（红黄绿灯）
+4. 立即探测功能
+5. 错误信息展示
+
+**状态指示器**：
+- 🟢 绿色：健康/验证成功
+- 🟡 黄色：警告/部分功能受限
+- 🔴 红色：不健康/验证失败
+- ⚪ 灰色：未知/未验证
+
+### 调试技巧
+
+**后端调试**：
+```bash
+# 查看验证日志
+tail -f logs/verification.log | grep "route_mode"
+
+# 测试特定路由模式
+curl -X POST http://localhost:8080/api/v1/admin/byok-routing/1/light-verify \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json"
+```
+
+**前端调试**：
+```bash
+# 查看网络请求
+# 浏览器开发者工具 -> Network -> Filter: byok
+
+# 查看组件状态
+# React DevTools -> AdminByokRouting组件
+```
+
+**数据库查询**：
+```sql
+-- 查看BYOK路由配置
+SELECT id, merchant_id, provider, route_mode, route_config 
+FROM merchant_api_keys 
+WHERE route_mode IS NOT NULL;
+
+-- 查看验证结果
+SELECT id, api_key_id, route_mode, endpoint_used, error_category, created_at
+FROM api_key_verifications
+ORDER BY created_at DESC
+LIMIT 10;
+```
+
 ## 代码标准
 
 参考 [CLAUDE.md](../CLAUDE.md) 了解详细的代码标准和约定。

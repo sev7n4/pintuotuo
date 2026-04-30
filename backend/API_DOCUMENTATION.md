@@ -694,6 +694,294 @@ Authorization: Bearer <token>
 
 ---
 
+## 🔑 BYOK 路由管理
+
+### 概述
+
+BYOK (Bring Your Own Key) 路由管理API允许管理员管理商户的API密钥路由配置，支持多种路由模式和验证功能。
+
+### 路由模式
+
+BYOK支持以下路由模式：
+
+| 模式 | 说明 | 使用场景 |
+|------|------|----------|
+| `direct` | 直连模式 | 直接访问上游API，性能最优 |
+| `litellm` | LiteLLM网关模式 | 通过LiteLLM网关访问，支持负载均衡 |
+| `proxy` | 代理模式 | 通过代理服务器访问，适用于网络限制场景 |
+| `auto` | 自动模式 | 根据系统配置自动选择最佳路由 |
+
+### 获取BYOK路由列表
+
+```
+GET /admin/byok-routing
+Authorization: Bearer <admin_token>
+```
+
+**查询参数**:
+- `merchant_id` (可选): 商户ID
+- `byok_type` (可选): BYOK类型 (official/reseller/self_hosted)
+- `provider` (可选): 供应商名称
+- `region` (可选): 区域 (domestic/overseas)
+- `route_mode` (可选): 路由模式
+- `health_status` (可选): 健康状态
+
+**响应** (200):
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "merchant_id": 1,
+      "company_name": "示例公司",
+      "byok_type": "official",
+      "provider": "openai",
+      "name": "OpenAI API Key",
+      "region": "overseas",
+      "route_mode": "direct",
+      "endpoint_url": "https://api.openai.com",
+      "route_config": {
+        "endpoints": {
+          "direct": {
+            "overseas": "https://api.openai.com",
+            "domestic": "https://api.openai-proxy.com"
+          }
+        }
+      },
+      "health_status": "healthy",
+      "health_error_message": "",
+      "health_error_category": "",
+      "health_error_code": "",
+      "last_health_check_at": "2026-04-30T10:00:00Z",
+      "verification_result": "success",
+      "verification_message": "验证成功",
+      "models_supported": ["gpt-4", "gpt-3.5-turbo"],
+      "verified_at": "2026-04-30T09:00:00Z",
+      "status": "active",
+      "created_at": "2026-04-01T00:00:00Z",
+      "updated_at": "2026-04-30T10:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### 更新路由配置
+
+```
+PUT /admin/byok-routing/:id/config
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "route_mode": "litellm",
+  "endpoint_url": "https://litellm.example.com",
+  "route_config": {
+    "endpoints": {
+      "litellm": {
+        "domestic": "https://litellm-domestic.example.com",
+        "overseas": "https://litellm-overseas.example.com"
+      }
+    },
+    "base_url": "https://litellm.example.com"
+  }
+}
+```
+
+**响应** (200):
+```json
+{
+  "message": "路由配置更新成功"
+}
+```
+
+### 轻量验证
+
+执行轻量级API密钥验证，返回基本信息。
+
+```
+POST /admin/byok-routing/:id/light-verify
+Authorization: Bearer <admin_token>
+```
+
+**响应** (200):
+```json
+{
+  "status": "success",
+  "message": "验证成功",
+  "route_mode": "direct",
+  "endpoint_used": "https://api.openai.com",
+  "models": ["gpt-4", "gpt-3.5-turbo"],
+  "latency_ms": 150,
+  "verified_at": "2026-04-30T10:00:00Z"
+}
+```
+
+**失败响应**:
+```json
+{
+  "status": "failed",
+  "message": "API密钥无效",
+  "route_mode": "direct",
+  "endpoint_used": "https://api.openai.com",
+  "error_category": "AUTH_INVALID_KEY",
+  "error_code": "invalid_api_key",
+  "retryable": false,
+  "verified_at": "2026-04-30T10:00:00Z"
+}
+```
+
+### 深度验证
+
+执行深度API密钥验证，包含余额检查等详细信息。
+
+```
+POST /admin/byok-routing/:id/deep-verify
+Authorization: Bearer <admin_token>
+```
+
+**响应** (200):
+```json
+{
+  "status": "success",
+  "message": "深度验证成功",
+  "route_mode": "direct",
+  "endpoint_used": "https://api.openai.com",
+  "models": ["gpt-4", "gpt-3.5-turbo"],
+  "latency_ms": 350,
+  "balance": {
+    "total_granted": 100.00,
+    "total_used": 25.50,
+    "total_remaining": 74.50
+  },
+  "verified_at": "2026-04-30T10:00:00Z"
+}
+```
+
+### 立即探测
+
+立即执行健康检查探测。
+
+```
+POST /admin/byok-routing/:id/probe
+Authorization: Bearer <admin_token>
+```
+
+**响应** (200):
+```json
+{
+  "status": "healthy",
+  "message": "健康检查通过",
+  "route_mode": "direct",
+  "endpoint_used": "https://api.openai.com",
+  "latency_ms": 100,
+  "checked_at": "2026-04-30T10:00:00Z"
+}
+```
+
+### 错误分类
+
+BYOK验证和探测使用统一的错误分类体系：
+
+| 错误分类 | 错误码 | 说明 | 是否可重试 |
+|----------|--------|------|-----------|
+| `AUTH_INVALID_KEY` | `invalid_api_key` | API密钥无效 | ❌ |
+| `AUTH_PERMISSION_DENIED` | `permission_denied` | 权限被拒绝 | ❌ |
+| `QUOTA_INSUFFICIENT` | `insufficient_quota` | 配额不足 | ❌ |
+| `RATE_LIMITED` | `rate_limit_exceeded` | 速率限制 | ✅ |
+| `MODEL_NOT_FOUND` | `model_not_found` | 模型不存在 | ❌ |
+| `SERVICE_UNAVAILABLE` | `service_unavailable` | 服务不可用 | ✅ |
+| `NETWORK_TIMEOUT` | `timeout` | 网络超时 | ✅ |
+| `UNKNOWN` | `unknown` | 未知错误 | 视情况 |
+
+### 路由模式配置示例
+
+#### Direct模式配置
+
+```json
+{
+  "route_mode": "direct",
+  "route_config": {
+    "endpoint_url": "https://api.openai.com",
+    "endpoints": {
+      "direct": {
+        "overseas": "https://api.openai.com",
+        "domestic": "https://api.openai-proxy.com"
+      }
+    }
+  }
+}
+```
+
+**Endpoint优先级**:
+1. `route_config.endpoint_url`
+2. `route_config.endpoints.direct.{region}`
+3. `model_providers.api_base_url`
+
+#### LiteLLM模式配置
+
+```json
+{
+  "route_mode": "litellm",
+  "route_config": {
+    "base_url": "https://litellm.example.com",
+    "endpoints": {
+      "litellm": {
+        "domestic": "https://litellm-domestic.example.com",
+        "overseas": "https://litellm-overseas.example.com"
+      }
+    }
+  }
+}
+```
+
+**Endpoint优先级**:
+1. `route_config.endpoints.litellm.{region}`
+2. `route_config.base_url`
+3. 环境变量 `LLM_GATEWAY_LITELLM_URL`
+
+**认证Token**:
+- 使用环境变量 `LITELLM_MASTER_KEY`
+- 如果没有master key，使用原始API key
+
+#### Proxy模式配置
+
+```json
+{
+  "route_mode": "proxy",
+  "route_config": {
+    "proxy_url": "https://proxy.example.com",
+    "endpoints": {
+      "proxy": {
+        "gaap": "https://gaap-proxy.example.com",
+        "cdn": "https://cdn-proxy.example.com"
+      }
+    }
+  }
+}
+```
+
+**Endpoint优先级**:
+1. `route_config.endpoints.proxy.{type}` (优先gaap)
+2. `route_config.proxy_url`
+
+#### Auto模式配置
+
+```json
+{
+  "route_mode": "auto",
+  "route_config": {
+    "fallback_priority": ["direct", "litellm", "proxy"]
+  }
+}
+```
+
+**降级策略**:
+- Direct → LiteLLM → Proxy
+- 按顺序尝试，直到找到可用的endpoint
+
+---
+
 ## 🧪 测试 API
 
 ### 使用 curl

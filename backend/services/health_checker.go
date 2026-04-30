@@ -488,18 +488,20 @@ func (s *HealthChecker) resolveEndpointWithRouteMode(ctx context.Context, apiKey
 }
 
 func (s *HealthChecker) resolveDirectEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
-	if endpoint, ok := apiKey.RouteConfig["endpoint_url"].(string); ok && endpoint != "" {
-		return endpoint, nil
-	}
+	if apiKey.RouteConfig != nil {
+		if endpoint, ok := apiKey.RouteConfig["endpoint_url"].(string); ok && endpoint != "" {
+			return endpoint, nil
+		}
 
-	if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
-		if directEndpoints, ok := endpoints[GatewayModeDirect].(map[string]interface{}); ok {
-			region := apiKey.Region
-			if region == "" {
-				region = regionOverseas
-			}
-			if url, ok := directEndpoints[region].(string); ok && url != "" {
-				return url, nil
+		if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
+			if directEndpoints, ok := endpoints[GatewayModeDirect].(map[string]interface{}); ok {
+				region := apiKey.Region
+				if region == "" {
+					region = regionOverseas
+				}
+				if url, ok := directEndpoints[region].(string); ok && url != "" {
+					return url, nil
+				}
 			}
 		}
 	}
@@ -517,20 +519,22 @@ func (s *HealthChecker) resolveDirectEndpoint(ctx context.Context, apiKey *model
 }
 
 func (s *HealthChecker) resolveLitellmEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
-	if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
-		if litellmEndpoints, ok := endpoints[GatewayModeLitellm].(map[string]interface{}); ok {
-			region := apiKey.Region
-			if region == "" {
-				region = regionDomestic
-			}
-			if url, ok := litellmEndpoints[region].(string); ok && url != "" {
-				return url, nil
+	if apiKey.RouteConfig != nil {
+		if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
+			if litellmEndpoints, ok := endpoints[GatewayModeLitellm].(map[string]interface{}); ok {
+				region := apiKey.Region
+				if region == "" {
+					region = regionDomestic
+				}
+				if url, ok := litellmEndpoints[region].(string); ok && url != "" {
+					return url, nil
+				}
 			}
 		}
-	}
 
-	if baseURL, ok := apiKey.RouteConfig["base_url"].(string); ok && baseURL != "" {
-		return baseURL, nil
+		if baseURL, ok := apiKey.RouteConfig["base_url"].(string); ok && baseURL != "" {
+			return baseURL, nil
+		}
 	}
 
 	litellmURL := os.Getenv("LLM_GATEWAY_LITELLM_URL")
@@ -542,21 +546,23 @@ func (s *HealthChecker) resolveLitellmEndpoint(ctx context.Context, apiKey *mode
 }
 
 func (s *HealthChecker) resolveProxyEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
-	if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
-		if proxyEndpoints, ok := endpoints[GatewayModeProxy].(map[string]interface{}); ok {
-			if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
-				return gaapURL, nil
-			}
-			for _, v := range proxyEndpoints {
-				if url, ok := v.(string); ok && url != "" {
-					return url, nil
+	if apiKey.RouteConfig != nil {
+		if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
+			if proxyEndpoints, ok := endpoints[GatewayModeProxy].(map[string]interface{}); ok {
+				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
+					return gaapURL, nil
+				}
+				for _, v := range proxyEndpoints {
+					if url, ok := v.(string); ok && url != "" {
+						return url, nil
+					}
 				}
 			}
 		}
-	}
 
-	if proxyURL, ok := apiKey.RouteConfig["proxy_url"].(string); ok && proxyURL != "" {
-		return proxyURL, nil
+		if proxyURL, ok := apiKey.RouteConfig["proxy_url"].(string); ok && proxyURL != "" {
+			return proxyURL, nil
+		}
 	}
 
 	return "", fmt.Errorf("Proxy endpoint not configured")

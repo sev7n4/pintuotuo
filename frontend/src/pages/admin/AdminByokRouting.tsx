@@ -511,7 +511,7 @@ const AdminByokRouting = () => {
       responsive: ['lg'],
     },
     {
-      title: '路由',
+      title: '路由模式',
       dataIndex: 'route_mode',
       key: 'route_mode',
       width: 70,
