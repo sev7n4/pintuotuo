@@ -759,17 +759,19 @@ func (v *APIKeyValidator) resolveEndpointByRouteMode(ctx context.Context, provid
 }
 
 func (v *APIKeyValidator) resolveDirectEndpoint(ctx context.Context, provider string, routeConfig map[string]interface{}, region string) (string, error) {
-	if endpoint, ok := routeConfig["endpoint_url"].(string); ok && endpoint != "" {
-		return endpoint, nil
-	}
+	if routeConfig != nil {
+		if endpoint, ok := routeConfig["endpoint_url"].(string); ok && endpoint != "" {
+			return endpoint, nil
+		}
 
-	if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
-		if directEndpoints, ok := endpoints[GatewayModeDirect].(map[string]interface{}); ok {
-			if region == "" {
-				region = regionOverseas
-			}
-			if url, ok := directEndpoints[region].(string); ok && url != "" {
-				return url, nil
+		if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
+			if directEndpoints, ok := endpoints[GatewayModeDirect].(map[string]interface{}); ok {
+				if region == "" {
+					region = regionOverseas
+				}
+				if url, ok := directEndpoints[region].(string); ok && url != "" {
+					return url, nil
+				}
 			}
 		}
 	}
