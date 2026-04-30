@@ -242,6 +242,94 @@ type MerchantAPIKey struct {
 	RouteConfig         map[string]interface{} `json:"route_config,omitempty"`
 }
 
+func (k *MerchantAPIKey) GetEndpointForMode(mode string, region string) string {
+	if region == "" {
+		region = "overseas"
+	}
+
+	switch mode {
+	case "direct":
+		if endpoint, ok := k.RouteConfig["endpoint_url"].(string); ok && endpoint != "" {
+			return endpoint
+		}
+		if endpoints, ok := k.RouteConfig["endpoints"].(map[string]interface{}); ok {
+			if directEndpoints, ok := endpoints["direct"].(map[string]interface{}); ok {
+				if url, ok := directEndpoints[region].(string); ok && url != "" {
+					return url
+				}
+			}
+		}
+		return k.EndpointURL
+	case "litellm":
+		if endpoints, ok := k.RouteConfig["endpoints"].(map[string]interface{}); ok {
+			if litellmEndpoints, ok := endpoints["litellm"].(map[string]interface{}); ok {
+				litellmRegion := region
+				if litellmRegion == "" {
+					litellmRegion = "domestic"
+				}
+				if url, ok := litellmEndpoints[litellmRegion].(string); ok && url != "" {
+					return url
+				}
+			}
+		}
+		if baseURL, ok := k.RouteConfig["base_url"].(string); ok && baseURL != "" {
+			return baseURL
+		}
+	case "proxy":
+		if endpoints, ok := k.RouteConfig["endpoints"].(map[string]interface{}); ok {
+			if proxyEndpoints, ok := endpoints["proxy"].(map[string]interface{}); ok {
+				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
+					return gaapURL
+				}
+				for _, v := range proxyEndpoints {
+					if url, ok := v.(string); ok && url != "" {
+						return url
+					}
+				}
+			}
+		}
+		if proxyURL, ok := k.RouteConfig["proxy_url"].(string); ok && proxyURL != "" {
+			return proxyURL
+		}
+	}
+
+	return k.EndpointURL
+}
+
+func (k *MerchantAPIKey) GetAuthTokenForMode(mode string) string {
+	return k.APIKeyEncrypted
+}
+
+func (k *MerchantAPIKey) HasRouteConfig() bool {
+	return len(k.RouteConfig) > 0
+}
+
+func (k *MerchantAPIKey) GetEndpoints() map[string]interface{} {
+	if endpoints, ok := k.RouteConfig["endpoints"].(map[string]interface{}); ok {
+		return endpoints
+	}
+	return nil
+}
+
+func (k *MerchantAPIKey) GetEndpointByType(endpointType string) string {
+	endpoints := k.GetEndpoints()
+	if endpoints == nil {
+		return ""
+	}
+
+	if typeEndpoints, ok := endpoints[endpointType].(map[string]interface{}); ok {
+		region := k.Region
+		if region == "" {
+			region = "overseas"
+		}
+		if url, ok := typeEndpoints[region].(string); ok && url != "" {
+			return url
+		}
+	}
+
+	return ""
+}
+
 // APIKeyRealtimeStatus represents real-time status of an API key
 type APIKeyRealtimeStatus struct {
 	APIKeyID             int        `json:"api_key_id"`
