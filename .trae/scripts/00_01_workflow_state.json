@@ -1,13 +1,13 @@
 {
-  "workflow_id": "byok-verify-500-error",
-  "created_at": "2026-04-30T08:30:00Z",
+  "workflow_id": "byok-verify-jsonb-scan",
+  "created_at": "2026-04-30T09:00:00Z",
   "current_step": 9,
-  "issue_description": "BYOK路由管理页面轻量验证和深度验证API返回500错误",
+  "issue_description": "BYOK验证API返回DATABASE_ERROR，JSONB字段Scan失败",
   "current_fix_cases": [
-    "BUG: 修复/admin/byok-routing/:id/light-verify 500错误",
-    "BUG: 修复/admin/byok-routing/:id/deep-verify 500错误"
+    "BUG: 修复LightVerifyBYOK中JSONB Scan错误",
+    "BUG: 修复DeepVerifyBYOK中JSONB Scan错误"
   ],
-  "branch_name": "bugfix/byok-verify-nil-routeconfig",
+  "branch_name": "bugfix/byok-verify-jsonb-scan",
   "pr_number": 0,
   "merged": false,
   "retry_count": 0,

@@ -413,12 +413,13 @@ func LightVerifyBYOK(c *gin.Context) {
 	}
 
 	var apiKey models.MerchantAPIKey
+	var routeConfigBytes []byte
 	err = db.QueryRow(
 		`SELECT id, merchant_id, provider, api_key_encrypted, route_mode, route_config, region
 		 FROM merchant_api_keys
 		 WHERE id = $1 AND status = 'active'`,
 		keyID,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.RouteMode, &apiKey.RouteConfig, &apiKey.Region)
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.RouteMode, &routeConfigBytes, &apiKey.Region)
 
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -431,6 +432,10 @@ func LightVerifyBYOK(c *gin.Context) {
 	} else if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
+	}
+
+	if len(routeConfigBytes) > 0 {
+		_ = json.Unmarshal(routeConfigBytes, &apiKey.RouteConfig)
 	}
 
 	validator := services.GetAPIKeyValidator()
@@ -483,12 +488,13 @@ func DeepVerifyBYOK(c *gin.Context) {
 	}
 
 	var apiKey models.MerchantAPIKey
+	var routeConfigBytes []byte
 	err = db.QueryRow(
 		`SELECT id, merchant_id, provider, api_key_encrypted, route_mode, route_config, region
 		 FROM merchant_api_keys
 		 WHERE id = $1 AND status = 'active'`,
 		keyID,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.RouteMode, &apiKey.RouteConfig, &apiKey.Region)
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.RouteMode, &routeConfigBytes, &apiKey.Region)
 
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -501,6 +507,10 @@ func DeepVerifyBYOK(c *gin.Context) {
 	} else if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
+	}
+
+	if len(routeConfigBytes) > 0 {
+		_ = json.Unmarshal(routeConfigBytes, &apiKey.RouteConfig)
 	}
 
 	validator := services.GetAPIKeyValidator()
