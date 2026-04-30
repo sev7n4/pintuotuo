@@ -57,10 +57,11 @@ test.describe('Admin BYOK Routing Management', () => {
       return;
     }
     
-    const statusDots = page.locator('[class*="statusDot"]');
-    const count = await statusDots.count();
+    const healthColumn = page.locator('.ant-table-thead th').filter({ hasText: '健康' });
+    await expect(healthColumn).toBeVisible({ timeout: 5000 });
     
-    expect(count).toBeGreaterThan(0);
+    const verifyColumn = page.locator('.ant-table-thead th').filter({ hasText: '验证' });
+    await expect(verifyColumn).toBeVisible({ timeout: 5000 });
   });
 
   test('should open route config modal', async ({ page }) => {
