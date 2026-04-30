@@ -34,6 +34,9 @@ type VerificationResult struct {
 	PricingInfo       map[string]interface{} `json:"pricing_info,omitempty"`
 	ErrorCode         string                 `json:"error_code,omitempty"`
 	ErrorMessage      string                 `json:"error_message,omitempty"`
+	ErrorCategory     string                 `json:"error_category,omitempty"`
+	RouteMode         string                 `json:"route_mode,omitempty"`
+	EndpointUsed      string                 `json:"endpoint_used,omitempty"`
 	StartedAt         time.Time              `json:"started_at"`
 	CompletedAt       time.Time              `json:"completed_at,omitempty"`
 	RetryCount        int                    `json:"retry_count,omitempty"`
@@ -291,6 +294,7 @@ func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]Ver
 			   models_found, models_count,
 			   pricing_verified, pricing_info,
 			   error_code, error_message,
+			   route_mode, endpoint_used, error_category,
 			   started_at, completed_at
 		FROM api_key_verifications
 		WHERE api_key_id = $1
@@ -312,6 +316,7 @@ func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]Ver
 		var latency sql.NullInt64
 		var completedAt sql.NullTime
 		var errCode, errMsg sql.NullString
+		var routeMode, endpointUsed, errorCategory sql.NullString
 
 		err := rows.Scan(
 			&result.ID, &result.APIKeyID, &result.VerificationType, &result.Status,
@@ -319,6 +324,7 @@ func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]Ver
 			&modelsJSON, &result.ModelsCount,
 			&result.PricingVerified, &pricingJSON,
 			&errCode, &errMsg,
+			&routeMode, &endpointUsed, &errorCategory,
 			&result.StartedAt, &completedAt,
 		)
 		if err != nil {
@@ -339,6 +345,15 @@ func (v *APIKeyValidator) GetVerificationHistory(apiKeyID int, limit int) ([]Ver
 		}
 		if errMsg.Valid {
 			result.ErrorMessage = errMsg.String
+		}
+		if routeMode.Valid {
+			result.RouteMode = routeMode.String
+		}
+		if endpointUsed.Valid {
+			result.EndpointUsed = endpointUsed.String
+		}
+		if errorCategory.Valid {
+			result.ErrorCategory = errorCategory.String
 		}
 
 		if len(modelsJSON) > 0 {
@@ -384,11 +399,13 @@ func (v *APIKeyValidator) updateVerificationRecord(verificationID int, result Ve
 		`UPDATE api_key_verifications 
 		 SET status = $1, connection_test = $2, connection_latency_ms = $3,
 		     models_found = $4, models_count = $5, pricing_verified = $6, pricing_info = $7,
-		     completed_at = $8, error_code = $9, error_message = $10
-		 WHERE id = $11`,
+		     completed_at = $8, error_code = $9, error_message = $10,
+		     route_mode = $11, endpoint_used = $12, error_category = $13
+		 WHERE id = $14`,
 		result.Status, result.ConnectionTest, result.ConnectionLatency,
 		modelsJSON, result.ModelsCount, result.PricingVerified, pricingJSON,
 		result.CompletedAt, nullStr(result.ErrorCode), nullStr(result.ErrorMessage),
+		nullStr(result.RouteMode), nullStr(result.EndpointUsed), nullStr(result.ErrorCategory),
 		verificationID,
 	)
 
@@ -462,12 +479,14 @@ func (v *APIKeyValidator) getProviderConfig(provider string) (map[string]string,
 }
 
 func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificationID, apiKeyID int, errorCode, errorMessage string, startTime time.Time) {
+	errInfo := MapProviderError(0, errorCode, errorMessage, nil, nil, "")
 	result := VerificationResult{
-		ID:           verificationID,
-		Status:       verificationStatusFailed,
-		ErrorCode:    errorCode,
-		ErrorMessage: errorMessage,
-		CompletedAt:  time.Now(),
+		ID:            verificationID,
+		Status:        verificationStatusFailed,
+		ErrorCode:     errorCode,
+		ErrorMessage:  errorMessage,
+		ErrorCategory: errInfo.Category,
+		CompletedAt:   time.Now(),
 	}
 
 	var provider string
@@ -644,6 +663,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		v.handleVerificationError(ctx, verificationID, apiKeyID, "ENDPOINT_RESOLVE_FAILED", err.Error(), startTime)
 		return
 	}
+	result.EndpointUsed = endpoint
 
 	authToken := v.resolveAuthToken(routeMode, decryptedKey)
 
