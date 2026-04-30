@@ -294,17 +294,20 @@ func UpdateBYOKRouteConfig(c *gin.Context) {
 		routeConfigJSON = []byte("{}")
 	}
 
+	endpointURL := strings.TrimSpace(req.EndpointURL)
+	fallbackEndpointURL := strings.TrimSpace(req.FallbackEndpointURL)
+
 	var merchantID int
 	err = db.QueryRow(
 		`UPDATE merchant_api_keys SET 
 		 route_mode = CASE WHEN $1::text = '' THEN route_mode ELSE $1::varchar(20) END,
-		 endpoint_url = CASE WHEN $2::text = '' THEN endpoint_url ELSE NULLIF(TRIM($2::text), '')::varchar(500) END,
-		 fallback_endpoint_url = CASE WHEN $3::text = '' THEN fallback_endpoint_url ELSE NULLIF(TRIM($3::text), '')::varchar(500) END,
+		 endpoint_url = NULLIF($2::text, ''),
+		 fallback_endpoint_url = NULLIF($3::text, ''),
 		 route_config = $4::jsonb,
 		 updated_at = CURRENT_TIMESTAMP
 		 WHERE id = $5
 		 RETURNING merchant_id`,
-		routeMode, req.EndpointURL, req.FallbackEndpointURL, routeConfigJSON, keyID,
+		routeMode, endpointURL, fallbackEndpointURL, routeConfigJSON, keyID,
 	).Scan(&merchantID)
 
 	if err == sql.ErrNoRows {

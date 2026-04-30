@@ -1,21 +1,21 @@
 {
   "workflow_id": "byok-verify-result-display",
   "created_at": "2026-04-30T09:30:00Z",
-  "current_step": 9,
+  "current_step": 14,
   "issue_description": "BYOK验证结果展示完善：轻量验证显示详情、立即探测显示错误信息",
   "current_fix_cases": [
     "FEATURE: 轻量验证添加轮询逻辑显示验证结果详情",
     "FEATURE: 立即探测显示健康错误信息"
   ],
   "branch_name": "feature/byok-verify-result-display",
-  "pr_number": 0,
-  "merged": false,
+  "pr_number": 401,
+  "merged": true,
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "pending",
-    "integration": "pending",
-    "e2e": "pending",
+    "cicd": "success",
+    "integration": "success",
+    "e2e": "success",
     "deploy": "pending"
   },
   "local_validation": "passed"
