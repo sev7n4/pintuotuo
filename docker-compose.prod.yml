@@ -33,6 +33,54 @@ services:
       - WECHAT_NOTIFY_URL=${WECHAT_NOTIFY_URL}
       - WECHAT_SANDBOX=${WECHAT_SANDBOX:-true}
       - ALLOW_TEST_RECHARGE=${ALLOW_TEST_RECHARGE:-false}
+      # 权益与计价：off 兼容历史；strict 时 API 代理仅允许订单/订阅覆盖的 (provider, model)
+      - ENTITLEMENT_ENFORCEMENT=${ENTITLEMENT_ENFORCEMENT:-off}
+      # 登录 / OAuth / 短信：与根目录 .env.example 一致，由服务器 .env 注入
+      - FRONTEND_URL=${FRONTEND_URL:-}
+      - PUBLIC_API_BASE_URL=${PUBLIC_API_BASE_URL:-}
+      - MOCK_SMS=${MOCK_SMS:-}
+      - SMS_PROVIDER=${SMS_PROVIDER:-}
+      - AUTH_MAGIC_LINK=${AUTH_MAGIC_LINK:-}
+      - EMAIL_MAGIC_MOCK=${EMAIL_MAGIC_MOCK:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
+      - GITHUB_OAUTH_CLIENT_SECRET=${GITHUB_OAUTH_CLIENT_SECRET:-}
+      - GITHUB_OAUTH_REDIRECT_URI=${GITHUB_OAUTH_REDIRECT_URI:-}
+      - GITHUB_OAUTH_SCOPE=${GITHUB_OAUTH_SCOPE:-}
+      - WECHAT_OPEN_APP_ID=${WECHAT_OPEN_APP_ID:-}
+      - WECHAT_OPEN_APP_SECRET=${WECHAT_OPEN_APP_SECRET:-}
+      - WECHAT_OAUTH_REDIRECT_URI=${WECHAT_OAUTH_REDIRECT_URI:-}
+      - AUTH_ACCOUNT_LINKING=${AUTH_ACCOUNT_LINKING:-}
+      # 邀请制商户入驻 / 管理员安全策略
+      - MERCHANT_REGISTER_MODE=${MERCHANT_REGISTER_MODE:-open}
+      - ADMIN_MFA_REQUIRED=${ADMIN_MFA_REQUIRED:-false}
+      - ADMIN_ALLOWED_CIDRS=${ADMIN_ALLOWED_CIDRS:-}
+      - MFA_TOTP_ISSUER=${MFA_TOTP_ISSUER:-Pintuotuo}
+      - PUBLIC_APP_BASE_URL=${PUBLIC_APP_BASE_URL:-}
+      - FRONTEND_ORIGIN=${FRONTEND_ORIGIN:-}
+      # Execution Layer 灰度开关（Phase 3）
+      - USE_EXECUTION_LAYER=${USE_EXECUTION_LAYER:-false}
+      # LiteLLM 网关配置（当 merchant_api_keys.route_mode = 'litellm' 时使用）
+      - API_PROXY_LITELLM_MAX_RETRIES=${API_PROXY_LITELLM_MAX_RETRIES:-1}
+      - LLM_GATEWAY_LITELLM_URL=${LLM_GATEWAY_LITELLM_URL:-http://litellm:4000}
+      # LiteLLM 鉴权：当 route_mode=litellm 时用作 Authorization Bearer
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
+      - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-false}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-}
+      # 勿在此注入 HTTP(S)_PROXY 空值：会导致 Go 出站行为与未设置时不一致。
+      # 若大陆机房必须走代理访问 github.com，请使用 docker-compose.proxy.override.yml.example 合并启动。
+      # OpenTelemetry → Grafana Tempo（OTLP gRPC）；不配 endpoint 时后端为 noop
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4317}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-pintuotuo-backend}
+      - OTEL_SDK_DISABLED=${OTEL_SDK_DISABLED:-}
+      - OTEL_TRACES_SAMPLER=${OTEL_TRACES_SAMPLER:-}
+      - OTEL_TRACES_SAMPLER_ARG=${OTEL_TRACES_SAMPLER_ARG:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,6 +107,7 @@ services:
       args:
         - VITE_API_URL=${VITE_API_URL:-http://backend:8080/api/v1}
         - VITE_ALLOW_MOCK_RECHARGE=${VITE_ALLOW_MOCK_RECHARGE:-false}
+        - VITE_MERCHANT_REGISTER_MODE=${VITE_MERCHANT_REGISTER_MODE:-open}
     container_name: pintuotuo-frontend
     restart: unless-stopped
     ports:
@@ -132,6 +181,7 @@ services:
       - '--web.enable-lifecycle'
     volumes:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
@@ -151,6 +201,8 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
       - GF_USERS_ALLOW_SIGN_UP=false
+      # 与 ROOT_URL 中带 /grafana/ 子路径配套；未开启时浏览器访问会出现 /grafana/login 无限重定向
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana/
     volumes:
       - grafana_data:/var/lib/grafana
@@ -160,6 +212,7 @@ services:
       - "3001:3000"
     depends_on:
       - prometheus
+      - tempo
     networks:
       - pintuotuo-network
     logging:
@@ -168,8 +221,43 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  tempo:
+    image: grafana/tempo:2.3.1
+    container_name: pintuotuo-tempo
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - pintuotuo-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: pintuotuo-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./deploy/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - pintuotuo-network
+
   litellm:
-    image: ghcr.io/berriai/litellm-database:main-latest
+    image: litellm/litellm:v1.83.3-stable
     container_name: pintuotuo-litellm
     restart: unless-stopped
     environment:
@@ -215,3 +303,5 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
+  tempo_data:
