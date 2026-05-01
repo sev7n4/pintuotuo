@@ -81,6 +81,8 @@ jobs:
           done
           echo "Starting containers (no server-side build)..."
           IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway up -d
+          echo "Force recreating litellm container to ensure latest image..."
+          docker compose -f docker-compose.prod.yml --profile llm-gateway up -d --force-recreate litellm || true
           echo "Running database migrations..."
           for migration_file in backend/migrations/*.sql; do
             filename=$(basename "$migration_file")
