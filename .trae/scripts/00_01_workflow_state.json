@@ -1,21 +1,23 @@
 {
-  "workflow_id": "byok-route-config-update",
-  "created_at": "2026-04-30T10:00:00Z",
-  "current_step": 14,
-  "issue_description": "BYOK路由配置无法清空端点URL",
+  "workflow_id": "litellm-pure-byok-mode",
+  "created_at": "2026-05-01T08:00:00Z",
+  "current_step": 1,
+  "issue_description": "实现LiteLLM纯BYOK模式 - merchant_api_keys作为唯一SSOT真相",
   "current_fix_cases": [
-    "BUG: 修复BYOK路由配置无法清空端点URL的问题"
+    "FEATURE: LiteLLM配置从merchant_api_keys获取api_base",
+    "FEATURE: 模型列表从merchant_skus关联获取",
+    "FEATURE: 通过user_config动态传递完整配置给LiteLLM"
   ],
-  "branch_name": "bugfix/byok-route-config-update",
-  "pr_number": 402,
-  "merged": true,
+  "branch_name": "",
+  "pr_number": null,
+  "merged": false,
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "success",
-    "integration": "success",
-    "e2e": "success",
-    "deploy": "pending"
+    "cicd": "",
+    "integration": "",
+    "e2e": "",
+    "deploy": ""
   },
-  "local_validation": "passed"
+  "local_validation": ""
 }

@@ -471,6 +471,24 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 					}
 				}
 			}
+			routeMode := resolveRouteMode(&pk)
+			if routeMode == routeModeLitellm {
+				litellmTemplate, tmplErr := getProviderLitellmTemplate(db, att.provider)
+				if tmplErr != nil {
+					litellmTemplate = att.model
+				}
+				litellmModel := litellmTemplate
+				if strings.Contains(litellmTemplate, "{model_id}") {
+					litellmModel = strings.ReplaceAll(litellmTemplate, "{model_id}", att.model)
+				} else if litellmTemplate == "" {
+					litellmModel = "openai/" + att.model
+				}
+				apiBaseForUser := pk.EndpointURL
+				if apiBaseForUser == "" {
+					apiBaseForUser = pcfg.APIBaseURL
+				}
+				rb["user_config"] = buildLitellmUserConfig(att.model, litellmModel, apiBaseForUser, dk)
+			}
 			jb, mErr := json.Marshal(rb)
 			if mErr != nil {
 				billingEngine.CancelPreDeduct(userIDInt, requestID)
@@ -634,6 +652,24 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 					rb[k] = v
 				}
 			}
+		}
+		routeMode := resolveRouteMode(&pk)
+		if routeMode == routeModeLitellm {
+			litellmTemplate, tmplErr := getProviderLitellmTemplate(db, att.provider)
+			if tmplErr != nil {
+				litellmTemplate = att.model
+			}
+			litellmModel := litellmTemplate
+			if strings.Contains(litellmTemplate, "{model_id}") {
+				litellmModel = strings.ReplaceAll(litellmTemplate, "{model_id}", att.model)
+			} else if litellmTemplate == "" {
+				litellmModel = "openai/" + att.model
+			}
+			apiBaseForUser := pk.EndpointURL
+			if apiBaseForUser == "" {
+				apiBaseForUser = pcfg.APIBaseURL
+			}
+			rb["user_config"] = buildLitellmUserConfig(att.model, litellmModel, apiBaseForUser, dk)
 		}
 		jb, mErr := json.Marshal(rb)
 		if mErr != nil {
@@ -1075,6 +1111,34 @@ func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeC
 		providerCode,
 	).Scan(&cfg.Code, &cfg.Name, &cfg.APIBaseURL, &cfg.APIFormat)
 	return cfg, err
+}
+
+func getProviderLitellmTemplate(db *sql.DB, providerCode string) (string, error) {
+	var template string
+	err := db.QueryRow(
+		`SELECT COALESCE(litellm_model_template, '') 
+		 FROM model_providers 
+		 WHERE code = $1 AND status = 'active' 
+		 LIMIT 1`,
+		providerCode,
+	).Scan(&template)
+	if err != nil {
+		return "", err
+	}
+	return template, nil
+}
+
+func buildLitellmUserConfig(modelName, litellmModel, apiBase, apiKey string) map[string]interface{} {
+	return map[string]interface{}{
+		"model_list": []map[string]interface{}{{
+			"model_name": modelName,
+			"litellm_params": map[string]interface{}{
+				"model":    litellmModel,
+				"api_base": apiBase,
+				"api_key":  apiKey,
+			},
+		}},
+	}
 }
 
 // entitlementKeyFilterForRouter: nil = no filter (legacy); strict with no keys = empty slice (no SmartRouter pool).
