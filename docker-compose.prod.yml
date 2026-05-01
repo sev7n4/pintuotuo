@@ -257,23 +257,21 @@ services:
       - pintuotuo-network
 
   litellm:
-    # 固定版本：避免 latest 漂移；v1.83.x 含 provider/部署相关修复，利于 zai、minimax 等网关稳定启动
     image: litellm/litellm:v1.83.3-stable
     container_name: pintuotuo-litellm
     restart: unless-stopped
     environment:
+      - DATABASE_URL=postgresql://pintuotuo:${DB_PASSWORD}@postgres:5432/pintuotuo_db?sslmode=disable
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - MOONSHOT_API_KEY=${MOONSHOT_API_KEY:-}
-      # P1 扩展厂商（与 deploy/litellm/litellm_proxy_config.yaml 中 model_list 对应）
       - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - ZAI_API_KEY=${ZAI_API_KEY:-}
       - STEPFUN_API_KEY=${STEPFUN_API_KEY:-}
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
-      # OpenTelemetry：LiteLLM 若进程内启用 OTel，通常走 OTLP HTTP → Tempo 4318（与 Go 后端 gRPC 4317 区分）
       - OTEL_SERVICE_NAME=${LITELLM_OTEL_SERVICE_NAME:-litellm-proxy}
       - OTEL_EXPORTER_OTLP_ENDPOINT=${LITELLM_OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318}
     volumes:
@@ -291,6 +289,9 @@ services:
       - "4000:4000"
     networks:
       - pintuotuo-network
+    depends_on:
+      postgres:
+        condition: service_healthy
     profiles: ["llm-gateway"]
 
 networks:
