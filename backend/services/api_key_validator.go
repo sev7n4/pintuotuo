@@ -711,7 +711,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 			probeSupported := apiFmt == modelProviderOpenAI
 			result.PricingVerified = probeSupported
 			if probeSupported {
-				quotaOK, quotaCode, quotaMsg := v.probeQuotaWithEndpoint(endpoint, provider, authToken, result.ModelsFound)
+				quotaOK, quotaCode, quotaMsg := v.probeQuotaWithEndpoint(endpoint, provider, authToken, result.ModelsFound, routeMode, decryptedKey)
 				if !quotaOK {
 					v.handleVerificationError(ctx, verificationID, apiKeyID, quotaCode, quotaMsg, startTime)
 					return
@@ -899,7 +899,7 @@ func (v *APIKeyValidator) resolveAuthToken(routeMode string, originalAPIKey stri
 	}
 }
 
-func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey string, models []string) (bool, string, string) {
+func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey string, models []string, routeMode, originalAPIKey string) (bool, string, string) {
 	baseURL := strings.TrimRight(endpoint, "/")
 	if baseURL == "" {
 		return false, "QUOTA_PROBE_CONFIG_ERROR", "endpoint is empty"
@@ -916,6 +916,17 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 			{"role": "user", "content": "ping"},
 		},
 		"max_tokens": 1,
+	}
+
+	if routeMode == GatewayModeLitellm && originalAPIKey != "" {
+		providerConfig, err := v.getProviderConfig(provider)
+		if err == nil {
+			upstreamBaseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
+			if upstreamBaseURL != "" {
+				body["api_key"] = originalAPIKey
+				body["api_base"] = upstreamBaseURL
+			}
+		}
 	}
 
 	jsonBody, _ := json.Marshal(body)
