@@ -13,9 +13,7 @@ model_list:
       configurable_clientside_auth_params: ["api_key", "api_base"]
 
 general_settings:
-  master_key: os.environ/LITELLM_MASTER_KEY
-  forward_client_headers_to_llm_api: true
-  forward_llm_provider_auth_headers: true
+  master_key: ""
 
 router_settings:
   routing_strategy: simple-shuffle
