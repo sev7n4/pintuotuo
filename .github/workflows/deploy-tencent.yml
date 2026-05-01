@@ -70,7 +70,7 @@ jobs:
           echo "Login GHCR and pull prebuilt images..."
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           for i in 1 2 3 4 5; do
-            if IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway pull; then
+            if IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml pull; then
               break
             fi
             if [ "$i" -eq 5 ]; then
@@ -80,34 +80,9 @@ jobs:
             sleep $((i * 20))
           done
           echo "Starting containers (no server-side build)..."
-          IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway up -d
-          echo "Force recreating litellm container to ensure latest image..."
-          docker compose -f docker-compose.prod.yml --profile llm-gateway up -d --force-recreate litellm || true
-          echo "Running database migrations..."
-          for migration_file in backend/migrations/*.sql; do
-            filename=$(basename "$migration_file")
-            echo "Checking migration: $filename"
-            # Extract SQL between "-- +goose Up" and "-- +goose Down" for goose-formatted migrations
-            # If no goose markers, execute the entire file
-            migration_sql=$(sed -n '/-- +goose Up/,/-- +goose Down/p' "$migration_file" | sed '1d;$d' | sed '/-- +goose StatementBegin/d' | sed '/-- +goose StatementEnd/d')
-            if [ -n "$migration_sql" ]; then
-              echo "Executing goose-formatted migration: $filename"
-              echo "$migration_sql" | docker exec -i pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 2>&1 || echo "Migration $filename may have already been applied or had non-fatal errors"
-            else
-              echo "Executing plain SQL migration: $filename"
-              docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 -f "/docker-entrypoint-initdb.d/$filename" 2>&1 || echo "Migration $filename may have already been applied or had non-fatal errors"
-            fi
-          done
-          echo "Migrations completed"
+          IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml up -d
           echo "Pruning dangling images to keep disk stable..."
           docker image prune -f >/dev/null || true
-          echo "Verifying gateway containers are running..."
-          if ! docker ps --format '{{.Names}}' | grep -q '^pintuotuo-litellm$'; then
-            echo "ERROR: pintuotuo-litellm not in running containers"
-            docker ps -a
-            exit 1
-          fi
-          echo "Gateway container OK (litellm)."
           echo "Seeding database..."
           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('admin@example.com', 'Admin', 'd5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05', 'admin', 'active') ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;"
           echo "Seed user password update completed"
