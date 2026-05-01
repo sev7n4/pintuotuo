@@ -925,6 +925,9 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 			if upstreamBaseURL != "" {
 				body["api_key"] = originalAPIKey
 				body["api_base"] = upstreamBaseURL
+				if !strings.Contains(model, "/") {
+					body["model"] = "openai/" + model
+				}
 			}
 		}
 	}
