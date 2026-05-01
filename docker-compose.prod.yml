@@ -257,7 +257,7 @@ services:
       - pintuotuo-network
 
   litellm:
-    image: litellm/litellm:v1.83.3-stable
+    image: litellm/litellm-database:v1.83.3-stable
     container_name: pintuotuo-litellm
     restart: unless-stopped
     environment:
