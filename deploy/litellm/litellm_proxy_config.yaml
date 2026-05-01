@@ -2,10 +2,20 @@
 # 所有配置从 merchant_api_keys + merchant_skus 动态获取
 # 文档：https://docs.litellm.ai/docs/proxy/clientside_auth
 
-model_list: []
+model_list:
+  - model_name: openai/*
+    litellm_params:
+      model: openai/*
+      configurable_clientside_auth_params: ["api_key", "api_base"]
+  - model_name: anthropic/*
+    litellm_params:
+      model: anthropic/*
+      configurable_clientside_auth_params: ["api_key", "api_base"]
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
+  forward_client_headers_to_llm_api: true
+  forward_llm_provider_auth_headers: true
 
 router_settings:
   routing_strategy: simple-shuffle
