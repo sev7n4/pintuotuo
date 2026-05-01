@@ -1,0 +1,74 @@
+name: Deploy LiteLLM Gateway
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+      litellm_image_tag:
+        description: 'LiteLLM image tag (e.g., main-latest)'
+        required: true
+        default: 'main-latest'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-litellm:
+    name: Deploy LiteLLM Gateway
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Deploy LiteLLM to Tencent Cloud
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.TENCENT_CLOUD_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
+          set -e
+          cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}
+          echo "Fetching latest code from GitHub..."
+          git fetch origin ${{ github.event.inputs.branch }}
+          git reset --hard origin/${{ github.event.inputs.branch }}
+          
+          echo "Pulling LiteLLM image..."
+          docker pull ghcr.io/berriai/litellm-database:${{ github.event.inputs.litellm_image_tag }}
+          
+          echo "Starting LiteLLM container..."
+          docker-compose -f docker-compose.prod.yml --profile llm-gateway up -d litellm
+          
+          echo "Verifying LiteLLM container is running..."
+          if ! docker ps --format '{{.Names}}' | grep -q '^pintuotuo-litellm$'; then
+            echo "ERROR: pintuotuo-litellm not in running containers"
+            docker ps -a
+            exit 1
+          fi
+          
+          echo "Checking LiteLLM health..."
+          sleep 10
+          curl -f http://localhost:4000/health || echo "Warning: LiteLLM health check failed"
+          
+          echo 'LiteLLM deployment completed successfully'
+          EOF
+
+          rm -f ~/.ssh/deploy_key
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          echo "## LiteLLM Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Tencent Cloud | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | ${{ github.event.inputs.branch }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Server | ${{ secrets.TENCENT_CLOUD_IP }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image Tag | ${{ github.event.inputs.litellm_image_tag }} |" >> $GITHUB_STEP_SUMMARY
