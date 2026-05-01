@@ -257,7 +257,7 @@ services:
       - pintuotuo-network
 
   litellm:
-    image: litellm/litellm-database:v1.83.3-stable
+    image: ghcr.io/berriai/litellm-database:main-latest
     container_name: pintuotuo-litellm
     restart: unless-stopped
     environment:
