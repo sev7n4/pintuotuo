@@ -483,11 +483,13 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				} else if litellmTemplate == "" {
 					litellmModel = "openai/" + att.model
 				}
+				rb["model"] = litellmModel
 				apiBaseForUser := pk.EndpointURL
 				if apiBaseForUser == "" {
 					apiBaseForUser = pcfg.APIBaseURL
 				}
-				rb["user_config"] = buildLitellmUserConfig(att.model, litellmModel, apiBaseForUser, dk)
+				rb["api_key"] = dk
+				rb["api_base"] = apiBaseForUser
 			}
 			jb, mErr := json.Marshal(rb)
 			if mErr != nil {
@@ -665,11 +667,13 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			} else if litellmTemplate == "" {
 				litellmModel = "openai/" + att.model
 			}
+			rb["model"] = litellmModel
 			apiBaseForUser := pk.EndpointURL
 			if apiBaseForUser == "" {
 				apiBaseForUser = pcfg.APIBaseURL
 			}
-			rb["user_config"] = buildLitellmUserConfig(att.model, litellmModel, apiBaseForUser, dk)
+			rb["api_key"] = dk
+			rb["api_base"] = apiBaseForUser
 		}
 		jb, mErr := json.Marshal(rb)
 		if mErr != nil {
@@ -1126,19 +1130,6 @@ func getProviderLitellmTemplate(db *sql.DB, providerCode string) (string, error)
 		return "", err
 	}
 	return template, nil
-}
-
-func buildLitellmUserConfig(modelName, litellmModel, apiBase, apiKey string) map[string]interface{} {
-	return map[string]interface{}{
-		"model_list": []map[string]interface{}{{
-			"model_name": modelName,
-			"litellm_params": map[string]interface{}{
-				"model":    litellmModel,
-				"api_base": apiBase,
-				"api_key":  apiKey,
-			},
-		}},
-	}
 }
 
 // entitlementKeyFilterForRouter: nil = no filter (legacy); strict with no keys = empty slice (no SmartRouter pool).
