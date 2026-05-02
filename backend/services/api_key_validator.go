@@ -599,6 +599,9 @@ func (v *APIKeyValidator) probeQuota(providerConfig map[string]string, provider,
 	if msg == "" {
 		msg = strings.TrimSpace(string(rawBody))
 	}
+	if resp.StatusCode == http.StatusPaymentRequired || resp.StatusCode == http.StatusTooManyRequests {
+		code = errorCategoryQuotaInsufficient
+	}
 	return false, code, msg
 }
 
@@ -1036,6 +1039,9 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	if msg == "" {
 		msg = strings.TrimSpace(string(rawBody))
 	}
+	if resp.StatusCode == http.StatusPaymentRequired || resp.StatusCode == http.StatusTooManyRequests {
+		code = errorCategoryQuotaInsufficient
+	}
 	return false, code, msg
 }
 
@@ -1100,6 +1106,9 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 	}
 	if msg == "" {
 		msg = strings.TrimSpace(string(rawBody))
+	}
+	if resp.StatusCode == http.StatusPaymentRequired || resp.StatusCode == http.StatusTooManyRequests {
+		code = errorCategoryQuotaInsufficient
 	}
 	return false, code, msg
 }
