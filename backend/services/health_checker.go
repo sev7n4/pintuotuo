@@ -155,7 +155,13 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 		}, nil
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.getDecryptedAPIKey(apiKey)))
+	authToken := s.getDecryptedAPIKey(apiKey)
+	if apiKey.RouteMode == GatewayModeLitellm {
+		if masterKey := os.Getenv("LITELLM_MASTER_KEY"); masterKey != "" {
+			authToken = strings.TrimSpace(masterKey)
+		}
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 	req.Header.Set("Content-Type", "application/json")
 
 	start := time.Now()
@@ -203,7 +209,13 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 	}
 
 	modelsEndpoint := openAICompatModelsProbeURL(endpoint)
-	probe, err := ProbeProviderModels(ctx, s.httpClient, modelsEndpoint, s.getDecryptedAPIKey(apiKey))
+	authToken := s.getDecryptedAPIKey(apiKey)
+	if apiKey.RouteMode == GatewayModeLitellm {
+		if masterKey := os.Getenv("LITELLM_MASTER_KEY"); masterKey != "" {
+			authToken = strings.TrimSpace(masterKey)
+		}
+	}
+	probe, err := ProbeProviderModels(ctx, s.httpClient, modelsEndpoint, authToken)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -834,7 +846,13 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 		}, nil
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.getDecryptedAPIKey(apiKey)))
+	authToken := s.getDecryptedAPIKey(apiKey)
+	if apiKey.RouteMode == GatewayModeLitellm {
+		if masterKey := os.Getenv("LITELLM_MASTER_KEY"); masterKey != "" {
+			authToken = strings.TrimSpace(masterKey)
+		}
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 	req.Header.Set("Content-Type", "application/json")
 
 	start := time.Now()
