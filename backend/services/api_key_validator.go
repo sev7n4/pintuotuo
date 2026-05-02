@@ -63,6 +63,9 @@ const (
 	verificationStatusSuccess  = "success"
 	verificationStatusFailed   = "failed"
 	verificationResultVerified = "verified"
+
+	ErrCodeQuotaProbeRequestBuildFailed = "QUOTA_PROBE_REQUEST_BUILD_FAILED"
+	ErrCodeQuotaProbeNetworkError       = "QUOTA_PROBE_NETWORK_ERROR"
 )
 
 var (
@@ -559,14 +562,14 @@ func (v *APIKeyValidator) probeQuota(providerConfig map[string]string, provider,
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return false, "QUOTA_PROBE_REQUEST_BUILD_FAILED", err.Error()
+		return false, ErrCodeQuotaProbeRequestBuildFailed, err.Error()
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
 	if err != nil {
-		return false, "QUOTA_PROBE_NETWORK_ERROR", err.Error()
+		return false, ErrCodeQuotaProbeNetworkError, err.Error()
 	}
 	defer resp.Body.Close()
 
@@ -722,10 +725,10 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		result.ModelsCount = len(result.ModelsFound)
 
 		logger.LogWarn(ctx, "api_key_validator", "Light verification failed, using predefined models", map[string]interface{}{
-			"api_key_id":     apiKeyID,
-			"provider":       provider,
-			"error_code":     code,
-			"error_message":  msg,
+			"api_key_id":      apiKeyID,
+			"provider":        provider,
+			"error_code":      code,
+			"error_message":   msg,
 			"models_fallback": result.ModelsFound,
 		})
 
@@ -1001,14 +1004,14 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequest("POST", chatEndpoint, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return false, "QUOTA_PROBE_REQUEST_BUILD_FAILED", err.Error()
+		return false, ErrCodeQuotaProbeRequestBuildFailed, err.Error()
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
 	if err != nil {
-		return false, "QUOTA_PROBE_NETWORK_ERROR", err.Error()
+		return false, ErrCodeQuotaProbeNetworkError, err.Error()
 	}
 	defer resp.Body.Close()
 
@@ -1057,23 +1060,23 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 	}
 
 	body := map[string]interface{}{
-		"model":      "probe-model",
-		"messages":   []map[string]string{{"role": "user", "content": "ping"}},
-		"max_tokens": 1,
+		"model":       "probe-model",
+		"messages":    []map[string]string{{"role": "user", "content": "ping"}},
+		"max_tokens":  1,
 		"user_config": userConfig,
 	}
 
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequest("POST", chatEndpoint, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return false, "QUOTA_PROBE_REQUEST_BUILD_FAILED", err.Error()
+		return false, ErrCodeQuotaProbeRequestBuildFailed, err.Error()
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", litellmMasterKey))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
 	if err != nil {
-		return false, "QUOTA_PROBE_NETWORK_ERROR", err.Error()
+		return false, ErrCodeQuotaProbeNetworkError, err.Error()
 	}
 	defer resp.Body.Close()
 
