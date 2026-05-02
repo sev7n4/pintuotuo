@@ -918,20 +918,6 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 		"max_tokens": 1,
 	}
 
-	if routeMode == GatewayModeLitellm && originalAPIKey != "" {
-		providerConfig, err := v.getProviderConfig(provider)
-		if err == nil {
-			upstreamBaseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
-			if upstreamBaseURL != "" {
-				body["api_key"] = originalAPIKey
-				body["api_base"] = upstreamBaseURL
-				if !strings.Contains(model, "/") {
-					body["model"] = "openai/" + model
-				}
-			}
-		}
-	}
-
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequest("POST", chatEndpoint, bytes.NewBuffer(jsonBody))
 	if err != nil {
@@ -939,6 +925,24 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 	req.Header.Set("Content-Type", "application/json")
+
+	if routeMode == GatewayModeLitellm && originalAPIKey != "" {
+		providerConfig, providerErr := v.getProviderConfig(provider)
+		if providerErr == nil {
+			upstreamBaseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
+			if upstreamBaseURL != "" {
+				req.Header.Set("x-api-key", originalAPIKey)
+				req.Header.Set("x-api-base", upstreamBaseURL)
+				if !strings.Contains(model, "/") {
+					var newBody map[string]interface{}
+					json.Unmarshal(jsonBody, &newBody)
+					newBody["model"] = "openai/" + model
+					jsonBody, _ = json.Marshal(newBody)
+					req.Body = io.NopCloser(bytes.NewBuffer(jsonBody))
+				}
+			}
+		}
+	}
 
 	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
 	if err != nil {
