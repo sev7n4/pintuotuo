@@ -2,10 +2,7 @@ import type { MerchantAPIKey } from '@/types';
 
 /** 与后端 strict 权益白名单 buildAllowlistEdgesForSKU 条件对齐 */
 export function isStrictEntitlementEligible(k: MerchantAPIKey): boolean {
-  const verifiedLine =
-    !!(k.verified_at && String(k.verified_at).trim() !== '') ||
-    k.verification_result === 'verified' ||
-    k.verification_result === 'success';
+  const verifiedLine = k.verification_result === 'verified';
   const h = (k.health_status || 'unknown').toLowerCase();
   const healthOk = h === 'healthy' || h === 'degraded';
   return verifiedLine && healthOk;

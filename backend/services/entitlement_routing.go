@@ -188,7 +188,7 @@ WHERE ms.sku_id = $1
   AND ms.api_key_id IS NOT NULL
   AND lower(trim(mak.provider)) = lower(trim($2::text))
   AND mak.status = 'active'
-  AND (mak.verified_at IS NOT NULL OR mak.verification_result = 'verified')
+  AND mak.verification_result = 'verified'
   AND mak.health_status IN ('healthy', 'degraded')
   AND (mak.quota_limit IS NULL OR mak.quota_used < mak.quota_limit)
 ORDER BY ms.id ASC`

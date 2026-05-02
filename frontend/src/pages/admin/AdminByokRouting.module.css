@@ -110,6 +110,54 @@
   transform: scale(1.3);
 }
 
+.statusDotSuspend {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06) inset;
+  cursor: pointer;
+  background: #faad14;
+  transition: transform 0.2s ease;
+}
+
+.statusDotSuspend:hover {
+  transform: scale(1.3);
+}
+
+.statusDotUnreachable {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06) inset;
+  cursor: pointer;
+  background: #ff4d4f;
+  transition: transform 0.2s ease;
+}
+
+.statusDotUnreachable:hover {
+  transform: scale(1.3);
+}
+
+.statusDotInvalid {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06) inset;
+  cursor: pointer;
+  background: #ff4d4f;
+  transition: transform 0.2s ease;
+}
+
+.statusDotInvalid:hover {
+  transform: scale(1.3);
+}
+
 .statusDotVerifyFailed {
   display: inline-block;
   width: 12px;

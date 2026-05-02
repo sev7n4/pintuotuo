@@ -210,12 +210,14 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 		return
 	}
 
-	err = v.updateAPIKeyVerificationStatus(apiKeyID, result)
-	if err != nil {
-		logger.LogError(ctx, "api_key_validator", "Failed to update API key verification status", err, map[string]interface{}{
-			"api_key_id": apiKeyID,
-		})
-		return
+	if isDeepVerification(verificationType) {
+		err = v.updateAPIKeyVerificationStatus(apiKeyID, result)
+		if err != nil {
+			logger.LogError(ctx, "api_key_validator", "Failed to update API key verification status", err, map[string]interface{}{
+				"api_key_id": apiKeyID,
+			})
+			return
+		}
 	}
 
 	err = v.cacheVerificationResult(ctx, result)
@@ -233,6 +235,7 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 		"models_count":       result.ModelsCount,
 		"connection_latency": result.ConnectionLatency,
 		"retry_count":        result.RetryCount,
+		"is_deep":            isDeepVerification(verificationType),
 	})
 }
 
@@ -425,6 +428,11 @@ func nullStr(s string) interface{} {
 }
 
 func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result VerificationResult) error {
+	dbResult := normalizeVerificationDBStatus(result.Status)
+	return v.updateAPIKeyVerificationStatusWithStatus(apiKeyID, result, dbResult)
+}
+
+func (v *APIKeyValidator) updateAPIKeyVerificationStatusWithStatus(apiKeyID int, result VerificationResult, dbResult string) error {
 	db := v.ensureDB()
 	if db == nil {
 		return fmt.Errorf("database not available")
@@ -440,7 +448,11 @@ func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result Ve
 	} else if result.Status == verificationStatusFailed && result.ErrorCode != "" && verifyMsg != "" && verifyMsg != result.ErrorCode {
 		verifyMsg = fmt.Sprintf("[%s] %s", result.ErrorCode, verifyMsg)
 	}
-	dbResult := normalizeVerificationDBStatus(result.Status)
+
+	var verifiedAt interface{}
+	if dbResult == VerificationStatusVerified {
+		verifiedAt = result.CompletedAt
+	}
 
 	var merchantID int
 	err := db.QueryRow(
@@ -448,13 +460,12 @@ func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result Ve
 		 SET verification_result = $1, verified_at = $2, models_supported = $3, verification_message = $4, updated_at = NOW()
 		 WHERE id = $5
 		 RETURNING merchant_id`,
-		dbResult, result.CompletedAt, modelsJSON, verifyMsg, apiKeyID,
+		dbResult, verifiedAt, modelsJSON, verifyMsg, apiKeyID,
 	).Scan(&merchantID)
 	if err != nil {
 		return err
 	}
 
-	// 验证结果落库后必须清理商户 API Key 列表缓存，否则前端会看到旧 verification_result。
 	cache.Delete(context.Background(), cache.MerchantAPIKeysKey(merchantID))
 
 	return nil
@@ -495,11 +506,12 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 	}
 
 	var provider string
+	var currentStatus string
 	if db := v.ensureDB(); db != nil {
 		db.QueryRow(
-			"SELECT provider FROM api_key_verifications v JOIN merchant_api_keys k ON v.api_key_id = k.id WHERE v.id = $1",
+			"SELECT k.provider, k.verification_result FROM api_key_verifications v JOIN merchant_api_keys k ON v.api_key_id = k.id WHERE v.id = $1",
 			verificationID,
-		).Scan(&provider)
+		).Scan(&provider, &currentStatus)
 	}
 
 	if provider != "" {
@@ -516,7 +528,8 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 	}
 
 	if apiKeyID > 0 {
-		if uerr := v.updateAPIKeyVerificationStatus(apiKeyID, result); uerr != nil {
+		newStatus := MapErrorCategoryToVerificationStatus(errInfo.Category, currentStatus)
+		if uerr := v.updateAPIKeyVerificationStatusWithStatus(apiKeyID, result, newStatus); uerr != nil {
 			logger.LogError(ctx, "api_key_validator", "Failed to update merchant_api_keys after verification error", uerr, map[string]interface{}{
 				"api_key_id": apiKeyID,
 			})
@@ -526,6 +539,7 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 	logger.LogError(ctx, "api_key_validator", "API key verification failed", fmt.Errorf("%s", errorMessage), map[string]interface{}{
 		"verification_id": verificationID,
 		"error_code":      errorCode,
+		"error_category":  errInfo.Category,
 	})
 }
 
@@ -747,14 +761,6 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 				return
 			}
 
-			err = v.updateAPIKeyVerificationStatus(apiKeyID, result)
-			if err != nil {
-				logger.LogError(ctx, "api_key_validator", "Failed to update API key verification status", err, map[string]interface{}{
-					"api_key_id": apiKeyID,
-				})
-				return
-			}
-
 			err = v.cacheVerificationResult(ctx, result)
 			if err != nil {
 				logger.LogError(ctx, "api_key_validator", "Failed to cache verification result", err, map[string]interface{}{
@@ -813,12 +819,14 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		return
 	}
 
-	err = v.updateAPIKeyVerificationStatus(apiKeyID, result)
-	if err != nil {
-		logger.LogError(ctx, "api_key_validator", "Failed to update API key verification status", err, map[string]interface{}{
-			"api_key_id": apiKeyID,
-		})
-		return
+	if isDeepVerification(verificationType) {
+		err = v.updateAPIKeyVerificationStatus(apiKeyID, result)
+		if err != nil {
+			logger.LogError(ctx, "api_key_validator", "Failed to update API key verification status", err, map[string]interface{}{
+				"api_key_id": apiKeyID,
+			})
+			return
+		}
 	}
 
 	err = v.cacheVerificationResult(ctx, result)
@@ -838,6 +846,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		"retry_count":        result.RetryCount,
 		"route_mode":         routeMode,
 		"endpoint_used":      endpoint,
+		"is_deep":            isDeepVerification(verificationType),
 	})
 }
 

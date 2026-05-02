@@ -127,29 +127,44 @@ function healthTooltipDesc(status?: string): string {
 
 function verificationDotClass(result?: string): string {
   const r = (result || '').toLowerCase();
-  if (r === 'verified' || r === 'success') return styles.statusDotVerified;
+  if (r === 'verified') return styles.statusDotVerified;
+  if (r === 'suspend') return styles.statusDotSuspend;
+  if (r === 'unreachable') return styles.statusDotUnreachable;
+  if (r === 'invalid') return styles.statusDotInvalid;
   if (r === 'failed') return styles.statusDotVerifyFailed;
   return styles.statusDotVerifyPending;
 }
 
 function verificationLabel(result?: string): string {
   const r = (result || '').toLowerCase();
-  if (r === 'verified' || r === 'success') return '已验证';
+  if (r === 'verified') return '验证通过';
+  if (r === 'suspend') return '余额不足';
+  if (r === 'unreachable') return '连接失败';
+  if (r === 'invalid') return '认证失败';
   if (r === 'failed') return '验证失败';
   if (r === 'pending' || r === 'in_progress') return '验证中';
-  return '未验证';
+  return '待验证';
 }
 
 function verificationTooltipDesc(k: MerchantAPIKey): string {
   const r = (k.verification_result || '').toLowerCase();
   const base = `验证结果：${verificationLabel(k.verification_result)}。`;
-  if (r === 'verified' || r === 'success') {
-    return `${base}已通过上游 OpenAI 兼容 /models（及深度验证时的额外检查）。`;
+  if (r === 'verified') {
+    return `${base}已通过深度验证，可作为路由候选。`;
+  }
+  if (r === 'suspend') {
+    return `${base}请充值后重新验证。`;
+  }
+  if (r === 'unreachable') {
+    return `${base}请检查网络或端点配置。`;
+  }
+  if (r === 'invalid') {
+    return `${base}请更换 API Key。`;
   }
   if (r === 'failed') {
-    return `${base}请修正 Key 或厂商配置后重新「轻量/深度验证」。注意：若仅有验证时间但结果为失败，strict 仍可能因其它条件不通过。`;
+    return `${base}请查看详情并修正问题。`;
   }
-  return `${base}请完成「轻量验证」或「深度验证」；通过后会写入 verified。`;
+  return `${base}请完成深度验证。`;
 }
 
 function formatHealthError(record: MerchantAPIKey): string {

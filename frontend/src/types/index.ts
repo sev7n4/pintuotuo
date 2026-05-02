@@ -472,8 +472,8 @@ export interface MerchantAPIKey {
   consecutive_failures?: number;
 
   verified_at?: string;
-  /** 与后端 merchant_api_keys.verification_result 对齐：verified | failed | pending 等 */
-  verification_result?: 'verified' | 'success' | 'failed' | 'pending' | string;
+  /** 与后端 merchant_api_keys.verification_result 对齐：verified | suspend | unreachable | invalid | failed | pending */
+  verification_result?: 'verified' | 'suspend' | 'unreachable' | 'invalid' | 'failed' | 'pending' | string;
   verification_message?: string;
   models_supported?: string[];
 

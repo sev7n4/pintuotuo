@@ -221,7 +221,7 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 			COALESCE(mak.region, 'domestic') as region,
 			COALESCE(mak.security_level, 'standard') as security_level,
 			COALESCE(mak.health_status, 'unknown') as health_status,
-			CASE WHEN mak.verified_at IS NOT NULL OR mak.verification_result = 'verified' THEN true ELSE false END as verified
+			CASE WHEN mak.verification_result = 'verified' THEN true ELSE false END as verified
 		FROM merchant_api_keys mak
 		WHERE mak.status = 'active'
 			AND mak.models_supported ? $1
