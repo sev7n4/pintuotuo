@@ -952,6 +952,8 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 					newBody["model"] = "openai/" + model
 					jsonBody, _ = json.Marshal(newBody)
 					req.Body = io.NopCloser(bytes.NewBuffer(jsonBody))
+					req.ContentLength = int64(len(jsonBody))
+					req.Header.Set("Content-Length", fmt.Sprintf("%d", len(jsonBody)))
 				}
 			}
 		}
