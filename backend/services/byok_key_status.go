@@ -7,7 +7,6 @@ import (
 
 const (
 	byokVerificationVerified = "verified"
-	byokVerificationSuccess  = "success"
 	byokHealthDegraded       = "degraded"
 	byokHealthUnknown        = "unknown"
 	byokHealthUnhealthy      = "unhealthy"
@@ -15,10 +14,10 @@ const (
 )
 
 // KeyMeetsStrictAllowlist 与 entitlement 白名单 SQL 一致：
-// (verified_at IS NOT NULL OR verification_result = 'verified') AND health IN (healthy, degraded)
+// verification_result = 'verified' AND health IN (healthy, degraded)
 func KeyMeetsStrictAllowlist(health, verification string, verifiedAt sql.NullTime) bool {
 	vr := strings.ToLower(strings.TrimSpace(verification))
-	verifiedLine := verifiedAt.Valid || vr == byokVerificationVerified || vr == byokVerificationSuccess
+	verifiedLine := vr == byokVerificationVerified
 	h := strings.ToLower(strings.TrimSpace(health))
 	if h == "" {
 		h = byokHealthUnknown

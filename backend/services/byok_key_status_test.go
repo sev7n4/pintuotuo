@@ -12,8 +12,17 @@ func TestKeyMeetsStrictAllowlist(t *testing.T) {
 	if KeyMeetsStrictAllowlist("unhealthy", "verified", sql.NullTime{}) {
 		t.Fatal("unhealthy should fail")
 	}
-	if !KeyMeetsStrictAllowlist("degraded", "success", sql.NullTime{Valid: true}) {
-		t.Fatal("degraded + success should pass")
+	if !KeyMeetsStrictAllowlist("degraded", "verified", sql.NullTime{}) {
+		t.Fatal("degraded + verified should pass")
+	}
+	if KeyMeetsStrictAllowlist("healthy", "success", sql.NullTime{Valid: true}) {
+		t.Fatal("success should not pass, only verified is valid")
+	}
+	if KeyMeetsStrictAllowlist("healthy", "suspend", sql.NullTime{}) {
+		t.Fatal("suspend should not pass")
+	}
+	if KeyMeetsStrictAllowlist("healthy", "pending", sql.NullTime{}) {
+		t.Fatal("pending should not pass")
 	}
 }
 

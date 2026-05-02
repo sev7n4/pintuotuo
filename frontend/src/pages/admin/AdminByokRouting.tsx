@@ -116,7 +116,10 @@ function healthTooltipDesc(status?: string): string {
 
 function verificationDotClass(result?: string): string {
   const r = (result || '').toLowerCase();
-  if (r === 'verified' || r === 'success') return styles.statusDotVerified;
+  if (r === 'verified') return styles.statusDotVerified;
+  if (r === 'suspend') return styles.statusDotSuspend;
+  if (r === 'unreachable') return styles.statusDotUnreachable;
+  if (r === 'invalid') return styles.statusDotInvalid;
   if (r === 'failed') return styles.statusDotVerifyFailed;
   if (r === 'in_progress') return styles.statusDotInProgress;
   return styles.statusDotVerifyPending;
@@ -124,25 +127,37 @@ function verificationDotClass(result?: string): string {
 
 function verificationLabel(result?: string): string {
   const r = (result || '').toLowerCase();
-  if (r === 'verified' || r === 'success') return '已验证';
+  if (r === 'verified') return '验证通过';
+  if (r === 'suspend') return '余额不足';
+  if (r === 'unreachable') return '连接失败';
+  if (r === 'invalid') return '认证失败';
   if (r === 'failed') return '验证失败';
   if (r === 'in_progress') return '验证中';
-  return '未验证';
+  return '待验证';
 }
 
 function verificationTooltipDesc(result?: string): string {
   const r = (result || '').toLowerCase();
   const base = `验证结果：${verificationLabel(result)}。`;
-  if (r === 'verified' || r === 'success') {
-    return `${base}已通过上游验证。`;
+  if (r === 'verified') {
+    return `${base}已通过深度验证，可作为路由候选。`;
+  }
+  if (r === 'suspend') {
+    return `${base}请充值后重新验证。`;
+  }
+  if (r === 'unreachable') {
+    return `${base}请检查网络或端点配置。`;
+  }
+  if (r === 'invalid') {
+    return `${base}请更换 API Key。`;
   }
   if (r === 'failed') {
-    return `${base}请修正 Key 或配置后重新验证。`;
+    return `${base}请查看详情并修正问题。`;
   }
   if (r === 'in_progress') {
     return `${base}正在验证中，请稍后刷新。`;
   }
-  return `${base}请完成验证。`;
+  return `${base}请完成深度验证。`;
 }
 
 interface OperationResult {

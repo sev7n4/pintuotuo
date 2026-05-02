@@ -1,20 +1,21 @@
 {
-  "workflow_id": "litellm-byok-verification-optimization",
+  "workflow_id": "enhance-verification-status-enum",
   "created_at": "2026-05-02T00:00:00Z",
-  "current_step": 9,
-  "issue_description": "LiteLLM BYOK验证优化 - 使用user_config实现动态路由配置",
+  "current_step": 10,
+  "issue_description": "优化候选筛选逻辑：扩展 verification_result 枚举值，区分轻量验证和深度验证状态",
   "current_fix_cases": [
-    "FEATURE: 轻量验证使用预定义模型fallback",
-    "FEATURE: 深度验证使用LiteLLM user_config",
-    "FEATURE: 生产请求使用LiteLLM user_config动态路由"
+    "FEATURE: 轻量验证不更新 verification_result",
+    "FEATURE: 深度验证根据错误分类更新状态",
+    "FEATURE: 候选筛选只选择 verified 状态",
+    "UI: 前端展示验证状态图标和提示"
   ],
-  "branch_name": "feature/litellm-byok-verification-optimization",
-  "pr_number": null,
+  "branch_name": "enhance/verification-status-enum",
+  "pr_number": 424,
   "merged": false,
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "",
+    "cicd": "running",
     "integration": "",
     "e2e": "",
     "deploy": ""

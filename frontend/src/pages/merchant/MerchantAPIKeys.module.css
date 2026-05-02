@@ -61,6 +61,18 @@
   background: #52c41a;
 }
 
+.statusDotSuspend {
+  background: #faad14;
+}
+
+.statusDotUnreachable {
+  background: #ff4d4f;
+}
+
+.statusDotInvalid {
+  background: #ff4d4f;
+}
+
 .statusDotVerifyFailed {
   background: #ff4d4f;
 }
