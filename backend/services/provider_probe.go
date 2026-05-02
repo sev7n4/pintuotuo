@@ -169,3 +169,21 @@ func ProbeEndpointURL(ctx context.Context, url string, apiKey string, timeoutMs 
 
 	return result
 }
+
+var predefinedModels = map[string][]string{
+	"openai":    {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"},
+	"anthropic": {"claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-haiku-20240307"},
+	"stepfun":   {"stepfun-step-1-8k", "stepfun-step-1-32k", "stepfun-step-2-16k"},
+	"deepseek":  {"deepseek-chat", "deepseek-coder"},
+	"moonshot":  {"moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"},
+	"zhipu":     {"glm-4", "glm-4-flash", "glm-3-turbo"},
+	"qwen":      {"qwen-turbo", "qwen-plus", "qwen-max"},
+}
+
+func GetPredefinedModels(provider string) []string {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if models, ok := predefinedModels[provider]; ok {
+		return models
+	}
+	return []string{}
+}
