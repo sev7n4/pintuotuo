@@ -1,7 +1,7 @@
 {
   "workflow_id": "enhance-verification-status-enum",
   "created_at": "2026-05-02T00:00:00Z",
-  "current_step": 9,
+  "current_step": 10,
   "issue_description": "优化候选筛选逻辑：扩展 verification_result 枚举值，区分轻量验证和深度验证状态",
   "current_fix_cases": [
     "FEATURE: 轻量验证不更新 verification_result",
@@ -10,12 +10,12 @@
     "UI: 前端展示验证状态图标和提示"
   ],
   "branch_name": "enhance/verification-status-enum",
-  "pr_number": null,
+  "pr_number": 424,
   "merged": false,
   "retry_count": 0,
   "error_history": [],
   "ci_status": {
-    "cicd": "",
+    "cicd": "running",
     "integration": "",
     "e2e": "",
     "deploy": ""
