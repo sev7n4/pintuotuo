@@ -28,6 +28,8 @@ type VerificationResult struct {
 	Status            string                 `json:"status"`
 	ConnectionTest    bool                   `json:"connection_test"`
 	ConnectionLatency int                    `json:"connection_latency_ms"`
+	ConnectionError   string                 `json:"connection_error,omitempty"`
+	NetworkStatus     string                 `json:"network_status,omitempty"`
 	ModelsFound       []string               `json:"models_found"`
 	ModelsCount       int                    `json:"models_count"`
 	PricingVerified   bool                   `json:"pricing_verified"`
@@ -685,6 +687,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 
 	var probe *ProbeModelsResult
 	var probeErr error
+	var connectionFailed bool
 	for attempt := retryCount; ; attempt++ {
 		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, modelsAuthToken)
 		if probeErr == nil && probe != nil && probe.Success {
@@ -692,30 +695,89 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 			break
 		}
 		if attempt >= v.maxRetries || !shouldRetryVerificationAttempt(probe, probeErr) {
-			msg := "connection test failed"
-			if probeErr != nil {
-				msg = probeErr.Error()
-			}
-			code := "CONNECTION_FAILED"
-			if probe != nil && strings.TrimSpace(probe.ErrorCode) != "" {
-				code = probe.ErrorCode
-			}
-			if probe != nil && strings.TrimSpace(probe.ErrorMsg) != "" {
-				msg = firstNonEmpty(msg, probe.ErrorMsg)
-			}
-			v.handleVerificationError(ctx, verificationID, apiKeyID, code, msg, startTime)
-			return
+			connectionFailed = true
+			break
 		}
 		metrics.VerificationRetries.WithLabelValues(provider, fmt.Sprintf("%d", attempt+1)).Inc()
 		time.Sleep(v.retryDelay * time.Duration(1<<attempt))
 	}
 
-	result.ConnectionTest = true
-	result.ConnectionLatency = probe.LatencyMs
-	metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(probe.LatencyMs))
-	result.ModelsFound = probe.Models
-	result.ModelsCount = len(probe.Models)
-	metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(probe.Models)))
+	if connectionFailed {
+		msg := "connection test failed"
+		if probeErr != nil {
+			msg = probeErr.Error()
+		}
+		code := "CONNECTION_FAILED"
+		if probe != nil && strings.TrimSpace(probe.ErrorCode) != "" {
+			code = probe.ErrorCode
+		}
+		if probe != nil && strings.TrimSpace(probe.ErrorMsg) != "" {
+			msg = firstNonEmpty(msg, probe.ErrorMsg)
+		}
+
+		result.ConnectionTest = false
+		result.ConnectionError = msg
+		result.NetworkStatus = "network_error"
+		result.ModelsFound = GetPredefinedModels(provider)
+		result.ModelsCount = len(result.ModelsFound)
+
+		logger.LogWarn(ctx, "api_key_validator", "Light verification failed, using predefined models", map[string]interface{}{
+			"api_key_id":     apiKeyID,
+			"provider":       provider,
+			"error_code":     code,
+			"error_message":  msg,
+			"models_fallback": result.ModelsFound,
+		})
+
+		if !isDeepVerification(verificationType) {
+			result.Status = verificationStatusSuccess
+			result.CompletedAt = time.Now()
+			duration := result.CompletedAt.Sub(startTime).Seconds()
+			metrics.VerificationDuration.WithLabelValues(provider, verificationType).Observe(duration)
+			metrics.VerificationTotal.WithLabelValues(provider, verificationType, verificationStatusSuccess).Inc()
+
+			err = v.updateVerificationRecord(verificationID, result)
+			if err != nil {
+				logger.LogError(ctx, "api_key_validator", "Failed to update verification record", err, map[string]interface{}{
+					"verification_id": verificationID,
+				})
+				return
+			}
+
+			err = v.updateAPIKeyVerificationStatus(apiKeyID, result)
+			if err != nil {
+				logger.LogError(ctx, "api_key_validator", "Failed to update API key verification status", err, map[string]interface{}{
+					"api_key_id": apiKeyID,
+				})
+				return
+			}
+
+			err = v.cacheVerificationResult(ctx, result)
+			if err != nil {
+				logger.LogError(ctx, "api_key_validator", "Failed to cache verification result", err, map[string]interface{}{
+					"api_key_id": apiKeyID,
+				})
+			}
+
+			logger.LogInfo(ctx, "api_key_validator", "Light verification completed with fallback models", map[string]interface{}{
+				"api_key_id":      apiKeyID,
+				"verification_id": verificationID,
+				"status":          result.Status,
+				"connection_test": result.ConnectionTest,
+				"models_count":    result.ModelsCount,
+				"network_status":  result.NetworkStatus,
+			})
+			return
+		}
+	} else {
+		result.ConnectionTest = true
+		result.NetworkStatus = "ok"
+		result.ConnectionLatency = probe.LatencyMs
+		metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(probe.LatencyMs))
+		result.ModelsFound = probe.Models
+		result.ModelsCount = len(probe.Models)
+		metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(probe.Models)))
+	}
 
 	if isDeepVerification(verificationType) {
 		providerConfig, providerErr := v.getProviderConfig(provider)
@@ -923,6 +985,11 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	}
 
 	chatEndpoint := baseURL + "/chat/completions"
+
+	if routeMode == GatewayModeLitellm && originalAPIKey != "" {
+		return v.probeQuotaViaLitellmUserConfig(chatEndpoint, provider, model, originalAPIKey, apiKey)
+	}
+
 	body := map[string]interface{}{
 		"model": model,
 		"messages": []map[string]string{
@@ -939,27 +1006,72 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 	req.Header.Set("Content-Type", "application/json")
 
-	if routeMode == GatewayModeLitellm && originalAPIKey != "" {
-		providerConfig, providerErr := v.getProviderConfig(provider)
-		if providerErr == nil {
-			upstreamBaseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
-			if upstreamBaseURL != "" {
-				req.Header.Set("x-api-key", originalAPIKey)
-				req.Header.Set("x-api-base", upstreamBaseURL)
-				if !strings.Contains(model, "/") {
-					var newBody map[string]interface{}
-					json.Unmarshal(jsonBody, &newBody)
-					newBody["model"] = "openai/" + model
-					jsonBody, _ = json.Marshal(newBody)
-					req.Body = io.NopCloser(bytes.NewBuffer(jsonBody))
-					req.ContentLength = int64(len(jsonBody))
-					req.Header.Set("Content-Length", fmt.Sprintf("%d", len(jsonBody)))
-				}
-			}
-		}
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return false, "QUOTA_PROBE_NETWORK_ERROR", err.Error()
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return true, "", ""
 	}
 
-	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	rawBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	code, msg := ExtractProviderError(rawBody)
+	if code == "" {
+		code = fmt.Sprintf("HTTP_%d", resp.StatusCode)
+	}
+	if msg == "" {
+		msg = strings.TrimSpace(string(rawBody))
+	}
+	return false, code, msg
+}
+
+func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider, model, originalAPIKey, litellmMasterKey string) (bool, string, string) {
+	providerConfig, err := v.getProviderConfig(provider)
+	if err != nil {
+		return false, "QUOTA_PROBE_PROVIDER_CONFIG_ERROR", fmt.Sprintf("failed to get provider config: %v", err)
+	}
+
+	upstreamBaseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
+	if upstreamBaseURL == "" {
+		return false, "QUOTA_PROBE_UPSTREAM_URL_MISSING", "upstream base URL not configured"
+	}
+
+	litellmModel := model
+	if !strings.Contains(model, "/") {
+		litellmModel = "openai/" + model
+	}
+
+	userConfig := map[string]interface{}{
+		"model_list": []map[string]interface{}{
+			{
+				"model_name": "probe-model",
+				"litellm_params": map[string]interface{}{
+					"model":    litellmModel,
+					"api_key":  originalAPIKey,
+					"api_base": upstreamBaseURL,
+				},
+			},
+		},
+	}
+
+	body := map[string]interface{}{
+		"model":      "probe-model",
+		"messages":   []map[string]string{{"role": "user", "content": "ping"}},
+		"max_tokens": 1,
+		"user_config": userConfig,
+	}
+
+	jsonBody, _ := json.Marshal(body)
+	req, err := http.NewRequest("POST", chatEndpoint, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return false, "QUOTA_PROBE_REQUEST_BUILD_FAILED", err.Error()
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", litellmMasterKey))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
 	if err != nil {
 		return false, "QUOTA_PROBE_NETWORK_ERROR", err.Error()
 	}

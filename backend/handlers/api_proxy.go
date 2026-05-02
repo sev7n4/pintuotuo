@@ -667,13 +667,25 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			} else if litellmTemplate == "" {
 				litellmModel = "openai/" + att.model
 			}
-			rb["model"] = litellmModel
 			apiBaseForUser := pk.EndpointURL
 			if apiBaseForUser == "" {
 				apiBaseForUser = pcfg.APIBaseURL
 			}
-			rb["api_key"] = dk
-			rb["api_base"] = apiBaseForUser
+
+			userConfig := map[string]interface{}{
+				"model_list": []map[string]interface{}{
+					{
+						"model_name": "proxy-model",
+						"litellm_params": map[string]interface{}{
+							"model":    litellmModel,
+							"api_key":  dk,
+							"api_base": apiBaseForUser,
+						},
+					},
+				},
+			}
+			rb["model"] = "proxy-model"
+			rb["user_config"] = userConfig
 		}
 		jb, mErr := json.Marshal(rb)
 		if mErr != nil {
