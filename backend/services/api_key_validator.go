@@ -667,13 +667,26 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 
 	authToken := v.resolveAuthToken(routeMode, decryptedKey)
 
-	baseURL := strings.TrimRight(endpoint, "/")
+	modelsEndpoint := endpoint
+	if routeMode == GatewayModeLitellm {
+		upstreamEndpoint, upstreamErr := v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
+		if upstreamErr == nil && upstreamEndpoint != "" {
+			modelsEndpoint = upstreamEndpoint
+		}
+	}
+
+	baseURL := strings.TrimRight(modelsEndpoint, "/")
 	modelsURL := baseURL + "/models"
+
+	modelsAuthToken := decryptedKey
+	if routeMode == GatewayModeLitellm {
+		modelsAuthToken = decryptedKey
+	}
 
 	var probe *ProbeModelsResult
 	var probeErr error
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, authToken)
+		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, modelsAuthToken)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break
