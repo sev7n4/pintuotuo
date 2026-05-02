@@ -91,7 +91,7 @@ func parseOpenAIModels(body []byte) ([]string, error) {
 	models := make([]string, 0, len(modelsResp.Data))
 	for _, m := range modelsResp.Data {
 		id := strings.TrimSpace(m.ID)
-		if id != "" {
+		if id != "" && !strings.Contains(id, "*") {
 			models = append(models, id)
 		}
 	}
