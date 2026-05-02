@@ -1,7 +1,7 @@
 {
   "workflow_id": "enhance-verification-status-enum",
   "created_at": "2026-05-02T00:00:00Z",
-  "current_step": 10,
+  "current_step": 12,
   "issue_description": "优化候选筛选逻辑：扩展 verification_result 枚举值，区分轻量验证和深度验证状态",
   "current_fix_cases": [
     "FEATURE: 轻量验证不更新 verification_result",
@@ -12,12 +12,19 @@
   "branch_name": "enhance/verification-status-enum",
   "pr_number": 424,
   "merged": false,
-  "retry_count": 0,
-  "error_history": [],
+  "retry_count": 1,
+  "error_history": [
+    {
+      "step": 10,
+      "error_type": "test_failure",
+      "message": "TestKeyMeetsStrictAllowlist failed: success status should not pass",
+      "timestamp": "2026-05-02T13:25:05Z"
+    }
+  ],
   "ci_status": {
-    "cicd": "running",
-    "integration": "",
-    "e2e": "",
+    "cicd": "success",
+    "integration": "success",
+    "e2e": "success",
     "deploy": ""
   },
   "local_validation": "passed"
