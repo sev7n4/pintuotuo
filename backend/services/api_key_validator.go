@@ -781,6 +781,9 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 			})
 			return
 		}
+
+		v.handleVerificationError(ctx, verificationID, apiKeyID, code, msg, startTime)
+		return
 	} else {
 		result.ConnectionTest = true
 		result.NetworkStatus = "ok"
