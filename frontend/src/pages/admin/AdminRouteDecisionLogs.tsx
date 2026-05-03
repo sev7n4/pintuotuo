@@ -118,17 +118,17 @@ const AdminRouteDecisionLogs: React.FC = () => {
       if (response.data && response.data.code === 0) {
         const data = response.data.data;
         setLogs(data.logs || []);
-        setPagination({
-          ...pagination,
+        setPagination(prev => ({
+          ...prev,
           total: data.total,
-        });
+        }));
       }
     } catch (error) {
       message.error('获取路由决策日志失败');
     } finally {
       setLoading(false);
     }
-  }, [pagination, filters]);
+  }, [pagination.current, pagination.pageSize, filters]);
 
   useEffect(() => {
     fetchLogs();
