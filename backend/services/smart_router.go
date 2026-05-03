@@ -39,6 +39,7 @@ type RoutingCandidate struct {
 	SuccessRate   float64
 	Region        string
 	SecurityLevel string
+	RouteMode     string
 }
 
 type SmartRouter struct {
@@ -221,7 +222,8 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 			COALESCE(mak.region, 'domestic') as region,
 			COALESCE(mak.security_level, 'standard') as security_level,
 			COALESCE(mak.health_status, 'unknown') as health_status,
-			CASE WHEN mak.verification_result = 'verified' THEN true ELSE false END as verified
+			CASE WHEN mak.verification_result = 'verified' THEN true ELSE false END as verified,
+			COALESCE(mak.route_mode, 'direct') as route_mode
 		FROM merchant_api_keys mak
 		WHERE mak.status = 'active'
 			AND mak.models_supported ? $1
@@ -256,6 +258,7 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 		var modelsSupported []byte
 		var healthStatus string
 		var verified bool
+		var routeMode string
 		err := rows.Scan(
 			&c.APIKeyID,
 			&c.MerchantID,
@@ -269,6 +272,7 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 			&c.SecurityLevel,
 			&healthStatus,
 			&verified,
+			&routeMode,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan candidate: %w", err)
@@ -276,6 +280,7 @@ func (r *SmartRouter) GetCandidatesWithKeyAllowlist(ctx context.Context, model s
 
 		c.HealthStatus = healthStatus
 		c.Verified = verified
+		c.RouteMode = routeMode
 
 		candidates = append(candidates, c)
 	}
