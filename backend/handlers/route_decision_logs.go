@@ -110,20 +110,20 @@ func GetRouteDecisionLogs(c *gin.Context) {
 	for rows.Next() {
 		var log map[string]interface{} = make(map[string]interface{})
 		var (
-			id                     int
-			requestID              string
-			merchantID             *int
-			apiKeyID               *int
-			strategyLayerGoal      string
-			strategyLayerInput     []byte
-			strategyLayerOutput    []byte
+			id                      int
+			requestID               string
+			merchantID              *int
+			apiKeyID                *int
+			strategyLayerGoal       string
+			strategyLayerInput      []byte
+			strategyLayerOutput     []byte
 			decisionLayerCandidates []byte
-			decisionLayerOutput    []byte
-			executionLayerResult   []byte
-			decisionDurationMs     int
-			decisionResult         string
-			errorMessage           *string
-			createdAt              time.Time
+			decisionLayerOutput     []byte
+			executionLayerResult    []byte
+			decisionDurationMs      int
+			decisionResult          string
+			errorMessage            *string
+			createdAt               time.Time
 		)
 
 		scanErr := rows.Scan(
@@ -258,20 +258,20 @@ func GetRouteDecisionLog(c *gin.Context) {
 
 	var log map[string]interface{} = make(map[string]interface{})
 	var (
-		id                     int
-		requestID              string
-		merchantID             *int
-		apiKeyID               *int
-		strategyLayerGoal      string
-		strategyLayerInput     []byte
-		strategyLayerOutput    []byte
+		id                      int
+		requestID               string
+		merchantID              *int
+		apiKeyID                *int
+		strategyLayerGoal       string
+		strategyLayerInput      []byte
+		strategyLayerOutput     []byte
 		decisionLayerCandidates []byte
-		decisionLayerOutput    []byte
-		executionLayerResult   []byte
-		decisionDurationMs     int
-		decisionResult         string
-		errorMessage           *string
-		createdAt              time.Time
+		decisionLayerOutput     []byte
+		executionLayerResult    []byte
+		decisionDurationMs      int
+		decisionResult          string
+		errorMessage            *string
+		createdAt               time.Time
 	)
 
 	err = db.QueryRowContext(c.Request.Context(), query, logID).Scan(
