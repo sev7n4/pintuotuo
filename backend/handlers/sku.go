@@ -1556,6 +1556,9 @@ func CreateModelProvider(c *gin.Context) {
 		))
 		return
 	}
+	if normalizedPrefixes == nil {
+		normalizedPrefixes = []string{}
+	}
 	compatArg := pq.Array(normalizedPrefixes)
 
 	db := config.GetDB()
