@@ -1016,9 +1016,6 @@ func resolveEndpointURL(routeMode string, apiKey *models.MerchantAPIKey, provide
 		}
 		return strings.TrimRight(providerBaseURL, "/")
 	case routeModeLitellm:
-		if apiKey != nil && apiKey.EndpointURL != "" {
-			return strings.TrimRight(apiKey.EndpointURL, "/")
-		}
 		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
 			return strings.TrimRight(base, "/") + "/v1"
 		}
