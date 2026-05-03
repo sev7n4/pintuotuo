@@ -1572,7 +1572,7 @@ func CreateModelProvider(c *gin.Context) {
 		`INSERT INTO model_providers (code, name, api_base_url, api_format, billing_type, status, sort_order, compat_prefixes,
 			litellm_model_template, litellm_gateway_api_key_env, litellm_gateway_api_base,
 			provider_region, route_strategy, endpoints)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb)
 		 RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), compat_prefixes,
 			COALESCE(litellm_model_template, ''), COALESCE(litellm_gateway_api_key_env, ''), COALESCE(litellm_gateway_api_base, ''),
 			COALESCE(provider_region, 'domestic'), COALESCE(route_strategy, '{}'::jsonb), COALESCE(endpoints, '{}'::jsonb),
