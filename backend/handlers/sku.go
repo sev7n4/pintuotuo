@@ -1566,16 +1566,23 @@ func CreateModelProvider(c *gin.Context) {
 
 	var p models.ModelProvider
 	var compatScan pq.StringArray
+	var providerRegion sql.NullString
+	var routeStrategyJSON, endpointsJSON []byte
 	err := db.QueryRow(
 		`INSERT INTO model_providers (code, name, api_base_url, api_format, billing_type, status, sort_order, compat_prefixes,
-			litellm_model_template, litellm_gateway_api_key_env, litellm_gateway_api_base)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			litellm_model_template, litellm_gateway_api_key_env, litellm_gateway_api_base,
+			provider_region, route_strategy, endpoints)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		 RETURNING id, code, name, COALESCE(api_base_url, ''), api_format, COALESCE(billing_type, ''), cache_enabled, COALESCE(cache_discount_rate, 0), compat_prefixes,
 			COALESCE(litellm_model_template, ''), COALESCE(litellm_gateway_api_key_env, ''), COALESCE(litellm_gateway_api_base, ''),
+			COALESCE(provider_region, 'domestic'), COALESCE(route_strategy, '{}'::jsonb), COALESCE(endpoints, '{}'::jsonb),
 			status, sort_order, created_at, updated_at`,
 		code, name, apiBaseArg, apiFormat, billingType, status, req.SortOrder, compatArg, litellmTplArg, litellmKeyArg, litellmBaseArg,
+		"domestic", "{}", "{}",
 	).Scan(&p.ID, &p.Code, &p.Name, &p.APIBaseURL, &p.APIFormat, &p.BillingType, &p.CacheEnabled, &p.CacheDiscount, &compatScan,
-		&p.LitellmModelTemplate, &p.LitellmGatewayAPIKeyEnv, &p.LitellmGatewayAPIBase, &p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
+		&p.LitellmModelTemplate, &p.LitellmGatewayAPIKeyEnv, &p.LitellmGatewayAPIBase,
+		&providerRegion, &routeStrategyJSON, &endpointsJSON,
+		&p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
@@ -1592,6 +1599,15 @@ func CreateModelProvider(c *gin.Context) {
 	}
 	if len(compatScan) > 0 {
 		p.CompatPrefixes = []string(compatScan)
+	}
+	if providerRegion.Valid {
+		p.ProviderRegion = providerRegion.String
+	}
+	if len(routeStrategyJSON) > 0 {
+		json.Unmarshal(routeStrategyJSON, &p.RouteStrategy)
+	}
+	if len(endpointsJSON) > 0 {
+		json.Unmarshal(endpointsJSON, &p.Endpoints)
 	}
 
 	cache.Delete(context.Background(), "model_providers:all")
