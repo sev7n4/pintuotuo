@@ -1031,8 +1031,20 @@ func resolveEndpointURL(routeMode string, apiKey *models.MerchantAPIKey, provide
 }
 
 func applyAPIKeyRouteConfig(cfg providerRuntimeConfig, apiKey *models.MerchantAPIKey) providerRuntimeConfig {
-	routeMode := resolveRouteMode(apiKey)
-	endpointURL := resolveEndpointURL(routeMode, apiKey, cfg.APIBaseURL)
+	execCfg := &services.ExecutionProviderConfig{
+		Code:           cfg.Code,
+		Name:           cfg.Name,
+		APIBaseURL:     cfg.APIBaseURL,
+		APIFormat:      cfg.APIFormat,
+		ProviderRegion: cfg.ProviderRegion,
+		RouteStrategy:  cfg.RouteStrategy,
+		Endpoints:      cfg.Endpoints,
+	}
+	if apiKey != nil {
+		services.ApplyBYOKConfig(execCfg, apiKey.EndpointURL, apiKey.RouteMode, apiKey.RouteConfig, apiKey.FallbackEndpointURL)
+		execCfg.GatewayMode = services.ResolveRouteMode(apiKey.RouteMode)
+	}
+	endpointURL := services.ResolveEndpoint(execCfg)
 	if endpointURL != "" {
 		cfg.APIBaseURL = endpointURL
 	}
@@ -1104,14 +1116,32 @@ func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTok
 
 func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeConfig, error) {
 	var cfg providerRuntimeConfig
+	var routeStrategyJSON, endpointsJSON []byte
 	err := db.QueryRow(
-		`SELECT code, name, COALESCE(api_base_url, ''), api_format
+		`SELECT code, name, COALESCE(api_base_url, ''), api_format,
+				COALESCE(provider_region, 'domestic'),
+				COALESCE(route_strategy, '{}'::jsonb),
+				COALESCE(endpoints, '{}'::jsonb)
 		 FROM model_providers
 		 WHERE code = $1 AND status = 'active'
 		 LIMIT 1`,
 		providerCode,
-	).Scan(&cfg.Code, &cfg.Name, &cfg.APIBaseURL, &cfg.APIFormat)
-	return cfg, err
+	).Scan(&cfg.Code, &cfg.Name, &cfg.APIBaseURL, &cfg.APIFormat,
+		&cfg.ProviderRegion, &routeStrategyJSON, &endpointsJSON)
+	if err != nil {
+		return cfg, err
+	}
+	if len(routeStrategyJSON) > 0 {
+		if err := json.Unmarshal(routeStrategyJSON, &cfg.RouteStrategy); err != nil {
+			cfg.RouteStrategy = make(map[string]interface{})
+		}
+	}
+	if len(endpointsJSON) > 0 {
+		if err := json.Unmarshal(endpointsJSON, &cfg.Endpoints); err != nil {
+			cfg.Endpoints = make(map[string]interface{})
+		}
+	}
+	return cfg, nil
 }
 
 func getProviderLitellmTemplate(db *sql.DB, providerCode string) (string, error) {

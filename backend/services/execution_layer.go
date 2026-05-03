@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -205,17 +206,26 @@ func (l *ExecutionLayer) GetProviderConfig(ctx context.Context, providerCode str
 	}
 
 	query := `
-		SELECT code, name, COALESCE(api_base_url, ''), COALESCE(api_format, 'openai')
+		SELECT code, name, 
+			   COALESCE(api_base_url, ''), 
+			   COALESCE(api_format, 'openai'),
+			   COALESCE(provider_region, 'domestic'),
+			   COALESCE(route_strategy, '{}'::jsonb),
+			   COALESCE(endpoints, '{}'::jsonb)
 		FROM model_providers
 		WHERE code = $1 AND status = 'active'
 	`
 
 	var cfg ExecutionProviderConfig
+	var routeStrategyJSON, endpointsJSON []byte
 	err := l.db.QueryRowContext(ctx, query, providerCode).Scan(
 		&cfg.Code,
 		&cfg.Name,
 		&cfg.APIBaseURL,
 		&cfg.APIFormat,
+		&cfg.ProviderRegion,
+		&routeStrategyJSON,
+		&endpointsJSON,
 	)
 
 	if err == sql.ErrNoRows {
@@ -225,10 +235,25 @@ func (l *ExecutionLayer) GetProviderConfig(ctx context.Context, providerCode str
 		return nil, fmt.Errorf("failed to query provider config: %w", err)
 	}
 
+	if len(routeStrategyJSON) > 0 {
+		if err := json.Unmarshal(routeStrategyJSON, &cfg.RouteStrategy); err != nil {
+			cfg.RouteStrategy = make(map[string]interface{})
+		}
+	}
+	if len(endpointsJSON) > 0 {
+		if err := json.Unmarshal(endpointsJSON, &cfg.Endpoints); err != nil {
+			cfg.Endpoints = make(map[string]interface{})
+		}
+	}
+
 	return &cfg, nil
 }
 
 func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
+	return ResolveEndpoint(cfg)
+}
+
+func ResolveEndpoint(cfg *ExecutionProviderConfig) string {
 	if cfg == nil {
 		return ""
 	}
@@ -337,4 +362,26 @@ func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) stri
 	}
 
 	return GatewayModeDirect
+}
+
+func ApplyBYOKConfig(cfg *ExecutionProviderConfig, byokEndpointURL, byokRouteMode string, byokRouteConfig map[string]interface{}, byokFallbackURL string) {
+	if cfg == nil {
+		return
+	}
+	cfg.BYOKEndpointURL = byokEndpointURL
+	cfg.BYOKRouteMode = byokRouteMode
+	cfg.BYOKRouteConfig = byokRouteConfig
+	cfg.BYOKFallbackURL = byokFallbackURL
+}
+
+func ResolveRouteMode(routeMode string) string {
+	mode := strings.TrimSpace(strings.ToLower(routeMode))
+	switch mode {
+	case GatewayModeDirect, GatewayModeLitellm, GatewayModeProxy:
+		return mode
+	case "auto", "":
+		return GatewayModeDirect
+	default:
+		return GatewayModeDirect
+	}
 }
