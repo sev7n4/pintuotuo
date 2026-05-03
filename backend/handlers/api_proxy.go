@@ -671,21 +671,9 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			if apiBaseForUser == "" {
 				apiBaseForUser = pcfg.APIBaseURL
 			}
-
-			userConfig := map[string]interface{}{
-				"model_list": []map[string]interface{}{
-					{
-						"model_name": "proxy-model",
-						"litellm_params": map[string]interface{}{
-							"model":    litellmModel,
-							"api_key":  dk,
-							"api_base": apiBaseForUser,
-						},
-					},
-				},
-			}
-			rb["model"] = "proxy-model"
-			rb["user_config"] = userConfig
+			rb["model"] = litellmModel
+			rb["api_key"] = dk
+			rb["api_base"] = apiBaseForUser
 		}
 		jb, mErr := json.Marshal(rb)
 		if mErr != nil {
