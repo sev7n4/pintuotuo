@@ -3,7 +3,11 @@
 # 文档：https://docs.litellm.ai/docs/proxy/clientside_auth
 
 model_list:
-  # 动态 BYOK 模式（主服务使用）
+  - model_name: "*"
+    litellm_params:
+      model: "*"
+      configurable_clientside_auth_params: ["api_key", "api_base"]
+  
   - model_name: openai/*
     litellm_params:
       model: openai/*
@@ -13,7 +17,6 @@ model_list:
       model: anthropic/*
       configurable_clientside_auth_params: ["api_key", "api_base"]
   
-  # 测试模型（用于健康检查和指标生成）
   - model_name: gpt-3.5-turbo
     litellm_params:
       model: openai/gpt-3.5-turbo
