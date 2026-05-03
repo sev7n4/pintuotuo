@@ -237,7 +237,10 @@ func determineRoutingMode(candidate *RoutingCandidate) string {
 	if candidate == nil {
 		return "unknown"
 	}
-	return "direct"
+	if candidate.RouteMode == "" {
+		return "direct"
+	}
+	return candidate.RouteMode
 }
 
 func (e *UnifiedRoutingEngine) LogDecision(ctx context.Context, decision *RoutingDecision) error {
