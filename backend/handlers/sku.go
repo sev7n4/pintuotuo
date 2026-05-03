@@ -1584,6 +1584,7 @@ func CreateModelProvider(c *gin.Context) {
 		&providerRegion, &routeStrategyJSON, &endpointsJSON,
 		&p.Status, &p.SortOrder, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
+		log.Printf("[CreateModelProvider] INSERT failed: %v", err)
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
 			middleware.RespondWithError(c, apperrors.NewAppError(
