@@ -32,16 +32,27 @@ func GetRouteDecisionLogs(c *gin.Context) {
 	startTime := c.Query("start_time")
 	endTime := c.Query("end_time")
 	strategy := c.Query("strategy")
+	decisionResult := c.Query("decision_result")
+	requestID := c.Query("request_id")
 
 	// 构建查询
 	query := `
 		SELECT id, request_id, merchant_id, api_key_id, strategy_layer_goal, 
-		       decision_layer_output, execution_layer_result, created_at
+		       strategy_layer_input, strategy_layer_output,
+		       decision_layer_candidates, decision_layer_output,
+		       execution_layer_result, decision_duration_ms, decision_result, error_message,
+		       created_at
 		FROM routing_decision_logs
 		WHERE 1=1
 	`
 	var args []interface{}
 	argPos := 1
+
+	if requestID != "" {
+		query += ` AND request_id LIKE $` + strconv.Itoa(argPos)
+		args = append(args, "%"+requestID+"%")
+		argPos++
+	}
 
 	if merchantID > 0 {
 		query += ` AND merchant_id = $` + strconv.Itoa(argPos)
@@ -58,6 +69,12 @@ func GetRouteDecisionLogs(c *gin.Context) {
 	if strategy != "" {
 		query += ` AND strategy_layer_goal = $` + strconv.Itoa(argPos)
 		args = append(args, strategy)
+		argPos++
+	}
+
+	if decisionResult != "" {
+		query += ` AND decision_result = $` + strconv.Itoa(argPos)
+		args = append(args, decisionResult)
 		argPos++
 	}
 
@@ -93,14 +110,20 @@ func GetRouteDecisionLogs(c *gin.Context) {
 	for rows.Next() {
 		var log map[string]interface{} = make(map[string]interface{})
 		var (
-			id                   int
-			requestID            string
-			merchantID           int
-			apiKeyID             int
-			strategyLayerGoal    string
-			decisionLayerOutput  []byte
-			executionLayerResult []byte
-			createdAt            time.Time
+			id                     int
+			requestID              string
+			merchantID             *int
+			apiKeyID               *int
+			strategyLayerGoal      string
+			strategyLayerInput     []byte
+			strategyLayerOutput    []byte
+			decisionLayerCandidates []byte
+			decisionLayerOutput    []byte
+			executionLayerResult   []byte
+			decisionDurationMs     int
+			decisionResult         string
+			errorMessage           *string
+			createdAt              time.Time
 		)
 
 		scanErr := rows.Scan(
@@ -109,8 +132,14 @@ func GetRouteDecisionLogs(c *gin.Context) {
 			&merchantID,
 			&apiKeyID,
 			&strategyLayerGoal,
+			&strategyLayerInput,
+			&strategyLayerOutput,
+			&decisionLayerCandidates,
 			&decisionLayerOutput,
 			&executionLayerResult,
+			&decisionDurationMs,
+			&decisionResult,
+			&errorMessage,
 			&createdAt,
 		)
 		if scanErr != nil {
@@ -118,8 +147,23 @@ func GetRouteDecisionLogs(c *gin.Context) {
 		}
 
 		// 解析JSON字段
+		var strategyInput map[string]interface{}
+		var strategyOutput map[string]interface{}
+		var decisionCandidates []map[string]interface{}
 		var decisionOutput map[string]interface{}
 		var executionResult map[string]interface{}
+
+		if len(strategyLayerInput) > 0 {
+			json.Unmarshal(strategyLayerInput, &strategyInput)
+		}
+
+		if len(strategyLayerOutput) > 0 {
+			json.Unmarshal(strategyLayerOutput, &strategyOutput)
+		}
+
+		if len(decisionLayerCandidates) > 0 {
+			json.Unmarshal(decisionLayerCandidates, &decisionCandidates)
+		}
 
 		if len(decisionLayerOutput) > 0 {
 			json.Unmarshal(decisionLayerOutput, &decisionOutput)
@@ -131,11 +175,23 @@ func GetRouteDecisionLogs(c *gin.Context) {
 
 		log["id"] = id
 		log["request_id"] = requestID
-		log["merchant_id"] = merchantID
-		log["api_key_id"] = apiKeyID
+		if merchantID != nil {
+			log["merchant_id"] = *merchantID
+		}
+		if apiKeyID != nil {
+			log["api_key_id"] = *apiKeyID
+		}
 		log["strategy_layer_goal"] = strategyLayerGoal
+		log["strategy_layer_input"] = strategyInput
+		log["strategy_layer_output"] = strategyOutput
+		log["decision_layer_candidates"] = decisionCandidates
 		log["decision_layer_output"] = decisionOutput
 		log["execution_layer_result"] = executionResult
+		log["decision_duration_ms"] = decisionDurationMs
+		log["decision_result"] = decisionResult
+		if errorMessage != nil {
+			log["error_message"] = *errorMessage
+		}
 		log["created_at"] = createdAt
 
 		logs = append(logs, log)
@@ -192,21 +248,30 @@ func GetRouteDecisionLog(c *gin.Context) {
 
 	query := `
 		SELECT id, request_id, merchant_id, api_key_id, strategy_layer_goal, 
-		       decision_layer_output, execution_layer_result, created_at
+		       strategy_layer_input, strategy_layer_output,
+		       decision_layer_candidates, decision_layer_output,
+		       execution_layer_result, decision_duration_ms, decision_result, error_message,
+		       created_at
 		FROM routing_decision_logs
 		WHERE id = $1
 	`
 
 	var log map[string]interface{} = make(map[string]interface{})
 	var (
-		id                   int
-		requestID            string
-		merchantID           int
-		apiKeyID             int
-		strategyLayerGoal    string
-		decisionLayerOutput  []byte
-		executionLayerResult []byte
-		createdAt            time.Time
+		id                     int
+		requestID              string
+		merchantID             *int
+		apiKeyID               *int
+		strategyLayerGoal      string
+		strategyLayerInput     []byte
+		strategyLayerOutput    []byte
+		decisionLayerCandidates []byte
+		decisionLayerOutput    []byte
+		executionLayerResult   []byte
+		decisionDurationMs     int
+		decisionResult         string
+		errorMessage           *string
+		createdAt              time.Time
 	)
 
 	err = db.QueryRowContext(c.Request.Context(), query, logID).Scan(
@@ -215,8 +280,14 @@ func GetRouteDecisionLog(c *gin.Context) {
 		&merchantID,
 		&apiKeyID,
 		&strategyLayerGoal,
+		&strategyLayerInput,
+		&strategyLayerOutput,
+		&decisionLayerCandidates,
 		&decisionLayerOutput,
 		&executionLayerResult,
+		&decisionDurationMs,
+		&decisionResult,
+		&errorMessage,
 		&createdAt,
 	)
 
@@ -229,8 +300,23 @@ func GetRouteDecisionLog(c *gin.Context) {
 	}
 
 	// 解析JSON字段
+	var strategyInput map[string]interface{}
+	var strategyOutput map[string]interface{}
+	var decisionCandidates []map[string]interface{}
 	var decisionOutput map[string]interface{}
 	var executionResult map[string]interface{}
+
+	if len(strategyLayerInput) > 0 {
+		json.Unmarshal(strategyLayerInput, &strategyInput)
+	}
+
+	if len(strategyLayerOutput) > 0 {
+		json.Unmarshal(strategyLayerOutput, &strategyOutput)
+	}
+
+	if len(decisionLayerCandidates) > 0 {
+		json.Unmarshal(decisionLayerCandidates, &decisionCandidates)
+	}
 
 	if len(decisionLayerOutput) > 0 {
 		json.Unmarshal(decisionLayerOutput, &decisionOutput)
@@ -242,11 +328,23 @@ func GetRouteDecisionLog(c *gin.Context) {
 
 	log["id"] = id
 	log["request_id"] = requestID
-	log["merchant_id"] = merchantID
-	log["api_key_id"] = apiKeyID
+	if merchantID != nil {
+		log["merchant_id"] = *merchantID
+	}
+	if apiKeyID != nil {
+		log["api_key_id"] = *apiKeyID
+	}
 	log["strategy_layer_goal"] = strategyLayerGoal
+	log["strategy_layer_input"] = strategyInput
+	log["strategy_layer_output"] = strategyOutput
+	log["decision_layer_candidates"] = decisionCandidates
 	log["decision_layer_output"] = decisionOutput
 	log["execution_layer_result"] = executionResult
+	log["decision_duration_ms"] = decisionDurationMs
+	log["decision_result"] = decisionResult
+	if errorMessage != nil {
+		log["error_message"] = *errorMessage
+	}
 	log["created_at"] = createdAt
 
 	c.JSON(http.StatusOK, gin.H{
