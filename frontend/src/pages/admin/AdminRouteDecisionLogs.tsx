@@ -36,17 +36,17 @@ const { RangePicker } = DatePicker;
 interface RouteDecisionLog {
   id: number;
   request_id: string;
-  merchant_id: number;
-  api_key_id: number;
+  merchant_id?: number;
+  api_key_id?: number;
   strategy_layer_goal: string;
   strategy_layer_input: Record<string, any>;
   strategy_layer_output: Record<string, any>;
-  decision_layer_candidates: Record<string, any>;
+  decision_layer_candidates: Array<{ api_key_id?: number; provider?: string; score?: number; health_status?: string; selected?: boolean }>;
   decision_layer_output: Record<string, any>;
   execution_layer_result: Record<string, any>;
   decision_duration_ms: number;
   decision_result: string;
-  error_message: string;
+  error_message?: string;
   created_at: string;
 }
 
@@ -73,6 +73,8 @@ const AdminRouteDecisionLogs: React.FC = () => {
     merchant_id: '',
     api_key_id: '',
     strategy: '',
+    decision_result: '',
+    request_id: '',
     time_range: null as [string, string] | null,
   });
 
@@ -95,6 +97,14 @@ const AdminRouteDecisionLogs: React.FC = () => {
 
       if (filters.strategy) {
         params.strategy = filters.strategy;
+      }
+
+      if (filters.decision_result) {
+        params.decision_result = filters.decision_result;
+      }
+
+      if (filters.request_id) {
+        params.request_id = filters.request_id;
       }
 
       if (filters.time_range) {
@@ -160,6 +170,8 @@ const AdminRouteDecisionLogs: React.FC = () => {
       merchant_id: '',
       api_key_id: '',
       strategy: '',
+      decision_result: '',
+      request_id: '',
       time_range: null,
     });
   };
@@ -340,22 +352,29 @@ const AdminRouteDecisionLogs: React.FC = () => {
         <Space wrap size={16}>
           <Input
             allowClear
+            placeholder="请求ID"
+            style={{ width: 200 }}
+            value={filters.request_id}
+            onChange={(e) => handleFilterChange('request_id', e.target.value)}
+          />
+          <Input
+            allowClear
             placeholder="商户ID"
-            style={{ width: 150 }}
+            style={{ width: 120 }}
             value={filters.merchant_id}
             onChange={(e) => handleFilterChange('merchant_id', e.target.value)}
           />
           <Input
             allowClear
             placeholder="API Key ID"
-            style={{ width: 150 }}
+            style={{ width: 120 }}
             value={filters.api_key_id}
             onChange={(e) => handleFilterChange('api_key_id', e.target.value)}
           />
           <Select
             allowClear
             placeholder="策略类型"
-            style={{ width: 150 }}
+            style={{ width: 130 }}
             value={filters.strategy}
             onChange={(value) => handleFilterChange('strategy', value)}
             options={[
@@ -367,8 +386,20 @@ const AdminRouteDecisionLogs: React.FC = () => {
               { value: 'auto', label: '自动模式' },
             ]}
           />
-          <RangePicker style={{ width: 300 }} onChange={handleTimeRangeChange} />
-          <Button onClick={handleResetFilters}>重置筛选</Button>
+          <Select
+            allowClear
+            placeholder="决策结果"
+            style={{ width: 120 }}
+            value={filters.decision_result}
+            onChange={(value) => handleFilterChange('decision_result', value)}
+            options={[
+              { value: 'success', label: '成功' },
+              { value: 'failed', label: '失败' },
+              { value: 'fallback', label: '降级' },
+            ]}
+          />
+          <RangePicker style={{ width: 280 }} onChange={handleTimeRangeChange} />
+          <Button onClick={handleResetFilters}>重置</Button>
           <Button type="primary" onClick={handleRefresh}>
             <SearchOutlined />
             查询
@@ -446,16 +477,106 @@ const AdminRouteDecisionLogs: React.FC = () => {
               )}
             </Descriptions>
 
-            <Card title="决策层输出" style={{ marginBottom: 16 }}>
-              <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            <Card title="策略层" style={{ marginBottom: 16 }}>
+              <Descriptions bordered column={2} size="small">
+                <Descriptions.Item label="策略目标">
+                  <Tag color="blue">{getStrategyLabel(selectedLog.strategy_layer_goal)}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="决策耗时">
+                  <Tag color={selectedLog.decision_duration_ms > 10 ? 'orange' : 'green'}>
+                    {selectedLog.decision_duration_ms ? `${selectedLog.decision_duration_ms}ms` : '-'}
+                  </Tag>
+                </Descriptions.Item>
+              </Descriptions>
+              {selectedLog.strategy_layer_input && Object.keys(selectedLog.strategy_layer_input).length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: 8 }}>策略层输入：</div>
+                  <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+                    {JSON.stringify(selectedLog.strategy_layer_input, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {selectedLog.strategy_layer_output && Object.keys(selectedLog.strategy_layer_output).length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: 8 }}>策略层输出：</div>
+                  <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+                    {JSON.stringify(selectedLog.strategy_layer_output, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </Card>
+
+            <Card title="决策层" style={{ marginBottom: 16 }}>
+              {selectedLog.decision_layer_candidates && selectedLog.decision_layer_candidates.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: 8 }}>候选 API Keys ({selectedLog.decision_layer_candidates.length} 个)：</div>
+                  <Table
+                    dataSource={selectedLog.decision_layer_candidates}
+                    rowKey={(_, index) => `candidate-${index}`}
+                    size="small"
+                    pagination={false}
+                    columns={[
+                      { title: 'API Key ID', dataIndex: 'api_key_id', key: 'api_key_id', width: 100 },
+                      { title: '提供商', dataIndex: 'provider', key: 'provider', width: 100 },
+                      { title: '评分', dataIndex: 'score', key: 'score', width: 80, render: (v: number) => v?.toFixed(2) || '-' },
+                      { title: '健康状态', dataIndex: 'health_status', key: 'health_status', width: 100 },
+                      { title: '选中', dataIndex: 'selected', key: 'selected', width: 60, render: (v: boolean) => v ? <Tag color="green">是</Tag> : <Tag>否</Tag> },
+                    ]}
+                  />
+                </div>
+              )}
+              <div style={{ fontWeight: 'bold', marginBottom: 8 }}>决策层输出：</div>
+              <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
                 {JSON.stringify(selectedLog.decision_layer_output, null, 2)}
               </pre>
             </Card>
 
-            <Card title="执行层结果">
-              <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                {JSON.stringify(selectedLog.execution_layer_result, null, 2)}
-              </pre>
+            <Card title="执行层" style={{ marginBottom: 16 }}>
+              <Descriptions bordered column={2} size="small">
+                <Descriptions.Item label="决策结果">
+                  {(() => {
+                    if (!selectedLog.decision_result) return '-';
+                    const colorMap: Record<string, string> = {
+                      success: 'green',
+                      failed: 'red',
+                      fallback: 'orange',
+                    };
+                    const labelMap: Record<string, string> = {
+                      success: '成功',
+                      failed: '失败',
+                      fallback: '降级',
+                    };
+                    return (
+                      <Tag color={colorMap[selectedLog.decision_result] || 'default'}>
+                        {labelMap[selectedLog.decision_result] || selectedLog.decision_result}
+                      </Tag>
+                    );
+                  })()}
+                </Descriptions.Item>
+                <Descriptions.Item label="执行状态">
+                  {selectedLog.execution_layer_result?.status ? (
+                    <Badge
+                      status={selectedLog.execution_layer_result.status === 'success' ? 'success' : 'error'}
+                      text={selectedLog.execution_layer_result.status === 'success' ? '成功' : '失败'}
+                    />
+                  ) : '-'}
+                </Descriptions.Item>
+              </Descriptions>
+              {selectedLog.error_message && (
+                <Alert
+                  type="error"
+                  message="错误信息"
+                  description={selectedLog.error_message}
+                  style={{ marginTop: 12 }}
+                  showIcon
+                />
+              )}
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontWeight: 'bold', marginBottom: 8 }}>执行层结果：</div>
+                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+                  {JSON.stringify(selectedLog.execution_layer_result, null, 2)}
+                </pre>
+              </div>
             </Card>
           </div>
         ) : (
