@@ -24,20 +24,6 @@ import {
   SearchOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import api from '@/services/api';
 
 interface APIResponse<T> {
@@ -47,7 +33,15 @@ interface APIResponse<T> {
 }
 
 interface APIKeyStatus {
-  api_key_id: number;
+  id: number;
+  merchant_id: number;
+  name: string;
+  provider: string;
+  status: string;
+  region: string;
+  security_level: string;
+  endpoint_url: string;
+  health_status: string;
   latency_p50: number;
   latency_p95: number;
   latency_p99: number;
@@ -56,10 +50,10 @@ interface APIKeyStatus {
   connection_pool_size: number;
   connection_pool_active: number;
   rate_limit_remaining: number;
-  rate_limit_reset_at: string | null;
   load_balance_weight: number;
-  last_request_at: string | null;
-  updated_at: string;
+  last_request_at: string;
+  status_updated_at: string;
+  created_at: string;
 }
 
 interface MerchantAPIKeyStatus {
@@ -86,20 +80,8 @@ interface MerchantAPIKeyStatus {
   created_at: string;
 }
 
-interface APIKeyInfo {
-  id: number;
-  name: string;
-  provider: string;
-  status: string;
-}
-
 interface APIKeyDetail extends APIKeyStatus {
-  name: string;
-  provider: string;
-  status: string;
-  latencyHistory?: { timestamp: string; p50: number; p95: number; p99: number }[];
-  errorRateHistory?: { timestamp: string; errorRate: number; successRate: number }[];
-  latencyDistribution?: { range: string; count: number }[];
+  api_key_id: number;
 }
 
 const AdminAPIKeyStatus: React.FC = () => {
@@ -206,51 +188,14 @@ const AdminAPIKeyStatus: React.FC = () => {
 
   const handleViewDetail = async (apiKeyID: number) => {
     try {
-      const [statusResponse, keyResponse] = await Promise.all([
-        api.get<APIResponse<APIKeyStatus>>(`/admin/api-key-status/${apiKeyID}`),
-        api.get<APIResponse<APIKeyInfo>>(`/admin/merchants/api-keys/${apiKeyID}`),
-      ]);
+      const response = await api.get<APIResponse<APIKeyStatus>>(`/admin/api-key-status/${apiKeyID}`);
 
-      if (statusResponse.data.code === 0 && keyResponse.data.code === 0) {
-        const statusData = statusResponse.data.data;
-        const keyData = keyResponse.data.data;
-
-        const now = new Date();
-        const latencyHistory = Array.from({ length: 24 }, (_, i) => {
-          const time = new Date(now.getTime() - (23 - i) * 60 * 60 * 1000);
-          return {
-            timestamp: time.toISOString(),
-            p50: Math.floor(Math.random() * 100) + 20,
-            p95: Math.floor(Math.random() * 200) + 100,
-            p99: Math.floor(Math.random() * 300) + 200,
-          };
-        });
-
-        const errorRateHistory = Array.from({ length: 24 }, (_, i) => {
-          const time = new Date(now.getTime() - (23 - i) * 60 * 60 * 1000);
-          return {
-            timestamp: time.toISOString(),
-            errorRate: Math.random() * 0.2,
-            successRate: 1 - Math.random() * 0.2,
-          };
-        });
-
-        const latencyDistribution = [
-          { range: '0-50ms', count: Math.floor(Math.random() * 100) + 50 },
-          { range: '50-100ms', count: Math.floor(Math.random() * 100) + 30 },
-          { range: '100-200ms', count: Math.floor(Math.random() * 80) + 20 },
-          { range: '200-300ms', count: Math.floor(Math.random() * 50) + 10 },
-          { range: '300+ms', count: Math.floor(Math.random() * 30) + 5 },
-        ];
+      if (response.data.code === 0) {
+        const statusData = response.data.data;
 
         const detail: APIKeyDetail = {
           ...statusData,
-          name: keyData.name,
-          provider: keyData.provider,
-          status: keyData.status,
-          latencyHistory,
-          errorRateHistory,
-          latencyDistribution,
+          api_key_id: statusData.id,
         };
 
         setSelectedStatus(detail);
@@ -281,10 +226,60 @@ const AdminAPIKeyStatus: React.FC = () => {
 
   const allColumns = [
     {
-      title: 'API Key ID',
-      dataIndex: 'api_key_id',
-      key: 'api_key_id',
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 80,
+    },
+    {
+      title: '商户ID',
+      dataIndex: 'merchant_id',
+      key: 'merchant_id',
       width: 100,
+    },
+    {
+      title: '名称',
+      dataIndex: 'name',
+      key: 'name',
+      width: 150,
+    },
+    {
+      title: '提供商',
+      dataIndex: 'provider',
+      key: 'provider',
+      width: 120,
+      render: (provider: string) => <Tag color="blue">{provider}</Tag>,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 80,
+      render: (status: string) => (
+        <Tag color={status === 'active' ? 'green' : 'default'}>
+          {status === 'active' ? '启用' : '禁用'}
+        </Tag>
+      ),
+    },
+    {
+      title: '区域',
+      dataIndex: 'region',
+      key: 'region',
+      width: 80,
+      render: (region: string) => (
+        <Tag color="orange">{region === 'domestic' ? '国内' : '海外'}</Tag>
+      ),
+    },
+    {
+      title: '健康状态',
+      dataIndex: 'health_status',
+      key: 'health_status',
+      width: 100,
+      render: (healthStatus: string) => {
+        if (healthStatus === 'healthy') return <Tag color="green">健康</Tag>;
+        if (healthStatus === 'degraded') return <Tag color="orange">降级</Tag>;
+        return <Tag color="red">异常</Tag>;
+      },
     },
     {
       title: '延迟 (ms)',
@@ -364,16 +359,16 @@ const AdminAPIKeyStatus: React.FC = () => {
       dataIndex: 'last_request_at',
       key: 'last_request_at',
       width: 150,
-      render: (lastRequestAt: string | null) => (
-        <span>{lastRequestAt ? new Date(lastRequestAt).toLocaleString('zh-CN') : '无'}</span>
+      render: (lastRequestAt: string) => (
+        <span>{lastRequestAt || '-'}</span>
       ),
     },
     {
-      title: '更新时间',
-      dataIndex: 'updated_at',
-      key: 'updated_at',
+      title: '状态更新',
+      dataIndex: 'status_updated_at',
+      key: 'status_updated_at',
       width: 150,
-      render: (updatedAt: string) => <span>{new Date(updatedAt).toLocaleString('zh-CN')}</span>,
+      render: (statusUpdatedAt: string) => <span>{statusUpdatedAt || '-'}</span>,
     },
     {
       title: '操作',
@@ -383,7 +378,7 @@ const AdminAPIKeyStatus: React.FC = () => {
         <Button
           type="link"
           icon={<EyeOutlined />}
-          onClick={() => handleViewDetail(record.api_key_id)}
+          onClick={() => handleViewDetail(record.id)}
         >
           详情
         </Button>
@@ -507,7 +502,7 @@ const AdminAPIKeyStatus: React.FC = () => {
         <Table
           columns={allColumns}
           dataSource={statuses}
-          rowKey="api_key_id"
+          rowKey="id"
           loading={loading && activeTab === 'all'}
           pagination={{
             pageSize: 20,
@@ -649,170 +644,113 @@ const AdminAPIKeyStatus: React.FC = () => {
         title="API Key 详细状态"
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
-        footer={[<Button key="close">关闭</Button>]}
+        footer={[<Button key="close" onClick={() => setDetailModalVisible(false)}>关闭</Button>]}
         width={800}
       >
         {selectedStatus ? (
-          <>
-            <Descriptions bordered column={1}>
-              <Descriptions.Item label="API Key ID">{selectedStatus.api_key_id}</Descriptions.Item>
-              <Descriptions.Item label="名称">{selectedStatus.name}</Descriptions.Item>
-              <Descriptions.Item label="提供商">
-                <Tag color="blue">{selectedStatus.provider}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="状态">
-                <Tag color={selectedStatus.status === 'active' ? 'green' : 'default'}>
-                  {selectedStatus.status === 'active' ? '启用' : '禁用'}
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="延迟指标 (ms)">
-                <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                  <div>
-                    <span>P50: </span>
-                    <Tag color={getLatencyColor(selectedStatus.latency_p50)}>
-                      {selectedStatus.latency_p50}
-                    </Tag>
-                  </div>
-                  <div>
-                    <span>P95: </span>
-                    <Tag color={getLatencyColor(selectedStatus.latency_p95)}>
-                      {selectedStatus.latency_p95}
-                    </Tag>
-                  </div>
-                  <div>
-                    <span>P99: </span>
-                    <Tag color={getLatencyColor(selectedStatus.latency_p99)}>
-                      {selectedStatus.latency_p99}
-                    </Tag>
-                  </div>
-                </Space>
-              </Descriptions.Item>
-              <Descriptions.Item label="错误率">
-                <Tag color={getErrorRateColor(selectedStatus.error_rate)}>
-                  {(selectedStatus.error_rate * 100).toFixed(2)}%
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="成功率">
-                <Tag color={getSuccessRateColor(selectedStatus.success_rate)}>
-                  {(selectedStatus.success_rate * 100).toFixed(2)}%
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="连接池状态">
+          <Descriptions bordered column={2}>
+            <Descriptions.Item label="API Key ID">{selectedStatus.api_key_id}</Descriptions.Item>
+            <Descriptions.Item label="商户ID">{selectedStatus.merchant_id}</Descriptions.Item>
+            <Descriptions.Item label="名称">{selectedStatus.name}</Descriptions.Item>
+            <Descriptions.Item label="提供商">
+              <Tag color="blue">{selectedStatus.provider}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="状态">
+              <Tag color={selectedStatus.status === 'active' ? 'green' : 'default'}>
+                {selectedStatus.status === 'active' ? '启用' : '禁用'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="区域">
+              <Tag color="orange">{selectedStatus.region === 'domestic' ? '国内' : '海外'}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="健康状态">
+              {selectedStatus.health_status === 'healthy' ? (
+                <Tag color="green">健康</Tag>
+              ) : selectedStatus.health_status === 'degraded' ? (
+                <Tag color="orange">降级</Tag>
+              ) : (
+                <Tag color="red">异常</Tag>
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="安全等级">
+              <Tag color={selectedStatus.security_level === 'high' ? 'red' : 'default'}>
+                {selectedStatus.security_level === 'high' ? '高' : '标准'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="端点URL" span={2}>
+              <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                {selectedStatus.endpoint_url || '-'}
+              </span>
+            </Descriptions.Item>
+            <Descriptions.Item label="延迟指标 (ms)">
+              <Space direction="vertical" size={4}>
                 <div>
-                  <Progress
-                    percent={
-                      (selectedStatus.connection_pool_active /
-                        selectedStatus.connection_pool_size) *
-                      100
-                    }
-                    status={
-                      selectedStatus.connection_pool_active >
-                      selectedStatus.connection_pool_size * 0.8
-                        ? 'exception'
-                        : 'normal'
-                    }
-                  />
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                    活跃连接: {selectedStatus.connection_pool_active} /{' '}
-                    {selectedStatus.connection_pool_size}
-                  </div>
+                  <span>P50: </span>
+                  <Tag color={getLatencyColor(selectedStatus.latency_p50)}>
+                    {selectedStatus.latency_p50}
+                  </Tag>
                 </div>
-              </Descriptions.Item>
-              <Descriptions.Item label="限流信息">
                 <div>
-                  <div>剩余配额: {selectedStatus.rate_limit_remaining}</div>
-                  {selectedStatus.rate_limit_reset_at && (
-                    <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
-                      重置时间:{' '}
-                      {new Date(selectedStatus.rate_limit_reset_at).toLocaleString('zh-CN')}
-                    </div>
-                  )}
+                  <span>P95: </span>
+                  <Tag color={getLatencyColor(selectedStatus.latency_p95)}>
+                    {selectedStatus.latency_p95}
+                  </Tag>
                 </div>
-              </Descriptions.Item>
-              <Descriptions.Item label="负载均衡权重">
-                <Tag color="blue">{selectedStatus.load_balance_weight.toFixed(2)}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="最后请求时间">
-                {selectedStatus.last_request_at
-                  ? new Date(selectedStatus.last_request_at).toLocaleString('zh-CN')
-                  : '无'}
-              </Descriptions.Item>
-              <Descriptions.Item label="状态更新时间">
-                {new Date(selectedStatus.updated_at).toLocaleString('zh-CN')}
-              </Descriptions.Item>
-            </Descriptions>
-
-            <div style={{ marginTop: 24 }}>
-              <h3 style={{ marginBottom: 16 }}>延迟分布图表</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={selectedStatus.latencyDistribution}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="range" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="count" name="请求数" fill="#1890ff" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div style={{ marginTop: 24 }}>
-              <h3 style={{ marginBottom: 16 }}>错误率趋势图</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={selectedStatus.errorRateHistory}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="timestamp"
-                    tickFormatter={(time) => new Date(time).toLocaleTimeString()}
-                  />
-                  <YAxis tickFormatter={(value: number) => `${(value * 100).toFixed(0)}%`} />
-                  <Tooltip
-                    formatter={(value) => [`${((value as number) * 100).toFixed(2)}%`, '']}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="errorRate" name="错误率" stroke="#f5222d" />
-                  <Line type="monotone" dataKey="successRate" name="成功率" stroke="#52c41a" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div style={{ marginTop: 24 }}>
-              <h3 style={{ marginBottom: 16 }}>延迟趋势图</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={selectedStatus.latencyHistory}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="timestamp"
-                    tickFormatter={(time) => new Date(time).toLocaleTimeString()}
-                  />
-                  <YAxis unit="ms" />
-                  <Tooltip formatter={(value) => [`${value}ms`, '']} />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="p50"
-                    name="P50 延迟"
-                    stroke="#1890ff"
-                    fill="#e6f7ff"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="p95"
-                    name="P95 延迟"
-                    stroke="#fa8c16"
-                    fill="#fff7e6"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="p99"
-                    name="P99 延迟"
-                    stroke="#f5222d"
-                    fill="#fff1f0"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </>
+                <div>
+                  <span>P99: </span>
+                  <Tag color={getLatencyColor(selectedStatus.latency_p99)}>
+                    {selectedStatus.latency_p99}
+                  </Tag>
+                </div>
+              </Space>
+            </Descriptions.Item>
+            <Descriptions.Item label="错误率">
+              <Tag color={getErrorRateColor(selectedStatus.error_rate)}>
+                {(selectedStatus.error_rate * 100).toFixed(2)}%
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="成功率">
+              <Tag color={getSuccessRateColor(selectedStatus.success_rate)}>
+                {(selectedStatus.success_rate * 100).toFixed(2)}%
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="连接池状态">
+              <div>
+                <Progress
+                  percent={
+                    (selectedStatus.connection_pool_active /
+                      selectedStatus.connection_pool_size) *
+                    100
+                  }
+                  status={
+                    selectedStatus.connection_pool_active >
+                    selectedStatus.connection_pool_size * 0.8
+                      ? 'exception'
+                      : 'normal'
+                  }
+                />
+                <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                  活跃连接: {selectedStatus.connection_pool_active} /{' '}
+                  {selectedStatus.connection_pool_size}
+                </div>
+              </div>
+            </Descriptions.Item>
+            <Descriptions.Item label="限流剩余">
+              {selectedStatus.rate_limit_remaining}
+            </Descriptions.Item>
+            <Descriptions.Item label="负载均衡权重">
+              <Tag color="blue">{selectedStatus.load_balance_weight.toFixed(2)}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="最后请求时间">
+              {selectedStatus.last_request_at || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="状态更新时间">
+              {selectedStatus.status_updated_at || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="创建时间">
+              {selectedStatus.created_at || '-'}
+            </Descriptions.Item>
+          </Descriptions>
         ) : (
           <Spin size="large" style={{ textAlign: 'center', padding: '40px 0' }} />
         )}

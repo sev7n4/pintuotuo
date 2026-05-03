@@ -191,12 +191,24 @@ func GetAllAPIKeyStatus(c *gin.Context) {
 	}
 
 	query := `
-		SELECT api_key_id, latency_p50, latency_p95, latency_p99,
-		       error_rate, success_rate, connection_pool_size, connection_pool_active,
-		       rate_limit_remaining, rate_limit_reset_at, load_balance_weight,
-		       last_request_at, updated_at
-		FROM api_key_realtime_status
-		ORDER BY api_key_id ASC
+		SELECT 
+			mak.id, mak.merchant_id, mak.name, mak.provider, mak.status,
+			mak.region, mak.security_level, mak.endpoint_url, mak.health_status,
+			COALESCE(ars.latency_p50, 0) as latency_p50,
+			COALESCE(ars.latency_p95, 0) as latency_p95,
+			COALESCE(ars.latency_p99, 0) as latency_p99,
+			COALESCE(ars.error_rate, 0) as error_rate,
+			COALESCE(ars.success_rate, 1.0) as success_rate,
+			COALESCE(ars.connection_pool_size, 0) as connection_pool_size,
+			COALESCE(ars.connection_pool_active, 0) as connection_pool_active,
+			COALESCE(ars.rate_limit_remaining, 0) as rate_limit_remaining,
+			COALESCE(ars.load_balance_weight, 1.0) as load_balance_weight,
+			ars.last_request_at,
+			ars.updated_at,
+			mak.created_at
+		FROM merchant_api_keys mak
+		LEFT JOIN api_key_realtime_status ars ON mak.id = ars.api_key_id
+		ORDER BY mak.id ASC
 	`
 
 	rows, err := db.QueryContext(c.Request.Context(), query)
@@ -209,57 +221,61 @@ func GetAllAPIKeyStatus(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var statuses []map[string]interface{}
+	var statuses []MerchantAPIKeyStatusResponse
 	for rows.Next() {
-		var status map[string]interface{} = make(map[string]interface{})
-		var (
-			apiKeyID             int
-			latencyP50           int
-			latencyP95           int
-			latencyP99           int
-			errorRate            float64
-			successRate          float64
-			connectionPoolSize   int
-			connectionPoolActive int
-			rateLimitRemaining   int
-			rateLimitResetAt     interface{}
-			loadBalanceWeight    float64
-			lastRequestAt        interface{}
-			updatedAt            interface{}
-		)
+		var status MerchantAPIKeyStatusResponse
+		var region, securityLevel, endpointURL, healthStatus sql.NullString
+		var lastRequestAt, statusUpdatedAt, createdAt sql.NullTime
 
 		err := rows.Scan(
-			&apiKeyID,
-			&latencyP50,
-			&latencyP95,
-			&latencyP99,
-			&errorRate,
-			&successRate,
-			&connectionPoolSize,
-			&connectionPoolActive,
-			&rateLimitRemaining,
-			&rateLimitResetAt,
-			&loadBalanceWeight,
+			&status.ID,
+			&status.MerchantID,
+			&status.Name,
+			&status.Provider,
+			&status.Status,
+			&region,
+			&securityLevel,
+			&endpointURL,
+			&healthStatus,
+			&status.LatencyP50,
+			&status.LatencyP95,
+			&status.LatencyP99,
+			&status.ErrorRate,
+			&status.SuccessRate,
+			&status.ConnectionPoolSize,
+			&status.ConnectionPoolActive,
+			&status.RateLimitRemaining,
+			&status.LoadBalanceWeight,
 			&lastRequestAt,
-			&updatedAt,
+			&statusUpdatedAt,
+			&createdAt,
 		)
 		if err != nil {
+			log.Printf("Failed to scan row: %v", err)
 			continue
 		}
 
-		status["api_key_id"] = apiKeyID
-		status["latency_p50"] = latencyP50
-		status["latency_p95"] = latencyP95
-		status["latency_p99"] = latencyP99
-		status["error_rate"] = errorRate
-		status["success_rate"] = successRate
-		status["connection_pool_size"] = connectionPoolSize
-		status["connection_pool_active"] = connectionPoolActive
-		status["rate_limit_remaining"] = rateLimitRemaining
-		status["rate_limit_reset_at"] = rateLimitResetAt
-		status["load_balance_weight"] = loadBalanceWeight
-		status["last_request_at"] = lastRequestAt
-		status["updated_at"] = updatedAt
+		if region.Valid {
+			status.Region = region.String
+		}
+		if securityLevel.Valid {
+			status.SecurityLevel = securityLevel.String
+		}
+		if endpointURL.Valid {
+			status.EndpointURL = endpointURL.String
+		}
+		if healthStatus.Valid {
+			status.HealthStatus = healthStatus.String
+		}
+		if lastRequestAt.Valid {
+			status.LastRequestAt = lastRequestAt.Time.Format("2006-01-02 15:04:05")
+		}
+		if statusUpdatedAt.Valid {
+			status.StatusUpdatedAt = statusUpdatedAt.Time.Format("2006-01-02 15:04:05")
+		}
+		if createdAt.Valid {
+			status.CreatedAt = createdAt.Time.Format("2006-01-02 15:04:05")
+		}
 
 		statuses = append(statuses, status)
 	}

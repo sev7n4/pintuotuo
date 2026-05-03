@@ -99,11 +99,6 @@ const menuItems = [
     label: '决策日志',
   },
   {
-    key: '/admin/api-key-advanced-config',
-    icon: <SettingOutlined />,
-    label: 'API Key 配置',
-  },
-  {
     key: '/admin/gateway-stats',
     icon: <CloudServerOutlined />,
     label: '网关统计',
