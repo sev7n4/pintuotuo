@@ -18,7 +18,7 @@ func TestProbeProviderModels_ErrorMapping(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		res, err := ProbeProviderModels(context.Background(), &http.Client{Timeout: 2 * time.Second}, srv.URL+"/models", "k")
+		res, err := ProbeProviderModels(context.Background(), &http.Client{Timeout: 2 * time.Second}, srv.URL+"/models", "k", "openai")
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -41,7 +41,7 @@ func TestProbeProviderModels_ErrorMapping(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		res, err := ProbeProviderModels(context.Background(), &http.Client{Timeout: 2 * time.Second}, srv.URL+"/models", "k")
+		res, err := ProbeProviderModels(context.Background(), &http.Client{Timeout: 2 * time.Second}, srv.URL+"/models", "k", "openai")
 		if err != nil {
 			t.Fatalf("unexpected err: %v", err)
 		}
@@ -53,8 +53,7 @@ func TestProbeProviderModels_ErrorMapping(t *testing.T) {
 	t.Run("network timeout maps category", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
-		// 10.255.255.1 常用于不可达地址，触发超时错误
-		res, err := ProbeProviderModels(ctx, &http.Client{Timeout: 50 * time.Millisecond}, "http://10.255.255.1/models", "k")
+		res, err := ProbeProviderModels(ctx, &http.Client{Timeout: 50 * time.Millisecond}, "http://10.255.255.1/models", "k", "openai")
 		if err == nil {
 			t.Fatal("expected timeout/network error")
 		}
@@ -65,4 +64,87 @@ func TestProbeProviderModels_ErrorMapping(t *testing.T) {
 			t.Fatalf("unexpected category=%s", res.ErrorCategory)
 		}
 	})
+}
+
+func TestSetProviderAuthHeaders(t *testing.T) {
+	t.Run("openai uses Bearer token", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/models", nil)
+		SetProviderAuthHeaders(req, "openai", "sk-test123")
+		if got := req.Header.Get("Authorization"); got != "Bearer sk-test123" {
+			t.Fatalf("Authorization=%s want=Bearer sk-test123", got)
+		}
+		if got := req.Header.Get("x-api-key"); got != "" {
+			t.Fatalf("x-api-key should be empty, got=%s", got)
+		}
+	})
+
+	t.Run("anthropic uses x-api-key header", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/models", nil)
+		SetProviderAuthHeaders(req, "anthropic", "sk-ant-test123")
+		if got := req.Header.Get("x-api-key"); got != "sk-ant-test123" {
+			t.Fatalf("x-api-key=%s want=sk-ant-test123", got)
+		}
+		if got := req.Header.Get("anthropic-version"); got != "2023-06-01" {
+			t.Fatalf("anthropic-version=%s want=2023-06-01", got)
+		}
+		if got := req.Header.Get("Authorization"); got != "" {
+			t.Fatalf("Authorization should be empty for anthropic, got=%s", got)
+		}
+	})
+
+	t.Run("anthropic case insensitive", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/models", nil)
+		SetProviderAuthHeaders(req, "Anthropic", "sk-ant-test")
+		if got := req.Header.Get("x-api-key"); got != "sk-ant-test" {
+			t.Fatalf("x-api-key=%s want=sk-ant-test", got)
+		}
+	})
+
+	t.Run("unknown provider defaults to Bearer", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/models", nil)
+		SetProviderAuthHeaders(req, "google", "AIza-test")
+		if got := req.Header.Get("Authorization"); got != "Bearer AIza-test" {
+			t.Fatalf("Authorization=%s want=Bearer AIza-test", got)
+		}
+		if got := req.Header.Get("x-api-key"); got != "" {
+			t.Fatalf("x-api-key should be empty, got=%s", got)
+		}
+	})
+
+	t.Run("content-type always set", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/models", nil)
+		SetProviderAuthHeaders(req, "openai", "key")
+		if got := req.Header.Get("Content-Type"); got != "application/json" {
+			t.Fatalf("Content-Type=%s want=application/json", got)
+		}
+	})
+}
+
+func TestProbeProviderModels_AnthropicAuthHeaders(t *testing.T) {
+	var receivedAuth string
+	var receivedAPIKey string
+	var receivedVersion string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuth = r.Header.Get("Authorization")
+		receivedAPIKey = r.Header.Get("x-api-key")
+		receivedVersion = r.Header.Get("anthropic-version")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":[{"id":"claude-3-5-sonnet-20241022"}]}`))
+	}))
+	defer srv.Close()
+
+	_, err := ProbeProviderModels(context.Background(), &http.Client{Timeout: 2 * time.Second}, srv.URL+"/models", "sk-ant-key", "anthropic")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if receivedAuth != "" {
+		t.Fatalf("Authorization should be empty for anthropic, got=%s", receivedAuth)
+	}
+	if receivedAPIKey != "sk-ant-key" {
+		t.Fatalf("x-api-key=%s want=sk-ant-key", receivedAPIKey)
+	}
+	if receivedVersion != "2023-06-01" {
+		t.Fatalf("anthropic-version=%s want=2023-06-01", receivedVersion)
+	}
 }

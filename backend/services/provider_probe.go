@@ -24,13 +24,23 @@ type ProbeModelsResult struct {
 }
 
 // ProbeProviderModels performs one GET <modelsURL> probe and parses OpenAI-style model list payload.
-func ProbeProviderModels(ctx context.Context, client *http.Client, modelsURL string, apiKey string) (*ProbeModelsResult, error) {
+func SetProviderAuthHeaders(req *http.Request, provider, apiKey string) {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case modelProviderAnthropic:
+		req.Header.Set("x-api-key", apiKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+	default:
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	}
+	req.Header.Set("Content-Type", "application/json")
+}
+
+func ProbeProviderModels(ctx context.Context, client *http.Client, modelsURL string, apiKey string, provider string) (*ProbeModelsResult, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, modelsURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-	req.Header.Set("Content-Type", "application/json")
+	SetProviderAuthHeaders(req, provider, apiKey)
 
 	start := time.Now()
 	resp, err := client.Do(req)

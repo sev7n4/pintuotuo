@@ -216,11 +216,13 @@ func TestResolveProxyEndpoint(t *testing.T) {
 
 	tests := []struct {
 		name        string
+		provider    string
 		routeConfig map[string]interface{}
 		wantErr     bool
 	}{
 		{
-			name: "Priority 1: endpoints.proxy.gaap",
+			name:     "Priority 1: endpoints.proxy.gaap",
+			provider: "openai",
 			routeConfig: map[string]interface{}{
 				"endpoints": map[string]interface{}{
 					"proxy": map[string]interface{}{
@@ -231,14 +233,16 @@ func TestResolveProxyEndpoint(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Priority 2: proxy_url",
+			name:     "Priority 2: proxy_url",
+			provider: "openai",
 			routeConfig: map[string]interface{}{
 				"proxy_url": "https://proxy.example.com",
 			},
 			wantErr: false,
 		},
 		{
-			name:        "No config",
+			name:        "No config, no DB returns error",
+			provider:    "openai",
 			routeConfig: map[string]interface{}{},
 			wantErr:     true,
 		},
@@ -246,7 +250,7 @@ func TestResolveProxyEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			endpoint, err := validator.resolveProxyEndpoint(ctx, tt.routeConfig)
+			endpoint, err := validator.resolveProxyEndpoint(ctx, tt.provider, tt.routeConfig)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("resolveProxyEndpoint() error = %v, wantErr %v", err, tt.wantErr)
 				return

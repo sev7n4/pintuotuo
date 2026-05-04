@@ -161,8 +161,7 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 			authToken = strings.TrimSpace(masterKey)
 		}
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
-	req.Header.Set("Content-Type", "application/json")
+	SetProviderAuthHeaders(req, apiKey.Provider, authToken)
 
 	start := time.Now()
 	resp, err := s.httpClient.Do(req)
@@ -215,7 +214,7 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 			authToken = strings.TrimSpace(masterKey)
 		}
 	}
-	probe, err := ProbeProviderModels(ctx, s.httpClient, modelsEndpoint, authToken)
+	probe, err := ProbeProviderModels(ctx, s.httpClient, modelsEndpoint, authToken, apiKey.Provider)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -852,8 +851,7 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 			authToken = strings.TrimSpace(masterKey)
 		}
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
-	req.Header.Set("Content-Type", "application/json")
+	SetProviderAuthHeaders(req, apiKey.Provider, authToken)
 
 	start := time.Now()
 	resp, err := s.httpClient.Do(req)

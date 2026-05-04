@@ -158,7 +158,7 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 	var probe *ProbeModelsResult
 	var probeErr error
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, decryptedKey)
+		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, decryptedKey, provider)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break
@@ -623,8 +623,7 @@ func (v *APIKeyValidator) probeQuota(providerConfig map[string]string, provider,
 	if err != nil {
 		return false, ErrCodeQuotaProbeRequestBuildFailed, err.Error()
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-	req.Header.Set("Content-Type", "application/json")
+	SetProviderAuthHeaders(req, provider, apiKey)
 
 	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
 	if err != nil {
@@ -754,7 +753,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 	var probeErr error
 	var connectionFailed bool
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, modelsAuthToken)
+		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, modelsAuthToken, provider)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break
@@ -908,7 +907,7 @@ func (v *APIKeyValidator) resolveEndpointByRouteMode(ctx context.Context, provid
 	case GatewayModeLitellm:
 		return v.resolveLitellmEndpoint(ctx, routeConfig, region)
 	case GatewayModeProxy:
-		return v.resolveProxyEndpoint(ctx, routeConfig)
+		return v.resolveProxyEndpoint(ctx, provider, routeConfig)
 	case string(GoalAuto):
 		return v.resolveAutoEndpoint(ctx, provider, routeConfig, region)
 	default:
@@ -973,7 +972,7 @@ func (v *APIKeyValidator) resolveLitellmEndpoint(ctx context.Context, routeConfi
 	return "", fmt.Errorf("LiteLLM endpoint not configured")
 }
 
-func (v *APIKeyValidator) resolveProxyEndpoint(ctx context.Context, routeConfig map[string]interface{}) (string, error) {
+func (v *APIKeyValidator) resolveProxyEndpoint(ctx context.Context, provider string, routeConfig map[string]interface{}) (string, error) {
 	if routeConfig != nil {
 		if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
 			if proxyEndpoints, ok := endpoints[GatewayModeProxy].(map[string]interface{}); ok {
@@ -993,6 +992,15 @@ func (v *APIKeyValidator) resolveProxyEndpoint(ctx context.Context, routeConfig 
 		}
 	}
 
+	providerConfig, err := v.getProviderConfig(provider)
+	if err != nil {
+		return "", fmt.Errorf("Proxy endpoint not configured and provider not found: %w", err)
+	}
+
+	if baseURL := strings.TrimRight(providerConfig["api_base_url"], "/"); baseURL != "" {
+		return baseURL, nil
+	}
+
 	return "", fmt.Errorf("Proxy endpoint not configured")
 }
 
@@ -1009,7 +1017,7 @@ func (v *APIKeyValidator) resolveAutoEndpoint(ctx context.Context, provider stri
 		case GatewayModeLitellm:
 			endpoint, err = v.resolveLitellmEndpoint(ctx, routeConfig, region)
 		case GatewayModeProxy:
-			endpoint, err = v.resolveProxyEndpoint(ctx, routeConfig)
+			endpoint, err = v.resolveProxyEndpoint(ctx, provider, routeConfig)
 		}
 
 		if err == nil && endpoint != "" {
@@ -1066,8 +1074,7 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	if err != nil {
 		return false, ErrCodeQuotaProbeRequestBuildFailed, err.Error()
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-	req.Header.Set("Content-Type", "application/json")
+	SetProviderAuthHeaders(req, provider, apiKey)
 
 	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
 	if err != nil {
