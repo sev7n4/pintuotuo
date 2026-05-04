@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,6 +83,143 @@ func TestResolveRouteMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := resolveRouteMode(tt.apiKey)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestResolveRouteModeWithProvider(t *testing.T) {
+	tests := []struct {
+		name           string
+		apiKey         *models.MerchantAPIKey
+		providerRegion string
+		envHTTPSProxy  string
+		envLitellmURL  string
+		expected       string
+	}{
+		{
+			name:           "nil api key returns direct",
+			apiKey:         nil,
+			providerRegion: "overseas",
+			envHTTPSProxy:  "http://proxy:7890",
+			expected:       routeModeDirect,
+		},
+		{
+			name: "explicit direct not affected by proxy",
+			apiKey: &models.MerchantAPIKey{
+				RouteMode: "direct",
+			},
+			providerRegion: "overseas",
+			envHTTPSProxy:  "http://proxy:7890",
+			expected:       routeModeDirect,
+		},
+		{
+			name: "explicit litellm not affected by proxy",
+			apiKey: &models.MerchantAPIKey{
+				RouteMode: "litellm",
+			},
+			providerRegion: "overseas",
+			envHTTPSProxy:  "http://proxy:7890",
+			expected:       routeModeLitellm,
+		},
+		{
+			name: "explicit proxy not affected",
+			apiKey: &models.MerchantAPIKey{
+				RouteMode: "proxy",
+			},
+			providerRegion: "domestic",
+			envHTTPSProxy:  "",
+			expected:       routeModeProxy,
+		},
+		{
+			name: "auto + overseas + HTTPS_PROXY returns proxy",
+			apiKey: &models.MerchantAPIKey{
+				RouteMode: "auto",
+			},
+			providerRegion: "overseas",
+			envHTTPSProxy:  "http://host.docker.internal:7890",
+			expected:       routeModeProxy,
+		},
+		{
+			name: "auto + overseas + https_proxy lowercase returns proxy",
+			apiKey: &models.MerchantAPIKey{
+				RouteMode: "auto",
+			},
+			providerRegion: "overseas",
+			envHTTPSProxy:  "",
+			envLitellmURL:  "",
+			expected:       routeModeProxy,
+		},
+		{
+			name: "auto + overseas + no HTTPS_PROXY + LiteLLM URL returns litellm",
+			apiKey: &models.MerchantAPIKey{
+				RouteMode: "auto",
+			},
+			providerRegion: "overseas",
+			envHTTPSProxy:  "",
+			envLitellmURL:  "http://litellm:4000",
+			expected:       routeModeLitellm,
+		},
+		{
+			name: "auto + overseas + no proxy no litellm returns direct",
+			apiKey: &models.MerchantAPIKey{
+				RouteMode: "auto",
+			},
+			providerRegion: "overseas",
+			envHTTPSProxy:  "",
+			envLitellmURL:  "",
+			expected:       routeModeDirect,
+		},
+		{
+			name: "auto + domestic returns direct regardless of HTTPS_PROXY",
+			apiKey: &models.MerchantAPIKey{
+				RouteMode: "auto",
+			},
+			providerRegion: "domestic",
+			envHTTPSProxy:  "http://host.docker.internal:7890",
+			expected:       routeModeDirect,
+		},
+		{
+			name: "empty route mode + overseas + HTTPS_PROXY returns proxy",
+			apiKey: &models.MerchantAPIKey{
+				RouteMode: "",
+			},
+			providerRegion: "overseas",
+			envHTTPSProxy:  "http://host.docker.internal:7890",
+			expected:       routeModeProxy,
+		},
+		{
+			name: "auto + empty region returns direct",
+			apiKey: &models.MerchantAPIKey{
+				RouteMode: "auto",
+			},
+			providerRegion: "",
+			envHTTPSProxy:  "http://host.docker.internal:7890",
+			expected:       routeModeDirect,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origHTTPS := os.Getenv("HTTPS_PROXY")
+			origHTTPSLower := os.Getenv("https_proxy")
+			origLitellm := os.Getenv("LLM_GATEWAY_LITELLM_URL")
+			defer func() {
+				os.Setenv("HTTPS_PROXY", origHTTPS)
+				os.Setenv("https_proxy", origHTTPSLower)
+				os.Setenv("LLM_GATEWAY_LITELLM_URL", origLitellm)
+			}()
+
+			os.Setenv("HTTPS_PROXY", tt.envHTTPSProxy)
+			os.Setenv("https_proxy", "")
+			os.Setenv("LLM_GATEWAY_LITELLM_URL", tt.envLitellmURL)
+
+			if tt.name == "auto + overseas + https_proxy lowercase returns proxy" {
+				os.Setenv("HTTPS_PROXY", "")
+				os.Setenv("https_proxy", "http://host.docker.internal:7890")
+			}
+
+			result := resolveRouteModeWithProvider(tt.apiKey, tt.providerRegion)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

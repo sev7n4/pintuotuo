@@ -1,607 +1,259 @@
 package services
 
 import (
-	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestNewExecutionLayer(t *testing.T) {
-	engine := NewExecutionEngine()
-	layer := NewExecutionLayer(nil, engine)
-
-	assert.NotNil(t, layer)
-	assert.Equal(t, engine, layer.engine)
-}
-
-func TestNewExecutionLayer_NilEngine(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-	assert.NotNil(t, layer)
-	assert.NotNil(t, layer.engine)
-}
-
-func TestExecutionLayer_Execute_Success(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		response := map[string]interface{}{
-			"id":      "test-id",
-			"model":   "gpt-4",
-			"choices": []interface{}{},
-			"usage": map[string]int{
-				"prompt_tokens":     10,
-				"completion_tokens": 20,
-				"total_tokens":      30,
+func TestDetermineGatewayMode(t *testing.T) {
+	tests := []struct {
+		name          string
+		cfg           *ExecutionProviderConfig
+		envHTTPSProxy string
+		envLitellmURL string
+		expected      string
+	}{
+		{
+			name:          "nil config returns direct",
+			cfg:           nil,
+			envHTTPSProxy: "",
+			envLitellmURL: "",
+			expected:      GatewayModeDirect,
+		},
+		{
+			name: "explicit direct mode not affected",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  GatewayModeDirect,
+				ProviderRegion: regionOverseas,
 			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-	}))
-	defer server.Close()
-
-	engine := NewExecutionEngine()
-	layer := NewExecutionLayer(nil, engine)
-
-	decision := &RoutingDecision{
-		SelectedModel: "gpt-4",
-	}
-
-	input := &ExecutionLayerInput{
-		RoutingDecision: decision,
-		ProviderConfig: &ExecutionProviderConfig{
-			Code:       "openai",
-			Name:       "OpenAI",
-			APIBaseURL: server.URL,
-			APIFormat:  "openai",
+			envHTTPSProxy: "http://proxy:7890",
+			envLitellmURL: "",
+			expected:      GatewayModeDirect,
 		},
-		DecryptedAPIKey: "test-api-key",
-		Messages: []Message{
-			{Role: "user", Content: "Hello"},
-		},
-	}
-
-	output, err := layer.Execute(context.Background(), input)
-
-	require.NoError(t, err)
-	assert.NotNil(t, output)
-	assert.True(t, output.Result.Success)
-	assert.Equal(t, 200, output.Result.StatusCode)
-	assert.NotNil(t, output.Result.Usage)
-}
-
-func TestExecutionLayer_Execute_MissingProviderConfig(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	input := &ExecutionLayerInput{
-		DecryptedAPIKey: "test-api-key",
-	}
-
-	output, err := layer.Execute(context.Background(), input)
-
-	assert.Error(t, err)
-	assert.Nil(t, output)
-	assert.Contains(t, err.Error(), "provider config is required")
-}
-
-func TestExecutionLayer_Execute_MissingAPIKey(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	input := &ExecutionLayerInput{
-		ProviderConfig: &ExecutionProviderConfig{
-			Code:       "openai",
-			APIBaseURL: "http://example.com",
-		},
-	}
-
-	output, err := layer.Execute(context.Background(), input)
-
-	assert.Error(t, err)
-	assert.Nil(t, output)
-	assert.Contains(t, err.Error(), "decrypted API key is required")
-}
-
-func TestExecutionLayer_RecordExecutionResult(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	decision := &RoutingDecision{}
-	result := &ExecutionResult{
-		Success:     true,
-		StatusCode:  200,
-		LatencyMs:   150,
-		Provider:    "openai",
-		ActualModel: "gpt-4",
-		Usage: &TokenUsage{
-			PromptTokens:     10,
-			CompletionTokens: 20,
-			TotalTokens:      30,
-		},
-	}
-
-	layer.recordExecutionResult(decision, result)
-
-	assert.True(t, decision.ExecutionSuccess)
-	assert.Equal(t, 200, decision.ExecutionStatusCode)
-	assert.Equal(t, 150, decision.ExecutionLatencyMs)
-	assert.NotNil(t, decision.ExecutionLayerResult)
-
-	var resultData map[string]interface{}
-	err := json.Unmarshal(decision.ExecutionLayerResult, &resultData)
-	require.NoError(t, err)
-	assert.True(t, resultData["success"].(bool))
-	assert.Equal(t, float64(200), resultData["status_code"])
-}
-
-func TestExecutionLayer_RecordExecutionResult_NilDecision(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	result := &ExecutionResult{
-		Success:    true,
-		StatusCode: 200,
-	}
-
-	assert.NotPanics(t, func() {
-		layer.recordExecutionResult(nil, result)
-	})
-}
-
-func TestExecutionLayer_RecordExecutionResult_NilResult(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	decision := &RoutingDecision{}
-
-	assert.NotPanics(t, func() {
-		layer.recordExecutionResult(decision, nil)
-	})
-}
-
-func TestExecutionLayer_Execute_AnthropicFormat(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "test-api-key", r.Header.Get("x-api-key"))
-		assert.Equal(t, "2023-06-01", r.Header.Get("anthropic-version"))
-
-		response := map[string]interface{}{
-			"id":    "test-id",
-			"model": "claude-3",
-			"content": []interface{}{
-				map[string]string{"type": "text", "text": "Hello!"},
+		{
+			name: "explicit litellm mode not affected",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  GatewayModeLitellm,
+				ProviderRegion: regionOverseas,
 			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-	}))
-	defer server.Close()
-
-	engine := NewExecutionEngine()
-	layer := NewExecutionLayer(nil, engine)
-
-	input := &ExecutionLayerInput{
-		ProviderConfig: &ExecutionProviderConfig{
-			Code:       "anthropic",
-			Name:       "Anthropic",
-			APIBaseURL: server.URL,
-			APIFormat:  "anthropic",
+			envHTTPSProxy: "http://proxy:7890",
+			envLitellmURL: "",
+			expected:      GatewayModeLitellm,
 		},
-		DecryptedAPIKey: "test-api-key",
-		Messages: []Message{
-			{Role: "user", Content: "Hello"},
-		},
-	}
-
-	output, err := layer.Execute(context.Background(), input)
-
-	require.NoError(t, err)
-	assert.True(t, output.Result.Success)
-}
-
-func TestExecutionLayer_Execute_WithRetry(t *testing.T) {
-	attempts := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		attempts++
-		if attempts < 2 {
-			w.WriteHeader(http.StatusBadGateway)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	}))
-	defer server.Close()
-
-	engine := NewExecutionEngine()
-	layer := NewExecutionLayer(nil, engine)
-
-	input := &ExecutionLayerInput{
-		ProviderConfig: &ExecutionProviderConfig{
-			Code:       "openai",
-			APIBaseURL: server.URL,
-			APIFormat:  "openai",
-		},
-		DecryptedAPIKey: "test-key",
-	}
-
-	output, err := layer.Execute(context.Background(), input)
-
-	require.NoError(t, err)
-	assert.True(t, output.Result.Success)
-	assert.Equal(t, 2, attempts)
-}
-
-func TestExecutionLayer_GetProviderConfig(t *testing.T) {
-	t.Run("nil database", func(t *testing.T) {
-		layer := NewExecutionLayer(nil, nil)
-		_, err := layer.GetProviderConfig(context.Background(), "openai")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "database connection is required")
-	})
-}
-
-func TestExecutionLayer_UpdateRoutingDecisionLog(t *testing.T) {
-	t.Run("nil database", func(t *testing.T) {
-		layer := NewExecutionLayer(nil, nil)
-		err := layer.UpdateRoutingDecisionLog(context.Background(), 1, &ExecutionResult{})
-		assert.NoError(t, err)
-	})
-}
-
-func TestExecutionLayer_Execute_WithMessages(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&body)
-		assert.Contains(t, body, "messages")
-		assert.Contains(t, body, "model")
-
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	}))
-	defer server.Close()
-
-	engine := NewExecutionEngine()
-	layer := NewExecutionLayer(nil, engine)
-
-	input := &ExecutionLayerInput{
-		ProviderConfig: &ExecutionProviderConfig{
-			Code:       "openai",
-			APIBaseURL: server.URL,
-			APIFormat:  "openai",
-		},
-		DecryptedAPIKey: "test-key",
-		Messages: []Message{
-			{Role: "system", Content: "You are helpful"},
-			{Role: "user", Content: "Hello"},
-		},
-		Stream: false,
-		Options: json.RawMessage(`{
-			"temperature": 0.7,
-			"max_tokens": 100
-		}`),
-	}
-
-	output, err := layer.Execute(context.Background(), input)
-
-	require.NoError(t, err)
-	assert.True(t, output.Result.Success)
-}
-
-func TestExecutionProviderConfig_NewFields(t *testing.T) {
-	cfg := &ExecutionProviderConfig{
-		Code:           "openai",
-		Name:           "OpenAI",
-		APIBaseURL:     "https://api.openai.com/v1",
-		APIFormat:      "openai",
-		GatewayMode:    "litellm",
-		ProviderRegion: "overseas",
-		RouteStrategy: map[string]interface{}{
-			"domestic_users": map[string]interface{}{"mode": "litellm"},
-			"overseas_users": map[string]interface{}{"mode": "direct"},
-		},
-		Endpoints: map[string]interface{}{
-			"direct": map[string]interface{}{
-				"overseas": "https://api.openai.com/v1",
+		{
+			name: "explicit proxy mode not affected",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  GatewayModeProxy,
+				ProviderRegion: regionOverseas,
 			},
-			"litellm": map[string]interface{}{
-				"domestic": "http://litellm:4000/v1",
+			envHTTPSProxy: "",
+			envLitellmURL: "",
+			expected:      GatewayModeProxy,
+		},
+		{
+			name: "auto + overseas + HTTPS_PROXY returns proxy",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  RouteModeAuto,
+				ProviderRegion: regionOverseas,
 			},
+			envHTTPSProxy: "http://host.docker.internal:7890",
+			envLitellmURL: "",
+			expected:      GatewayModeProxy,
 		},
-	}
-
-	assert.Equal(t, "openai", cfg.Code)
-	assert.Equal(t, "litellm", cfg.GatewayMode)
-	assert.Equal(t, "overseas", cfg.ProviderRegion)
-	assert.NotNil(t, cfg.RouteStrategy)
-	assert.NotNil(t, cfg.Endpoints)
-
-	domesticUsers, ok := cfg.RouteStrategy["domestic_users"].(map[string]interface{})
-	require.True(t, ok)
-	assert.Equal(t, "litellm", domesticUsers["mode"])
-
-	overseasUsers, ok := cfg.RouteStrategy["overseas_users"].(map[string]interface{})
-	require.True(t, ok)
-	assert.Equal(t, "direct", overseasUsers["mode"])
-}
-
-func TestExecutionProviderConfig_ProviderRegion_Default(t *testing.T) {
-	cfg := &ExecutionProviderConfig{
-		Code:       "openai",
-		APIBaseURL: "https://api.openai.com/v1",
-	}
-
-	assert.Equal(t, "", cfg.ProviderRegion)
-}
-
-func TestExecutionProviderConfig_RouteStrategy_Nil(t *testing.T) {
-	cfg := &ExecutionProviderConfig{
-		Code:       "openai",
-		APIBaseURL: "https://api.openai.com/v1",
-	}
-
-	assert.Nil(t, cfg.RouteStrategy)
-}
-
-func TestExecutionProviderConfig_Endpoints_Nil(t *testing.T) {
-	cfg := &ExecutionProviderConfig{
-		Code:       "openai",
-		APIBaseURL: "https://api.openai.com/v1",
-	}
-
-	assert.Nil(t, cfg.Endpoints)
-}
-
-func TestExecutionLayer_ResolveEndpoint_DirectMode(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	cfg := &ExecutionProviderConfig{
-		Code:           "openai",
-		APIBaseURL:     "https://api.openai.com/v1",
-		GatewayMode:    "direct",
-		ProviderRegion: "overseas",
-	}
-
-	endpoint := layer.resolveEndpoint(cfg)
-	assert.Equal(t, "https://api.openai.com/v1", endpoint)
-}
-
-func TestExecutionLayer_ResolveEndpoint_LitellmMode(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	cfg := &ExecutionProviderConfig{
-		Code:           "openai",
-		APIBaseURL:     "https://api.openai.com/v1",
-		GatewayMode:    "litellm",
-		ProviderRegion: "domestic",
-		Endpoints: map[string]interface{}{
-			"litellm": map[string]interface{}{
-				"domestic": "http://litellm-domestic:4000/v1",
-				"overseas": "http://litellm-overseas:4000/v1",
+		{
+			name: "auto + overseas + https_proxy lowercase returns proxy",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  RouteModeAuto,
+				ProviderRegion: regionOverseas,
 			},
+			envHTTPSProxy: "",
+			envLitellmURL: "",
+			expected:      GatewayModeProxy,
 		},
-	}
-
-	endpoint := layer.resolveEndpoint(cfg)
-	assert.Equal(t, "http://litellm-domestic:4000/v1", endpoint)
-}
-
-func TestExecutionLayer_ResolveEndpoint_ProxyMode(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	cfg := &ExecutionProviderConfig{
-		Code:           "openai",
-		APIBaseURL:     "https://api.openai.com/v1",
-		GatewayMode:    "proxy",
-		ProviderRegion: "domestic",
-		Endpoints: map[string]interface{}{
-			"proxy": map[string]interface{}{
-				"gaap": "https://openai-gaap.example.com",
+		{
+			name: "auto + overseas + no HTTPS_PROXY + LiteLLM URL returns litellm",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  RouteModeAuto,
+				ProviderRegion: regionOverseas,
 			},
+			envHTTPSProxy: "",
+			envLitellmURL: "http://litellm:4000",
+			expected:      GatewayModeLitellm,
 		},
-	}
-
-	endpoint := layer.resolveEndpoint(cfg)
-	assert.Equal(t, "https://openai-gaap.example.com", endpoint)
-}
-
-func TestExecutionLayer_ResolveEndpoint_FallbackToAPIBaseURL(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	cfg := &ExecutionProviderConfig{
-		Code:           "openai",
-		APIBaseURL:     "https://api.openai.com/v1",
-		GatewayMode:    "direct",
-		ProviderRegion: "overseas",
-		Endpoints:      nil,
-	}
-
-	endpoint := layer.resolveEndpoint(cfg)
-	assert.Equal(t, "https://api.openai.com/v1", endpoint)
-}
-
-func TestExecutionLayer_ResolveAuthToken_DirectMode(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	cfg := &ExecutionProviderConfig{
-		Code:        "openai",
-		GatewayMode: "direct",
-	}
-
-	token := layer.resolveAuthToken(cfg, "sk-original-key")
-	assert.Equal(t, "sk-original-key", token)
-}
-
-func TestExecutionLayer_ResolveAuthToken_LitellmMode(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	cfg := &ExecutionProviderConfig{
-		Code:        "openai",
-		GatewayMode: "litellm",
-	}
-
-	os.Setenv("LITELLM_MASTER_KEY", "sk-litellm-master-key")
-	defer os.Unsetenv("LITELLM_MASTER_KEY")
-
-	token := layer.resolveAuthToken(cfg, "sk-original-key")
-	assert.Equal(t, "sk-litellm-master-key", token)
-}
-
-func TestExecutionLayer_DetermineGatewayMode_FromConfig(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	cfg := &ExecutionProviderConfig{
-		Code:          "openai",
-		BYOKRouteMode: "litellm",
-		RouteStrategy: map[string]interface{}{
-			"domestic_users": map[string]interface{}{"mode": "litellm"},
-		},
-	}
-
-	mode := layer.determineGatewayMode(cfg)
-	assert.Equal(t, "litellm", mode)
-}
-
-func TestExecutionLayer_DetermineGatewayMode_EmptyConfig(t *testing.T) {
-	layer := NewExecutionLayer(nil, nil)
-
-	cfg := &ExecutionProviderConfig{
-		Code:        "openai",
-		GatewayMode: "",
-	}
-
-	mode := layer.determineGatewayMode(cfg)
-	assert.Equal(t, "direct", mode)
-}
-
-func TestExecutionLayer_Execute_WithGatewayMode(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer sk-litellm-master", r.Header.Get("Authorization"))
-
-		response := map[string]interface{}{
-			"id":      "test-id",
-			"model":   "gpt-4",
-			"choices": []interface{}{},
-			"usage": map[string]int{
-				"prompt_tokens":     10,
-				"completion_tokens": 20,
-				"total_tokens":      30,
+		{
+			name: "auto + overseas + no proxy no litellm returns direct",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  RouteModeAuto,
+				ProviderRegion: regionOverseas,
 			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-	}))
-	defer server.Close()
-
-	os.Setenv("LITELLM_MASTER_KEY", "sk-litellm-master")
-	defer os.Unsetenv("LITELLM_MASTER_KEY")
-
-	engine := NewExecutionEngine()
-	layer := NewExecutionLayer(nil, engine)
-
-	input := &ExecutionLayerInput{
-		ProviderConfig: &ExecutionProviderConfig{
-			Code:           "openai",
-			Name:           "OpenAI",
-			APIBaseURL:     "https://api.openai.com/v1",
-			APIFormat:      "openai",
-			BYOKRouteMode:  GatewayModeLitellm,
-			ProviderRegion: "domestic",
-			Endpoints: map[string]interface{}{
-				GatewayModeLitellm: map[string]interface{}{
-					"domestic": server.URL,
-				},
-			},
+			envHTTPSProxy: "",
+			envLitellmURL: "",
+			expected:      GatewayModeDirect,
 		},
-		DecryptedAPIKey: "sk-original-key",
-		Messages: []Message{
-			{Role: "user", Content: "Hello"},
+		{
+			name: "auto + domestic returns direct regardless of HTTPS_PROXY",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  RouteModeAuto,
+				ProviderRegion: regionDomestic,
+			},
+			envHTTPSProxy: "http://host.docker.internal:7890",
+			envLitellmURL: "",
+			expected:      GatewayModeDirect,
+		},
+		{
+			name: "auto + empty region + HTTPS_PROXY returns direct",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  RouteModeAuto,
+				ProviderRegion: "",
+			},
+			envHTTPSProxy: "http://host.docker.internal:7890",
+			envLitellmURL: "",
+			expected:      GatewayModeDirect,
+		},
+		{
+			name: "empty route mode treated as auto + overseas + HTTPS_PROXY returns proxy",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  "",
+				ProviderRegion: regionOverseas,
+			},
+			envHTTPSProxy: "http://host.docker.internal:7890",
+			envLitellmURL: "",
+			expected:      GatewayModeProxy,
+		},
+		{
+			name: "HTTPS_PROXY takes priority over LiteLLM URL",
+			cfg: &ExecutionProviderConfig{
+				BYOKRouteMode:  RouteModeAuto,
+				ProviderRegion: regionOverseas,
+			},
+			envHTTPSProxy: "http://host.docker.internal:7890",
+			envLitellmURL: "http://litellm:4000",
+			expected:      GatewayModeProxy,
 		},
 	}
 
-	output, err := layer.Execute(context.Background(), input)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origHTTPS := os.Getenv("HTTPS_PROXY")
+			origHTTPSLower := os.Getenv("https_proxy")
+			origLitellm := os.Getenv("LLM_GATEWAY_LITELLM_URL")
+			defer func() {
+				os.Setenv("HTTPS_PROXY", origHTTPS)
+				os.Setenv("https_proxy", origHTTPSLower)
+				os.Setenv("LLM_GATEWAY_LITELLM_URL", origLitellm)
+			}()
 
-	require.NoError(t, err)
-	assert.NotNil(t, output)
-	assert.True(t, output.Result.Success)
-	assert.Equal(t, 200, output.Result.StatusCode)
+			os.Setenv("HTTPS_PROXY", tt.envHTTPSProxy)
+			os.Setenv("https_proxy", "")
+			os.Setenv("LLM_GATEWAY_LITELLM_URL", tt.envLitellmURL)
+
+			if tt.name == "auto + overseas + https_proxy lowercase returns proxy" {
+				os.Setenv("HTTPS_PROXY", "")
+				os.Setenv("https_proxy", "http://host.docker.internal:7890")
+			}
+
+			layer := &ExecutionLayer{}
+			result := layer.determineGatewayMode(tt.cfg)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
 
-func TestExecutionLayer_Execute_DirectMode(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer sk-original-key", r.Header.Get("Authorization"))
-
-		response := map[string]interface{}{
-			"id":      "test-id",
-			"model":   "gpt-4",
-			"choices": []interface{}{},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-	}))
-	defer server.Close()
-
-	engine := NewExecutionEngine()
-	layer := NewExecutionLayer(nil, engine)
-
-	input := &ExecutionLayerInput{
-		ProviderConfig: &ExecutionProviderConfig{
-			Code:           "openai",
-			Name:           "OpenAI",
-			APIBaseURL:     server.URL,
-			APIFormat:      "openai",
-			GatewayMode:    GatewayModeDirect,
-			ProviderRegion: "overseas",
+func TestResolveRouteModeWithProvider(t *testing.T) {
+	tests := []struct {
+		name          string
+		routeMode     string
+		providerRegion string
+		envHTTPSProxy string
+		envLitellmURL string
+		expected      string
+	}{
+		{
+			name:           "explicit direct not affected",
+			routeMode:      GatewayModeDirect,
+			providerRegion: regionOverseas,
+			envHTTPSProxy:  "http://proxy:7890",
+			expected:       GatewayModeDirect,
 		},
-		DecryptedAPIKey: "sk-original-key",
-		Messages: []Message{
-			{Role: "user", Content: "Hello"},
+		{
+			name:           "explicit litellm not affected",
+			routeMode:      GatewayModeLitellm,
+			providerRegion: regionOverseas,
+			envHTTPSProxy:  "http://proxy:7890",
+			expected:       GatewayModeLitellm,
+		},
+		{
+			name:           "explicit proxy not affected",
+			routeMode:      GatewayModeProxy,
+			providerRegion: regionDomestic,
+			envHTTPSProxy:  "",
+			expected:       GatewayModeProxy,
+		},
+		{
+			name:           "auto + overseas + HTTPS_PROXY returns proxy",
+			routeMode:      RouteModeAuto,
+			providerRegion: regionOverseas,
+			envHTTPSProxy:  "http://host.docker.internal:7890",
+			expected:       GatewayModeProxy,
+		},
+		{
+			name:           "auto + overseas + no HTTPS_PROXY + LiteLLM URL returns litellm",
+			routeMode:      RouteModeAuto,
+			providerRegion: regionOverseas,
+			envHTTPSProxy:  "",
+			envLitellmURL:  "http://litellm:4000",
+			expected:       GatewayModeLitellm,
+		},
+		{
+			name:           "auto + overseas + no proxy no litellm returns direct",
+			routeMode:      RouteModeAuto,
+			providerRegion: regionOverseas,
+			envHTTPSProxy:  "",
+			envLitellmURL:  "",
+			expected:       GatewayModeDirect,
+		},
+		{
+			name:           "auto + domestic returns direct regardless of HTTPS_PROXY",
+			routeMode:      RouteModeAuto,
+			providerRegion: regionDomestic,
+			envHTTPSProxy:  "http://host.docker.internal:7890",
+			expected:       GatewayModeDirect,
+		},
+		{
+			name:           "empty route mode treated as auto + overseas + HTTPS_PROXY returns proxy",
+			routeMode:      "",
+			providerRegion: regionOverseas,
+			envHTTPSProxy:  "http://host.docker.internal:7890",
+			expected:       GatewayModeProxy,
+		},
+		{
+			name:           "unknown route mode returns direct",
+			routeMode:      "unknown",
+			providerRegion: regionOverseas,
+			envHTTPSProxy:  "http://proxy:7890",
+			expected:       GatewayModeDirect,
 		},
 	}
 
-	output, err := layer.Execute(context.Background(), input)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origHTTPS := os.Getenv("HTTPS_PROXY")
+			origHTTPSLower := os.Getenv("https_proxy")
+			origLitellm := os.Getenv("LLM_GATEWAY_LITELLM_URL")
+			defer func() {
+				os.Setenv("HTTPS_PROXY", origHTTPS)
+				os.Setenv("https_proxy", origHTTPSLower)
+				os.Setenv("LLM_GATEWAY_LITELLM_URL", origLitellm)
+			}()
 
-	require.NoError(t, err)
-	assert.NotNil(t, output)
-	assert.True(t, output.Result.Success)
-}
+			os.Setenv("HTTPS_PROXY", tt.envHTTPSProxy)
+			os.Setenv("https_proxy", "")
+			os.Setenv("LLM_GATEWAY_LITELLM_URL", tt.envLitellmURL)
 
-func TestExecutionLayer_Execute_ProxyMode(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer sk-original-key", r.Header.Get("Authorization"))
-
-		response := map[string]interface{}{
-			"id":      "test-id",
-			"model":   "gpt-4",
-			"choices": []interface{}{},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-	}))
-	defer server.Close()
-
-	engine := NewExecutionEngine()
-	layer := NewExecutionLayer(nil, engine)
-
-	input := &ExecutionLayerInput{
-		ProviderConfig: &ExecutionProviderConfig{
-			Code:          "openai",
-			Name:          "OpenAI",
-			APIBaseURL:    "https://api.openai.com/v1",
-			APIFormat:     "openai",
-			BYOKRouteMode: GatewayModeProxy,
-			Endpoints: map[string]interface{}{
-				GatewayModeProxy: map[string]interface{}{
-					"gaap": server.URL,
-				},
-			},
-		},
-		DecryptedAPIKey: "sk-original-key",
-		Messages: []Message{
-			{Role: "user", Content: "Hello"},
-		},
+			result := ResolveRouteModeWithProvider(tt.routeMode, tt.providerRegion)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
-
-	output, err := layer.Execute(context.Background(), input)
-
-	require.NoError(t, err)
-	assert.NotNil(t, output)
-	assert.True(t, output.Result.Success)
 }

@@ -400,7 +400,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		}
 		streamClient := proxyHTTPClient(15 * time.Minute)
 		retryPolicyStream := buildRetryPolicy(strategySnapshot)
-		retryPolicyStream = applyLitellmGatewayRetryCap(retryPolicyStream, resolveRouteMode(&apiKey))
+		retryPolicyStream = applyLitellmGatewayRetryCap(retryPolicyStream, resolveRouteModeWithProvider(&apiKey, providerCfg.ProviderRegion))
 		streamAttempts := buildProxyCatalogAttempts(c.Request.Context(), db, req)
 		var retryCountStream int
 		for attemptIdx, att := range streamAttempts {
@@ -471,7 +471,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 					}
 				}
 			}
-			routeMode := resolveRouteMode(&pk)
+			routeMode := resolveRouteModeWithProvider(&pk, pcfg.ProviderRegion)
 			if routeMode == routeModeLitellm {
 				litellmTemplate, tmplErr := getProviderLitellmTemplate(db, att.provider)
 				if tmplErr != nil {
@@ -517,7 +517,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				return io.NopCloser(bytes.NewReader(jb)), nil
 			}
 			hreq.Header.Set("Content-Type", "application/json")
-			authToken := resolveAuthTokenFromRouteMode(resolveRouteMode(&pk), dk)
+			authToken := resolveAuthTokenFromRouteMode(resolveRouteModeWithProvider(&pk, pcfg.ProviderRegion), dk)
 			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 			hreq.Header.Set("Accept", "text/event-stream")
 			applyProxyUpstreamHeaders(c, hreq, requestID)
@@ -585,7 +585,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	client := proxyHTTPClient(60 * time.Second)
 	retryPolicy := buildRetryPolicy(strategySnapshot)
-	retryPolicy = applyLitellmGatewayRetryCap(retryPolicy, resolveRouteMode(&apiKey))
+	retryPolicy = applyLitellmGatewayRetryCap(retryPolicy, resolveRouteModeWithProvider(&apiKey, providerCfg.ProviderRegion))
 	attempts := buildProxyCatalogAttempts(c.Request.Context(), db, req)
 
 	var (
@@ -655,7 +655,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				}
 			}
 		}
-		routeMode := resolveRouteMode(&pk)
+		routeMode := resolveRouteModeWithProvider(&pk, pcfg.ProviderRegion)
 		if routeMode == routeModeLitellm {
 			litellmTemplate, tmplErr := getProviderLitellmTemplate(db, att.provider)
 			if tmplErr != nil {
@@ -706,7 +706,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			hreq.Header.Set("x-api-key", dk)
 			hreq.Header.Set("anthropic-version", "2023-06-01")
 		default:
-			authToken := resolveAuthTokenFromRouteMode(resolveRouteMode(&pk), dk)
+			authToken := resolveAuthTokenFromRouteMode(resolveRouteModeWithProvider(&pk, pcfg.ProviderRegion), dk)
 			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 		}
 		applyProxyUpstreamHeaders(c, hreq, requestID)
@@ -899,7 +899,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	if currentRoutingDecision != nil {
 		pipeline := services.NewThreeLayerRoutingPipeline()
 
-		gatewayMode := resolveRouteMode(&apiKey)
+		gatewayMode := resolveRouteModeWithProvider(&apiKey, providerCfg.ProviderRegion)
 
 		execInput := &services.ExecutionLayerInputData{
 			GatewayMode:   gatewayMode,
@@ -994,18 +994,24 @@ func applyProxyUpstreamHeaders(c *gin.Context, httpReq *http.Request, requestID 
 }
 
 func resolveRouteMode(apiKey *models.MerchantAPIKey) string {
+	return resolveRouteModeWithProvider(apiKey, "")
+}
+
+func resolveRouteModeWithProvider(apiKey *models.MerchantAPIKey, providerRegion string) string {
 	if apiKey == nil {
 		return routeModeDirect
 	}
-	mode := strings.TrimSpace(strings.ToLower(apiKey.RouteMode))
-	switch mode {
-	case routeModeDirect, routeModeLitellm, routeModeProxy:
-		return mode
-	case routeModeAuto, "":
-		return routeModeDirect
-	default:
+	mode := services.ResolveRouteModeWithProvider(apiKey.RouteMode, providerRegion)
+	if mode == services.GatewayModeDirect {
 		return routeModeDirect
 	}
+	if mode == services.GatewayModeLitellm {
+		return routeModeLitellm
+	}
+	if mode == services.GatewayModeProxy {
+		return routeModeProxy
+	}
+	return routeModeDirect
 }
 
 func applyAPIKeyRouteConfig(cfg providerRuntimeConfig, apiKey *models.MerchantAPIKey) providerRuntimeConfig {
@@ -1020,7 +1026,7 @@ func applyAPIKeyRouteConfig(cfg providerRuntimeConfig, apiKey *models.MerchantAP
 	}
 	if apiKey != nil {
 		services.ApplyBYOKConfig(execCfg, apiKey.EndpointURL, apiKey.RouteMode, apiKey.RouteConfig, apiKey.FallbackEndpointURL)
-		execCfg.GatewayMode = services.ResolveRouteMode(apiKey.RouteMode)
+		execCfg.GatewayMode = services.ResolveRouteModeWithProvider(apiKey.RouteMode, cfg.ProviderRegion)
 	}
 	endpointURL := services.ResolveEndpoint(execCfg)
 	if endpointURL != "" {

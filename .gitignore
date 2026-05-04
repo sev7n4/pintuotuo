@@ -99,6 +99,10 @@ Thumbs.db
 .trae/skills/
 .trae/specs/
 .trae/scripts/
+.trae/plans/
+
+# Docker proxy override (contains proxy URLs)
+docker-compose.proxy.override.yml
 
 # Go Coverage
 backend/coverage.out
@@ -146,6 +150,10 @@ deploy/*
 !deploy/prometheus/**
 !deploy/litellm/
 !deploy/litellm/**
+!deploy/clash/
+!deploy/clash/**
+!deploy/scripts/
+!deploy/scripts/**
 
 # Docs folder (keep local only)
 docs/

@@ -147,6 +147,12 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 		return
 	}
 
+	routeMode, routeConfig, region := v.getAPIKeyRouteConfig(apiKeyID, provider)
+	if routeMode != "" && routeMode != "direct" {
+		v.performVerificationWithRouteMode(apiKeyID, provider, encryptedKey, verificationType, routeMode, routeConfig, region, retryCount)
+		return
+	}
+
 	baseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
 	modelsURL := baseURL + "/models"
 	var probe *ProbeModelsResult
@@ -492,6 +498,45 @@ func (v *APIKeyValidator) getProviderConfig(provider string) (map[string]string,
 		"api_base_url": apiBaseURL,
 		"api_format":   apiFormat,
 	}, nil
+}
+
+func (v *APIKeyValidator) getAPIKeyRouteConfig(apiKeyID int, provider string) (string, map[string]interface{}, string) {
+	db := v.ensureDB()
+	if db == nil {
+		return "", nil, ""
+	}
+
+	var routeMode string
+	var routeConfigJSON []byte
+	var region string
+	var providerRegion string
+
+	err := db.QueryRow(
+		`SELECT COALESCE(mak.route_mode, 'auto'),
+		        mak.route_config,
+		        COALESCE(mak.region, 'domestic'),
+		        COALESCE(mp.provider_region, 'domestic')
+		 FROM merchant_api_keys mak
+		 LEFT JOIN model_providers mp ON mak.provider = mp.code
+		 WHERE mak.id = $1`,
+		apiKeyID,
+	).Scan(&routeMode, &routeConfigJSON, &region, &providerRegion)
+
+	if err != nil {
+		return "", nil, ""
+	}
+
+	var routeConfig map[string]interface{}
+	if len(routeConfigJSON) > 0 {
+		_ = json.Unmarshal(routeConfigJSON, &routeConfig)
+	}
+
+	if routeMode == "auto" || routeMode == "" {
+		resolved := resolveAutoRouteMode(providerRegion)
+		return resolved, routeConfig, region
+	}
+
+	return routeMode, routeConfig, region
 }
 
 func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificationID, apiKeyID int, errorCode, errorMessage string, startTime time.Time) {
