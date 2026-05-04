@@ -148,7 +148,7 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 	}
 
 	routeMode, routeConfig, region := v.getAPIKeyRouteConfig(apiKeyID, provider)
-	if routeMode != "" && routeMode != "direct" {
+	if routeMode != "" && routeMode != GatewayModeDirect {
 		v.performVerificationWithRouteMode(apiKeyID, provider, encryptedKey, verificationType, routeMode, routeConfig, region, retryCount)
 		return
 	}

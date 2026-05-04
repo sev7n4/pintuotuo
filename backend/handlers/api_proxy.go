@@ -993,10 +993,6 @@ func applyProxyUpstreamHeaders(c *gin.Context, httpReq *http.Request, requestID 
 	}
 }
 
-func resolveRouteMode(apiKey *models.MerchantAPIKey) string {
-	return resolveRouteModeWithProvider(apiKey, "")
-}
-
 func resolveRouteModeWithProvider(apiKey *models.MerchantAPIKey, providerRegion string) string {
 	if apiKey == nil {
 		return routeModeDirect

@@ -82,7 +82,7 @@ func TestResolveRouteMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resolveRouteMode(tt.apiKey)
+			result := resolveRouteModeWithProvider(tt.apiKey, "")
 			assert.Equal(t, tt.expected, result)
 		})
 	}
