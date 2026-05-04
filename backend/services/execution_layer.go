@@ -19,6 +19,23 @@ const (
 	regionOverseas     = "overseas"
 )
 
+func resolveAutoRouteMode(providerRegion string) string {
+	if providerRegion == regionOverseas {
+		httpsProxy := os.Getenv("HTTPS_PROXY")
+		if httpsProxy == "" {
+			httpsProxy = os.Getenv("https_proxy")
+		}
+		if httpsProxy != "" {
+			return GatewayModeProxy
+		}
+		litellmURL := os.Getenv("LLM_GATEWAY_LITELLM_URL")
+		if litellmURL != "" {
+			return GatewayModeLitellm
+		}
+	}
+	return GatewayModeDirect
+}
+
 type ExecutionLayer struct {
 	engine *ExecutionEngine
 	db     *sql.DB
@@ -362,7 +379,7 @@ func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) stri
 		return cfg.BYOKRouteMode
 	}
 
-	return GatewayModeDirect
+	return resolveAutoRouteMode(cfg.ProviderRegion)
 }
 
 func ApplyBYOKConfig(cfg *ExecutionProviderConfig, byokEndpointURL, byokRouteMode string, byokRouteConfig map[string]interface{}, byokFallbackURL string) {
@@ -376,12 +393,16 @@ func ApplyBYOKConfig(cfg *ExecutionProviderConfig, byokEndpointURL, byokRouteMod
 }
 
 func ResolveRouteMode(routeMode string) string {
+	return ResolveRouteModeWithProvider(routeMode, "")
+}
+
+func ResolveRouteModeWithProvider(routeMode string, providerRegion string) string {
 	mode := strings.TrimSpace(strings.ToLower(routeMode))
 	switch mode {
 	case GatewayModeDirect, GatewayModeLitellm, GatewayModeProxy:
 		return mode
 	case RouteModeAuto, "":
-		return GatewayModeDirect
+		return resolveAutoRouteMode(providerRegion)
 	default:
 		return GatewayModeDirect
 	}

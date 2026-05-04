@@ -1,0 +1,35 @@
+mixed-port: 7890
+allow-lan: false
+bind-address: 127.0.0.1
+mode: rule
+log-level: info
+ipv6: false
+
+proxies:
+  - name: "trojan-proxy"
+    type: trojan
+    server: <REPLACE_WITH_YOUR_SERVER>
+    port: 10111
+    password: <REPLACE_WITH_YOUR_PASSWORD>
+    udp: true
+    sni: bilibili.com
+    skip-cert-verify: true
+
+proxy-groups:
+  - name: "overseas-api"
+    type: select
+    proxies:
+      - "trojan-proxy"
+      - DIRECT
+
+rules:
+  - DOMAIN-SUFFIX,openai.com,overseas-api
+  - DOMAIN-SUFFIX,anthropic.com,overseas-api
+  - DOMAIN-SUFFIX,googleapis.com,overseas-api
+  - DOMAIN-SUFFIX,openrouter.ai,overseas-api
+  - DOMAIN-SUFFIX,github.com,overseas-api
+  - IP-CIDR,127.0.0.0/8,DIRECT
+  - IP-CIDR,10.0.0.0/8,DIRECT
+  - IP-CIDR,172.16.0.0/12,DIRECT
+  - IP-CIDR,192.168.0.0/16,DIRECT
+  - MATCH,DIRECT
