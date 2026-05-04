@@ -5,22 +5,33 @@ mode: rule
 log-level: info
 ipv6: false
 
-proxies:
-  - name: "trojan-proxy"
-    type: trojan
-    server: <REPLACE_WITH_YOUR_SERVER>
-    port: 10111
-    password: <REPLACE_WITH_YOUR_PASSWORD>
-    udp: true
-    sni: bilibili.com
-    skip-cert-verify: true
+proxy-providers:
+  xiguajiasu:
+    type: http
+    url: "http://43.248.192.4:60001/api/v1/client/subscribe?token=27508e6dba6ee86f6e9ef759d569e977"
+    interval: 86400
+    path: ./providers/xiguajiasu.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
 
 proxy-groups:
-  - name: "overseas-api"
+  - name: overseas-api
     type: select
+    use:
+      - xiguajiasu
     proxies:
-      - "trojan-proxy"
+      - auto-select
       - DIRECT
+
+  - name: auto-select
+    type: url-test
+    use:
+      - xiguajiasu
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 100
 
 rules:
   - DOMAIN-SUFFIX,openai.com,overseas-api
@@ -28,6 +39,7 @@ rules:
   - DOMAIN-SUFFIX,googleapis.com,overseas-api
   - DOMAIN-SUFFIX,openrouter.ai,overseas-api
   - DOMAIN-SUFFIX,github.com,overseas-api
+  - DOMAIN-SUFFIX,githubusercontent.com,overseas-api
   - IP-CIDR,127.0.0.0/8,DIRECT
   - IP-CIDR,10.0.0.0/8,DIRECT
   - IP-CIDR,172.16.0.0/12,DIRECT
