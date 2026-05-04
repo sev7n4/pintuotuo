@@ -14,6 +14,7 @@ const (
 	GatewayModeDirect  = "direct"
 	GatewayModeLitellm = "litellm"
 	GatewayModeProxy   = "proxy"
+	RouteModeAuto      = "auto"
 	regionDomestic     = "domestic"
 	regionOverseas     = "overseas"
 )
@@ -357,7 +358,7 @@ func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) stri
 		return GatewayModeDirect
 	}
 
-	if cfg.BYOKRouteMode != "" && cfg.BYOKRouteMode != "auto" {
+	if cfg.BYOKRouteMode != "" && cfg.BYOKRouteMode != RouteModeAuto {
 		return cfg.BYOKRouteMode
 	}
 
@@ -379,7 +380,7 @@ func ResolveRouteMode(routeMode string) string {
 	switch mode {
 	case GatewayModeDirect, GatewayModeLitellm, GatewayModeProxy:
 		return mode
-	case "auto", "":
+	case RouteModeAuto, "":
 		return GatewayModeDirect
 	default:
 		return GatewayModeDirect

@@ -1008,28 +1008,6 @@ func resolveRouteMode(apiKey *models.MerchantAPIKey) string {
 	}
 }
 
-func resolveEndpointURL(routeMode string, apiKey *models.MerchantAPIKey, providerBaseURL string) string {
-	switch routeMode {
-	case routeModeDirect:
-		if apiKey != nil && apiKey.EndpointURL != "" {
-			return strings.TrimRight(apiKey.EndpointURL, "/")
-		}
-		return strings.TrimRight(providerBaseURL, "/")
-	case routeModeLitellm:
-		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
-			return strings.TrimRight(base, "/") + "/v1"
-		}
-		return ""
-	case routeModeProxy:
-		if apiKey != nil && apiKey.FallbackEndpointURL != "" {
-			return strings.TrimRight(apiKey.FallbackEndpointURL, "/")
-		}
-		return ""
-	default:
-		return strings.TrimRight(providerBaseURL, "/")
-	}
-}
-
 func applyAPIKeyRouteConfig(cfg providerRuntimeConfig, apiKey *models.MerchantAPIKey) providerRuntimeConfig {
 	execCfg := &services.ExecutionProviderConfig{
 		Code:           cfg.Code,
