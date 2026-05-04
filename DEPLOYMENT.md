@@ -4,9 +4,10 @@
 
 1. [部署流程](#部署流程)
 2. [环境配置](#环境配置)
-3. [监控和日志](#监控和日志)
-4. [备份和恢复](#备份和恢复)
-5. [常见问题](#常见问题)
+3. [海外大模型代理部署（Phase 1）](#海外大模型代理部署phase-1)
+4. [监控和日志](#监控和日志)
+5. [备份和恢复](#备份和恢复)
+6. [常见问题](#常见问题)
 
 ---
 
@@ -200,6 +201,341 @@ docker-compose -f docker-compose.prod.yml up -d --force-recreate backend
 4. **前端**：登录页「发送邮箱魔法链接」可点；开发环境下前端可能对 `debug_link` 再弹一条 `message.info`，生产环境请以接口或日志为准。
 
 切换到真实邮件时：关闭 `EMAIL_MAGIC_MOCK`（或设为 `false`），配置完整 `SMTP_*`，并去掉与 Mock 冲突的依赖。
+
+---
+
+## 海外大模型代理部署（Phase 1）
+
+国内服务器无法直连海外大模型 Provider API（OpenAI、Anthropic、Google、OpenRouter 等），需要通过 HTTPS_PROXY 出站代理解决网络限制。本节指导在腾讯云 CVM 上部署 Mihomo（Clash Meta 内核）作为宿主机级 HTTP 代理。
+
+### 环境信息
+
+| 项目 | 值 |
+|------|------|
+| 服务器 IP | `119.29.173.89` |
+| 部署路径 | `/opt/pintuotuo` |
+| SSH 密钥 | `~/.ssh/tencent_cloud_deploy` |
+| 架构 | Linux x86_64 (腾讯云 CVM) |
+
+### 第一步：SSH 登录服务器
+
+```bash
+ssh -i ~/.ssh/tencent_cloud_deploy root@119.29.173.89
+```
+
+> 如果不是 root 用户，将后续命令中的 `sudo` 保留；如果是 root，`sudo` 可省略。
+
+### 第二步：安装 Mihomo（Clash Meta 内核）
+
+**方式 A：使用项目自带脚本**
+
+```bash
+cd /opt/pintuotuo
+bash deploy/scripts/setup-clash.sh
+```
+
+脚本会自动完成：下载 mihomo 二进制、安装到 `/usr/local/bin/mihomo`、创建配置目录 `/etc/mihomo`、复制配置文件、创建 systemd 服务并启动。
+
+**⚠️ 脚本启动前必须先编辑配置文件**（见第三步），建议分步执行：
+
+```bash
+cd /opt/pintuotuo
+
+# 1. 下载 mihomo
+curl -L -o /tmp/mihomo.gz \
+  "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.0/mihomo-linux-amd64-v1.19.0.gz"
+gunzip /tmp/mihomo.gz
+chmod +x /tmp/mihomo
+sudo cp /tmp/mihomo /usr/local/bin/mihomo
+
+# 2. 创建配置目录
+sudo mkdir -p /etc/mihomo
+
+# 3. 验证安装
+mihomo -v
+```
+
+> **如果 GitHub 下载超时**（大陆服务器常见），可以在本地下载后 scp 上传：
+> ```bash
+> # 本地机器执行
+> curl -L -o /tmp/mihomo.gz \
+>   "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.0/mihomo-linux-amd64-v1.19.0.gz"
+> scp -i ~/.ssh/tencent_cloud_deploy /tmp/mihomo.gz root@119.29.173.89:/tmp/
+>
+> # 然后在服务器上执行
+> gunzip /tmp/mihomo.gz && chmod +x /tmp/mihomo && sudo cp /tmp/mihomo /usr/local/bin/
+> ```
+
+### 第三步：编辑 Clash 配置文件
+
+```bash
+sudo vi /etc/mihomo/config.yaml
+```
+
+需要修改 `proxies` 部分，将 `<REPLACE_WITH_YOUR_SERVER>` 和 `<REPLACE_WITH_YOUR_PASSWORD>` 替换为实际代理节点信息。
+
+**方式 A：手动配置单个节点**
+
+```yaml
+proxies:
+  - name: "my-proxy"
+    type: trojan            # 根据你的节点类型修改
+    server: your.server.com # ← 替换为实际服务器地址
+    port: 443               # ← 替换为实际端口
+    password: your-password # ← 替换为实际密码
+    udp: true
+    sni: your.server.com    # ← 通常与 server 相同
+    skip-cert-verify: false # 生产环境建议 false
+```
+
+支持的代理类型：`trojan`、`vmess`、`vless`、`ss`（Shadowsocks）、`hysteria2`。
+
+**方式 B：使用订阅链接（推荐）**
+
+如果有 Clash 订阅 URL，可用 `proxy-providers` 替代手动配置：
+
+```yaml
+mixed-port: 7890
+allow-lan: false
+bind-address: 127.0.0.1
+mode: rule
+log-level: info
+ipv6: false
+
+proxy-providers:
+  my-provider:
+    type: http
+    url: "https://your-subscription-url/clash"  # ← 替换为你的订阅链接
+    interval: 3600
+    path: ./providers/my-provider.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+
+proxy-groups:
+  - name: "overseas-api"
+    type: select
+    use:
+      - my-provider
+    proxies:
+      - DIRECT
+
+rules:
+  - DOMAIN-SUFFIX,openai.com,overseas-api
+  - DOMAIN-SUFFIX,anthropic.com,overseas-api
+  - DOMAIN-SUFFIX,googleapis.com,overseas-api
+  - DOMAIN-SUFFIX,openrouter.ai,overseas-api
+  - DOMAIN-SUFFIX,github.com,overseas-api
+  - IP-CIDR,127.0.0.0/8,DIRECT
+  - IP-CIDR,10.0.0.0/8,DIRECT
+  - IP-CIDR,172.16.0.0/12,DIRECT
+  - IP-CIDR,192.168.0.0/16,DIRECT
+  - MATCH,DIRECT
+```
+
+**关键配置说明**：
+
+| 配置项 | 值 | 说明 |
+|--------|------|------|
+| `mixed-port` | `7890` | HTTP+SOCKS5 混合代理端口 |
+| `allow-lan` | `false` | 仅监听本机，不暴露到外网 |
+| `bind-address` | `127.0.0.1` | 绑定本机回环地址 |
+| `rules` | 见上方 | 海外 API 域名走代理，其余直连 |
+
+### 第四步：创建 systemd 服务并启动
+
+```bash
+sudo tee /etc/systemd/system/mihomo.service > /dev/null <<'EOF'
+[Unit]
+Description=Mihomo (Clash Meta)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mihomo -d /etc/mihomo
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable mihomo
+sudo systemctl start mihomo
+sudo systemctl status mihomo
+```
+
+预期输出：
+```
+● mihomo.service - Mihomo (Clash Meta)
+     Loaded: loaded (/etc/systemd/system/mihomo.service; enabled)
+     Active: active (running)
+```
+
+如果启动失败，查看日志：
+```bash
+sudo journalctl -u mihomo -n 50 --no-pager
+```
+
+常见失败原因：配置文件 YAML 语法错误、代理节点信息不正确、端口 7890 被占用。
+
+### 第五步：验证 Clash 代理可用
+
+```bash
+# 1. 检查 mihomo 进程
+ps aux | grep mihomo
+
+# 2. 检查端口监听
+ss -tlnp | grep 7890
+# 预期: LISTEN 127.0.0.1:7890
+
+# 3. 测试代理访问 OpenAI
+curl -x http://127.0.0.1:7890 \
+  -s -o /dev/null -w "HTTP %{http_code} (%{time_total}s)\n" \
+  --connect-timeout 10 --max-time 15 \
+  https://api.openai.com/v1/models
+# 预期: HTTP 401 (1.5s)  ← 401 说明网络通了，只是没带 API Key
+
+# 4. 批量测试所有海外 Provider
+cd /opt/pintuotuo
+bash deploy/scripts/test-connectivity.sh
+```
+
+预期输出：
+```
+=== Connectivity Test ===
+Proxy: http://127.0.0.1:7890
+
+--- Via Proxy ---
+OpenAI       proxy    AUTH (401) (1500ms)
+Anthropic    proxy    AUTH (401) (800ms)
+Google       proxy    AUTH (401) (600ms)
+OpenRouter   proxy    OK (200) (500ms)
+
+--- Direct (expected to timeout for overseas) ---
+OpenAI       direct   TIMEOUT (10000ms)
+Anthropic    direct   TIMEOUT (10000ms)
+...
+```
+
+> `AUTH (401)` = 网络通了，只是没带 API Key，这是正确的预期结果。
+> `OK (200)` = OpenRouter 不需要 Key 也能列出模型。
+> `TIMEOUT` = 直连不通，符合国内服务器预期。
+
+### 第六步：配置 Docker Compose 代理注入
+
+Clash 验证通过后，让 Backend 容器通过代理出站：
+
+```bash
+cd /opt/pintuotuo
+
+# 1. 创建 proxy override 文件
+cp docker-compose.proxy.override.yml.example docker-compose.proxy.override.yml
+
+# 2. 确认内容（默认即可，无需修改）
+cat docker-compose.proxy.override.yml
+```
+
+默认内容：
+```yaml
+services:
+  backend:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - HTTPS_PROXY=${HTTPS_PROXY:-http://host.docker.internal:7890}
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - NO_PROXY=localhost,127.0.0.1,postgres,redis,backend,frontend,pintuotuo-postgres,pintuotuo-redis
+```
+
+关键说明：
+- `host.docker.internal:host-gateway` — 让容器能解析宿主机 IP
+- `HTTPS_PROXY=http://host.docker.internal:7890` — 容器通过宿主机 Clash 代理出站
+- `NO_PROXY` — 内部服务直连，不走代理
+
+### 第七步：重启 Backend 容器（带代理）
+
+```bash
+cd /opt/pintuotuo
+
+docker compose -f docker-compose.prod.yml \
+  -f docker-compose.prod.images.yml \
+  -f docker-compose.proxy.override.yml \
+  up -d --force-recreate backend
+```
+
+> **注意**：后续每次部署（CI/CD 自动部署）也需要包含 proxy override，见第八步。
+
+### 第八步：更新 CI/CD 部署 Workflow
+
+当前 `.github/workflows/deploy-tencent.yml` 的启动命令是：
+```bash
+IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml up -d
+```
+
+需要加上 proxy override：
+```bash
+IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml -f docker-compose.proxy.override.yml up -d
+```
+
+修改 `.github/workflows/deploy-tencent.yml` 中对应的 `docker-compose up` 命令，添加 `-f docker-compose.proxy.override.yml`。
+
+### 第九步：端到端验证
+
+Backend 重启后，验证海外模型 API 代理访问：
+
+```bash
+# 1. 检查 backend 容器内的环境变量
+docker exec pintuotuo-backend env | grep -i proxy
+# 预期输出:
+# HTTPS_PROXY=http://host.docker.internal:7890
+# NO_PROXY=localhost,127.0.0.1,postgres,redis,...
+
+# 2. 从容器内测试代理连通性
+docker exec pintuotuo-backend wget -q -O - \
+  --timeout=10 \
+  "https://api.openai.com/v1/models" 2>&1 | head -5
+# 预期: 返回 401 JSON 或模型列表
+
+# 3. 通过 Backend API 测试（需要有效的海外 Provider API Key）
+# 先在管理后台配置 OpenAI Provider 和 BYOK Key，然后：
+curl -X POST http://127.0.0.1:8080/api/v1/proxy/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_USER_TOKEN" \
+  -d '{
+    "provider": "openai",
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+
+### 操作清单
+
+| # | 步骤 | 命令/操作 | 验证方式 |
+|---|------|----------|----------|
+| 1 | SSH 登录 | `ssh -i ~/.ssh/tencent_cloud_deploy root@119.29.173.89` | 登录成功 |
+| 2 | 安装 mihomo | 手动下载或 `setup-clash.sh` | `mihomo -v` |
+| 3 | 编辑配置 | `sudo vi /etc/mihomo/config.yaml` | 填入实际代理节点 |
+| 4 | 启动服务 | `sudo systemctl start mihomo` | `systemctl status mihomo` |
+| 5 | 验证代理 | `curl -x http://127.0.0.1:7890 https://api.openai.com/v1/models` | HTTP 401 |
+| 6 | 创建 override | `cp docker-compose.proxy.override.yml.example docker-compose.proxy.override.yml` | 文件存在 |
+| 7 | 重启 backend | `docker compose -f ... -f proxy.override.yml up -d --force-recreate backend` | 容器运行 |
+| 8 | 更新 CI/CD | 修改 `deploy-tencent.yml` 添加 `-f docker-compose.proxy.override.yml` | PR 合并 |
+| 9 | E2E 验证 | 通过 Backend API 请求海外模型 | 成功返回 |
+
+### 常见问题排查
+
+| 问题 | 排查命令 | 解决方案 |
+|------|----------|----------|
+| mihomo 启动失败 | `journalctl -u mihomo -n 50` | 检查 YAML 语法和节点配置 |
+| 代理超时 | `curl -x http://127.0.0.1:7890 https://www.google.com` | 检查代理节点是否可用 |
+| 容器无法访问宿主机 | `docker exec backend ping host.docker.internal` | 检查 `extra_hosts` 配置 |
+| Backend 不走代理 | `docker exec backend env \| grep PROXY` | 检查 override 文件是否加载 |
+| 内部服务走代理了 | 检查 `NO_PROXY` 环境变量 | 确保 postgres/redis 在 NO_PROXY 中 |
+| CI/CD 部署后代理丢失 | 检查 workflow 中的 docker-compose 命令 | 添加 `-f docker-compose.proxy.override.yml` |
 
 ---
 
@@ -445,6 +781,6 @@ DB.SetConnMaxLifetime(10 * time.Minute)
 
 ---
 
-**最后更新**：2026-03-14
+**最后更新**：2026-05-04
 **维护者**：DevOps Team
-**下次审查**：2026-04-14
+**下次审查**：2026-06-04
