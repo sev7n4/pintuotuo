@@ -4,6 +4,8 @@ bind-address: "*"
 mode: rule
 log-level: info
 ipv6: false
+external-controller: 0.0.0.0:9091
+external-ui: /etc/mihomo/ui
 
 proxy-providers:
   xiguajiasu:
@@ -22,8 +24,19 @@ proxy-groups:
     use:
       - xiguajiasu
     proxies:
+      - us-auto
       - auto-select
       - DIRECT
+    filter: "(?:美国|日本|韩国)"
+
+  - name: us-auto
+    type: url-test
+    use:
+      - xiguajiasu
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 100
+    filter: "美国.*流媒体.*GPT"
 
   - name: auto-select
     type: url-test

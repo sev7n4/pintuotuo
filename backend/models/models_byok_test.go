@@ -13,7 +13,7 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 		wantEndpoint string
 	}{
 		{
-			name: "Direct mode with endpoint_url",
+			name: "Direct mode with endpoint_url column takes priority over route_config",
 			apiKey: MerchantAPIKey{
 				EndpointURL: "https://default.example.com",
 				RouteConfig: map[string]interface{}{
@@ -22,12 +22,11 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 			},
 			mode:        "direct",
 			region:      "overseas",
-			wantEndpoint: "https://custom.example.com",
+			wantEndpoint: "https://default.example.com",
 		},
 		{
-			name: "Direct mode with endpoints.direct.overseas",
+			name: "Direct mode with endpoints.direct.overseas falls back when EndpointURL empty",
 			apiKey: MerchantAPIKey{
-				EndpointURL: "https://default.example.com",
 				RouteConfig: map[string]interface{}{
 					"endpoints": map[string]interface{}{
 						"direct": map[string]interface{}{
@@ -42,9 +41,25 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 			wantEndpoint: "https://api.overseas.example.com",
 		},
 		{
-			name: "Direct mode with endpoints.direct.domestic",
+			name: "Direct mode EndpointURL overrides endpoints.direct",
 			apiKey: MerchantAPIKey{
-				EndpointURL: "https://default.example.com",
+				EndpointURL: "https://user-configured.example.com",
+				RouteConfig: map[string]interface{}{
+					"endpoints": map[string]interface{}{
+						"direct": map[string]interface{}{
+							"overseas": "https://stale-overseas.example.com",
+							"domestic": "https://stale-domestic.example.com",
+						},
+					},
+				},
+			},
+			mode:        "direct",
+			region:      "overseas",
+			wantEndpoint: "https://user-configured.example.com",
+		},
+		{
+			name: "Direct mode with endpoints.direct.domestic falls back when EndpointURL empty",
+			apiKey: MerchantAPIKey{
 				RouteConfig: map[string]interface{}{
 					"endpoints": map[string]interface{}{
 						"direct": map[string]interface{}{
@@ -124,7 +139,6 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 		{
 			name: "Empty region defaults to overseas",
 			apiKey: MerchantAPIKey{
-				EndpointURL: "https://default.example.com",
 				RouteConfig: map[string]interface{}{
 					"endpoints": map[string]interface{}{
 						"direct": map[string]interface{}{

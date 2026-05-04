@@ -249,6 +249,9 @@ func (k *MerchantAPIKey) GetEndpointForMode(mode string, region string) string {
 
 	switch mode {
 	case "direct":
+		if k.EndpointURL != "" {
+			return k.EndpointURL
+		}
 		if endpoint, ok := k.RouteConfig["endpoint_url"].(string); ok && endpoint != "" {
 			return endpoint
 		}
@@ -259,7 +262,6 @@ func (k *MerchantAPIKey) GetEndpointForMode(mode string, region string) string {
 				}
 			}
 		}
-		return k.EndpointURL
 	case "litellm":
 		if endpoints, ok := k.RouteConfig["endpoints"].(map[string]interface{}); ok {
 			if litellmEndpoints, ok := endpoints["litellm"].(map[string]interface{}); ok {
