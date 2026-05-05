@@ -787,6 +787,12 @@ func DeleteMerchantAPIKey(c *gin.Context) {
 		return
 	}
 
+	_, err = tx.Exec("UPDATE settlement_items SET api_usage_log_id = NULL WHERE api_usage_log_id IN (SELECT id FROM api_usage_logs WHERE key_id = $1)", keyID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
 	_, err = tx.Exec("DELETE FROM api_usage_logs WHERE key_id = $1", keyID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
