@@ -280,6 +280,16 @@ func TestEndpointTypeConstants(t *testing.T) {
 			expected: "images_generations",
 		},
 		{
+			name:     "EndpointTypeImagesVariations",
+			constant: EndpointTypeImagesVariations,
+			expected: "images_variations",
+		},
+		{
+			name:     "EndpointTypeImagesEdits",
+			constant: EndpointTypeImagesEdits,
+			expected: "images_edits",
+		},
+		{
 			name:     "EndpointTypeAudioSpeech",
 			constant: EndpointTypeAudioSpeech,
 			expected: "audio_speech",
@@ -288,6 +298,11 @@ func TestEndpointTypeConstants(t *testing.T) {
 			name:     "EndpointTypeAudioTranscriptions",
 			constant: EndpointTypeAudioTranscriptions,
 			expected: "audio_transcriptions",
+		},
+		{
+			name:     "EndpointTypeAudioTranslations",
+			constant: EndpointTypeAudioTranslations,
+			expected: "audio_translations",
 		},
 		{
 			name:     "EndpointTypeModerations",
@@ -323,7 +338,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeChatCompletions,
-			expected:     "https://api.openai.com/v1",
+			expected:     "https://api.openai.com/v1/v1/chat/completions",
 		},
 		{
 			name: "embeddings endpoint from direct mode",
@@ -338,7 +353,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeEmbeddings,
-			expected:     "https://api.openai.com/v1",
+			expected:     "https://api.openai.com/v1/v1/embeddings",
 		},
 		{
 			name: "images_generations endpoint from direct mode",
@@ -353,7 +368,37 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeImagesGenerations,
-			expected:     "https://api.openai.com/v1",
+			expected:     "https://api.openai.com/v1/v1/images/generations",
+		},
+		{
+			name: "images_variations endpoint from direct mode",
+			cfg: &ExecutionProviderConfig{
+				APIBaseURL:     "https://api.openai.com",
+				GatewayMode:    GatewayModeDirect,
+				ProviderRegion: regionOverseas,
+				Endpoints: map[string]interface{}{
+					GatewayModeDirect: map[string]interface{}{
+						regionOverseas: "https://api.openai.com/v1",
+					},
+				},
+			},
+			endpointType: EndpointTypeImagesVariations,
+			expected:     "https://api.openai.com/v1/v1/images/variations",
+		},
+		{
+			name: "images_edits endpoint from direct mode",
+			cfg: &ExecutionProviderConfig{
+				APIBaseURL:     "https://api.openai.com",
+				GatewayMode:    GatewayModeDirect,
+				ProviderRegion: regionOverseas,
+				Endpoints: map[string]interface{}{
+					GatewayModeDirect: map[string]interface{}{
+						regionOverseas: "https://api.openai.com/v1",
+					},
+				},
+			},
+			endpointType: EndpointTypeImagesEdits,
+			expected:     "https://api.openai.com/v1/v1/images/edits",
 		},
 		{
 			name: "audio_speech endpoint from direct mode",
@@ -368,7 +413,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeAudioSpeech,
-			expected:     "https://api.openai.com/v1",
+			expected:     "https://api.openai.com/v1/v1/audio/speech",
 		},
 		{
 			name: "audio_transcriptions endpoint from direct mode",
@@ -383,7 +428,22 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeAudioTranscriptions,
-			expected:     "https://api.openai.com/v1",
+			expected:     "https://api.openai.com/v1/v1/audio/transcriptions",
+		},
+		{
+			name: "audio_translations endpoint from direct mode",
+			cfg: &ExecutionProviderConfig{
+				APIBaseURL:     "https://api.openai.com",
+				GatewayMode:    GatewayModeDirect,
+				ProviderRegion: regionOverseas,
+				Endpoints: map[string]interface{}{
+					GatewayModeDirect: map[string]interface{}{
+						regionOverseas: "https://api.openai.com/v1",
+					},
+				},
+			},
+			endpointType: EndpointTypeAudioTranslations,
+			expected:     "https://api.openai.com/v1/v1/audio/translations",
 		},
 		{
 			name: "moderations endpoint from direct mode",
@@ -398,7 +458,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeModerations,
-			expected:     "https://api.openai.com/v1",
+			expected:     "https://api.openai.com/v1/v1/moderations",
 		},
 		{
 			name: "fallback to APIBaseURL when no endpoints configured",
@@ -409,7 +469,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				Endpoints:      nil,
 			},
 			endpointType: EndpointTypeChatCompletions,
-			expected:     "https://api.openai.com/v1",
+			expected:     "https://api.openai.com/v1/v1/chat/completions",
 		},
 	}
 

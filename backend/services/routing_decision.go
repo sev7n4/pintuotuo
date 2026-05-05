@@ -75,6 +75,7 @@ const (
 type ExecutionLayerInputData struct {
 	GatewayMode   string `json:"gateway_mode"`
 	EndpointURL   string `json:"endpoint_url"`
+	EndpointType  string `json:"endpoint_type,omitempty"`
 	AuthMethod    string `json:"auth_method"`
 	ResolvedModel string `json:"resolved_model"`
 	RequestFormat string `json:"request_format"`

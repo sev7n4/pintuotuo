@@ -26,6 +26,7 @@ const (
 
 type RequestAnalysis struct {
 	Intent          RequestIntent          `json:"intent"`
+	EndpointType    string                 `json:"endpoint_type,omitempty"`
 	Complexity      RequestComplexity      `json:"complexity"`
 	EstimatedTokens int                    `json:"estimated_tokens"`
 	ActualTokens    int                    `json:"actual_tokens,omitempty"`
