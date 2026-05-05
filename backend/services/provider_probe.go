@@ -118,7 +118,8 @@ type ProbeURLResult struct {
 
 func ProbeEndpointURL(ctx context.Context, url string, apiKey string, timeoutMs int) *ProbeURLResult {
 	client := &http.Client{
-		Timeout: time.Duration(timeoutMs) * time.Millisecond,
+		Timeout:   time.Duration(timeoutMs) * time.Millisecond,
+		Transport: http.DefaultTransport.(*http.Transport).Clone(),
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)

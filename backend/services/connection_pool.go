@@ -64,6 +64,7 @@ func (p *ConnectionPool) GetClient(apiKeyID int) (*http.Client, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
 			MaxIdleConns:          10,
 			IdleConnTimeout:       90 * time.Second,
 			DisableCompression:    true,

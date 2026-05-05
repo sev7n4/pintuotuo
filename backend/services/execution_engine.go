@@ -70,6 +70,7 @@ func NewExecutionEngine(opts ...ExecutionEngineOption) *ExecutionEngine {
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
 			Transport: &http.Transport{
+				Proxy:               http.ProxyFromEnvironment,
 				MaxIdleConns:        100,
 				MaxIdleConnsPerHost: 20,
 				IdleConnTimeout:     90 * time.Second,

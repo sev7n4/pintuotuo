@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -155,10 +156,11 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 
 	baseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
 	modelsURL := baseURL + "/models"
+	probeClient := newProxyAwareHTTPClient(10*time.Second, routeMode)
 	var probe *ProbeModelsResult
 	var probeErr error
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, decryptedKey, provider)
+		probe, probeErr = ProbeProviderModels(ctx, probeClient, modelsURL, decryptedKey, provider)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break
@@ -625,7 +627,7 @@ func (v *APIKeyValidator) probeQuota(providerConfig map[string]string, provider,
 	}
 	SetProviderAuthHeaders(req, provider, apiKey)
 
-	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	resp, err := newProxyAwareHTTPClient(15*time.Second, "").Do(req)
 	if err != nil {
 		return false, ErrCodeQuotaProbeNetworkError, err.Error()
 	}
@@ -647,6 +649,42 @@ func (v *APIKeyValidator) probeQuota(providerConfig map[string]string, provider,
 		code = errorCategoryQuotaInsufficient
 	}
 	return false, code, msg
+}
+
+func newProxyAwareHTTPClient(timeout time.Duration, routeMode string) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if routeMode == GatewayModeProxy {
+		httpsProxy := os.Getenv("HTTPS_PROXY")
+		if httpsProxy == "" {
+			httpsProxy = os.Getenv("https_proxy")
+		}
+		if httpsProxy != "" {
+			proxyURL, err := url.Parse(httpsProxy)
+			if err == nil {
+				transport.Proxy = http.ProxyURL(proxyURL)
+			}
+		}
+	}
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+	}
+}
+
+func (v *APIKeyValidator) getProviderRegion(provider string) string {
+	db := v.ensureDB()
+	if db == nil {
+		return regionDomestic
+	}
+	var providerRegion string
+	err := db.QueryRow(
+		"SELECT COALESCE(provider_region, 'domestic') FROM model_providers WHERE code = $1",
+		provider,
+	).Scan(&providerRegion)
+	if err != nil {
+		return regionDomestic
+	}
+	return providerRegion
 }
 
 func selectProbeModel(provider string, models []string) string {
@@ -724,12 +762,25 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		return
 	}
 
+	if routeMode == RouteModeAuto || routeMode == string(GoalAuto) {
+		providerRegion := v.getProviderRegion(provider)
+		resolved := resolveAutoRouteMode(providerRegion)
+		logger.LogInfo(ctx, "api_key_validator", "Resolved auto route mode for verification", map[string]interface{}{
+			"api_key_id":      apiKeyID,
+			"original_mode":   routeMode,
+			"resolved_mode":   resolved,
+			"provider_region": providerRegion,
+		})
+		routeMode = resolved
+	}
+
 	endpoint, err := v.resolveEndpointByRouteMode(ctx, provider, routeMode, routeConfig, region)
 	if err != nil {
 		v.handleVerificationError(ctx, verificationID, apiKeyID, "ENDPOINT_RESOLVE_FAILED", err.Error(), startTime)
 		return
 	}
 	result.EndpointUsed = endpoint
+	result.RouteMode = routeMode
 
 	authToken := v.resolveAuthToken(routeMode, decryptedKey)
 
@@ -749,11 +800,13 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		modelsAuthToken = decryptedKey
 	}
 
+	probeClient := newProxyAwareHTTPClient(10*time.Second, routeMode)
+
 	var probe *ProbeModelsResult
 	var probeErr error
 	var connectionFailed bool
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = ProbeProviderModels(ctx, &http.Client{Timeout: 10 * time.Second}, modelsURL, modelsAuthToken, provider)
+		probe, probeErr = ProbeProviderModels(ctx, probeClient, modelsURL, modelsAuthToken, provider)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break
@@ -1076,7 +1129,7 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	}
 	SetProviderAuthHeaders(req, provider, apiKey)
 
-	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	resp, err := newProxyAwareHTTPClient(15*time.Second, routeMode).Do(req)
 	if err != nil {
 		return false, ErrCodeQuotaProbeNetworkError, err.Error()
 	}
@@ -1144,7 +1197,7 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", litellmMasterKey))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	resp, err := newProxyAwareHTTPClient(30*time.Second, GatewayModeLitellm).Do(req)
 	if err != nil {
 		return false, ErrCodeQuotaProbeNetworkError, err.Error()
 	}

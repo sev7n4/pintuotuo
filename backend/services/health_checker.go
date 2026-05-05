@@ -120,7 +120,8 @@ type HealthChecker struct {
 func NewHealthChecker() *HealthChecker {
 	return &HealthChecker{
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout:   10 * time.Second,
+			Transport: http.DefaultTransport.(*http.Transport).Clone(),
 		},
 		db: config.GetDB(),
 	}
