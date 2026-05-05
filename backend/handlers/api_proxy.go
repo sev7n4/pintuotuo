@@ -153,17 +153,6 @@ type ChatMessage struct {
 	Name    string         `json:"name,omitempty"`
 }
 
-func estimateImageTokens(detail string) int {
-	switch detail {
-	case ImageDetailLow:
-		return 85
-	case ImageDetailHigh:
-		return 765
-	default:
-		return 765
-	}
-}
-
 func estimateImageTokensWithSize(detail string, width, height int) int {
 	switch detail {
 	case ImageDetailLow:
@@ -198,7 +187,7 @@ func estimateInputTokens(messages []ChatMessage) int {
 				if part.ImageURL != nil {
 					detail = part.ImageURL.Detail
 				}
-				totalChars += estimateImageTokens(detail)
+				totalChars += estimateImageTokensWithSize(detail, 0, 0)
 			}
 		}
 	}

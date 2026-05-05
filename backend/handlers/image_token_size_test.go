@@ -94,9 +94,9 @@ func TestEstimateImageTokensWithSize(t *testing.T) {
 	}
 }
 
-func TestEstimateImageTokens_BackwardCompatible(t *testing.T) {
-	assert.Equal(t, 85, estimateImageTokens("low"))
-	assert.Equal(t, 765, estimateImageTokens("high"))
-	assert.Equal(t, 765, estimateImageTokens("auto"))
-	assert.Equal(t, 765, estimateImageTokens(""))
+func TestEstimateImageTokensWithSize_BackwardCompatible(t *testing.T) {
+	assert.Equal(t, 85, estimateImageTokensWithSize("low", 0, 0))
+	assert.Equal(t, 765, estimateImageTokensWithSize("high", 0, 0))
+	assert.Equal(t, 765, estimateImageTokensWithSize("auto", 0, 0))
+	assert.Equal(t, 765, estimateImageTokensWithSize("", 0, 0))
 }
