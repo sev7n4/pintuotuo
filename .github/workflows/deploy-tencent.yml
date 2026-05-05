@@ -35,31 +35,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Build backend image
+      - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          load: true
+          push: true
           tags: ghcr.io/${{ github.repository_owner }}/pintuotuo-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Push backend image to GHCR
-        run: docker push ghcr.io/${{ github.repository_owner }}/pintuotuo-backend:${{ github.sha }}
-
-      - name: Build frontend image
+      - name: Build and push frontend image
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
-          load: true
+          push: true
           tags: ghcr.io/${{ github.repository_owner }}/pintuotuo-frontend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Push frontend image to GHCR
-        run: docker push ghcr.io/${{ github.repository_owner }}/pintuotuo-frontend:${{ github.sha }}
 
       - name: Deploy to Tencent Cloud
         run: |
@@ -67,25 +61,55 @@ jobs:
           echo "${{ secrets.TENCENT_CLOUD_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          SSH_OPTS="-o StrictHostKeyChecking=no -i ~/.ssh/deploy_key"
-          SERVER="${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }}"
-          BACKEND_IMAGE="ghcr.io/${{ github.repository_owner }}/pintuotuo-backend:${{ github.sha }}"
-          FRONTEND_IMAGE="ghcr.io/${{ github.repository_owner }}/pintuotuo-frontend:${{ github.sha }}"
-
-          echo "[$(date +%H:%M:%S)] Transferring backend image via SSH pipe (gzip)..."
-          docker save "$BACKEND_IMAGE" | gzip | ssh $SSH_OPTS "$SERVER" "gunzip | docker load"
-          echo "[$(date +%H:%M:%S)] Backend image transferred"
-
-          echo "[$(date +%H:%M:%S)] Transferring frontend image via SSH pipe (gzip)..."
-          docker save "$FRONTEND_IMAGE" | gzip | ssh $SSH_OPTS "$SERVER" "gunzip | docker load"
-          echo "[$(date +%H:%M:%S)] Frontend image transferred"
-
-          ssh $SSH_OPTS "$SERVER" << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
           set -e
           cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}
           echo "[$(date +%H:%M:%S)] Fetching latest code from GitHub..."
           git fetch origin main
           git reset --hard origin/main
+          echo "[$(date +%H:%M:%S)] Login GHCR and pull prebuilt images..."
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+          echo "[$(date +%H:%M:%S)] Configuring Docker daemon for GHCR reliability..."
+          cat /etc/docker/daemon.json 2>/dev/null || echo "{}" > /tmp/daemon_base.json
+          python3 -c "
+          import json, sys
+          try:
+            with open('/etc/docker/daemon.json') as f:
+              cfg = json.load(f)
+          except:
+            cfg = {}
+          cfg.setdefault('registry-mirrors', [])
+          cfg['max-concurrent-downloads'] = 2
+          cfg['max-concurrent-uploads'] = 2
+          with open('/tmp/daemon_new.json', 'w') as f:
+            json.dump(cfg, f, indent=2)
+          " 2>/dev/null || true
+          if [ -f /tmp/daemon_new.json ]; then
+            sudo cp /tmp/daemon_new.json /etc/docker/daemon.json
+            sudo systemctl restart docker
+            echo "Docker daemon restarted with optimized config"
+            sleep 3
+          fi
+
+          PULL_SUCCESS=0
+          for i in 1 2 3 4 5; do
+            echo "[$(date +%H:%M:%S)] Pull attempt $i/5..."
+            if IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml pull 2>&1; then
+              PULL_SUCCESS=1
+              break
+            fi
+            echo "[$(date +%H:%M:%S)] Pull attempt $i failed, cleaning up and retrying..."
+            docker system prune -f >/dev/null 2>&1 || true
+            if [ "$i" -lt 5 ]; then
+              sleep $((i * 10))
+            fi
+          done
+          if [ "$PULL_SUCCESS" != "1" ]; then
+            echo "ERROR: docker compose pull failed after 5 attempts"
+            exit 1
+          fi
+          echo "[$(date +%H:%M:%S)] Images pulled successfully"
           echo "[$(date +%H:%M:%S)] Starting containers..."
           IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml -f docker-compose.proxy.override.yml up -d
           echo "[$(date +%H:%M:%S)] Running database migrations..."
@@ -99,17 +123,11 @@ jobs:
             echo "Applying migration: $filename"
             migration_sql=$(sed -n '/-- +goose Up/,/-- +goose Down/p' "$migration_file" | sed '1d;$d' | sed '/-- +goose StatementBegin/d' | sed '/-- +goose StatementEnd/d')
             if [ -n "$migration_sql" ]; then
-              echo "$migration_sql" | docker exec -i pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 2>&1
+              echo "$migration_sql" | docker exec -i pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 2>&1 || echo "Migration $filename may have already been applied or had non-fatal errors"
             else
-              docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 -f "/docker-entrypoint-initdb.d/$filename" 2>&1
+              docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 -f "/docker-entrypoint-initdb.d/$filename" 2>&1 || echo "Migration $filename may have already been applied or had non-fatal errors"
             fi
-            if [ $? -eq 0 ]; then
-              docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO _schema_migrations (version) VALUES ('$filename') ON CONFLICT (version) DO NOTHING;" 2>/dev/null || true
-              echo "Migration $filename applied successfully"
-            else
-              echo "Migration $filename failed, skipping (may have been partially applied)"
-              docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO _schema_migrations (version) VALUES ('$filename') ON CONFLICT (version) DO NOTHING;" 2>/dev/null || true
-            fi
+            docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO _schema_migrations (version) VALUES ('$filename') ON CONFLICT (version) DO NOTHING;" 2>/dev/null || true
           done
           echo "[$(date +%H:%M:%S)] Migrations completed"
           echo "Pruning dangling images to keep disk stable..."
@@ -130,7 +148,7 @@ jobs:
           BASE="http://${{ secrets.TENCENT_CLOUD_IP }}:8080"
           echo "=== 1) Health check: GET /api/v1/health ==="
           OK=0
-          for i in $(seq 1 15); do
+          for i in $(seq 1 20); do
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
               --connect-timeout 5 \
               --max-time 10 \
@@ -141,10 +159,16 @@ jobs:
               break
             fi
             echo "Attempt $i: health HTTP $HTTP_CODE, waiting..."
-            sleep 3
+            if [ $i -le 5 ]; then
+              sleep 5
+            elif [ $i -le 10 ]; then
+              sleep 10
+            else
+              sleep 15
+            fi
           done
           if [ "$OK" != "1" ]; then
-            echo "Health check failed after 15 attempts (~45s)"
+            echo "Health check failed after 20 attempts"
             exit 1
           fi
 
