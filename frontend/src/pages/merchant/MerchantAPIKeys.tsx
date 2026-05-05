@@ -21,6 +21,7 @@ import {
   Divider,
   Spin,
   Checkbox,
+  Result,
 } from 'antd';
 import {
   PlusOutlined,
@@ -31,6 +32,7 @@ import {
   ApiOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
 import { MerchantAPIKey, VerificationResult } from '@/types';
@@ -47,6 +49,14 @@ import MerchantBYOKOverviewCard from '@/components/merchant/MerchantBYOKOverview
 interface VerificationPollResponse {
   api_key: MerchantAPIKey;
   history: VerificationResult[];
+}
+
+interface OperationResult {
+  type: 'probe';
+  status: 'success' | 'failed' | 'loading';
+  message: string;
+  details?: string;
+  timestamp: Date;
 }
 
 function normalizeVerificationStatus(raw: string | undefined): VerificationResult['status'] {
@@ -227,6 +237,11 @@ const MerchantAPIKeys = () => {
   );
   const [recentMinutes, setRecentMinutes] = useState<number>(10);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<MerchantAPIKey | null>(null);
+  const [resultModalVisible, setResultModalVisible] = useState(false);
+  const [operationResults, setOperationResults] = useState<Map<number, OperationResult>>(
+    new Map()
+  );
 
   useEffect(() => {
     fetchAPIKeys();
@@ -433,14 +448,43 @@ const MerchantAPIKeys = () => {
     }
   };
 
-  const handleImmediateHealthCheck = async (id: number) => {
+  const setOperationResult = (id: number, result: OperationResult) => {
+    setOperationResults((prev) => {
+      const next = new Map(prev);
+      next.set(id, result);
+      return next;
+    });
+  };
+
+  const handleImmediateHealthCheck = async (record: MerchantAPIKey) => {
+    setOperationResult(record.id, {
+      type: 'probe',
+      status: 'loading',
+      message: '正在触发探测...',
+      timestamp: new Date(),
+    });
     try {
-      await api.post(`/merchants/api-keys/${id}/probe`);
-      message.success('已触发立即探测，正在获取结果...');
-      fetchAPIKeys();
-      void pollHealthCheckResult(id);
-    } catch {
-      message.error('触发探测失败');
+      await api.post(`/merchants/api-keys/${record.id}/probe`);
+      setOperationResult(record.id, {
+        type: 'probe',
+        status: 'success',
+        message: '探测已触发',
+        details: '请稍后刷新查看健康状态更新',
+        timestamp: new Date(),
+      });
+      setSelectedItem(record);
+      setResultModalVisible(true);
+      void pollHealthCheckResult(record.id);
+    } catch (err) {
+      setOperationResult(record.id, {
+        type: 'probe',
+        status: 'failed',
+        message: '触发探测失败',
+        details: String(err),
+        timestamp: new Date(),
+      });
+      setSelectedItem(record);
+      setResultModalVisible(true);
     }
   };
 
@@ -454,16 +498,14 @@ const MerchantAPIKeys = () => {
       if (!latest?.last_health_check_at) continue;
       const health = (latest.health_status || 'unknown').toLowerCase();
       if (health === 'healthy' || health === 'degraded') {
-        message.success(`探测完成：当前状态 ${health === 'healthy' ? '健康' : '降级'}`);
+        setSelectedItem(latest);
         return;
       }
       if (health === 'unhealthy') {
-        const reason = formatHealthError(latest).trim();
-        message.error(reason ? `探测失败：${reason}` : '探测失败：状态不健康');
+        setSelectedItem(latest);
         return;
       }
     }
-    message.warning('探测已触发，但结果尚未返回，请稍后手动刷新查看');
   };
 
   const pollVerificationResult = async (id: number) => {
@@ -732,11 +774,32 @@ const MerchantAPIKeys = () => {
               深度验证
             </Button>
           </Tooltip>
-          <Tooltip title="立即健康探测（绕过周期节流，按该 Key 的探测策略执行一次）">
-            <Button type="link" size="small" onClick={() => handleImmediateHealthCheck(record.id)}>
-              立即探测
-            </Button>
-          </Tooltip>
+          {(() => {
+            const result = operationResults.get(record.id);
+            const isLoading = result?.status === 'loading' && result?.type === 'probe';
+            const isSuccess = result?.status === 'success' && result?.type === 'probe';
+            const isFailed = result?.status === 'failed' && result?.type === 'probe';
+            let btnClass = '';
+            if (isSuccess) btnClass = styles.actionBtnSuccess;
+            if (isFailed) btnClass = styles.actionBtnError;
+            return (
+              <Tooltip
+                title={
+                  result
+                    ? `${result.message} (${result.timestamp.toLocaleTimeString()})`
+                    : '立即探测'
+                }
+              >
+                <Button
+                  size="small"
+                  icon={isLoading ? <SyncOutlined spin /> : <ThunderboltOutlined />}
+                  onClick={() => handleImmediateHealthCheck(record)}
+                  className={btnClass}
+                  loading={isLoading}
+                />
+              </Tooltip>
+            );
+          })()}
           <Button
             type="link"
             size="small"
@@ -1157,6 +1220,90 @@ const MerchantAPIKeys = () => {
             </Form.Item>
           )}
         </Form>
+      </Modal>
+
+      <Modal
+        title="操作结果"
+        open={resultModalVisible}
+        onCancel={() => setResultModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setResultModalVisible(false)}>
+            关闭
+          </Button>,
+          <Button
+            key="refresh"
+            type="primary"
+            onClick={() => {
+              setResultModalVisible(false);
+              fetchAPIKeys();
+            }}
+          >
+            刷新数据
+          </Button>,
+        ]}
+        width={500}
+      >
+        {selectedItem && operationResults.get(selectedItem.id) && (
+          <div className={styles.resultCard}>
+            <Result
+              icon={
+                operationResults.get(selectedItem.id)?.status === 'success' ? (
+                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                ) : (
+                  <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
+                )
+              }
+              title={operationResults.get(selectedItem.id)?.message}
+              subTitle={operationResults.get(selectedItem.id)?.details}
+            />
+            <Divider />
+            <Descriptions column={1} size="small">
+              <Descriptions.Item label="API Key">{selectedItem.name}</Descriptions.Item>
+              <Descriptions.Item label="提供商">
+                {selectedItem.provider.toUpperCase()}
+              </Descriptions.Item>
+              <Descriptions.Item label="当前健康状态">
+                <span className={styles.statusLightRow}>
+                  <span
+                    className={`${styles.statusDot} ${healthDotClass(selectedItem.health_status)}`}
+                    aria-hidden
+                  />
+                  <span className={styles.statusLightLabel}>
+                    {healthLabel(selectedItem.health_status)}
+                  </span>
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="当前验证状态">
+                <span className={styles.statusLightRow}>
+                  <span
+                    className={`${styles.statusDot} ${verificationDotClass(selectedItem.verification_result)}`}
+                    aria-hidden
+                  />
+                  <span className={styles.statusLightLabel}>
+                    {verificationLabel(selectedItem.verification_result)}
+                  </span>
+                </span>
+              </Descriptions.Item>
+              {selectedItem.health_error_category && (
+                <Descriptions.Item label="健康错误分类">
+                  <Tag color="error">
+                    {toHealthCategoryCN(selectedItem.health_error_category)}
+                  </Tag>
+                </Descriptions.Item>
+              )}
+              {selectedItem.health_error_code && (
+                <Descriptions.Item label="健康错误码">
+                  <Tag color="volcano">{selectedItem.health_error_code}</Tag>
+                </Descriptions.Item>
+              )}
+              {selectedItem.health_error_message && (
+                <Descriptions.Item label="健康错误信息">
+                  <span style={{ color: '#ff4d4f' }}>{selectedItem.health_error_message}</span>
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+          </div>
+        )}
       </Modal>
 
       <Modal
