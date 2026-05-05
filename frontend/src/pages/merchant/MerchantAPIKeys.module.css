@@ -124,3 +124,27 @@
     font-size: 18px;
   }
 }
+
+.resultCard {
+  text-align: left;
+}
+
+.actionBtnSuccess {
+  border-color: #52c41a !important;
+  color: #52c41a !important;
+}
+
+.actionBtnSuccess:hover {
+  border-color: #73d13d !important;
+  color: #73d13d !important;
+}
+
+.actionBtnError {
+  border-color: #ff4d4f !important;
+  color: #ff4d4f !important;
+}
+
+.actionBtnError:hover {
+  border-color: #ff7875 !important;
+  color: #ff7875 !important;
+}
