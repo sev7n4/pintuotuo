@@ -1,14 +1,5 @@
 import React from 'react';
-import {
-  Card,
-  Descriptions,
-  Tag,
-  Space,
-  Typography,
-  Divider,
-  Alert,
-  Table,
-} from 'antd';
+import { Card, Descriptions, Tag, Space, Typography, Divider, Alert, Table } from 'antd';
 import {
   CheckCircleOutlined,
   GlobalOutlined,
@@ -163,9 +154,7 @@ const RoutePreview: React.FC<RoutePreviewProps> = ({
       dataIndex: 'weight',
       key: 'weight',
       render: (weight: number) => (
-        <Tag color={weight >= 80 ? 'green' : weight >= 50 ? 'blue' : 'orange'}>
-          {weight || 100}
-        </Tag>
+        <Tag color={weight >= 80 ? 'green' : weight >= 50 ? 'blue' : 'orange'}>{weight || 100}</Tag>
       ),
     },
     {

@@ -17,6 +17,13 @@ const (
 	RouteModeAuto      = "auto"
 	regionDomestic     = "domestic"
 	regionOverseas     = "overseas"
+
+	EndpointTypeChatCompletions     = "chat_completions"
+	EndpointTypeEmbeddings          = "embeddings"
+	EndpointTypeImagesGenerations   = "images_generations"
+	EndpointTypeAudioSpeech         = "audio_speech"
+	EndpointTypeAudioTranscriptions = "audio_transcriptions"
+	EndpointTypeModerations         = "moderations"
 )
 
 func resolveAutoRouteMode(providerRegion string) string {
@@ -350,6 +357,10 @@ func ResolveEndpoint(cfg *ExecutionProviderConfig) string {
 		}
 		return cfg.APIBaseURL
 	}
+}
+
+func ResolveEndpointByType(cfg *ExecutionProviderConfig, endpointType string) string {
+	return ResolveEndpoint(cfg)
 }
 
 func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, originalAPIKey string) string {

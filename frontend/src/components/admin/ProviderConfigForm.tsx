@@ -1,6 +1,11 @@
 import React, { useEffect } from 'react';
 import { Modal, Form, Select, Divider, Typography, Space, Tooltip, Alert, Tabs } from 'antd';
-import { QuestionCircleOutlined, InfoCircleOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons';
+import {
+  QuestionCircleOutlined,
+  InfoCircleOutlined,
+  EyeOutlined,
+  EditOutlined,
+} from '@ant-design/icons';
 import RouteStrategyConfig from './RouteStrategyConfig';
 import EndpointsConfig from './EndpointsConfig';
 import RoutePreview from './RoutePreview';

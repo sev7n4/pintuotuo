@@ -250,10 +250,10 @@ const AdminByokRouting = () => {
     setSelectedItem(record);
     const routeConfig = record.route_config || {};
     const endpoints = (routeConfig.endpoints || {}) as Record<string, unknown>;
-    
+
     const litellmEndpoints = (endpoints.litellm || {}) as Record<string, unknown>;
     const proxyEndpoints = (endpoints.proxy || {}) as Record<string, unknown>;
-    
+
     configForm.setFieldsValue({
       route_mode: record.route_mode || 'auto',
       endpoint_url: record.endpoint_url || '',
@@ -279,7 +279,7 @@ const AdminByokRouting = () => {
     try {
       const routeConfig: Record<string, unknown> = {};
       const endpoints: Record<string, unknown> = {};
-      
+
       if (values.litellm_domestic || values.litellm_overseas) {
         const litellmEndpoints: Record<string, string> = {};
         if (values.litellm_domestic?.trim()) {
@@ -292,19 +292,19 @@ const AdminByokRouting = () => {
           endpoints.litellm = litellmEndpoints;
         }
       }
-      
+
       if (values.proxy_gaap?.trim()) {
         endpoints.proxy = { gaap: values.proxy_gaap.trim() };
       }
-      
+
       if (Object.keys(endpoints).length > 0) {
         routeConfig.endpoints = endpoints;
       }
-      
+
       if (values.proxy_url?.trim()) {
         routeConfig.proxy_url = values.proxy_url.trim();
       }
-      
+
       const payload: UpdateRouteConfigRequest = {
         route_mode: values.route_mode,
         endpoint_url: values.endpoint_url?.trim() || '',
@@ -457,7 +457,10 @@ const AdminByokRouting = () => {
     setKeywordFilter('');
   };
 
-  const renderOperationButton = (record: BYOKRoutingItem, type: 'probe' | 'verify' | 'deep-verify') => {
+  const renderOperationButton = (
+    record: BYOKRoutingItem,
+    type: 'probe' | 'verify' | 'deep-verify'
+  ) => {
     const result = operationResults.get(record.id);
     const isLoading = result?.status === 'loading' && result?.type === type;
     const isSuccess = result?.status === 'success' && result?.type === type;
@@ -469,7 +472,11 @@ const AdminByokRouting = () => {
 
     if (type === 'probe') {
       return (
-        <Tooltip title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : '立即探测'}>
+        <Tooltip
+          title={
+            result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : '立即探测'
+          }
+        >
           <Button
             size="small"
             icon={isLoading ? <SyncOutlined spin /> : <ThunderboltOutlined />}
@@ -483,7 +490,13 @@ const AdminByokRouting = () => {
 
     if (type === 'deep-verify') {
       return (
-        <Tooltip title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : '深度验证（包含配额探测）'}>
+        <Tooltip
+          title={
+            result
+              ? `${result.message} (${result.timestamp.toLocaleTimeString()})`
+              : '深度验证（包含配额探测）'
+          }
+        >
           <Button
             size="small"
             icon={isLoading ? <SyncOutlined spin /> : <SafetyCertificateOutlined />}
@@ -495,7 +508,9 @@ const AdminByokRouting = () => {
     }
 
     return (
-      <Tooltip title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : '轻量验证'}>
+      <Tooltip
+        title={result ? `${result.message} (${result.timestamp.toLocaleTimeString()})` : '轻量验证'}
+      >
         <Button
           size="small"
           icon={isLoading ? <SyncOutlined spin /> : <SafetyCertificateOutlined />}
@@ -597,7 +612,11 @@ const AdminByokRouting = () => {
       render: (_, record) => (
         <Space size="small" wrap>
           <Tooltip title="路由配置">
-            <Button size="small" icon={<SettingOutlined />} onClick={() => handleOpenConfig(record)} />
+            <Button
+              size="small"
+              icon={<SettingOutlined />}
+              onClick={() => handleOpenConfig(record)}
+            />
           </Tooltip>
           {renderOperationButton(record, 'probe')}
           {renderOperationButton(record, 'verify')}
@@ -643,7 +662,11 @@ const AdminByokRouting = () => {
       </div>
       <div className={styles.mobileActions}>
         <Tooltip title="路由配置">
-          <Button size="small" icon={<SettingOutlined />} onClick={() => handleOpenConfig(record)} />
+          <Button
+            size="small"
+            icon={<SettingOutlined />}
+            onClick={() => handleOpenConfig(record)}
+          />
         </Tooltip>
         {renderOperationButton(record, 'probe')}
         {renderOperationButton(record, 'verify')}
@@ -692,7 +715,10 @@ const AdminByokRouting = () => {
               onChange={setProviderFilter}
               allowClear
               placeholder="提供商"
-              options={providerOptions.map((p) => ({ value: p.toLowerCase(), label: p.toUpperCase() }))}
+              options={providerOptions.map((p) => ({
+                value: p.toLowerCase(),
+                label: p.toUpperCase(),
+              }))}
             />
             <Select
               style={{ width: 90 }}
@@ -740,11 +766,7 @@ const AdminByokRouting = () => {
         </div>
 
         <div className={styles.mobileCard}>
-          {loading ? (
-            <Spin />
-          ) : (
-            data.map((item) => renderMobileItem(item))
-          )}
+          {loading ? <Spin /> : data.map((item) => renderMobileItem(item))}
         </div>
       </Card>
 
@@ -769,19 +791,35 @@ const AdminByokRouting = () => {
             <Form.Item name="endpoint_url" label="端点URL" extra="直连模式使用的端点地址">
               <Input placeholder="自定义端点URL（可选）" />
             </Form.Item>
-            <Form.Item name="fallback_endpoint_url" label="备用端点URL" extra="主端点不可用时的备用地址">
+            <Form.Item
+              name="fallback_endpoint_url"
+              label="备用端点URL"
+              extra="主端点不可用时的备用地址"
+            >
               <Input placeholder="备用端点URL（可选）" />
             </Form.Item>
-            
-            <Divider orientation="left" plain>LiteLLM 配置</Divider>
-            <Form.Item name="litellm_domestic" label="LiteLLM 国内端点" extra="LiteLLM模式国内区域使用的端点">
+
+            <Divider orientation="left" plain>
+              LiteLLM 配置
+            </Divider>
+            <Form.Item
+              name="litellm_domestic"
+              label="LiteLLM 国内端点"
+              extra="LiteLLM模式国内区域使用的端点"
+            >
               <Input placeholder="https://litellm-cn.example.com/v1" />
             </Form.Item>
-            <Form.Item name="litellm_overseas" label="LiteLLM 海外端点" extra="LiteLLM模式海外区域使用的端点">
+            <Form.Item
+              name="litellm_overseas"
+              label="LiteLLM 海外端点"
+              extra="LiteLLM模式海外区域使用的端点"
+            >
               <Input placeholder="https://litellm-global.example.com/v1" />
             </Form.Item>
-            
-            <Divider orientation="left" plain>代理配置</Divider>
+
+            <Divider orientation="left" plain>
+              代理配置
+            </Divider>
             <Form.Item name="proxy_url" label="代理URL" extra="代理模式使用的通用代理地址">
               <Input placeholder="https://proxy.example.com" />
             </Form.Item>
@@ -800,7 +838,14 @@ const AdminByokRouting = () => {
           <Button key="close" onClick={() => setResultModalVisible(false)}>
             关闭
           </Button>,
-          <Button key="refresh" type="primary" onClick={() => { setResultModalVisible(false); fetchData(); }}>
+          <Button
+            key="refresh"
+            type="primary"
+            onClick={() => {
+              setResultModalVisible(false);
+              fetchData();
+            }}
+          >
             刷新数据
           </Button>,
         ]}
@@ -809,9 +854,13 @@ const AdminByokRouting = () => {
         {selectedItem && operationResults.get(selectedItem.id) && (
           <div className={styles.resultCard}>
             <Result
-              icon={operationResults.get(selectedItem.id)?.status === 'success' 
-                ? <CheckCircleOutlined style={{ color: '#52c41a' }} /> 
-                : <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              icon={
+                operationResults.get(selectedItem.id)?.status === 'success' ? (
+                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                ) : (
+                  <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
+                )
+              }
               title={operationResults.get(selectedItem.id)?.message}
               subTitle={operationResults.get(selectedItem.id)?.details}
             />
@@ -819,17 +868,23 @@ const AdminByokRouting = () => {
             <Descriptions column={1} size="small">
               <Descriptions.Item label="商户">{selectedItem.company_name}</Descriptions.Item>
               <Descriptions.Item label="API Key">{selectedItem.name}</Descriptions.Item>
-              <Descriptions.Item label="提供商">{selectedItem.provider.toUpperCase()}</Descriptions.Item>
+              <Descriptions.Item label="提供商">
+                {selectedItem.provider.toUpperCase()}
+              </Descriptions.Item>
               <Descriptions.Item label="当前健康状态">
                 <span className={styles.statusLightRow}>
                   <span className={healthDotClass(selectedItem.health_status)} />
-                  <span className={styles.statusLightLabel}>{healthLabel(selectedItem.health_status)}</span>
+                  <span className={styles.statusLightLabel}>
+                    {healthLabel(selectedItem.health_status)}
+                  </span>
                 </span>
               </Descriptions.Item>
               <Descriptions.Item label="当前验证状态">
                 <span className={styles.statusLightRow}>
                   <span className={verificationDotClass(selectedItem.verification_result)} />
-                  <span className={styles.statusLightLabel}>{verificationLabel(selectedItem.verification_result)}</span>
+                  <span className={styles.statusLightLabel}>
+                    {verificationLabel(selectedItem.verification_result)}
+                  </span>
                 </span>
               </Descriptions.Item>
               {selectedItem.health_error_category && (

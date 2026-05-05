@@ -24,7 +24,7 @@ export const getRouteModeColor = (mode?: string): string => {
   return ROUTE_MODE_COLORS[mode as RouteMode] || '#d9d9d9';
 };
 
-export type ErrorCategory = 
+export type ErrorCategory =
   | 'AUTHENTICATION_ERROR'
   | 'RATE_LIMIT_ERROR'
   | 'NETWORK_ERROR'
@@ -71,14 +71,18 @@ export const getErrorCategoryColor = (category?: string): string => {
 
 export const getErrorCategoryByCode = (errorCode?: string): ErrorCategory => {
   if (!errorCode) return 'UNKNOWN_ERROR';
-  
+
   if (errorCode.includes('AUTH') || errorCode.includes('401') || errorCode.includes('403')) {
     return 'AUTHENTICATION_ERROR';
   }
   if (errorCode.includes('RATE') || errorCode.includes('429')) {
     return 'RATE_LIMIT_ERROR';
   }
-  if (errorCode.includes('NETWORK') || errorCode.includes('TIMEOUT') || errorCode.includes('ECONNREFUSED')) {
+  if (
+    errorCode.includes('NETWORK') ||
+    errorCode.includes('TIMEOUT') ||
+    errorCode.includes('ECONNREFUSED')
+  ) {
     return 'NETWORK_ERROR';
   }
   if (errorCode.includes('QUOTA') || errorCode.includes('INSUFFICIENT')) {
@@ -90,6 +94,6 @@ export const getErrorCategoryByCode = (errorCode?: string): ErrorCategory => {
   if (errorCode.includes('INVALID') || errorCode.includes('400')) {
     return 'INVALID_REQUEST';
   }
-  
+
   return 'UNKNOWN_ERROR';
 };

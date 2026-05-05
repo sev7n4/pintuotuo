@@ -473,7 +473,14 @@ export interface MerchantAPIKey {
 
   verified_at?: string;
   /** 与后端 merchant_api_keys.verification_result 对齐：verified | suspend | unreachable | invalid | failed | pending */
-  verification_result?: 'verified' | 'suspend' | 'unreachable' | 'invalid' | 'failed' | 'pending' | string;
+  verification_result?:
+    | 'verified'
+    | 'suspend'
+    | 'unreachable'
+    | 'invalid'
+    | 'failed'
+    | 'pending'
+    | string;
   verification_message?: string;
   models_supported?: string[];
 

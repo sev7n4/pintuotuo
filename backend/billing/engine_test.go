@@ -164,3 +164,232 @@ func TestPricingTier_Values(t *testing.T) {
 		}
 	})
 }
+
+func TestBillingUnitConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant BillingUnit
+		expected string
+	}{
+		{
+			name:     "BillingUnitToken",
+			constant: BillingUnitToken,
+			expected: "token",
+		},
+		{
+			name:     "BillingUnitImage",
+			constant: BillingUnitImage,
+			expected: "image",
+		},
+		{
+			name:     "BillingUnitSecond",
+			constant: BillingUnitSecond,
+			expected: "second",
+		},
+		{
+			name:     "BillingUnitCharacter",
+			constant: BillingUnitCharacter,
+			expected: "character",
+		},
+		{
+			name:     "BillingUnitRequest",
+			constant: BillingUnitRequest,
+			expected: "request",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if string(tt.constant) != tt.expected {
+				t.Errorf("BillingUnit constant = %v, want %v", tt.constant, tt.expected)
+			}
+		})
+	}
+}
+
+func TestBillingRequest_Structure(t *testing.T) {
+	req := BillingRequest{
+		UserID:       123,
+		EndpointType: "chat_completions",
+		ProviderCode: "openai",
+		UnitType:     BillingUnitToken,
+		Quantity:     1000,
+		RequestID:    "req-123",
+		Reason:       "API usage",
+	}
+
+	if req.UserID != 123 {
+		t.Errorf("UserID = %v, want 123", req.UserID)
+	}
+	if req.EndpointType != "chat_completions" {
+		t.Errorf("EndpointType = %v, want chat_completions", req.EndpointType)
+	}
+	if req.ProviderCode != "openai" {
+		t.Errorf("ProviderCode = %v, want openai", req.ProviderCode)
+	}
+	if req.UnitType != BillingUnitToken {
+		t.Errorf("UnitType = %v, want token", req.UnitType)
+	}
+	if req.Quantity != 1000 {
+		t.Errorf("Quantity = %v, want 1000", req.Quantity)
+	}
+	if req.RequestID != "req-123" {
+		t.Errorf("RequestID = %v, want req-123", req.RequestID)
+	}
+	if req.Reason != "API usage" {
+		t.Errorf("Reason = %v, want API usage", req.Reason)
+	}
+}
+
+func TestBillingEngine_GetUnitPrice(t *testing.T) {
+	engine := GetBillingEngine()
+
+	tests := []struct {
+		name         string
+		endpointType string
+		providerCode string
+		wantMinPrice float64
+		wantMaxPrice float64
+	}{
+		{
+			name:         "chat_completions default price",
+			endpointType: "chat_completions",
+			providerCode: "openai",
+			wantMinPrice: 0.0001,
+			wantMaxPrice: 0.01,
+		},
+		{
+			name:         "embeddings default price",
+			endpointType: "embeddings",
+			providerCode: "openai",
+			wantMinPrice: 0.00001,
+			wantMaxPrice: 0.001,
+		},
+		{
+			name:         "images_generations default price",
+			endpointType: "images_generations",
+			providerCode: "openai",
+			wantMinPrice: 1.0,
+			wantMaxPrice: 50.0,
+		},
+		{
+			name:         "audio_speech default price",
+			endpointType: "audio_speech",
+			providerCode: "openai",
+			wantMinPrice: 0.00001,
+			wantMaxPrice: 0.001,
+		},
+		{
+			name:         "audio_transcriptions default price",
+			endpointType: "audio_transcriptions",
+			providerCode: "openai",
+			wantMinPrice: 0.001,
+			wantMaxPrice: 0.01,
+		},
+		{
+			name:         "moderations default price",
+			endpointType: "moderations",
+			providerCode: "openai",
+			wantMinPrice: 0.0,
+			wantMaxPrice: 0.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			price := engine.getUnitPrice(tt.endpointType, tt.providerCode)
+			if price < tt.wantMinPrice || price > tt.wantMaxPrice {
+				t.Errorf("getUnitPrice() = %v, want between %v and %v", price, tt.wantMinPrice, tt.wantMaxPrice)
+			}
+		})
+	}
+}
+
+func TestBillingEngine_PreDeductBalanceV2(t *testing.T) {
+	engine := GetBillingEngine()
+
+	t.Run("calculate amount from tokens", func(t *testing.T) {
+		req := BillingRequest{
+			UserID:       1,
+			EndpointType: "chat_completions",
+			ProviderCode: "openai",
+			UnitType:     BillingUnitToken,
+			Quantity:     1000,
+			RequestID:    "test-req-1",
+			Reason:       "test",
+		}
+
+		amount := engine.calculateAmountFromRequest(req)
+		if amount <= 0 {
+			t.Errorf("calculateAmountFromRequest() = %v, want > 0", amount)
+		}
+	})
+
+	t.Run("calculate amount from images", func(t *testing.T) {
+		req := BillingRequest{
+			UserID:       1,
+			EndpointType: "images_generations",
+			ProviderCode: "openai",
+			UnitType:     BillingUnitImage,
+			Quantity:     1,
+			RequestID:    "test-req-2",
+			Reason:       "test",
+		}
+
+		amount := engine.calculateAmountFromRequest(req)
+		if amount <= 0 {
+			t.Errorf("calculateAmountFromRequest() = %v, want > 0", amount)
+		}
+	})
+
+	t.Run("calculate amount from seconds", func(t *testing.T) {
+		req := BillingRequest{
+			UserID:       1,
+			EndpointType: "audio_transcriptions",
+			ProviderCode: "openai",
+			UnitType:     BillingUnitSecond,
+			Quantity:     60,
+			RequestID:    "test-req-3",
+			Reason:       "test",
+		}
+
+		amount := engine.calculateAmountFromRequest(req)
+		if amount <= 0 {
+			t.Errorf("calculateAmountFromRequest() = %v, want > 0", amount)
+		}
+	})
+
+	t.Run("calculate amount from characters", func(t *testing.T) {
+		req := BillingRequest{
+			UserID:       1,
+			EndpointType: "audio_speech",
+			ProviderCode: "openai",
+			UnitType:     BillingUnitCharacter,
+			Quantity:     1000,
+			RequestID:    "test-req-4",
+			Reason:       "test",
+		}
+
+		amount := engine.calculateAmountFromRequest(req)
+		if amount <= 0 {
+			t.Errorf("calculateAmountFromRequest() = %v, want > 0", amount)
+		}
+	})
+
+	t.Run("calculate amount from requests", func(t *testing.T) {
+		req := BillingRequest{
+			UserID:       1,
+			EndpointType: "moderations",
+			ProviderCode: "openai",
+			UnitType:     BillingUnitRequest,
+			Quantity:     10,
+			RequestID:    "test-req-5",
+			Reason:       "test",
+		}
+
+		amount := engine.calculateAmountFromRequest(req)
+		if amount != 0 {
+			t.Errorf("calculateAmountFromRequest() = %v, want 0 for moderations", amount)
+		}
+	})
+}

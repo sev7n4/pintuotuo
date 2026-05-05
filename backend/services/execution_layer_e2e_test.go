@@ -230,9 +230,9 @@ func TestE2E_RouteCacheIntegration(t *testing.T) {
 		cfg := providerRuntimeConfig{
 			Code:           "openai",
 			Name:           "OpenAI",
-			APIBaseURL:      "https://api.openai.com/v1",
-			APIFormat:       "openai",
-			ProviderRegion:  "overseas",
+			APIBaseURL:     "https://api.openai.com/v1",
+			APIFormat:      "openai",
+			ProviderRegion: "overseas",
 		}
 
 		cache.Set("openai", cfg)
@@ -256,5 +256,3 @@ func TestE2E_RouteCacheIntegration(t *testing.T) {
 		assert.False(t, found, "should not find expired cached decision")
 	})
 }
-
-

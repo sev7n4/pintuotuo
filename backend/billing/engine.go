@@ -13,6 +13,26 @@ import (
 	"github.com/pintuotuo/backend/config"
 )
 
+type BillingUnit string
+
+const (
+	BillingUnitToken     BillingUnit = "token"
+	BillingUnitImage     BillingUnit = "image"
+	BillingUnitSecond    BillingUnit = "second"
+	BillingUnitCharacter BillingUnit = "character"
+	BillingUnitRequest   BillingUnit = "request"
+)
+
+type BillingRequest struct {
+	UserID       int         `json:"user_id"`
+	EndpointType string      `json:"endpoint_type"`
+	ProviderCode string      `json:"provider_code"`
+	UnitType     BillingUnit `json:"unit_type"`
+	Quantity     int64       `json:"quantity"`
+	RequestID    string      `json:"request_id"`
+	Reason       string      `json:"reason"`
+}
+
 type PricingTier struct {
 	Provider    string  `json:"provider"`
 	Model       string  `json:"model"`
@@ -748,4 +768,56 @@ func (e *BillingEngine) CancelPreDeduct(userID int, requestID string) error {
 
 func (e *BillingEngine) CalculateCostForSettlement(provider, model string, inputTokens, outputTokens int) float64 {
 	return e.CalculateCost(provider, model, inputTokens, outputTokens)
+}
+
+func (e *BillingEngine) getUnitPrice(endpointType, providerCode string) float64 {
+	if e.db == nil {
+		e.db = config.GetDB()
+	}
+
+	if e.db != nil {
+		var unitPrice float64
+		err := e.db.QueryRow(
+			"SELECT unit_price FROM endpoint_pricing WHERE endpoint_type = $1 AND provider_code = $2",
+			endpointType, providerCode,
+		).Scan(&unitPrice)
+		if err == nil {
+			return unitPrice
+		}
+	}
+
+	defaultPrices := map[string]float64{
+		"chat_completions":     0.001,
+		"embeddings":           0.0001,
+		"images_generations":   20.0,
+		"audio_speech":         0.000015,
+		"audio_transcriptions": 0.006,
+		"moderations":          0.0,
+	}
+
+	if price, ok := defaultPrices[endpointType]; ok {
+		return price
+	}
+
+	return 0.001
+}
+
+func (e *BillingEngine) calculateAmountFromRequest(req BillingRequest) float64 {
+	unitPrice := e.getUnitPrice(req.EndpointType, req.ProviderCode)
+	return float64(req.Quantity) * unitPrice
+}
+
+func (e *BillingEngine) PreDeductBalanceV2(req BillingRequest) error {
+	amount := e.calculateAmountFromRequest(req)
+	amountInt := int64(amount)
+	if amountInt < 1 {
+		amountInt = 1
+	}
+	return e.PreDeductBalance(req.UserID, amountInt, req.Reason, req.RequestID)
+}
+
+func (e *BillingEngine) SettlePreDeductV2(userID int, requestID string, actualQuantity int64, endpointType, providerCode string) error {
+	unitPrice := e.getUnitPrice(endpointType, providerCode)
+	actualAmount := int64(float64(actualQuantity) * unitPrice)
+	return e.SettlePreDeduct(userID, requestID, actualAmount)
 }

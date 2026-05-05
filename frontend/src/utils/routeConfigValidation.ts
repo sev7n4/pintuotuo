@@ -29,12 +29,7 @@ export function validateRouteStrategy(
   }
 
   const validModes = ['direct', 'litellm', 'proxy', 'auto'];
-  const validUserTypes = [
-    'domestic_users',
-    'overseas_users',
-    'enterprise_users',
-    'default_mode',
-  ];
+  const validUserTypes = ['domestic_users', 'overseas_users', 'enterprise_users', 'default_mode'];
 
   const userTypes = Object.keys(strategy);
 
@@ -60,9 +55,7 @@ export function validateRouteStrategy(
       errors.push(`用户类型 ${userType} 缺少必填字段: mode`);
     } else if (!validModes.includes(item.mode)) {
       errors.push(
-        `用户类型 ${userType} 的 mode 字段值无效: ${
-          item.mode
-        }，有效值为: ${validModes.join(', ')}`
+        `用户类型 ${userType} 的 mode 字段值无效: ${item.mode}，有效值为: ${validModes.join(', ')}`
       );
     }
 
@@ -74,9 +67,7 @@ export function validateRouteStrategy(
 
     if (item.fallback_mode !== undefined) {
       if (!validModes.includes(item.fallback_mode)) {
-        errors.push(
-          `用户类型 ${userType} 的 fallback_mode 字段值无效: ${item.fallback_mode}`
-        );
+        errors.push(`用户类型 ${userType} 的 fallback_mode 字段值无效: ${item.fallback_mode}`);
       }
     }
 
@@ -96,9 +87,7 @@ export function validateRouteStrategy(
   };
 }
 
-export function validateEndpoints(
-  endpoints: Record<string, EndpointConfig>
-): ValidationResult {
+export function validateEndpoints(endpoints: Record<string, EndpointConfig>): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -107,7 +96,17 @@ export function validateEndpoints(
     return { valid: false, errors, warnings };
   }
 
-  const validModes = ['direct', 'litellm', 'proxy', 'direct_domestic', 'litellm_domestic', 'proxy_domestic', 'direct_overseas', 'litellm_overseas', 'proxy_overseas'];
+  const validModes = [
+    'direct',
+    'litellm',
+    'proxy',
+    'direct_domestic',
+    'litellm_domestic',
+    'proxy_domestic',
+    'direct_overseas',
+    'litellm_overseas',
+    'proxy_overseas',
+  ];
   const modes = Object.keys(endpoints);
 
   if (modes.length === 0) {
