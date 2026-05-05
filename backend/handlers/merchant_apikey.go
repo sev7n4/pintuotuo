@@ -567,6 +567,30 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		}
 	}
 
+	patchAPIKey := false
+	apiKeyPlain := ""
+	if raw, has := patch["api_key"]; has {
+		patchAPIKey = true
+		_ = json.Unmarshal(raw, &apiKeyPlain)
+		apiKeyPlain = strings.TrimSpace(apiKeyPlain)
+		if apiKeyPlain == "" {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_API_KEY",
+				"api_key cannot be empty",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+	}
+
+	patchAPISecret := false
+	apiSecretPlain := ""
+	if raw, has := patch["api_secret"]; has {
+		patchAPISecret = true
+		_ = json.Unmarshal(raw, &apiSecretPlain)
+	}
+
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -576,6 +600,39 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
 	if !ok {
 		return
+	}
+
+	var apiKeyEncryptedUpdate string
+	var apiSecretEncryptedUpdate string
+	if patchAPIKey {
+		enc, encErr := utils.Encrypt(apiKeyPlain)
+		if encErr != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"ENCRYPTION_FAILED",
+				"Failed to encrypt API key",
+				http.StatusInternalServerError,
+				encErr,
+			))
+			return
+		}
+		apiKeyEncryptedUpdate = enc
+	}
+	if patchAPISecret {
+		if apiSecretPlain == "" {
+			apiSecretEncryptedUpdate = ""
+		} else {
+			enc, encErr := utils.Encrypt(apiSecretPlain)
+			if encErr != nil {
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"ENCRYPTION_FAILED",
+					"Failed to encrypt API secret",
+					http.StatusInternalServerError,
+					encErr,
+				))
+				return
+			}
+			apiSecretEncryptedUpdate = enc
+		}
 	}
 
 	var apiKey models.MerchantAPIKey
@@ -605,6 +662,8 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		 region = CASE WHEN $16::bool THEN $17::varchar(20) ELSE region END,
 		 security_level = CASE WHEN $18::bool THEN $19::varchar(20) ELSE security_level END,
 		 byok_type = CASE WHEN $20::bool THEN $21::varchar(20) ELSE byok_type END,
+		 api_key_encrypted = CASE WHEN $24::bool THEN $25::text ELSE api_key_encrypted END,
+		 api_secret_encrypted = CASE WHEN $26::bool THEN $27::text ELSE api_secret_encrypted END,
 		 updated_at = CURRENT_TIMESTAMP
 		 WHERE id = $22 AND merchant_id = $23
 		 RETURNING id, merchant_id, name, provider, quota_limit, quota_used, status, last_used_at, created_at, updated_at,
@@ -633,6 +692,8 @@ func UpdateMerchantAPIKey(c *gin.Context) {
 		patchSecurityLevel, securityLevelStr,
 		patchBYOKType, byokTypeStr,
 		keyID, merchantID,
+		patchAPIKey, apiKeyEncryptedUpdate,
+		patchAPISecret, apiSecretEncryptedUpdate,
 	).Scan(
 		&apiKey.ID, &apiKey.MerchantID, &apiKey.Name, &apiKey.Provider, &quotaAfter, &apiKey.QuotaUsed, &apiKey.Status, &lastUsedAt, &apiKey.CreatedAt, &apiKey.UpdatedAt,
 		&apiKey.HealthCheckLevel, &apiKey.EndpointURL, &apiKey.HealthStatus, &lastHealth, &apiKey.ConsecutiveFailures,
@@ -968,12 +1029,13 @@ func VerifyMerchantAPIKey(c *gin.Context) {
 	}
 
 	var apiKey models.MerchantAPIKey
+	var routeConfigBytes []byte
 	err = db.QueryRow(
-		`SELECT id, merchant_id, provider, api_key_encrypted
+		`SELECT id, merchant_id, provider, api_key_encrypted, route_mode, route_config, region
 		 FROM merchant_api_keys
 		 WHERE id = $1 AND merchant_id = $2 AND status = 'active'`,
 		keyID, merchantID,
-	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted)
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.RouteMode, &routeConfigBytes, &apiKey.Region)
 
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -988,17 +1050,25 @@ func VerifyMerchantAPIKey(c *gin.Context) {
 		return
 	}
 
-	validator := services.GetAPIKeyValidator()
-	var req struct {
-		VerificationMode string `json:"verification_mode"` // light(default) / deep
-	}
-	_ = c.ShouldBindJSON(&req)
-	verificationType := "manual"
-	if req.VerificationMode == "deep" {
-		verificationType = "manual_deep"
+	if len(routeConfigBytes) > 0 {
+		_ = json.Unmarshal(routeConfigBytes, &apiKey.RouteConfig)
 	}
 
-	err = validator.ValidateAsync(apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, verificationType)
+	validator := services.GetAPIKeyValidator()
+	var req struct {
+		VerificationMode string `json:"verification_mode"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	verificationType := "merchant_light"
+	if req.VerificationMode == "deep" {
+		verificationType = "merchant_deep"
+	}
+
+	err = validator.ValidateAsyncWithRouteMode(
+		apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, verificationType,
+		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region,
+	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"VERIFICATION_FAILED",
@@ -1009,15 +1079,13 @@ func VerifyMerchantAPIKey(c *gin.Context) {
 		return
 	}
 
-	// 验证异步开始时先清理列表缓存，避免前端长时间看到旧状态。
 	cache.Delete(context.Background(), cache.MerchantAPIKeysKey(merchantID))
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":            "Verification started",
-		"api_key_id":         apiKey.ID,
-		"verification_mode":  req.VerificationMode,
-		"verification_type":  verificationType,
-		"quota_probe_policy": "light(default), optional deep probe for supported providers",
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":           "Verification started",
+		"api_key_id":        apiKey.ID,
+		"verification_mode": req.VerificationMode,
+		"verification_type": verificationType,
 	})
 }
 
@@ -1085,6 +1153,236 @@ func TriggerMerchantAPIKeyHealthCheck(c *gin.Context) {
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"message":    "Immediate health check triggered",
+		"api_key_id": keyID,
+	})
+}
+
+func LightVerifyMerchantAPIKey(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	keyIDStr := c.Param("id")
+	keyID, err := strconv.Atoi(keyIDStr)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
+		return
+	}
+
+	var apiKey models.MerchantAPIKey
+	var routeConfigBytes []byte
+	err = db.QueryRow(
+		`SELECT id, merchant_id, provider, api_key_encrypted, route_mode, route_config, region
+		 FROM merchant_api_keys
+		 WHERE id = $1 AND merchant_id = $2 AND status = 'active'`,
+		keyID, merchantID,
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.RouteMode, &routeConfigBytes, &apiKey.Region)
+
+	if err == sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"API key not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	} else if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	if len(routeConfigBytes) > 0 {
+		_ = json.Unmarshal(routeConfigBytes, &apiKey.RouteConfig)
+	}
+
+	validator := services.GetAPIKeyValidator()
+	err = validator.ValidateAsyncWithRouteMode(
+		apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "merchant_light",
+		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"VERIFICATION_FAILED",
+			"Failed to start verification",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	cache.Delete(context.Background(), cache.MerchantAPIKeysKey(merchantID))
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":           "Light verification started",
+		"api_key_id":        apiKey.ID,
+		"verification_type": "merchant_light",
+	})
+}
+
+func DeepVerifyMerchantAPIKey(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	keyIDStr := c.Param("id")
+	keyID, err := strconv.Atoi(keyIDStr)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
+		return
+	}
+
+	var apiKey models.MerchantAPIKey
+	var routeConfigBytes []byte
+	err = db.QueryRow(
+		`SELECT id, merchant_id, provider, api_key_encrypted, route_mode, route_config, region
+		 FROM merchant_api_keys
+		 WHERE id = $1 AND merchant_id = $2 AND status = 'active'`,
+		keyID, merchantID,
+	).Scan(&apiKey.ID, &apiKey.MerchantID, &apiKey.Provider, &apiKey.APIKeyEncrypted, &apiKey.RouteMode, &routeConfigBytes, &apiKey.Region)
+
+	if err == sql.ErrNoRows {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"API key not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	} else if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	if len(routeConfigBytes) > 0 {
+		_ = json.Unmarshal(routeConfigBytes, &apiKey.RouteConfig)
+	}
+
+	validator := services.GetAPIKeyValidator()
+	err = validator.ValidateAsyncWithRouteMode(
+		apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "merchant_deep",
+		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"VERIFICATION_FAILED",
+			"Failed to start verification",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	cache.Delete(context.Background(), cache.MerchantAPIKeysKey(merchantID))
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":           "Deep verification started",
+		"api_key_id":        apiKey.ID,
+		"verification_type": "merchant_deep",
+	})
+}
+
+func ProbeMerchantAPIKey(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	keyIDStr := c.Param("id")
+	keyID, err := strconv.Atoi(keyIDStr)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	merchantID, ok := gateMerchantOperational(c, db, userIDInt)
+	if !ok {
+		return
+	}
+
+	var existsKey bool
+	err = db.QueryRow(
+		`SELECT EXISTS(
+			SELECT 1 FROM merchant_api_keys
+			WHERE id = $1 AND merchant_id = $2 AND status = 'active'
+		)`,
+		keyID, merchantID,
+	).Scan(&existsKey)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	if !existsKey {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"API key not found",
+			http.StatusNotFound,
+			nil,
+		))
+		return
+	}
+
+	go func() {
+		if checkErr := services.GetHealthScheduler().TriggerImmediateCheck(keyID); checkErr != nil {
+			logger.LogError(context.Background(), "merchant_apikey", "Immediate probe failed", checkErr, map[string]interface{}{
+				"api_key_id":  keyID,
+				"merchant_id": merchantID,
+			})
+		}
+	}()
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":    "Probe triggered successfully",
 		"api_key_id": keyID,
 	})
 }
