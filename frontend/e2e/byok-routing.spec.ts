@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { LoginPage } from './pages';
 
 test.describe('Admin BYOK Routing Management', () => {
@@ -7,6 +7,20 @@ test.describe('Admin BYOK Routing Management', () => {
   test.beforeEach(async ({ page }) => {
     loginPage = new LoginPage(page);
   });
+
+  async function isMobileView(page: Page): Promise<boolean> {
+    const viewport = page.viewportSize();
+    return viewport !== null && viewport.width <= 768;
+  }
+
+  async function waitForContent(page: Page): Promise<void> {
+    const isMobile = await isMobileView(page);
+    if (isMobile) {
+      await expect(page.locator('.mobileCard')).toBeVisible({ timeout: 10000 });
+    } else {
+      await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    }
+  }
 
   test('should display BYOK routing page when logged in as admin', async ({ page }) => {
     await loginPage.goto();
@@ -25,7 +39,7 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await page.goto('/admin/byok-routing');
     
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    await waitForContent(page);
   });
 
   test('should display route mode column in list', async ({ page }) => {
@@ -35,10 +49,16 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await page.goto('/admin/byok-routing');
     
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    await waitForContent(page);
     
-    const routeModeHeader = page.locator('.ant-table-thead th').filter({ hasText: '路由模式' });
-    await expect(routeModeHeader).toBeVisible({ timeout: 5000 });
+    const isMobile = await isMobileView(page);
+    if (!isMobile) {
+      const routeModeHeader = page.locator('.ant-table-thead th').filter({ hasText: '路由模式' });
+      await expect(routeModeHeader).toBeVisible({ timeout: 5000 });
+    } else {
+      const routeModeLabel = page.locator('.mobileRow').filter({ hasText: '路由' });
+      await expect(routeModeLabel.first()).toBeVisible({ timeout: 5000 });
+    }
   });
 
   test('should display health status indicators', async ({ page }) => {
@@ -48,20 +68,36 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await page.goto('/admin/byok-routing');
     
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    await waitForContent(page);
     
-    const tableRows = page.locator('.ant-table-tbody tr');
-    const rowCount = await tableRows.count();
-    
-    if (rowCount === 0) {
-      return;
+    const isMobile = await isMobileView(page);
+    if (!isMobile) {
+      const tableRows = page.locator('.ant-table-tbody tr');
+      const rowCount = await tableRows.count();
+      
+      if (rowCount === 0) {
+        return;
+      }
+      
+      const healthColumn = page.locator('.ant-table-thead th').filter({ hasText: '健康' });
+      await expect(healthColumn).toBeVisible({ timeout: 5000 });
+      
+      const verifyColumn = page.locator('.ant-table-thead th').filter({ hasText: '验证' });
+      await expect(verifyColumn).toBeVisible({ timeout: 5000 });
+    } else {
+      const mobileItems = page.locator('.mobileItem');
+      const itemCount = await mobileItems.count();
+      
+      if (itemCount === 0) {
+        return;
+      }
+      
+      const healthLabel = page.locator('.mobileLabel').filter({ hasText: '健康' });
+      await expect(healthLabel.first()).toBeVisible({ timeout: 5000 });
+      
+      const verifyLabel = page.locator('.mobileLabel').filter({ hasText: '验证' });
+      await expect(verifyLabel.first()).toBeVisible({ timeout: 5000 });
     }
-    
-    const healthColumn = page.locator('.ant-table-thead th').filter({ hasText: '健康' });
-    await expect(healthColumn).toBeVisible({ timeout: 5000 });
-    
-    const verifyColumn = page.locator('.ant-table-thead th').filter({ hasText: '验证' });
-    await expect(verifyColumn).toBeVisible({ timeout: 5000 });
   });
 
   test('should open route config modal', async ({ page }) => {
@@ -71,7 +107,7 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await page.goto('/admin/byok-routing');
     
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    await waitForContent(page);
     
     const configButton = page.locator('button').filter({ hasText: '配置' }).first();
     const isVisible = await configButton.isVisible({ timeout: 5000 }).catch(() => false);
@@ -89,7 +125,7 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await page.goto('/admin/byok-routing');
     
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    await waitForContent(page);
     
     const verifyButton = page.locator('button').filter({ hasText: '轻验' }).first();
     const isVisible = await verifyButton.isVisible({ timeout: 5000 }).catch(() => false);
@@ -107,7 +143,7 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await page.goto('/admin/byok-routing');
     
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    await waitForContent(page);
     
     const deepVerifyButton = page.locator('button').filter({ hasText: '深验' }).first();
     const isVisible = await deepVerifyButton.isVisible({ timeout: 5000 }).catch(() => false);
@@ -125,7 +161,7 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await page.goto('/admin/byok-routing');
     
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    await waitForContent(page);
     
     const probeButton = page.locator('button').filter({ hasText: '探测' }).first();
     const isVisible = await probeButton.isVisible({ timeout: 5000 }).catch(() => false);
@@ -143,7 +179,7 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await page.goto('/admin/byok-routing');
     
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    await waitForContent(page);
     
     const verifyButton = page.locator('button').filter({ hasText: '轻验' }).first();
     const isVisible = await verifyButton.isVisible({ timeout: 5000 }).catch(() => false);
@@ -168,7 +204,7 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await page.goto('/admin/byok-routing');
     
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    await waitForContent(page);
     
     const verifyButton = page.locator('button').filter({ hasText: '轻验' }).first();
     const isVisible = await verifyButton.isVisible({ timeout: 5000 }).catch(() => false);
@@ -195,7 +231,7 @@ test.describe('Admin BYOK Routing Management', () => {
     
     await page.goto('/admin/byok-routing');
     
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
+    await waitForContent(page);
     
     const verifyButton = page.locator('button').filter({ hasText: '轻验' }).first();
     const isVisible = await verifyButton.isVisible({ timeout: 5000 }).catch(() => false);
