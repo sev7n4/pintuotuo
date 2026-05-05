@@ -96,6 +96,12 @@ type APIProxyRequest struct {
 	MerchantSKUID *int            `json:"merchant_sku_id,omitempty"`
 }
 
+const (
+	ImageDetailLow  = "low"
+	ImageDetailHigh = "high"
+	ImageDetailAuto = "auto"
+)
+
 type ImageURL struct {
 	URL    string `json:"url"`
 	Detail string `json:"detail,omitempty"`
@@ -149,9 +155,9 @@ type ChatMessage struct {
 
 func estimateImageTokens(detail string) int {
 	switch detail {
-	case "low":
+	case ImageDetailLow:
 		return 85
-	case "high":
+	case ImageDetailHigh:
 		return 765
 	default:
 		return 765
