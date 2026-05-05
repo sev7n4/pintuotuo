@@ -163,12 +163,12 @@ func TestDetermineGatewayMode(t *testing.T) {
 
 func TestResolveRouteModeWithProvider(t *testing.T) {
 	tests := []struct {
-		name          string
-		routeMode     string
+		name           string
+		routeMode      string
 		providerRegion string
-		envHTTPSProxy string
-		envLitellmURL string
-		expected      string
+		envHTTPSProxy  string
+		envLitellmURL  string
+		expected       string
 	}{
 		{
 			name:           "explicit direct not affected",
@@ -253,6 +253,169 @@ func TestResolveRouteModeWithProvider(t *testing.T) {
 			os.Setenv("LLM_GATEWAY_LITELLM_URL", tt.envLitellmURL)
 
 			result := ResolveRouteModeWithProvider(tt.routeMode, tt.providerRegion)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestEndpointTypeConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant string
+		expected string
+	}{
+		{
+			name:     "EndpointTypeChatCompletions",
+			constant: EndpointTypeChatCompletions,
+			expected: "chat_completions",
+		},
+		{
+			name:     "EndpointTypeEmbeddings",
+			constant: EndpointTypeEmbeddings,
+			expected: "embeddings",
+		},
+		{
+			name:     "EndpointTypeImagesGenerations",
+			constant: EndpointTypeImagesGenerations,
+			expected: "images_generations",
+		},
+		{
+			name:     "EndpointTypeAudioSpeech",
+			constant: EndpointTypeAudioSpeech,
+			expected: "audio_speech",
+		},
+		{
+			name:     "EndpointTypeAudioTranscriptions",
+			constant: EndpointTypeAudioTranscriptions,
+			expected: "audio_transcriptions",
+		},
+		{
+			name:     "EndpointTypeModerations",
+			constant: EndpointTypeModerations,
+			expected: "moderations",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.constant)
+		})
+	}
+}
+
+func TestResolveEndpointByType(t *testing.T) {
+	tests := []struct {
+		name         string
+		cfg          *ExecutionProviderConfig
+		endpointType string
+		expected     string
+	}{
+		{
+			name: "chat_completions endpoint from direct mode",
+			cfg: &ExecutionProviderConfig{
+				APIBaseURL:     "https://api.openai.com",
+				GatewayMode:    GatewayModeDirect,
+				ProviderRegion: regionOverseas,
+				Endpoints: map[string]interface{}{
+					GatewayModeDirect: map[string]interface{}{
+						regionOverseas: "https://api.openai.com/v1",
+					},
+				},
+			},
+			endpointType: EndpointTypeChatCompletions,
+			expected:     "https://api.openai.com/v1",
+		},
+		{
+			name: "embeddings endpoint from direct mode",
+			cfg: &ExecutionProviderConfig{
+				APIBaseURL:     "https://api.openai.com",
+				GatewayMode:    GatewayModeDirect,
+				ProviderRegion: regionOverseas,
+				Endpoints: map[string]interface{}{
+					GatewayModeDirect: map[string]interface{}{
+						regionOverseas: "https://api.openai.com/v1",
+					},
+				},
+			},
+			endpointType: EndpointTypeEmbeddings,
+			expected:     "https://api.openai.com/v1",
+		},
+		{
+			name: "images_generations endpoint from direct mode",
+			cfg: &ExecutionProviderConfig{
+				APIBaseURL:     "https://api.openai.com",
+				GatewayMode:    GatewayModeDirect,
+				ProviderRegion: regionOverseas,
+				Endpoints: map[string]interface{}{
+					GatewayModeDirect: map[string]interface{}{
+						regionOverseas: "https://api.openai.com/v1",
+					},
+				},
+			},
+			endpointType: EndpointTypeImagesGenerations,
+			expected:     "https://api.openai.com/v1",
+		},
+		{
+			name: "audio_speech endpoint from direct mode",
+			cfg: &ExecutionProviderConfig{
+				APIBaseURL:     "https://api.openai.com",
+				GatewayMode:    GatewayModeDirect,
+				ProviderRegion: regionOverseas,
+				Endpoints: map[string]interface{}{
+					GatewayModeDirect: map[string]interface{}{
+						regionOverseas: "https://api.openai.com/v1",
+					},
+				},
+			},
+			endpointType: EndpointTypeAudioSpeech,
+			expected:     "https://api.openai.com/v1",
+		},
+		{
+			name: "audio_transcriptions endpoint from direct mode",
+			cfg: &ExecutionProviderConfig{
+				APIBaseURL:     "https://api.openai.com",
+				GatewayMode:    GatewayModeDirect,
+				ProviderRegion: regionOverseas,
+				Endpoints: map[string]interface{}{
+					GatewayModeDirect: map[string]interface{}{
+						regionOverseas: "https://api.openai.com/v1",
+					},
+				},
+			},
+			endpointType: EndpointTypeAudioTranscriptions,
+			expected:     "https://api.openai.com/v1",
+		},
+		{
+			name: "moderations endpoint from direct mode",
+			cfg: &ExecutionProviderConfig{
+				APIBaseURL:     "https://api.openai.com",
+				GatewayMode:    GatewayModeDirect,
+				ProviderRegion: regionOverseas,
+				Endpoints: map[string]interface{}{
+					GatewayModeDirect: map[string]interface{}{
+						regionOverseas: "https://api.openai.com/v1",
+					},
+				},
+			},
+			endpointType: EndpointTypeModerations,
+			expected:     "https://api.openai.com/v1",
+		},
+		{
+			name: "fallback to APIBaseURL when no endpoints configured",
+			cfg: &ExecutionProviderConfig{
+				APIBaseURL:     "https://api.openai.com/v1",
+				GatewayMode:    GatewayModeDirect,
+				ProviderRegion: regionOverseas,
+				Endpoints:      nil,
+			},
+			endpointType: EndpointTypeChatCompletions,
+			expected:     "https://api.openai.com/v1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ResolveEndpointByType(tt.cfg, tt.endpointType)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

@@ -53,7 +53,12 @@ const routeTypes = [
   { value: 'direct', label: '直连', icon: <ApiOutlined />, color: 'orange' },
 ];
 
-const EndpointsConfig: React.FC<EndpointsConfigProps> = ({ value = {}, onChange, providerCode, apiKey }) => {
+const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
+  value = {},
+  onChange,
+  providerCode,
+  apiKey,
+}) => {
   const [testingEndpoint, setTestingEndpoint] = useState<string | null>(null);
   const [probeResult, setProbeResult] = useState<ProbeEndpointResponse | null>(null);
   const [resultModalVisible, setResultModalVisible] = useState(false);
@@ -313,14 +318,24 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({ value = {}, onChange,
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="探测状态">
               {probeResult.success ? (
-                <Tag color="success" icon={<CheckCircleOutlined />}>连接成功</Tag>
+                <Tag color="success" icon={<CheckCircleOutlined />}>
+                  连接成功
+                </Tag>
               ) : (
-                <Tag color="error" icon={<CloseCircleOutlined />}>连接失败</Tag>
+                <Tag color="error" icon={<CloseCircleOutlined />}>
+                  连接失败
+                </Tag>
               )}
             </Descriptions.Item>
             <Descriptions.Item label="响应状态码">
               {probeResult.status_code > 0 ? (
-                <Tag color={probeResult.status_code >= 200 && probeResult.status_code < 300 ? 'success' : 'warning'}>
+                <Tag
+                  color={
+                    probeResult.status_code >= 200 && probeResult.status_code < 300
+                      ? 'success'
+                      : 'warning'
+                  }
+                >
                   {probeResult.status_code}
                 </Tag>
               ) : (
@@ -333,7 +348,9 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({ value = {}, onChange,
                   <ClockCircleOutlined />
                   {probeResult.latency_ms} ms
                   {probeResult.latency_ms < 100 && <Tag color="success">优秀</Tag>}
-                  {probeResult.latency_ms >= 100 && probeResult.latency_ms < 500 && <Tag color="warning">正常</Tag>}
+                  {probeResult.latency_ms >= 100 && probeResult.latency_ms < 500 && (
+                    <Tag color="warning">正常</Tag>
+                  )}
                   {probeResult.latency_ms >= 500 && <Tag color="error">较慢</Tag>}
                 </Space>
               ) : (

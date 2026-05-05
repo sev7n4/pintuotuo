@@ -41,7 +41,13 @@ interface RouteDecisionLog {
   strategy_layer_goal: string;
   strategy_layer_input: Record<string, any>;
   strategy_layer_output: Record<string, any>;
-  decision_layer_candidates: Array<{ api_key_id?: number; provider?: string; score?: number; health_status?: string; selected?: boolean }>;
+  decision_layer_candidates: Array<{
+    api_key_id?: number;
+    provider?: string;
+    score?: number;
+    health_status?: string;
+    selected?: boolean;
+  }>;
   decision_layer_output: Record<string, any>;
   execution_layer_result: Record<string, any>;
   decision_duration_ms: number;
@@ -118,7 +124,7 @@ const AdminRouteDecisionLogs: React.FC = () => {
       if (response.data && response.data.code === 0) {
         const data = response.data.data;
         setLogs(data.logs || []);
-        setPagination(prev => ({
+        setPagination((prev) => ({
           ...prev,
           total: data.total,
         }));
@@ -484,49 +490,102 @@ const AdminRouteDecisionLogs: React.FC = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="决策耗时">
                   <Tag color={selectedLog.decision_duration_ms > 10 ? 'orange' : 'green'}>
-                    {selectedLog.decision_duration_ms ? `${selectedLog.decision_duration_ms}ms` : '-'}
+                    {selectedLog.decision_duration_ms
+                      ? `${selectedLog.decision_duration_ms}ms`
+                      : '-'}
                   </Tag>
                 </Descriptions.Item>
               </Descriptions>
-              {selectedLog.strategy_layer_input && Object.keys(selectedLog.strategy_layer_input).length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: 8 }}>策略层输入：</div>
-                  <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
-                    {JSON.stringify(selectedLog.strategy_layer_input, null, 2)}
-                  </pre>
-                </div>
-              )}
-              {selectedLog.strategy_layer_output && Object.keys(selectedLog.strategy_layer_output).length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: 8 }}>策略层输出：</div>
-                  <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
-                    {JSON.stringify(selectedLog.strategy_layer_output, null, 2)}
-                  </pre>
-                </div>
-              )}
+              {selectedLog.strategy_layer_input &&
+                Object.keys(selectedLog.strategy_layer_input).length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 8 }}>策略层输入：</div>
+                    <pre
+                      style={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all',
+                        background: '#f5f5f5',
+                        padding: 12,
+                        borderRadius: 4,
+                      }}
+                    >
+                      {JSON.stringify(selectedLog.strategy_layer_input, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              {selectedLog.strategy_layer_output &&
+                Object.keys(selectedLog.strategy_layer_output).length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 8 }}>策略层输出：</div>
+                    <pre
+                      style={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all',
+                        background: '#f5f5f5',
+                        padding: 12,
+                        borderRadius: 4,
+                      }}
+                    >
+                      {JSON.stringify(selectedLog.strategy_layer_output, null, 2)}
+                    </pre>
+                  </div>
+                )}
             </Card>
 
             <Card title="决策层" style={{ marginBottom: 16 }}>
-              {selectedLog.decision_layer_candidates && selectedLog.decision_layer_candidates.length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: 8 }}>候选 API Keys ({selectedLog.decision_layer_candidates.length} 个)：</div>
-                  <Table
-                    dataSource={selectedLog.decision_layer_candidates}
-                    rowKey={(_, index) => `candidate-${index}`}
-                    size="small"
-                    pagination={false}
-                    columns={[
-                      { title: 'API Key ID', dataIndex: 'api_key_id', key: 'api_key_id', width: 100 },
-                      { title: '提供商', dataIndex: 'provider', key: 'provider', width: 100 },
-                      { title: '评分', dataIndex: 'score', key: 'score', width: 80, render: (v: number) => v?.toFixed(2) || '-' },
-                      { title: '健康状态', dataIndex: 'health_status', key: 'health_status', width: 100 },
-                      { title: '选中', dataIndex: 'selected', key: 'selected', width: 60, render: (v: boolean) => v ? <Tag color="green">是</Tag> : <Tag>否</Tag> },
-                    ]}
-                  />
-                </div>
-              )}
+              {selectedLog.decision_layer_candidates &&
+                selectedLog.decision_layer_candidates.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+                      候选 API Keys ({selectedLog.decision_layer_candidates.length} 个)：
+                    </div>
+                    <Table
+                      dataSource={selectedLog.decision_layer_candidates}
+                      rowKey={(_, index) => `candidate-${index}`}
+                      size="small"
+                      pagination={false}
+                      columns={[
+                        {
+                          title: 'API Key ID',
+                          dataIndex: 'api_key_id',
+                          key: 'api_key_id',
+                          width: 100,
+                        },
+                        { title: '提供商', dataIndex: 'provider', key: 'provider', width: 100 },
+                        {
+                          title: '评分',
+                          dataIndex: 'score',
+                          key: 'score',
+                          width: 80,
+                          render: (v: number) => v?.toFixed(2) || '-',
+                        },
+                        {
+                          title: '健康状态',
+                          dataIndex: 'health_status',
+                          key: 'health_status',
+                          width: 100,
+                        },
+                        {
+                          title: '选中',
+                          dataIndex: 'selected',
+                          key: 'selected',
+                          width: 60,
+                          render: (v: boolean) => (v ? <Tag color="green">是</Tag> : <Tag>否</Tag>),
+                        },
+                      ]}
+                    />
+                  </div>
+                )}
               <div style={{ fontWeight: 'bold', marginBottom: 8 }}>决策层输出：</div>
-              <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+              <pre
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  background: '#f5f5f5',
+                  padding: 12,
+                  borderRadius: 4,
+                }}
+              >
                 {JSON.stringify(selectedLog.decision_layer_output, null, 2)}
               </pre>
             </Card>
@@ -556,10 +615,18 @@ const AdminRouteDecisionLogs: React.FC = () => {
                 <Descriptions.Item label="执行状态">
                   {selectedLog.execution_layer_result?.status ? (
                     <Badge
-                      status={selectedLog.execution_layer_result.status === 'success' ? 'success' : 'error'}
-                      text={selectedLog.execution_layer_result.status === 'success' ? '成功' : '失败'}
+                      status={
+                        selectedLog.execution_layer_result.status === 'success'
+                          ? 'success'
+                          : 'error'
+                      }
+                      text={
+                        selectedLog.execution_layer_result.status === 'success' ? '成功' : '失败'
+                      }
                     />
-                  ) : '-'}
+                  ) : (
+                    '-'
+                  )}
                 </Descriptions.Item>
               </Descriptions>
               {selectedLog.error_message && (
@@ -573,7 +640,15 @@ const AdminRouteDecisionLogs: React.FC = () => {
               )}
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontWeight: 'bold', marginBottom: 8 }}>执行层结果：</div>
-                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
+                <pre
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                    background: '#f5f5f5',
+                    padding: 12,
+                    borderRadius: 4,
+                  }}
+                >
                   {JSON.stringify(selectedLog.execution_layer_result, null, 2)}
                 </pre>
               </div>

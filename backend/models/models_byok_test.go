@@ -6,10 +6,10 @@ import (
 
 func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 	tests := []struct {
-		name        string
-		apiKey      MerchantAPIKey
-		mode        string
-		region      string
+		name         string
+		apiKey       MerchantAPIKey
+		mode         string
+		region       string
 		wantEndpoint string
 	}{
 		{
@@ -20,8 +20,8 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 					"endpoint_url": "https://custom.example.com",
 				},
 			},
-			mode:        "direct",
-			region:      "overseas",
+			mode:         "direct",
+			region:       "overseas",
 			wantEndpoint: "https://default.example.com",
 		},
 		{
@@ -36,8 +36,8 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 					},
 				},
 			},
-			mode:        "direct",
-			region:      "overseas",
+			mode:         "direct",
+			region:       "overseas",
 			wantEndpoint: "https://api.overseas.example.com",
 		},
 		{
@@ -53,8 +53,8 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 					},
 				},
 			},
-			mode:        "direct",
-			region:      "overseas",
+			mode:         "direct",
+			region:       "overseas",
 			wantEndpoint: "https://user-configured.example.com",
 		},
 		{
@@ -69,8 +69,8 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 					},
 				},
 			},
-			mode:        "direct",
-			region:      "domestic",
+			mode:         "direct",
+			region:       "domestic",
 			wantEndpoint: "https://api.domestic.example.com",
 		},
 		{
@@ -85,8 +85,8 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 					},
 				},
 			},
-			mode:        "litellm",
-			region:      "domestic",
+			mode:         "litellm",
+			region:       "domestic",
 			wantEndpoint: "http://litellm.local:4000/v1",
 		},
 		{
@@ -96,8 +96,8 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 					"base_url": "http://litellm.local:4000/v1",
 				},
 			},
-			mode:        "litellm",
-			region:      "domestic",
+			mode:         "litellm",
+			region:       "domestic",
 			wantEndpoint: "http://litellm.local:4000/v1",
 		},
 		{
@@ -111,8 +111,8 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 					},
 				},
 			},
-			mode:        "proxy",
-			region:      "",
+			mode:         "proxy",
+			region:       "",
 			wantEndpoint: "https://proxy.example.com",
 		},
 		{
@@ -122,8 +122,8 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 					"proxy_url": "https://proxy.example.com",
 				},
 			},
-			mode:        "proxy",
-			region:      "",
+			mode:         "proxy",
+			region:       "",
 			wantEndpoint: "https://proxy.example.com",
 		},
 		{
@@ -132,8 +132,8 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 				EndpointURL: "https://default.example.com",
 				RouteConfig: map[string]interface{}{},
 			},
-			mode:        "unknown",
-			region:      "",
+			mode:         "unknown",
+			region:       "",
 			wantEndpoint: "https://default.example.com",
 		},
 		{
@@ -147,8 +147,8 @@ func TestMerchantAPIKey_GetEndpointForMode(t *testing.T) {
 					},
 				},
 			},
-			mode:        "direct",
-			region:      "",
+			mode:         "direct",
+			region:       "",
 			wantEndpoint: "https://api.overseas.example.com",
 		},
 	}

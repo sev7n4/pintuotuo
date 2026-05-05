@@ -96,15 +96,92 @@ type APIProxyRequest struct {
 	MerchantSKUID *int            `json:"merchant_sku_id,omitempty"`
 }
 
+const (
+	ImageDetailLow  = "low"
+	ImageDetailHigh = "high"
+	ImageDetailAuto = "auto"
+)
+
+type ImageURL struct {
+	URL    string `json:"url"`
+	Detail string `json:"detail,omitempty"`
+}
+
+type ContentPart struct {
+	Type     string    `json:"type"`
+	Text     string    `json:"text,omitempty"`
+	ImageURL *ImageURL `json:"image_url,omitempty"`
+}
+
+type MessageContent struct {
+	Text  string        `json:"-"`
+	Parts []ContentPart `json:"-"`
+}
+
+func (mc *MessageContent) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		mc.Text = str
+		mc.Parts = nil
+		return nil
+	}
+
+	var parts []ContentPart
+	if err := json.Unmarshal(data, &parts); err == nil {
+		mc.Text = ""
+		if len(parts) == 0 {
+			mc.Parts = nil
+		} else {
+			mc.Parts = parts
+		}
+		return nil
+	}
+
+	return json.Unmarshal(data, &str)
+}
+
+func (mc MessageContent) MarshalJSON() ([]byte, error) {
+	if mc.Parts != nil {
+		return json.Marshal(mc.Parts)
+	}
+	return json.Marshal(mc.Text)
+}
+
 type ChatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string         `json:"role"`
+	Content MessageContent `json:"content"`
+	Name    string         `json:"name,omitempty"`
+}
+
+func estimateImageTokens(detail string) int {
+	switch detail {
+	case ImageDetailLow:
+		return 85
+	case ImageDetailHigh:
+		return 765
+	default:
+		return 765
+	}
 }
 
 func estimateInputTokens(messages []ChatMessage) int {
 	totalChars := 0
 	for _, msg := range messages {
-		totalChars += len(msg.Role) + len(msg.Content)
+		totalChars += len(msg.Role)
+		if msg.Content.Text != "" {
+			totalChars += len(msg.Content.Text)
+		}
+		for _, part := range msg.Content.Parts {
+			if part.Type == "text" {
+				totalChars += len(part.Text)
+			} else if part.Type == "image_url" {
+				detail := ""
+				if part.ImageURL != nil {
+					detail = part.ImageURL.Detail
+				}
+				totalChars += estimateImageTokens(detail)
+			}
+		}
 	}
 	return totalChars / 4
 }

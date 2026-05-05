@@ -27,9 +27,12 @@ export const adminService = {
   getStats: () => api.get<APIResponse<AdminStats>>('/admin/stats'),
 
   probeEndpoint: (providerCode: string, url: string, apiKey?: string, timeoutMs?: number) =>
-    api.post<APIResponse<ProbeEndpointResponse>>(`/admin/route-configs/providers/${providerCode}/probe-endpoint`, {
-      url,
-      api_key: apiKey,
-      timeout_ms: timeoutMs,
-    }),
+    api.post<APIResponse<ProbeEndpointResponse>>(
+      `/admin/route-configs/providers/${providerCode}/probe-endpoint`,
+      {
+        url,
+        api_key: apiKey,
+        timeout_ms: timeoutMs,
+      }
+    ),
 };

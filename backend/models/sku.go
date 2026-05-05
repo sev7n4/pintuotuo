@@ -112,6 +112,7 @@ type SKU struct {
 	SKUCode            string    `json:"sku_code"`
 	MerchantID         *int      `json:"merchant_id,omitempty"`
 	SKUType            string    `json:"sku_type"`
+	EndpointType       string    `json:"endpoint_type,omitempty"`
 	TokenAmount        int64     `json:"token_amount,omitempty"`
 	ComputePoints      float64   `json:"compute_points,omitempty"`
 	SubscriptionPeriod string    `json:"subscription_period,omitempty"`
@@ -244,6 +245,7 @@ type SKUCreateRequest struct {
 	SPUID              int     `json:"spu_id" binding:"required"`
 	SKUCode            string  `json:"sku_code" binding:"required"`
 	SKUType            string  `json:"sku_type" binding:"required"`
+	EndpointType       string  `json:"endpoint_type"`
 	TokenAmount        int64   `json:"token_amount"`
 	ComputePoints      float64 `json:"compute_points"`
 	SubscriptionPeriod string  `json:"subscription_period"`
@@ -273,6 +275,7 @@ type SKUCreateRequest struct {
 
 type SKUUpdateRequest struct {
 	Name               string  `json:"name"`
+	EndpointType       string  `json:"endpoint_type"`
 	TokenAmount        int64   `json:"token_amount"`
 	ComputePoints      float64 `json:"compute_points"`
 	SubscriptionPeriod string  `json:"subscription_period"`

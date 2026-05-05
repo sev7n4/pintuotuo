@@ -485,5 +485,3 @@ func TestProviderRuntimeConfig_EmptyFields(t *testing.T) {
 	assert.Nil(t, cfg.RouteStrategy)
 	assert.Nil(t, cfg.Endpoints)
 }
-
-

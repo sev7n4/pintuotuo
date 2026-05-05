@@ -89,9 +89,9 @@ func BenchmarkRouteCache_Get(b *testing.B) {
 	cfg := providerRuntimeConfig{
 		Code:           "openai",
 		Name:           "OpenAI",
-		APIBaseURL:      "https://api.openai.com/v1",
-		APIFormat:       "openai",
-		ProviderRegion:  "overseas",
+		APIBaseURL:     "https://api.openai.com/v1",
+		APIFormat:      "openai",
+		ProviderRegion: "overseas",
 	}
 
 	cache.Set("openai", cfg)
@@ -112,9 +112,9 @@ func BenchmarkRouteCache_Get_Parallel(b *testing.B) {
 		cfg := providerRuntimeConfig{
 			Code:           p,
 			Name:           p,
-			APIBaseURL:      "https://api.example.com/v1",
-			APIFormat:       "openai",
-			ProviderRegion:  "overseas",
+			APIBaseURL:     "https://api.example.com/v1",
+			APIFormat:      "openai",
+			ProviderRegion: "overseas",
 		}
 		cache.Set(p, cfg)
 	}
@@ -137,9 +137,9 @@ func BenchmarkRouteCache_Set(b *testing.B) {
 		cfg := providerRuntimeConfig{
 			Code:           "openai",
 			Name:           "OpenAI",
-			APIBaseURL:      "https://api.openai.com/v1",
-			APIFormat:       "openai",
-			ProviderRegion:  "overseas",
+			APIBaseURL:     "https://api.openai.com/v1",
+			APIFormat:      "openai",
+			ProviderRegion: "overseas",
 		}
 		cache.Set("openai", cfg)
 	}
@@ -155,9 +155,9 @@ func BenchmarkRouteCache_Set_Parallel(b *testing.B) {
 			cfg := providerRuntimeConfig{
 				Code:           "openai",
 				Name:           "OpenAI",
-				APIBaseURL:      "https://api.openai.com/v1",
-				APIFormat:       "openai",
-				ProviderRegion:  "overseas",
+				APIBaseURL:     "https://api.openai.com/v1",
+				APIFormat:      "openai",
+				ProviderRegion: "overseas",
 			}
 			cache.Set("openai", cfg)
 			i++

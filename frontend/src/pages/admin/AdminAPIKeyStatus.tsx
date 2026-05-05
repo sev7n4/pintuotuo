@@ -188,7 +188,9 @@ const AdminAPIKeyStatus: React.FC = () => {
 
   const handleViewDetail = async (apiKeyID: number) => {
     try {
-      const response = await api.get<APIResponse<APIKeyStatus>>(`/admin/api-key-status/${apiKeyID}`);
+      const response = await api.get<APIResponse<APIKeyStatus>>(
+        `/admin/api-key-status/${apiKeyID}`
+      );
 
       if (response.data.code === 0) {
         const statusData = response.data.data;
@@ -359,9 +361,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       dataIndex: 'last_request_at',
       key: 'last_request_at',
       width: 150,
-      render: (lastRequestAt: string) => (
-        <span>{lastRequestAt || '-'}</span>
-      ),
+      render: (lastRequestAt: string) => <span>{lastRequestAt || '-'}</span>,
     },
     {
       title: '状态更新',
@@ -375,11 +375,7 @@ const AdminAPIKeyStatus: React.FC = () => {
       key: 'action',
       width: 80,
       render: (_: unknown, record: APIKeyStatus) => (
-        <Button
-          type="link"
-          icon={<EyeOutlined />}
-          onClick={() => handleViewDetail(record.id)}
-        >
+        <Button type="link" icon={<EyeOutlined />} onClick={() => handleViewDetail(record.id)}>
           详情
         </Button>
       ),
@@ -644,7 +640,11 @@ const AdminAPIKeyStatus: React.FC = () => {
         title="API Key 详细状态"
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
-        footer={[<Button key="close" onClick={() => setDetailModalVisible(false)}>关闭</Button>]}
+        footer={[
+          <Button key="close" onClick={() => setDetailModalVisible(false)}>
+            关闭
+          </Button>,
+        ]}
         width={800}
       >
         {selectedStatus ? (
@@ -718,8 +718,7 @@ const AdminAPIKeyStatus: React.FC = () => {
               <div>
                 <Progress
                   percent={
-                    (selectedStatus.connection_pool_active /
-                      selectedStatus.connection_pool_size) *
+                    (selectedStatus.connection_pool_active / selectedStatus.connection_pool_size) *
                     100
                   }
                   status={
