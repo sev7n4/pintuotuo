@@ -273,6 +273,20 @@ func TestBillingEngine_GetUnitPrice(t *testing.T) {
 			wantMaxPrice: 50.0,
 		},
 		{
+			name:         "images_variations default price",
+			endpointType: "images_variations",
+			providerCode: "openai",
+			wantMinPrice: 1.0,
+			wantMaxPrice: 50.0,
+		},
+		{
+			name:         "images_edits default price",
+			endpointType: "images_edits",
+			providerCode: "openai",
+			wantMinPrice: 1.0,
+			wantMaxPrice: 50.0,
+		},
+		{
 			name:         "audio_speech default price",
 			endpointType: "audio_speech",
 			providerCode: "openai",
@@ -282,6 +296,13 @@ func TestBillingEngine_GetUnitPrice(t *testing.T) {
 		{
 			name:         "audio_transcriptions default price",
 			endpointType: "audio_transcriptions",
+			providerCode: "openai",
+			wantMinPrice: 0.001,
+			wantMaxPrice: 0.01,
+		},
+		{
+			name:         "audio_translations default price",
+			endpointType: "audio_translations",
 			providerCode: "openai",
 			wantMinPrice: 0.001,
 			wantMaxPrice: 0.01,

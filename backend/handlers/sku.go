@@ -953,21 +953,26 @@ func CreateSKU(c *gin.Context) {
 
 	subscriptionPeriod := sqlNullableString(req.SubscriptionPeriod)
 
+	endpointType := req.EndpointType
+	if endpointType == "" {
+		endpointType = "chat_completions"
+	}
+
 	var sku models.SKU
 	err = db.QueryRow(
-		`INSERT INTO skus (spu_id, sku_code, sku_type, token_amount, compute_points, 
+		`INSERT INTO skus (spu_id, sku_code, sku_type, endpoint_type, token_amount, compute_points, 
 		 subscription_period, is_unlimited, fair_use_limit, tpm_limit, rpm_limit, concurrent_requests,
 		 valid_days, retail_price, wholesale_price, original_price, stock, daily_limit,
 		 group_enabled, min_group_size, max_group_size, group_discount_rate,
 		 cost_input_rate, cost_output_rate, inherit_spu_cost, is_trial, trial_duration_days, status, is_promoted) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28) 
-		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, cost_input_rate, cost_output_rate, inherit_spu_cost, created_at, updated_at`,
-		req.SPUID, req.SKUCode, req.SKUType, req.TokenAmount, req.ComputePoints,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29) 
+		 RETURNING id, spu_id, sku_code, sku_type, endpoint_type, retail_price, stock, status, cost_input_rate, cost_output_rate, inherit_spu_cost, created_at, updated_at`,
+		req.SPUID, req.SKUCode, req.SKUType, endpointType, req.TokenAmount, req.ComputePoints,
 		subscriptionPeriod, req.IsUnlimited, req.FairUseLimit, req.TPMLimit, req.RPMLimit, req.ConcurrentReqs,
 		req.ValidDays, req.RetailPrice, req.WholesalePrice, req.OriginalPrice, req.Stock, req.DailyLimit,
 		req.GroupEnabled, req.MinGroupSize, req.MaxGroupSize, req.GroupDiscountRate,
 		costInputRate, costOutputRate, inheritSPUCost, req.IsTrial, req.TrialDurationDays, req.Status, req.IsPromoted,
-	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.CostInputRate, &sku.CostOutputRate, &sku.InheritSPUCost, &sku.CreatedAt, &sku.UpdatedAt)
+	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.EndpointType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.CostInputRate, &sku.CostOutputRate, &sku.InheritSPUCost, &sku.CreatedAt, &sku.UpdatedAt)
 
 	if err != nil {
 		var pqErr *pq.Error
@@ -1072,7 +1077,6 @@ func UpdateSKU(c *gin.Context) {
 	var sku models.SKU
 	subscriptionPeriod := strings.TrimSpace(req.SubscriptionPeriod)
 	err := db.QueryRow(
-		// 价格/折扣参数须显式 ::numeric：否则在扩展查询中「$n > 0」会与整型字面量 0 比较，导致小数绑定失败（pq: invalid input syntax for type integer: "9.9"）。
 		`UPDATE skus SET 
 		 retail_price = CASE WHEN $1::numeric > 0 THEN $1::numeric ELSE retail_price END,
 		 wholesale_price = CASE WHEN $2::numeric > 0 THEN $2::numeric ELSE wholesale_price END,
@@ -1096,9 +1100,11 @@ func UpdateSKU(c *gin.Context) {
 		 is_promoted = $20,
 		 cost_input_rate = $21,
 		 cost_output_rate = $22,
-		 inherit_spu_cost = $23
+		 inherit_spu_cost = $23,
+		 endpoint_type = COALESCE(NULLIF($25::text, ''), endpoint_type),
+		 updated_at = NOW()
 		 WHERE id = $24 
-		 RETURNING id, spu_id, sku_code, sku_type, retail_price, stock, status, valid_days, cost_input_rate, cost_output_rate, inherit_spu_cost, created_at, updated_at`,
+		 RETURNING id, spu_id, sku_code, sku_type, endpoint_type, retail_price, stock, status, valid_days, cost_input_rate, cost_output_rate, inherit_spu_cost, created_at, updated_at`,
 		req.RetailPrice, req.WholesalePrice, req.OriginalPrice,
 		req.TokenAmount, req.ComputePoints,
 		subscriptionPeriod,
@@ -1106,7 +1112,8 @@ func UpdateSKU(c *gin.Context) {
 		req.ValidDays, req.Stock, req.DailyLimit,
 		req.GroupEnabled, req.MinGroupSize, req.MaxGroupSize, req.GroupDiscountRate,
 		req.Status, req.IsPromoted, costInputRate, costOutputRate, inherit, skuID,
-	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.ValidDays, &sku.CostInputRate, &sku.CostOutputRate, &sku.InheritSPUCost, &sku.CreatedAt, &sku.UpdatedAt)
+		req.EndpointType,
+	).Scan(&sku.ID, &sku.SPUID, &sku.SKUCode, &sku.SKUType, &sku.EndpointType, &sku.RetailPrice, &sku.Stock, &sku.Status, &sku.ValidDays, &sku.CostInputRate, &sku.CostOutputRate, &sku.InheritSPUCost, &sku.CreatedAt, &sku.UpdatedAt)
 
 	if err != nil {
 		log.Printf("[UpdateSKU] sku_id=%d: %v", skuID, err)

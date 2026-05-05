@@ -164,6 +164,25 @@ func estimateImageTokens(detail string) int {
 	}
 }
 
+func estimateImageTokensWithSize(detail string, width, height int) int {
+	switch detail {
+	case ImageDetailLow:
+		return 85
+	case ImageDetailHigh:
+		if width <= 0 || height <= 0 {
+			return 765
+		}
+		tiles := ((width + 511) / 512) * ((height + 511) / 512)
+		return 85 + tiles*170 + 255
+	default:
+		if width > 0 && height > 0 {
+			tiles := ((width + 511) / 512) * ((height + 511) / 512)
+			return 85 + tiles*170 + 255
+		}
+		return 765
+	}
+}
+
 func estimateInputTokens(messages []ChatMessage) int {
 	totalChars := 0
 	for _, msg := range messages {
@@ -981,6 +1000,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		execInput := &services.ExecutionLayerInputData{
 			GatewayMode:   gatewayMode,
 			EndpointURL:   fmt.Sprintf("%s/chat/completions", strings.TrimRight(providerCfg.APIBaseURL, "/")),
+			EndpointType:  services.EndpointTypeChatCompletions,
 			AuthMethod:    "bearer",
 			ResolvedModel: billModel,
 			RequestFormat: providerCfg.APIFormat,
@@ -1520,6 +1540,7 @@ func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string, ke
 		MerchantID:    merchantID,
 		Model:         req.Model,
 		Provider:      req.Provider,
+		EndpointType:  services.EndpointTypeChatCompletions,
 		AllowedKeyIDs: keyFilter,
 		RequestBody:   map[string]interface{}{"messages": req.Messages},
 	}

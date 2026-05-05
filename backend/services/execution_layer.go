@@ -21,8 +21,11 @@ const (
 	EndpointTypeChatCompletions     = "chat_completions"
 	EndpointTypeEmbeddings          = "embeddings"
 	EndpointTypeImagesGenerations   = "images_generations"
-	EndpointTypeAudioSpeech         = "audio_speech"
+	EndpointTypeImagesVariations    = "images_variations"
+	EndpointTypeImagesEdits         = "images_edits"
 	EndpointTypeAudioTranscriptions = "audio_transcriptions"
+	EndpointTypeAudioTranslations   = "audio_translations"
+	EndpointTypeAudioSpeech         = "audio_speech"
 	EndpointTypeModerations         = "moderations"
 )
 
@@ -360,7 +363,29 @@ func ResolveEndpoint(cfg *ExecutionProviderConfig) string {
 }
 
 func ResolveEndpointByType(cfg *ExecutionProviderConfig, endpointType string) string {
-	return ResolveEndpoint(cfg)
+	baseURL := ResolveEndpoint(cfg)
+	if baseURL == "" {
+		return ""
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+
+	suffix, ok := endpointPathSuffixes[endpointType]
+	if !ok {
+		suffix = "/v1/chat/completions"
+	}
+	return baseURL + suffix
+}
+
+var endpointPathSuffixes = map[string]string{
+	EndpointTypeChatCompletions:     "/v1/chat/completions",
+	EndpointTypeEmbeddings:          "/v1/embeddings",
+	EndpointTypeImagesGenerations:   "/v1/images/generations",
+	EndpointTypeImagesVariations:    "/v1/images/variations",
+	EndpointTypeImagesEdits:         "/v1/images/edits",
+	EndpointTypeAudioTranscriptions: "/v1/audio/transcriptions",
+	EndpointTypeAudioTranslations:   "/v1/audio/translations",
+	EndpointTypeAudioSpeech:         "/v1/audio/speech",
+	EndpointTypeModerations:         "/v1/moderations",
 }
 
 func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, originalAPIKey string) string {

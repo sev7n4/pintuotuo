@@ -790,8 +790,11 @@ func (e *BillingEngine) getUnitPrice(endpointType, providerCode string) float64 
 		"chat_completions":     0.001,
 		"embeddings":           0.0001,
 		"images_generations":   20.0,
+		"images_variations":    20.0,
+		"images_edits":         20.0,
 		"audio_speech":         0.000015,
 		"audio_transcriptions": 0.006,
+		"audio_translations":   0.006,
 		"moderations":          0.0,
 	}
 

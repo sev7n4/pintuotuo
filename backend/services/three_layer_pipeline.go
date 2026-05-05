@@ -63,6 +63,10 @@ func (p *ThreeLayerRoutingPipeline) executeStrategyLayer(ctx context.Context, re
 		return nil, fmt.Errorf("failed to analyze request: %w", err)
 	}
 
+	if req.EndpointType != "" {
+		analysis.EndpointType = req.EndpointType
+	}
+
 	reqCtx := &RequestContext{
 		MerchantID:      req.MerchantID,
 		RequestAnalysis: analysis,
@@ -140,6 +144,15 @@ func (p *ThreeLayerRoutingPipeline) executeExecutionLayer(ctx context.Context, r
 		},
 		DecryptedAPIKey: req.DecryptedAPIKey,
 		Stream:          req.Stream,
+	}
+
+	endpointType := req.EndpointType
+	if endpointType == "" {
+		endpointType = EndpointTypeChatCompletions
+	}
+	resolvedURL := ResolveEndpointByType(layerInput.ProviderConfig, endpointType)
+	if resolvedURL != "" {
+		layerInput.ProviderConfig.APIBaseURL = resolvedURL
 	}
 
 	output, err := execLayer.Execute(ctx, layerInput)

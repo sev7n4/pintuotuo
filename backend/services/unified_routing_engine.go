@@ -22,6 +22,7 @@ type RoutingRequest struct {
 	MerchantID         int                    `json:"merchant_id"`
 	Model              string                 `json:"model"`
 	Provider           string                 `json:"provider,omitempty"`
+	EndpointType       string                 `json:"endpoint_type,omitempty"`
 	RequestBody        map[string]interface{} `json:"request_body"`
 	UserPrefs          map[string]interface{} `json:"user_preferences,omitempty"`
 	CostBudget         *float64               `json:"cost_budget,omitempty"`
