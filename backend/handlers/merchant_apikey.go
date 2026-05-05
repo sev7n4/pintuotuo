@@ -768,20 +768,63 @@ func DeleteMerchantAPIKey(c *gin.Context) {
 		return
 	}
 
-	result, err := db.Exec("DELETE FROM merchant_api_keys WHERE id = $1 AND merchant_id = $2", keyID, merchantID)
+	tx, txErr := db.Begin()
+	if txErr != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer tx.Rollback()
+
+	var existsKey bool
+	err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM merchant_api_keys WHERE id = $1 AND merchant_id = $2)", keyID, merchantID).Scan(&existsKey)
+	if err != nil || !existsKey {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"API key not found",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+
+	_, err = tx.Exec("DELETE FROM api_usage_logs WHERE key_id = $1", keyID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		middleware.RespondWithError(c, apperrors.NewAppError(
-			"API_KEY_NOT_FOUND",
-			"API key not found",
-			http.StatusNotFound,
-			nil,
-		))
+	_, err = tx.Exec("UPDATE routing_decisions SET selected_api_key_id = NULL WHERE selected_api_key_id = $1", keyID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	_, err = tx.Exec("UPDATE routing_decision_logs SET api_key_id = NULL WHERE api_key_id = $1", keyID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	_, err = tx.Exec("UPDATE merchant_sku_cost_history SET merchant_api_key_id = NULL WHERE merchant_api_key_id = $1", keyID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	_, err = tx.Exec("UPDATE merchant_skus SET api_key_id = NULL WHERE api_key_id = $1", keyID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	_, err = tx.Exec("DELETE FROM merchant_api_keys WHERE id = $1 AND merchant_id = $2", keyID, merchantID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	if commitErr := tx.Commit(); commitErr != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}
 
