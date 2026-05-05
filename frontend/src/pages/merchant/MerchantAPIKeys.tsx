@@ -290,7 +290,11 @@ const MerchantAPIKeys = () => {
   const handleAdd = () => {
     setEditingKey(null);
     form.resetFields();
-    form.setFieldsValue({ unlimited_quota: true, health_check_level: 'medium', byok_type: 'official' });
+    form.setFieldsValue({
+      unlimited_quota: true,
+      health_check_level: 'medium',
+      byok_type: 'official',
+    });
     setModalVisible(true);
   };
 
@@ -331,6 +335,9 @@ const MerchantAPIKeys = () => {
     if (success) {
       message.success('API密钥已删除');
       fetchAPIKeys();
+    } else {
+      const errMsg = useMerchantStore.getState().error || '删除API密钥失败';
+      message.error(errMsg);
     }
   };
 
@@ -339,7 +346,7 @@ const MerchantAPIKeys = () => {
       const values = await form.validateFields();
       if (editingKey) {
         const unlimited = Boolean(values.unlimited_quota);
-        const patch: Partial<MerchantAPIKey> = {
+        const patch: Partial<MerchantAPIKey> & { api_key?: string; api_secret?: string } = {
           name: values.name as string,
           status: values.status as MerchantAPIKey['status'],
           endpoint_url: values.endpoint_url as string | undefined,
@@ -352,6 +359,12 @@ const MerchantAPIKeys = () => {
           security_level: values.security_level as 'standard' | 'high' | undefined,
           byok_type: values.byok_type as 'official' | 'reseller' | 'self_hosted' | undefined,
         };
+        if (values.api_key?.trim()) {
+          patch.api_key = values.api_key.trim();
+        }
+        if (values.api_secret !== undefined && values.api_secret !== null) {
+          patch.api_secret = values.api_secret;
+        }
         const success = await updateAPIKey(editingKey.id, patch);
         if (!success) {
           const msg = useMerchantStore.getState().error || '更新失败';
@@ -402,9 +415,11 @@ const MerchantAPIKeys = () => {
     setVerificationResult(null);
 
     try {
-      await api.post(`/merchants/api-keys/${id}/verify`, {
-        verification_mode: mode,
-      });
+      const endpoint =
+        mode === 'deep'
+          ? `/merchants/api-keys/${id}/deep-verify`
+          : `/merchants/api-keys/${id}/light-verify`;
+      await api.post(endpoint);
       message.success(
         mode === 'deep'
           ? '深度验证已启动（包含配额探测，支持的提供商会执行）'
@@ -420,12 +435,12 @@ const MerchantAPIKeys = () => {
 
   const handleImmediateHealthCheck = async (id: number) => {
     try {
-      await api.post(`/merchants/api-keys/${id}/health-check`);
-      message.success('已触发立即健康探测，正在获取结果...');
+      await api.post(`/merchants/api-keys/${id}/probe`);
+      message.success('已触发立即探测，正在获取结果...');
       fetchAPIKeys();
       void pollHealthCheckResult(id);
     } catch {
-      message.error('触发健康探测失败');
+      message.error('触发探测失败');
     }
   };
 
@@ -1009,6 +1024,22 @@ const MerchantAPIKeys = () => {
                   />
                 </Form.Item>
               </Spin>
+            </>
+          )}
+
+          {editingKey && (
+            <>
+              <Form.Item name="api_key" label="API Key" extra="留空则不更新">
+                <Input.Password placeholder="输入新的 API Key 以更新，留空不修改" />
+              </Form.Item>
+              <Form.Item name="api_secret" label="API Secret" extra="留空则不更新">
+                <Input.Password placeholder="输入新的 API Secret 以更新，留空不修改" />
+              </Form.Item>
+            </>
+          )}
+
+          {!editingKey && (
+            <>
               <Form.Item
                 name="api_key"
                 label="API Key"
