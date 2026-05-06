@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,7 +83,7 @@ func TestResolveRouteMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resolveRouteModeWithProvider(tt.apiKey, "")
+			result := resolveRouteMode(tt.apiKey)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -98,11 +99,11 @@ func TestResolveRouteModeWithProvider(t *testing.T) {
 		expected       string
 	}{
 		{
-			name:           "nil api key returns direct",
-			apiKey:         nil,
+			name:           "empty route mode + overseas + HTTPS_PROXY returns proxy",
+			apiKey:         &models.MerchantAPIKey{RouteMode: ""},
 			providerRegion: "overseas",
 			envHTTPSProxy:  "http://proxy:7890",
-			expected:       routeModeDirect,
+			expected:       routeModeProxy,
 		},
 		{
 			name: "explicit direct not affected by proxy",
@@ -219,7 +220,11 @@ func TestResolveRouteModeWithProvider(t *testing.T) {
 				os.Setenv("https_proxy", "http://host.docker.internal:7890")
 			}
 
-			result := resolveRouteModeWithProvider(tt.apiKey, tt.providerRegion)
+			routeMode := ""
+			if tt.apiKey != nil {
+				routeMode = strings.TrimSpace(strings.ToLower(tt.apiKey.RouteMode))
+			}
+			result := services.ResolveRouteModeWithProvider(routeMode, tt.providerRegion)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

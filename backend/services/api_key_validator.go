@@ -533,7 +533,7 @@ func (v *APIKeyValidator) getAPIKeyRouteConfig(apiKeyID int, provider string) (s
 		_ = json.Unmarshal(routeConfigJSON, &routeConfig)
 	}
 
-	if routeMode == "auto" || routeMode == "" {
+	if routeMode == RouteModeAuto || routeMode == "" {
 		resolved := resolveAutoRouteMode(providerRegion)
 		return resolved, routeConfig, region
 	}

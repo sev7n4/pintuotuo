@@ -64,9 +64,7 @@ func ResolveEndpointByType(cfg *ExecutionProviderConfig, endpointType string) st
 	}
 
 	baseURL = strings.TrimRight(baseURL, "/")
-	if strings.HasSuffix(baseURL, "/v1") {
-		baseURL = baseURL[:len(baseURL)-3]
-	}
+	baseURL = strings.TrimSuffix(baseURL, "/v1")
 
 	return baseURL + suffix
 }
@@ -427,9 +425,9 @@ func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) stri
 		return GatewayModeDirect
 	}
 
-	if cfg.BYOKRouteMode != "" && cfg.BYOKRouteMode != "auto" {
+	if cfg.BYOKRouteMode != "" && cfg.BYOKRouteMode != RouteModeAuto {
 		return cfg.BYOKRouteMode
 	}
 
-	return GatewayModeDirect
+	return resolveAutoRouteMode(cfg.ProviderRegion)
 }

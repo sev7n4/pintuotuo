@@ -968,13 +968,7 @@ func resolveRouteMode(apiKey *models.MerchantAPIKey) string {
 	}
 }
 
-func resolveRouteModeWithProvider(apiKey *models.MerchantAPIKey, providerRegion string) string {
-	if apiKey == nil {
-		return routeModeDirect
-	}
-	mode := strings.TrimSpace(strings.ToLower(apiKey.RouteMode))
-	return services.ResolveRouteModeWithProvider(mode, providerRegion)
-}
+
 
 func resolveEndpointURL(routeMode string, apiKey *models.MerchantAPIKey, providerBaseURL string) string {
 	switch routeMode {
