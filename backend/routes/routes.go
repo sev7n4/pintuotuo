@@ -253,9 +253,6 @@ func RegisterMerchantRoutes(router *gin.RouterGroup) {
 			apiKeys.DELETE("/:id", handlers.DeleteMerchantAPIKey)
 			apiKeys.GET("/usage", handlers.GetMerchantAPIKeyUsage)
 			apiKeys.POST("/:id/verify", handlers.VerifyMerchantAPIKey)
-			apiKeys.POST("/:id/light-verify", handlers.LightVerifyMerchantAPIKey)
-			apiKeys.POST("/:id/deep-verify", handlers.DeepVerifyMerchantAPIKey)
-			apiKeys.POST("/:id/probe", handlers.ProbeMerchantAPIKey)
 			apiKeys.POST("/:id/health-check", handlers.TriggerMerchantAPIKeyHealthCheck)
 			apiKeys.GET("/:id/verification", handlers.GetMerchantAPIKeyVerification)
 		}
