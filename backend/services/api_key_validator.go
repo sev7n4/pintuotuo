@@ -692,13 +692,13 @@ func selectProbeModel(provider string, models []string) string {
 		return models[0]
 	}
 	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case "zhipu":
+	case modelProviderZhipu:
 		return "glm-4"
 	case modelProviderOpenAI:
 		return "gpt-4o-mini"
 	case modelProviderAnthropic:
 		return "claude-3-5-sonnet-20241022"
-	case "deepseek":
+	case modelProviderDeepseek:
 		return "deepseek-chat"
 	default:
 		return ""
@@ -1155,25 +1155,25 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 
 func litellmProviderPrefix(provider string) string {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case "openai":
-		return "openai"
-	case "anthropic":
-		return "anthropic"
-	case "deepseek":
-		return "deepseek"
-	case "alibaba":
+	case modelProviderOpenAI:
+		return modelProviderOpenAI
+	case modelProviderAnthropic:
+		return modelProviderAnthropic
+	case modelProviderDeepseek:
+		return modelProviderDeepseek
+	case modelProviderAlibaba:
 		return "dashscope"
-	case "zhipu":
-		return "zhipu"
-	case "moonshot":
-		return "moonshot"
-	case "minimax":
-		return "minimax"
-	case "google":
+	case modelProviderZhipu:
+		return modelProviderZhipu
+	case modelProviderMoonshot:
+		return modelProviderMoonshot
+	case modelProviderMinimax:
+		return modelProviderMinimax
+	case modelProviderGoogle:
 		return "gemini"
-	case "stepfun":
-		return "openai"
-	case "bytedance":
+	case modelProviderStepfun:
+		return modelProviderOpenAI
+	case modelProviderBytedance:
 		return ""
 	default:
 		return provider
