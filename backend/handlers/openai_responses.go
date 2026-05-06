@@ -24,7 +24,7 @@ import (
 )
 
 type ResponseInput struct {
-	Text  string                   `json:"-"`
+	Text  string                     `json:"-"`
 	Parts []ResponseInputMessagePart `json:"-"`
 }
 
@@ -65,19 +65,19 @@ type ToolConfig struct {
 }
 
 type ResponseRequest struct {
-	Model               string        `json:"model" binding:"required"`
-	Input               ResponseInput `json:"input" binding:"required"`
-	Instructions        string        `json:"instructions,omitempty"`
-	PreviousResponseID  string        `json:"previous_response_id,omitempty"`
-	Tools               []ToolConfig  `json:"tools,omitempty"`
-	ToolChoice          interface{}   `json:"tool_choice,omitempty"`
-	Temperature         *float64      `json:"temperature,omitempty"`
-	MaxOutputTokens     *int          `json:"max_output_tokens,omitempty"`
-	Metadata            interface{}   `json:"metadata,omitempty"`
-	Stream              bool          `json:"stream,omitempty"`
-	Background          bool          `json:"background,omitempty"`
-	Truncate            *int          `json:"truncate,omitempty"`
-	Reasoning           interface{}   `json:"reasoning,omitempty"`
+	Model              string        `json:"model" binding:"required"`
+	Input              ResponseInput `json:"input" binding:"required"`
+	Instructions       string        `json:"instructions,omitempty"`
+	PreviousResponseID string        `json:"previous_response_id,omitempty"`
+	Tools              []ToolConfig  `json:"tools,omitempty"`
+	ToolChoice         interface{}   `json:"tool_choice,omitempty"`
+	Temperature        *float64      `json:"temperature,omitempty"`
+	MaxOutputTokens    *int          `json:"max_output_tokens,omitempty"`
+	Metadata           interface{}   `json:"metadata,omitempty"`
+	Stream             bool          `json:"stream,omitempty"`
+	Background         bool          `json:"background,omitempty"`
+	Truncate           *int          `json:"truncate,omitempty"`
+	Reasoning          interface{}   `json:"reasoning,omitempty"`
 }
 
 type ReasoningOutput struct {
@@ -102,15 +102,15 @@ type ResponseUsageInfo struct {
 }
 
 type ResponseAPIResponse struct {
-	ID         string              `json:"id"`
-	Object     string              `json:"object"`
-	Model      string              `json:"model"`
-	Output     []ResponseOutputItem `json:"output"`
-	Usage      ResponseUsageInfo   `json:"usage"`
-	Status     string              `json:"status"`
-	CreatedAt  int64               `json:"created_at"`
-	Error      interface{}         `json:"error,omitempty"`
-	Metadata   interface{}         `json:"metadata,omitempty"`
+	ID        string               `json:"id"`
+	Object    string               `json:"object"`
+	Model     string               `json:"model"`
+	Output    []ResponseOutputItem `json:"output"`
+	Usage     ResponseUsageInfo    `json:"usage"`
+	Status    string               `json:"status"`
+	CreatedAt int64                `json:"created_at"`
+	Error     interface{}          `json:"error,omitempty"`
+	Metadata  interface{}          `json:"metadata,omitempty"`
 }
 
 type BackgroundJobResponse struct {
@@ -621,13 +621,13 @@ func estimateResponseTokens(req *ResponseRequest) int {
 
 func calculateToolBilling(output []ResponseOutputItem) int {
 	toolBillingMap := map[string]billing.BillingUnit{
-		"web_search_call":   billing.BillingUnitRequest,
-		"file_search_call":  billing.BillingUnitRequest,
-		"computer_call":     billing.BillingUnitRequest,
-		"code_interpreter":  billing.BillingUnitRequest,
-		"image_generation":  billing.BillingUnitImage,
-		"mcp_call":          billing.BillingUnitRequest,
-		"function_call":     billing.BillingUnitToken,
+		"web_search_call":  billing.BillingUnitRequest,
+		"file_search_call": billing.BillingUnitRequest,
+		"computer_call":    billing.BillingUnitRequest,
+		"code_interpreter": billing.BillingUnitRequest,
+		"image_generation": billing.BillingUnitImage,
+		"mcp_call":         billing.BillingUnitRequest,
+		"function_call":    billing.BillingUnitToken,
 	}
 
 	count := 0
