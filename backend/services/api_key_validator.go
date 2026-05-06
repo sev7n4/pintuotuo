@@ -692,13 +692,13 @@ func selectProbeModel(provider string, models []string) string {
 		return models[0]
 	}
 	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case "zhipu":
+	case modelProviderZhipu:
 		return "glm-4"
 	case modelProviderOpenAI:
 		return "gpt-4o-mini"
 	case modelProviderAnthropic:
 		return "claude-3-5-sonnet-20241022"
-	case "deepseek":
+	case modelProviderDeepseek:
 		return "deepseek-chat"
 	default:
 		return ""
@@ -1153,6 +1153,33 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	return false, code, msg
 }
 
+func litellmProviderPrefix(provider string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case modelProviderOpenAI:
+		return modelProviderOpenAI
+	case modelProviderAnthropic:
+		return modelProviderAnthropic
+	case modelProviderDeepseek:
+		return modelProviderDeepseek
+	case modelProviderAlibaba:
+		return "dashscope"
+	case modelProviderZhipu:
+		return modelProviderZhipu
+	case modelProviderMoonshot:
+		return modelProviderMoonshot
+	case modelProviderMinimax:
+		return modelProviderMinimax
+	case modelProviderGoogle:
+		return "gemini"
+	case modelProviderStepfun:
+		return modelProviderOpenAI
+	case modelProviderBytedance:
+		return ""
+	default:
+		return provider
+	}
+}
+
 func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider, model, originalAPIKey, litellmMasterKey string) (bool, string, string) {
 	providerConfig, err := v.getProviderConfig(provider)
 	if err != nil {
@@ -1166,7 +1193,11 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 
 	litellmModel := model
 	if !strings.Contains(model, "/") {
-		litellmModel = "openai/" + model
+		prefix := litellmProviderPrefix(provider)
+		if prefix == "" {
+			return false, "LITELLM_UNSUPPORTED_PROVIDER", fmt.Sprintf("provider %s is not supported by litellm (requires endpoint_id for bytedance)", provider)
+		}
+		litellmModel = prefix + "/" + model
 	}
 
 	userConfig := map[string]interface{}{

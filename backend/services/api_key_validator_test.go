@@ -212,3 +212,33 @@ func TestShouldRetryVerificationAttempt(t *testing.T) {
 		})
 	}
 }
+
+func TestLitellmProviderPrefix(t *testing.T) {
+	tests := []struct {
+		provider string
+		want     string
+	}{
+		{"openai", "openai"},
+		{"anthropic", "anthropic"},
+		{"deepseek", "deepseek"},
+		{"alibaba", "dashscope"},
+		{"zhipu", "zhipu"},
+		{"moonshot", "moonshot"},
+		{"minimax", "minimax"},
+		{"google", "gemini"},
+		{"stepfun", "openai"},
+		{"bytedance", ""},
+		{"unknown_provider", "unknown_provider"},
+		{"ALIBABA", "dashscope"},
+		{"  alibaba  ", "dashscope"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.provider, func(t *testing.T) {
+			got := litellmProviderPrefix(tt.provider)
+			if got != tt.want {
+				t.Errorf("litellmProviderPrefix(%q) = %q, want %q", tt.provider, got, tt.want)
+			}
+		})
+	}
+}
