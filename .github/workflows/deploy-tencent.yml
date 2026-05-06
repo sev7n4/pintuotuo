@@ -64,89 +64,66 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
           set -e
           cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}
-          echo "[$(date +%H:%M:%S)] Fetching latest code from GitHub..."
+          echo "Fetching latest code from GitHub..."
           git fetch origin main
           git reset --hard origin/main
-          echo "[$(date +%H:%M:%S)] Login GHCR and pull prebuilt images..."
+          echo "Login GHCR and pull prebuilt images..."
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-          echo "[$(date +%H:%M:%S)] Configuring Docker daemon for GHCR reliability..."
-          cat /etc/docker/daemon.json 2>/dev/null || echo "{}" > /tmp/daemon_base.json
-          python3 -c "
-          import json, sys
-          try:
-            with open('/etc/docker/daemon.json') as f:
-              cfg = json.load(f)
-          except:
-            cfg = {}
-          cfg.setdefault('registry-mirrors', [])
-          cfg['max-concurrent-downloads'] = 2
-          cfg['max-concurrent-uploads'] = 2
-          with open('/tmp/daemon_new.json', 'w') as f:
-            json.dump(cfg, f, indent=2)
-          " 2>/dev/null || true
-          if [ -f /tmp/daemon_new.json ]; then
-            sudo cp /tmp/daemon_new.json /etc/docker/daemon.json
-            sudo systemctl restart docker
-            echo "Docker daemon restarted with optimized config"
-            sleep 3
-          fi
-
-          PULL_SUCCESS=0
           for i in 1 2 3 4 5; do
-            echo "[$(date +%H:%M:%S)] Pull attempt $i/5..."
-            if IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml pull 2>&1; then
-              PULL_SUCCESS=1
+            if IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway pull; then
               break
             fi
-            echo "[$(date +%H:%M:%S)] Pull attempt $i failed, cleaning up and retrying..."
-            docker system prune -f >/dev/null 2>&1 || true
-            if [ "$i" -lt 5 ]; then
-              sleep $((i * 10))
+            if [ "$i" -eq 5 ]; then
+              echo "ERROR: docker compose pull failed after $i attempts"
+              exit 1
             fi
+            sleep $((i * 20))
           done
-          if [ "$PULL_SUCCESS" != "1" ]; then
-            echo "ERROR: docker compose pull failed after 5 attempts"
-            exit 1
-          fi
-          echo "[$(date +%H:%M:%S)] Images pulled successfully"
-          echo "[$(date +%H:%M:%S)] Starting containers..."
-          IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml -f docker-compose.proxy.override.yml up -d
-          echo "[$(date +%H:%M:%S)] Running database migrations..."
-          docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "CREATE TABLE IF NOT EXISTS _schema_migrations (version VARCHAR(255) PRIMARY KEY, applied_at TIMESTAMP DEFAULT NOW());" 2>/dev/null || true
+          echo "Starting containers (no server-side build)..."
+          IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway up -d
+          echo "Running database migrations..."
           for migration_file in backend/migrations/*.sql; do
             filename=$(basename "$migration_file")
-            already_applied=$(docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -tAc "SELECT COUNT(*) FROM _schema_migrations WHERE version = '$filename';" 2>/dev/null || echo "0")
-            if [ "$already_applied" = "1" ]; then
-              continue
-            fi
-            echo "Applying migration: $filename"
+            echo "Checking migration: $filename"
+            # Extract SQL between "-- +goose Up" and "-- +goose Down" for goose-formatted migrations
+            # If no goose markers, execute the entire file
             migration_sql=$(sed -n '/-- +goose Up/,/-- +goose Down/p' "$migration_file" | sed '1d;$d' | sed '/-- +goose StatementBegin/d' | sed '/-- +goose StatementEnd/d')
             if [ -n "$migration_sql" ]; then
+              echo "Executing goose-formatted migration: $filename"
               echo "$migration_sql" | docker exec -i pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 2>&1 || echo "Migration $filename may have already been applied or had non-fatal errors"
             else
+              echo "Executing plain SQL migration: $filename"
               docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -v ON_ERROR_STOP=1 -f "/docker-entrypoint-initdb.d/$filename" 2>&1 || echo "Migration $filename may have already been applied or had non-fatal errors"
             fi
-            docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO _schema_migrations (version) VALUES ('$filename') ON CONFLICT (version) DO NOTHING;" 2>/dev/null || true
           done
-          echo "[$(date +%H:%M:%S)] Migrations completed"
+          echo "Migrations completed"
           echo "Pruning dangling images to keep disk stable..."
           docker image prune -f >/dev/null || true
+          echo "Verifying gateway containers are running..."
+          if ! docker ps --format '{{.Names}}' | grep -q '^pintuotuo-litellm$'; then
+            echo "ERROR: pintuotuo-litellm not in running containers"
+            docker ps -a
+            exit 1
+          fi
+          echo "Gateway container OK (litellm)."
           echo "Seeding database..."
           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('admin@example.com', 'Admin', 'd5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05', 'admin', 'active') ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;"
           echo "Seed user password update completed"
-          echo "[$(date +%H:%M:%S)] Deployment completed successfully"
+          echo 'Deployment completed successfully'
           EOF
 
           rm -f ~/.ssh/deploy_key
 
+      # 1) /api/v1/health：进程存活（必选，标准项）
+      # 2) catalog：Repository variable DEPLOY_VERIFY_CATALOG_SKU_ID 有值时断言 GET /catalog/{id}；
+      #    未设置时断言 GET /catalog 列表（空列表也应 200）。二者二选一，不作为「替代 health」。
       - name: Verify deployment
         env:
           VERIFY_SKU_ID: ${{ vars.DEPLOY_VERIFY_CATALOG_SKU_ID }}
         run: |
           set -e
           BASE="http://${{ secrets.TENCENT_CLOUD_IP }}:8080"
-          echo "=== 1) Health check: GET /api/v1/health ==="
+          echo "=== 1) 进程健康检查: GET /api/v1/health（必选）==="
           OK=0
           for i in $(seq 1 20); do
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -154,11 +131,13 @@ jobs:
               --max-time 10 \
               "${BASE}/api/v1/health" 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "Health OK (HTTP $HTTP_CODE) after attempt $i"
+              echo "✅ Health OK (HTTP $HTTP_CODE)"
               OK=1
               break
             fi
             echo "Attempt $i: health HTTP $HTTP_CODE, waiting..."
+            
+            # 指数退避策略
             if [ $i -le 5 ]; then
               sleep 5
             elif [ $i -le 10 ]; then
@@ -168,28 +147,28 @@ jobs:
             fi
           done
           if [ "$OK" != "1" ]; then
-            echo "Health check failed after 20 attempts"
+            echo "❌ /api/v1/health 未在约 200s 内返回 200"
             exit 1
           fi
 
-          echo "=== 2) Catalog assertion ==="
+          echo "=== 2) Catalog 断言（health 通过后再执行；列表或固定 SKU 二选一）==="
           if [ -n "$VERIFY_SKU_ID" ]; then
-            echo "Using DEPLOY_VERIFY_CATALOG_SKU_ID=$VERIFY_SKU_ID"
+            echo "使用仓库变量 DEPLOY_VERIFY_CATALOG_SKU_ID=$VERIFY_SKU_ID → GET /api/v1/catalog/${VERIFY_SKU_ID}"
             C_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
               --connect-timeout 5 \
               --max-time 10 \
               "${BASE}/api/v1/catalog/${VERIFY_SKU_ID}" 2>/dev/null || echo "000")
           else
-            echo "No DEPLOY_VERIFY_CATALOG_SKU_ID set, checking catalog list"
+            echo "未设置 DEPLOY_VERIFY_CATALOG_SKU_ID → GET /api/v1/catalog?page=1&per_page=1（列表）"
             C_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
               --connect-timeout 5 \
               --max-time 10 \
               "${BASE}/api/v1/catalog?page=1&per_page=1" 2>/dev/null || echo "000")
           fi
           if [ "$C_CODE" = "200" ]; then
-            echo "Catalog assertion passed (HTTP $C_CODE)"
+            echo "✅ Catalog 断言通过 (HTTP $C_CODE)"
           else
-            echo "Catalog assertion failed (HTTP $C_CODE)"
+            echo "❌ Catalog 断言失败 (HTTP $C_CODE)。可在 GitHub Repository variables 中设置 DEPLOY_VERIFY_CATALOG_SKU_ID 为环境中存在的 SKU id。"
             exit 1
           fi
 
@@ -219,12 +198,14 @@ jobs:
             Server: ${{ secrets.TENCENT_CLOUD_IP }}
             Commit: ${{ github.sha }}
             Deployed by: ${{ github.actor }}
-
+            
             View deployment details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           to: ${{ secrets.DEPLOYMENT_NOTIFICATION_EMAIL }}
           from: "GitHub Actions <${{ secrets.SMTP_USERNAME }}>"
         continue-on-error: true
 
+      # 过激进会删掉仍被 main / 手动部署引用的 tag，导致服务器 docker compose pull 报 manifest not found。
+      # 与 backend / frontend 各保留最近若干「包版本」（通常对应每次 push 的 sha tag）。
       - name: Cleanup GHCR tags (keep latest 15 per package)
         if: always()
         uses: actions/github-script@v7

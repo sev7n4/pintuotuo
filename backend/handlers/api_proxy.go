@@ -96,100 +96,15 @@ type APIProxyRequest struct {
 	MerchantSKUID *int            `json:"merchant_sku_id,omitempty"`
 }
 
-const (
-	ImageDetailLow  = "low"
-	ImageDetailHigh = "high"
-	ImageDetailAuto = "auto"
-)
-
-type ImageURL struct {
-	URL    string `json:"url"`
-	Detail string `json:"detail,omitempty"`
-}
-
-type ContentPart struct {
-	Type     string    `json:"type"`
-	Text     string    `json:"text,omitempty"`
-	ImageURL *ImageURL `json:"image_url,omitempty"`
-}
-
-type MessageContent struct {
-	Text  string        `json:"-"`
-	Parts []ContentPart `json:"-"`
-}
-
-func (mc *MessageContent) UnmarshalJSON(data []byte) error {
-	var str string
-	if err := json.Unmarshal(data, &str); err == nil {
-		mc.Text = str
-		mc.Parts = nil
-		return nil
-	}
-
-	var parts []ContentPart
-	if err := json.Unmarshal(data, &parts); err == nil {
-		mc.Text = ""
-		if len(parts) == 0 {
-			mc.Parts = nil
-		} else {
-			mc.Parts = parts
-		}
-		return nil
-	}
-
-	return json.Unmarshal(data, &str)
-}
-
-func (mc MessageContent) MarshalJSON() ([]byte, error) {
-	if mc.Parts != nil {
-		return json.Marshal(mc.Parts)
-	}
-	return json.Marshal(mc.Text)
-}
-
 type ChatMessage struct {
-	Role    string         `json:"role"`
-	Content MessageContent `json:"content"`
-	Name    string         `json:"name,omitempty"`
-}
-
-func estimateImageTokensWithSize(detail string, width, height int) int {
-	switch detail {
-	case ImageDetailLow:
-		return 85
-	case ImageDetailHigh:
-		if width <= 0 || height <= 0 {
-			return 765
-		}
-		tiles := ((width + 511) / 512) * ((height + 511) / 512)
-		return 85 + tiles*170 + 255
-	default:
-		if width > 0 && height > 0 {
-			tiles := ((width + 511) / 512) * ((height + 511) / 512)
-			return 85 + tiles*170 + 255
-		}
-		return 765
-	}
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 func estimateInputTokens(messages []ChatMessage) int {
 	totalChars := 0
 	for _, msg := range messages {
-		totalChars += len(msg.Role)
-		if msg.Content.Text != "" {
-			totalChars += len(msg.Content.Text)
-		}
-		for _, part := range msg.Content.Parts {
-			if part.Type == "text" {
-				totalChars += len(part.Text)
-			} else if part.Type == "image_url" {
-				detail := ""
-				if part.ImageURL != nil {
-					detail = part.ImageURL.Detail
-				}
-				totalChars += estimateImageTokensWithSize(detail, 0, 0)
-			}
-		}
+		totalChars += len(msg.Role) + len(msg.Content)
 	}
 	return totalChars / 4
 }
@@ -485,7 +400,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		}
 		streamClient := proxyHTTPClient(15 * time.Minute)
 		retryPolicyStream := buildRetryPolicy(strategySnapshot)
-		retryPolicyStream = applyLitellmGatewayRetryCap(retryPolicyStream, resolveRouteModeWithProvider(&apiKey, providerCfg.ProviderRegion))
+		retryPolicyStream = applyLitellmGatewayRetryCap(retryPolicyStream, resolveRouteMode(&apiKey))
 		streamAttempts := buildProxyCatalogAttempts(c.Request.Context(), db, req)
 		var retryCountStream int
 		for attemptIdx, att := range streamAttempts {
@@ -556,26 +471,6 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 					}
 				}
 			}
-			routeMode := resolveRouteModeWithProvider(&pk, pcfg.ProviderRegion)
-			if routeMode == routeModeLitellm {
-				litellmTemplate, tmplErr := getProviderLitellmTemplate(db, att.provider)
-				if tmplErr != nil {
-					litellmTemplate = att.model
-				}
-				litellmModel := litellmTemplate
-				if strings.Contains(litellmTemplate, "{model_id}") {
-					litellmModel = strings.ReplaceAll(litellmTemplate, "{model_id}", att.model)
-				} else if litellmTemplate == "" {
-					litellmModel = "openai/" + att.model
-				}
-				rb["model"] = litellmModel
-				apiBaseForUser := pk.EndpointURL
-				if apiBaseForUser == "" {
-					apiBaseForUser = pcfg.APIBaseURL
-				}
-				rb["api_key"] = dk
-				rb["api_base"] = apiBaseForUser
-			}
 			jb, mErr := json.Marshal(rb)
 			if mErr != nil {
 				billingEngine.CancelPreDeduct(userIDInt, requestID)
@@ -602,7 +497,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				return io.NopCloser(bytes.NewReader(jb)), nil
 			}
 			hreq.Header.Set("Content-Type", "application/json")
-			authToken := resolveAuthTokenFromRouteMode(resolveRouteModeWithProvider(&pk, pcfg.ProviderRegion), dk)
+			authToken := resolveAuthTokenFromRouteMode(resolveRouteMode(&pk), dk)
 			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 			hreq.Header.Set("Accept", "text/event-stream")
 			applyProxyUpstreamHeaders(c, hreq, requestID)
@@ -670,7 +565,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	client := proxyHTTPClient(60 * time.Second)
 	retryPolicy := buildRetryPolicy(strategySnapshot)
-	retryPolicy = applyLitellmGatewayRetryCap(retryPolicy, resolveRouteModeWithProvider(&apiKey, providerCfg.ProviderRegion))
+	retryPolicy = applyLitellmGatewayRetryCap(retryPolicy, resolveRouteMode(&apiKey))
 	attempts := buildProxyCatalogAttempts(c.Request.Context(), db, req)
 
 	var (
@@ -740,26 +635,6 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				}
 			}
 		}
-		routeMode := resolveRouteModeWithProvider(&pk, pcfg.ProviderRegion)
-		if routeMode == routeModeLitellm {
-			litellmTemplate, tmplErr := getProviderLitellmTemplate(db, att.provider)
-			if tmplErr != nil {
-				litellmTemplate = att.model
-			}
-			litellmModel := litellmTemplate
-			if strings.Contains(litellmTemplate, "{model_id}") {
-				litellmModel = strings.ReplaceAll(litellmTemplate, "{model_id}", att.model)
-			} else if litellmTemplate == "" {
-				litellmModel = "openai/" + att.model
-			}
-			apiBaseForUser := pk.EndpointURL
-			if apiBaseForUser == "" {
-				apiBaseForUser = pcfg.APIBaseURL
-			}
-			rb["model"] = litellmModel
-			rb["api_key"] = dk
-			rb["api_base"] = apiBaseForUser
-		}
 		jb, mErr := json.Marshal(rb)
 		if mErr != nil {
 			billingEngine.CancelPreDeduct(userIDInt, requestID)
@@ -791,7 +666,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			hreq.Header.Set("x-api-key", dk)
 			hreq.Header.Set("anthropic-version", "2023-06-01")
 		default:
-			authToken := resolveAuthTokenFromRouteMode(resolveRouteModeWithProvider(&pk, pcfg.ProviderRegion), dk)
+			authToken := resolveAuthTokenFromRouteMode(resolveRouteMode(&pk), dk)
 			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
 		}
 		applyProxyUpstreamHeaders(c, hreq, requestID)
@@ -984,12 +859,11 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	if currentRoutingDecision != nil {
 		pipeline := services.NewThreeLayerRoutingPipeline()
 
-		gatewayMode := resolveRouteModeWithProvider(&apiKey, providerCfg.ProviderRegion)
+		gatewayMode := resolveRouteMode(&apiKey)
 
 		execInput := &services.ExecutionLayerInputData{
 			GatewayMode:   gatewayMode,
 			EndpointURL:   fmt.Sprintf("%s/chat/completions", strings.TrimRight(providerCfg.APIBaseURL, "/")),
-			EndpointType:  services.EndpointTypeChatCompletions,
 			AuthMethod:    "bearer",
 			ResolvedModel: billModel,
 			RequestFormat: providerCfg.APIFormat,
@@ -1079,38 +953,49 @@ func applyProxyUpstreamHeaders(c *gin.Context, httpReq *http.Request, requestID 
 	}
 }
 
-func resolveRouteModeWithProvider(apiKey *models.MerchantAPIKey, providerRegion string) string {
+func resolveRouteMode(apiKey *models.MerchantAPIKey) string {
 	if apiKey == nil {
 		return routeModeDirect
 	}
-	mode := services.ResolveRouteModeWithProvider(apiKey.RouteMode, providerRegion)
-	if mode == services.GatewayModeDirect {
+	mode := strings.TrimSpace(strings.ToLower(apiKey.RouteMode))
+	switch mode {
+	case routeModeDirect, routeModeLitellm, routeModeProxy:
+		return mode
+	case routeModeAuto, "":
+		return routeModeDirect
+	default:
 		return routeModeDirect
 	}
-	if mode == services.GatewayModeLitellm {
-		return routeModeLitellm
+}
+
+func resolveEndpointURL(routeMode string, apiKey *models.MerchantAPIKey, providerBaseURL string) string {
+	switch routeMode {
+	case routeModeDirect:
+		if apiKey != nil && apiKey.EndpointURL != "" {
+			return strings.TrimRight(apiKey.EndpointURL, "/")
+		}
+		return strings.TrimRight(providerBaseURL, "/")
+	case routeModeLitellm:
+		if apiKey != nil && apiKey.EndpointURL != "" {
+			return strings.TrimRight(apiKey.EndpointURL, "/")
+		}
+		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
+			return strings.TrimRight(base, "/") + "/v1"
+		}
+		return ""
+	case routeModeProxy:
+		if apiKey != nil && apiKey.FallbackEndpointURL != "" {
+			return strings.TrimRight(apiKey.FallbackEndpointURL, "/")
+		}
+		return ""
+	default:
+		return strings.TrimRight(providerBaseURL, "/")
 	}
-	if mode == services.GatewayModeProxy {
-		return routeModeProxy
-	}
-	return routeModeDirect
 }
 
 func applyAPIKeyRouteConfig(cfg providerRuntimeConfig, apiKey *models.MerchantAPIKey) providerRuntimeConfig {
-	execCfg := &services.ExecutionProviderConfig{
-		Code:           cfg.Code,
-		Name:           cfg.Name,
-		APIBaseURL:     cfg.APIBaseURL,
-		APIFormat:      cfg.APIFormat,
-		ProviderRegion: cfg.ProviderRegion,
-		RouteStrategy:  cfg.RouteStrategy,
-		Endpoints:      cfg.Endpoints,
-	}
-	if apiKey != nil {
-		services.ApplyBYOKConfig(execCfg, apiKey.EndpointURL, apiKey.RouteMode, apiKey.RouteConfig, apiKey.FallbackEndpointURL)
-		execCfg.GatewayMode = services.ResolveRouteModeWithProvider(apiKey.RouteMode, cfg.ProviderRegion)
-	}
-	endpointURL := services.ResolveEndpoint(execCfg)
+	routeMode := resolveRouteMode(apiKey)
+	endpointURL := resolveEndpointURL(routeMode, apiKey, cfg.APIBaseURL)
 	if endpointURL != "" {
 		cfg.APIBaseURL = endpointURL
 	}
@@ -1182,47 +1067,14 @@ func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTok
 
 func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeConfig, error) {
 	var cfg providerRuntimeConfig
-	var routeStrategyJSON, endpointsJSON []byte
 	err := db.QueryRow(
-		`SELECT code, name, COALESCE(api_base_url, ''), api_format,
-				COALESCE(provider_region, 'domestic'),
-				COALESCE(route_strategy, '{}'::jsonb),
-				COALESCE(endpoints, '{}'::jsonb)
+		`SELECT code, name, COALESCE(api_base_url, ''), api_format
 		 FROM model_providers
 		 WHERE code = $1 AND status = 'active'
 		 LIMIT 1`,
 		providerCode,
-	).Scan(&cfg.Code, &cfg.Name, &cfg.APIBaseURL, &cfg.APIFormat,
-		&cfg.ProviderRegion, &routeStrategyJSON, &endpointsJSON)
-	if err != nil {
-		return cfg, err
-	}
-	if len(routeStrategyJSON) > 0 {
-		if err := json.Unmarshal(routeStrategyJSON, &cfg.RouteStrategy); err != nil {
-			cfg.RouteStrategy = make(map[string]interface{})
-		}
-	}
-	if len(endpointsJSON) > 0 {
-		if err := json.Unmarshal(endpointsJSON, &cfg.Endpoints); err != nil {
-			cfg.Endpoints = make(map[string]interface{})
-		}
-	}
-	return cfg, nil
-}
-
-func getProviderLitellmTemplate(db *sql.DB, providerCode string) (string, error) {
-	var template string
-	err := db.QueryRow(
-		`SELECT COALESCE(litellm_model_template, '') 
-		 FROM model_providers 
-		 WHERE code = $1 AND status = 'active' 
-		 LIMIT 1`,
-		providerCode,
-	).Scan(&template)
-	if err != nil {
-		return "", err
-	}
-	return template, nil
+	).Scan(&cfg.Code, &cfg.Name, &cfg.APIBaseURL, &cfg.APIFormat)
+	return cfg, err
 }
 
 // entitlementKeyFilterForRouter: nil = no filter (legacy); strict with no keys = empty slice (no SmartRouter pool).
@@ -1529,7 +1381,6 @@ func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string, ke
 		MerchantID:    merchantID,
 		Model:         req.Model,
 		Provider:      req.Provider,
-		EndpointType:  services.EndpointTypeChatCompletions,
 		AllowedKeyIDs: keyFilter,
 		RequestBody:   map[string]interface{}{"messages": req.Messages},
 	}
