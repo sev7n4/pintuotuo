@@ -27,6 +27,7 @@ const (
 	EndpointTypeAudioTranslations   = "audio_translations"
 	EndpointTypeAudioSpeech         = "audio_speech"
 	EndpointTypeModerations         = "moderations"
+	EndpointTypeResponses           = "responses"
 )
 
 func resolveAutoRouteMode(providerRegion string) string {
@@ -386,6 +387,7 @@ var endpointPathSuffixes = map[string]string{
 	EndpointTypeAudioTranslations:   "/v1/audio/translations",
 	EndpointTypeAudioSpeech:         "/v1/audio/speech",
 	EndpointTypeModerations:         "/v1/moderations",
+	EndpointTypeResponses:           "/v1/responses",
 }
 
 func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, originalAPIKey string) string {

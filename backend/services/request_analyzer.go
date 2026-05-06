@@ -13,6 +13,7 @@ const (
 	IntentImage      RequestIntent = "image"
 	IntentAudio      RequestIntent = "audio"
 	IntentModeration RequestIntent = "moderation"
+	IntentResponse   RequestIntent = "response"
 	IntentUnknown    RequestIntent = "unknown"
 )
 

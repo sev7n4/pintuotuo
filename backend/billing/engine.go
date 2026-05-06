@@ -796,6 +796,7 @@ func (e *BillingEngine) getUnitPrice(endpointType, providerCode string) float64 
 		"audio_transcriptions": 0.006,
 		"audio_translations":   0.006,
 		"moderations":          0.0,
+		"responses":            0.001,
 	}
 
 	if price, ok := defaultPrices[endpointType]; ok {
