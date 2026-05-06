@@ -1180,6 +1180,19 @@ func litellmProviderPrefix(provider string) string {
 	}
 }
 
+func resolveLitellmModelName(provider, model string) (string, error) {
+	prefix := litellmProviderPrefix(provider)
+	if prefix == "" {
+		return "", fmt.Errorf("provider %s is not supported by litellm (requires endpoint_id for bytedance)", provider)
+	}
+
+	modelName := model
+	if idx := strings.LastIndex(model, "/"); idx >= 0 {
+		modelName = model[idx+1:]
+	}
+	return prefix + "/" + modelName, nil
+}
+
 func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider, model, originalAPIKey, litellmMasterKey string) (bool, string, string) {
 	providerConfig, err := v.getProviderConfig(provider)
 	if err != nil {
@@ -1191,16 +1204,10 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 		return false, "QUOTA_PROBE_UPSTREAM_URL_MISSING", "upstream base URL not configured"
 	}
 
-	prefix := litellmProviderPrefix(provider)
-	if prefix == "" {
-		return false, "LITELLM_UNSUPPORTED_PROVIDER", fmt.Sprintf("provider %s is not supported by litellm (requires endpoint_id for bytedance)", provider)
+	litellmModel, err := resolveLitellmModelName(provider, model)
+	if err != nil {
+		return false, "LITELLM_UNSUPPORTED_PROVIDER", err.Error()
 	}
-
-	modelName := model
-	if idx := strings.LastIndex(model, "/"); idx >= 0 {
-		modelName = model[idx+1:]
-	}
-	litellmModel := prefix + "/" + modelName
 
 	userConfig := map[string]interface{}{
 		"model_list": []map[string]interface{}{
