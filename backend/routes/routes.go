@@ -91,6 +91,10 @@ func RegisterOpenAICompatRoutes(router *gin.RouterGroup) {
 	{
 		openai.GET("/models", handlers.OpenAIListModels)
 		openai.POST("/chat/completions", handlers.OpenAIChatCompletions)
+		openai.POST("/responses", handlers.OpenAIResponses)
+		openai.GET("/responses/:id", handlers.OpenAIResponsesGet)
+		openai.DELETE("/responses/:id", handlers.OpenAIResponsesDelete)
+		openai.GET("/responses/:id/status", handlers.OpenAIResponsesStatus)
 	}
 }
 
