@@ -95,7 +95,7 @@ func ResolveRouteModeWithProvider(routeMode, providerRegion string) string {
 }
 
 func resolveAutoRouteMode(providerRegion string) string {
-	if providerRegion == regionDomestic {
+	if providerRegion == "" || providerRegion == regionDomestic {
 		return GatewayModeDirect
 	}
 	proxyURL := os.Getenv("HTTPS_PROXY")
