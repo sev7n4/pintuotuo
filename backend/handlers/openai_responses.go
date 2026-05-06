@@ -517,7 +517,7 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil || resp.StatusCode != http.StatusOK {
-			errMsg := "upstream error"
+			var errMsg string
 			if err != nil {
 				errMsg = err.Error()
 			} else {
