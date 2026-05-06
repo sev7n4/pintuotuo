@@ -1153,6 +1153,33 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	return false, code, msg
 }
 
+func litellmProviderPrefix(provider string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "openai":
+		return "openai"
+	case "anthropic":
+		return "anthropic"
+	case "deepseek":
+		return "deepseek"
+	case "alibaba":
+		return "dashscope"
+	case "zhipu":
+		return "zhipu"
+	case "moonshot":
+		return "moonshot"
+	case "minimax":
+		return "minimax"
+	case "google":
+		return "gemini"
+	case "stepfun":
+		return "openai"
+	case "bytedance":
+		return ""
+	default:
+		return provider
+	}
+}
+
 func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider, model, originalAPIKey, litellmMasterKey string) (bool, string, string) {
 	providerConfig, err := v.getProviderConfig(provider)
 	if err != nil {
@@ -1166,7 +1193,11 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 
 	litellmModel := model
 	if !strings.Contains(model, "/") {
-		litellmModel = "openai/" + model
+		prefix := litellmProviderPrefix(provider)
+		if prefix == "" {
+			return false, "LITELLM_UNSUPPORTED_PROVIDER", fmt.Sprintf("provider %s is not supported by litellm (requires endpoint_id for bytedance)", provider)
+		}
+		litellmModel = prefix + "/" + model
 	}
 
 	userConfig := map[string]interface{}{
