@@ -29,6 +29,7 @@ import (
 var orderScheduler *scheduler.OrderScheduler
 var settlementScheduler *scheduler.SettlementScheduler
 var subscriptionScheduler *scheduler.SubscriptionScheduler
+var responseCleanupScheduler *scheduler.ResponseCleanupScheduler
 
 func init() {
 	if err := config.LoadConfig(); err != nil {
@@ -83,6 +84,10 @@ func main() {
 	subscriptionScheduler = scheduler.NewSubscriptionScheduler(1*time.Hour, notifySvc)
 	subscriptionScheduler.Start()
 	defer subscriptionScheduler.Stop()
+
+	responseCleanupScheduler = scheduler.NewResponseCleanupScheduler(24 * time.Hour)
+	responseCleanupScheduler.Start()
+	defer responseCleanupScheduler.Stop()
 
 	services.GetHealthScheduler().Start()
 	defer services.GetHealthScheduler().Stop()

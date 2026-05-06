@@ -17,6 +17,7 @@ type StoredResponse struct {
 	ToolCalls       json.RawMessage `json:"tool_calls,omitempty"`
 	Usage           json.RawMessage `json:"usage,omitempty"`
 	Status          string          `json:"status"`
+	ErrorMessage    sql.NullString  `json:"error_message,omitempty"`
 	BackgroundJobID sql.NullString  `json:"background_job_id,omitempty"`
 	CreatedAt       time.Time       `json:"created_at"`
 	ExpiresAt       time.Time       `json:"expires_at"`

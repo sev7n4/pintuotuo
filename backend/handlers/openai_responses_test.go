@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/pintuotuo/backend/billing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -163,16 +164,24 @@ func TestCalculateToolBilling(t *testing.T) {
 		{Type: "image_generation", Status: "completed"},
 		{Type: "function_call", Status: "completed"},
 	}
-	count := calculateToolBilling(output)
-	assert.Equal(t, 2, count)
+	entries := calculateToolBilling(output)
+	assert.Len(t, entries, 3)
+
+	entryMap := map[billing.BillingUnit]int{}
+	for _, e := range entries {
+		entryMap[e.UnitType] = e.Count
+	}
+	assert.Equal(t, 1, entryMap[billing.BillingUnitRequest])
+	assert.Equal(t, 1, entryMap[billing.BillingUnitImage])
+	assert.Equal(t, 1, entryMap[billing.BillingUnitToken])
 }
 
 func TestCalculateToolBilling_NoTools(t *testing.T) {
 	output := []ResponseOutputItem{
 		{Type: "message", Status: "completed"},
 	}
-	count := calculateToolBilling(output)
-	assert.Equal(t, 0, count)
+	entries := calculateToolBilling(output)
+	assert.Len(t, entries, 0)
 }
 
 func TestReasoningOutput_Parse(t *testing.T) {

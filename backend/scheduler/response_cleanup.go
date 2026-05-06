@@ -1,0 +1,76 @@
+package scheduler
+
+import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/services"
+)
+
+type ResponseCleanupScheduler struct {
+	interval  time.Duration
+	stopChan  chan struct{}
+	isRunning bool
+}
+
+func NewResponseCleanupScheduler(interval time.Duration) *ResponseCleanupScheduler {
+	return &ResponseCleanupScheduler{
+		interval:  interval,
+		stopChan:  make(chan struct{}),
+		isRunning: false,
+	}
+}
+
+func (s *ResponseCleanupScheduler) Start() {
+	if s.isRunning {
+		return
+	}
+
+	s.isRunning = true
+	ticker := time.NewTicker(s.interval)
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				s.cleanExpiredResponses()
+			case <-s.stopChan:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	log.Println("Response cleanup scheduler started")
+}
+
+func (s *ResponseCleanupScheduler) Stop() {
+	if !s.isRunning {
+		return
+	}
+
+	s.isRunning = false
+	close(s.stopChan)
+	log.Println("Response cleanup scheduler stopped")
+}
+
+func (s *ResponseCleanupScheduler) cleanExpiredResponses() {
+	db := config.GetDB()
+	if db == nil {
+		log.Println("Response cleanup scheduler: database not available")
+		return
+	}
+
+	storageSvc := services.NewResponseStorageService(db)
+	deleted, err := storageSvc.CleanExpiredResponses(context.Background())
+	if err != nil {
+		log.Printf("Response cleanup scheduler: failed to clean expired responses: %v", err)
+		return
+	}
+
+	if deleted > 0 {
+		log.Printf("Response cleanup scheduler: cleaned up %d expired responses", deleted)
+	}
+}

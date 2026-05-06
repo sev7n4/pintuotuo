@@ -327,20 +327,8 @@ func handleSyncResponse(c *gin.Context, db *sql.DB, billingEngine *billing.Billi
 	}
 	billingEngine.SettlePreDeductV2(userID, requestID, int64(actualTokens), services.EndpointTypeResponses, "openai")
 
-	toolBilling := calculateToolBilling(apiResp.Output)
-	if toolBilling > 0 {
-		toolReq := billing.BillingRequest{
-			UserID:       userID,
-			EndpointType: services.EndpointTypeResponses,
-			ProviderCode: "openai",
-			UnitType:     billing.BillingUnitRequest,
-			Quantity:     int64(toolBilling),
-			RequestID:    requestID + "_tools",
-			Reason:       "Response API tool calls",
-		}
-		billingEngine.PreDeductBalanceV2(toolReq)
-		billingEngine.SettlePreDeductV2(userID, requestID+"_tools", int64(toolBilling), services.EndpointTypeResponses, "openai")
-	}
+	toolBillingEntries := calculateToolBilling(apiResp.Output)
+	settleToolBilling(billingEngine, userID, requestID, toolBillingEntries)
 
 	inputJSON, _ := json.Marshal(req.Input)
 	outputJSON, _ := json.Marshal(apiResp.Output)
@@ -456,6 +444,9 @@ func handleStreamResponse(c *gin.Context, db *sql.DB, billingEngine *billing.Bil
 	totalTokens := estimatedInputTokens + totalOutputTokens
 	billingEngine.SettlePreDeductV2(userID, requestID, int64(totalTokens), services.EndpointTypeResponses, "openai")
 
+	toolBillingEntries := calculateToolBilling(outputItems)
+	settleToolBilling(billingEngine, userID, requestID, toolBillingEntries)
+
 	if responseID != "" {
 		inputJSON, _ := json.Marshal(req.Input)
 		outputJSON, _ := json.Marshal(outputItems)
@@ -508,7 +499,7 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 		upstreamJSON, _ := json.Marshal(upstreamBody)
 		httpReq, err := http.NewRequestWithContext(ctx, "POST", endpointURL, strings.NewReader(string(upstreamJSON)))
 		if err != nil {
-			storageSvc.UpdateStatus(ctx, responseID, "failed")
+			storageSvc.UpdateStatusWithError(ctx, responseID, "failed", err.Error())
 			billingEngine.CancelPreDeduct(userID, requestID)
 			return
 		}
@@ -518,7 +509,7 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 		client := &http.Client{Timeout: 300 * time.Second}
 		resp, err := client.Do(httpReq)
 		if err != nil {
-			storageSvc.UpdateStatus(ctx, responseID, "failed")
+			storageSvc.UpdateStatusWithError(ctx, responseID, "failed", err.Error())
 			billingEngine.CancelPreDeduct(userID, requestID)
 			return
 		}
@@ -526,14 +517,20 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil || resp.StatusCode != http.StatusOK {
-			storageSvc.UpdateStatus(ctx, responseID, "failed")
+			var errMsg string
+			if err != nil {
+				errMsg = err.Error()
+			} else {
+				errMsg = fmt.Sprintf("upstream returned status %d", resp.StatusCode)
+			}
+			storageSvc.UpdateStatusWithError(ctx, responseID, "failed", errMsg)
 			billingEngine.CancelPreDeduct(userID, requestID)
 			return
 		}
 
 		var apiResp ResponseAPIResponse
 		if err := json.Unmarshal(body, &apiResp); err != nil {
-			storageSvc.UpdateStatus(ctx, responseID, "failed")
+			storageSvc.UpdateStatusWithError(ctx, responseID, "failed", err.Error())
 			billingEngine.CancelPreDeduct(userID, requestID)
 			return
 		}
@@ -543,6 +540,9 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 			actualTokens = apiResp.Usage.InputTokens + apiResp.Usage.OutputTokens
 		}
 		billingEngine.SettlePreDeductV2(userID, requestID, int64(actualTokens), services.EndpointTypeResponses, "openai")
+
+		toolBillingEntries := calculateToolBilling(apiResp.Output)
+		settleToolBilling(billingEngine, userID, requestID, toolBillingEntries)
 
 		outputJSON, _ := json.Marshal(apiResp.Output)
 		usageJSON, _ := json.Marshal(apiResp.Usage)
@@ -619,7 +619,12 @@ func estimateResponseTokens(req *ResponseRequest) int {
 	return tokens
 }
 
-func calculateToolBilling(output []ResponseOutputItem) int {
+type ToolBillingEntry struct {
+	UnitType billing.BillingUnit
+	Count    int
+}
+
+func calculateToolBilling(output []ResponseOutputItem) []ToolBillingEntry {
 	toolBillingMap := map[string]billing.BillingUnit{
 		"web_search_call":  billing.BillingUnitRequest,
 		"file_search_call": billing.BillingUnitRequest,
@@ -630,15 +635,37 @@ func calculateToolBilling(output []ResponseOutputItem) int {
 		"function_call":    billing.BillingUnitToken,
 	}
 
-	count := 0
+	counts := map[billing.BillingUnit]int{}
 	for _, item := range output {
-		if _, ok := toolBillingMap[item.Type]; ok {
-			if toolBillingMap[item.Type] != billing.BillingUnitToken {
-				count++
-			}
+		if unitType, ok := toolBillingMap[item.Type]; ok {
+			counts[unitType]++
 		}
 	}
-	return count
+
+	var entries []ToolBillingEntry
+	for unitType, count := range counts {
+		entries = append(entries, ToolBillingEntry{UnitType: unitType, Count: count})
+	}
+	return entries
+}
+
+func settleToolBilling(billingEngine *billing.BillingEngine, userID int, requestID string, entries []ToolBillingEntry) {
+	for _, entry := range entries {
+		if entry.Count == 0 {
+			continue
+		}
+		toolReq := billing.BillingRequest{
+			UserID:       userID,
+			EndpointType: services.EndpointTypeResponses,
+			ProviderCode: "openai",
+			UnitType:     entry.UnitType,
+			Quantity:     int64(entry.Count),
+			RequestID:    requestID + "_tools_" + string(entry.UnitType),
+			Reason:       "Response API tool calls (" + string(entry.UnitType) + ")",
+		}
+		billingEngine.PreDeductBalanceV2(toolReq)
+		billingEngine.SettlePreDeductV2(userID, requestID+"_tools_"+string(entry.UnitType), int64(entry.Count), services.EndpointTypeResponses, "openai")
+	}
 }
 
 func resolveResponseProvider(c *gin.Context, db *sql.DB, model string, userID int) (*services.ExecutionProviderConfig, string, string, error) {

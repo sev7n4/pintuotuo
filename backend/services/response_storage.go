@@ -84,6 +84,17 @@ func (s *ResponseStorageService) UpdateStatus(ctx context.Context, responseID, s
 	return nil
 }
 
+func (s *ResponseStorageService) UpdateStatusWithError(ctx context.Context, responseID, status, errMsg string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE stored_responses SET status = $1, error_message = $2 WHERE response_id = $3`,
+		status, errMsg, responseID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update response status with error: %w", err)
+	}
+	return nil
+}
+
 func (s *ResponseStorageService) UpdateOutput(ctx context.Context, responseID string, output, usage []byte) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE stored_responses SET output = $1, usage = $2, status = 'completed' WHERE response_id = $3`,

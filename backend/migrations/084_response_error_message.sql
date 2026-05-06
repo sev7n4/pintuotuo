@@ -1,0 +1,1 @@
+ALTER TABLE stored_responses ADD COLUMN IF NOT EXISTS error_message TEXT DEFAULT '';
