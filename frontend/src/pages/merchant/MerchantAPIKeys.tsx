@@ -21,7 +21,6 @@ import {
   Divider,
   Spin,
   Checkbox,
-  Result,
 } from 'antd';
 import {
   PlusOutlined,
@@ -32,7 +31,6 @@ import {
   ApiOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
-  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
 import { MerchantAPIKey, VerificationResult } from '@/types';
@@ -49,14 +47,6 @@ import MerchantBYOKOverviewCard from '@/components/merchant/MerchantBYOKOverview
 interface VerificationPollResponse {
   api_key: MerchantAPIKey;
   history: VerificationResult[];
-}
-
-interface OperationResult {
-  type: 'probe';
-  status: 'success' | 'failed' | 'loading';
-  message: string;
-  details?: string;
-  timestamp: Date;
 }
 
 function normalizeVerificationStatus(raw: string | undefined): VerificationResult['status'] {
@@ -137,44 +127,29 @@ function healthTooltipDesc(status?: string): string {
 
 function verificationDotClass(result?: string): string {
   const r = (result || '').toLowerCase();
-  if (r === 'verified') return styles.statusDotVerified;
-  if (r === 'suspend') return styles.statusDotSuspend;
-  if (r === 'unreachable') return styles.statusDotUnreachable;
-  if (r === 'invalid') return styles.statusDotInvalid;
+  if (r === 'verified' || r === 'success') return styles.statusDotVerified;
   if (r === 'failed') return styles.statusDotVerifyFailed;
   return styles.statusDotVerifyPending;
 }
 
 function verificationLabel(result?: string): string {
   const r = (result || '').toLowerCase();
-  if (r === 'verified') return '验证通过';
-  if (r === 'suspend') return '余额不足';
-  if (r === 'unreachable') return '连接失败';
-  if (r === 'invalid') return '认证失败';
+  if (r === 'verified' || r === 'success') return '已验证';
   if (r === 'failed') return '验证失败';
   if (r === 'pending' || r === 'in_progress') return '验证中';
-  return '待验证';
+  return '未验证';
 }
 
 function verificationTooltipDesc(k: MerchantAPIKey): string {
   const r = (k.verification_result || '').toLowerCase();
   const base = `验证结果：${verificationLabel(k.verification_result)}。`;
-  if (r === 'verified') {
-    return `${base}已通过深度验证，可作为路由候选。`;
-  }
-  if (r === 'suspend') {
-    return `${base}请充值后重新验证。`;
-  }
-  if (r === 'unreachable') {
-    return `${base}请检查网络或端点配置。`;
-  }
-  if (r === 'invalid') {
-    return `${base}请更换 API Key。`;
+  if (r === 'verified' || r === 'success') {
+    return `${base}已通过上游 OpenAI 兼容 /models（及深度验证时的额外检查）。`;
   }
   if (r === 'failed') {
-    return `${base}请查看详情并修正问题。`;
+    return `${base}请修正 Key 或厂商配置后重新「轻量/深度验证」。注意：若仅有验证时间但结果为失败，strict 仍可能因其它条件不通过。`;
   }
-  return `${base}请完成深度验证。`;
+  return `${base}请完成「轻量验证」或「深度验证」；通过后会写入 verified。`;
 }
 
 function formatHealthError(record: MerchantAPIKey): string {
@@ -237,11 +212,6 @@ const MerchantAPIKeys = () => {
   );
   const [recentMinutes, setRecentMinutes] = useState<number>(10);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<MerchantAPIKey | null>(null);
-  const [resultModalVisible, setResultModalVisible] = useState(false);
-  const [operationResults, setOperationResults] = useState<Map<number, OperationResult>>(
-    new Map()
-  );
 
   useEffect(() => {
     fetchAPIKeys();
@@ -305,11 +275,7 @@ const MerchantAPIKeys = () => {
   const handleAdd = () => {
     setEditingKey(null);
     form.resetFields();
-    form.setFieldsValue({
-      unlimited_quota: true,
-      health_check_level: 'medium',
-      byok_type: 'official',
-    });
+    form.setFieldsValue({ unlimited_quota: true, health_check_level: 'medium', byok_type: 'official' });
     setModalVisible(true);
   };
 
@@ -350,9 +316,6 @@ const MerchantAPIKeys = () => {
     if (success) {
       message.success('API密钥已删除');
       fetchAPIKeys();
-    } else {
-      const errMsg = useMerchantStore.getState().error || '删除API密钥失败';
-      message.error(errMsg);
     }
   };
 
@@ -361,7 +324,7 @@ const MerchantAPIKeys = () => {
       const values = await form.validateFields();
       if (editingKey) {
         const unlimited = Boolean(values.unlimited_quota);
-        const patch: Partial<MerchantAPIKey> & { api_key?: string; api_secret?: string } = {
+        const patch: Partial<MerchantAPIKey> = {
           name: values.name as string,
           status: values.status as MerchantAPIKey['status'],
           endpoint_url: values.endpoint_url as string | undefined,
@@ -374,12 +337,6 @@ const MerchantAPIKeys = () => {
           security_level: values.security_level as 'standard' | 'high' | undefined,
           byok_type: values.byok_type as 'official' | 'reseller' | 'self_hosted' | undefined,
         };
-        if (values.api_key?.trim()) {
-          patch.api_key = values.api_key.trim();
-        }
-        if (values.api_secret !== undefined && values.api_secret !== null) {
-          patch.api_secret = values.api_secret;
-        }
         const success = await updateAPIKey(editingKey.id, patch);
         if (!success) {
           const msg = useMerchantStore.getState().error || '更新失败';
@@ -430,11 +387,9 @@ const MerchantAPIKeys = () => {
     setVerificationResult(null);
 
     try {
-      const endpoint =
-        mode === 'deep'
-          ? `/merchants/api-keys/${id}/deep-verify`
-          : `/merchants/api-keys/${id}/light-verify`;
-      await api.post(endpoint);
+      await api.post(`/merchants/api-keys/${id}/verify`, {
+        verification_mode: mode,
+      });
       message.success(
         mode === 'deep'
           ? '深度验证已启动（包含配额探测，支持的提供商会执行）'
@@ -448,43 +403,14 @@ const MerchantAPIKeys = () => {
     }
   };
 
-  const setOperationResult = (id: number, result: OperationResult) => {
-    setOperationResults((prev) => {
-      const next = new Map(prev);
-      next.set(id, result);
-      return next;
-    });
-  };
-
-  const handleImmediateHealthCheck = async (record: MerchantAPIKey) => {
-    setOperationResult(record.id, {
-      type: 'probe',
-      status: 'loading',
-      message: '正在触发探测...',
-      timestamp: new Date(),
-    });
+  const handleImmediateHealthCheck = async (id: number) => {
     try {
-      await api.post(`/merchants/api-keys/${record.id}/probe`);
-      setOperationResult(record.id, {
-        type: 'probe',
-        status: 'success',
-        message: '探测已触发',
-        details: '请稍后刷新查看健康状态更新',
-        timestamp: new Date(),
-      });
-      setSelectedItem(record);
-      setResultModalVisible(true);
-      void pollHealthCheckResult(record.id);
-    } catch (err) {
-      setOperationResult(record.id, {
-        type: 'probe',
-        status: 'failed',
-        message: '触发探测失败',
-        details: String(err),
-        timestamp: new Date(),
-      });
-      setSelectedItem(record);
-      setResultModalVisible(true);
+      await api.post(`/merchants/api-keys/${id}/health-check`);
+      message.success('已触发立即健康探测，正在获取结果...');
+      fetchAPIKeys();
+      void pollHealthCheckResult(id);
+    } catch {
+      message.error('触发健康探测失败');
     }
   };
 
@@ -498,14 +424,16 @@ const MerchantAPIKeys = () => {
       if (!latest?.last_health_check_at) continue;
       const health = (latest.health_status || 'unknown').toLowerCase();
       if (health === 'healthy' || health === 'degraded') {
-        setSelectedItem(latest);
+        message.success(`探测完成：当前状态 ${health === 'healthy' ? '健康' : '降级'}`);
         return;
       }
       if (health === 'unhealthy') {
-        setSelectedItem(latest);
+        const reason = formatHealthError(latest).trim();
+        message.error(reason ? `探测失败：${reason}` : '探测失败：状态不健康');
         return;
       }
     }
+    message.warning('探测已触发，但结果尚未返回，请稍后手动刷新查看');
   };
 
   const pollVerificationResult = async (id: number) => {
@@ -774,32 +702,11 @@ const MerchantAPIKeys = () => {
               深度验证
             </Button>
           </Tooltip>
-          {(() => {
-            const result = operationResults.get(record.id);
-            const isLoading = result?.status === 'loading' && result?.type === 'probe';
-            const isSuccess = result?.status === 'success' && result?.type === 'probe';
-            const isFailed = result?.status === 'failed' && result?.type === 'probe';
-            let btnClass = '';
-            if (isSuccess) btnClass = styles.actionBtnSuccess;
-            if (isFailed) btnClass = styles.actionBtnError;
-            return (
-              <Tooltip
-                title={
-                  result
-                    ? `${result.message} (${result.timestamp.toLocaleTimeString()})`
-                    : '立即探测'
-                }
-              >
-                <Button
-                  size="small"
-                  icon={isLoading ? <SyncOutlined spin /> : <ThunderboltOutlined />}
-                  onClick={() => handleImmediateHealthCheck(record)}
-                  className={btnClass}
-                  loading={isLoading}
-                />
-              </Tooltip>
-            );
-          })()}
+          <Tooltip title="立即健康探测（绕过周期节流，按该 Key 的探测策略执行一次）">
+            <Button type="link" size="small" onClick={() => handleImmediateHealthCheck(record.id)}>
+              立即探测
+            </Button>
+          </Tooltip>
           <Button
             type="link"
             size="small"
@@ -1087,22 +994,6 @@ const MerchantAPIKeys = () => {
                   />
                 </Form.Item>
               </Spin>
-            </>
-          )}
-
-          {editingKey && (
-            <>
-              <Form.Item name="api_key" label="API Key" extra="留空则不更新">
-                <Input.Password placeholder="输入新的 API Key 以更新，留空不修改" />
-              </Form.Item>
-              <Form.Item name="api_secret" label="API Secret" extra="留空则不更新">
-                <Input.Password placeholder="输入新的 API Secret 以更新，留空不修改" />
-              </Form.Item>
-            </>
-          )}
-
-          {!editingKey && (
-            <>
               <Form.Item
                 name="api_key"
                 label="API Key"
@@ -1220,90 +1111,6 @@ const MerchantAPIKeys = () => {
             </Form.Item>
           )}
         </Form>
-      </Modal>
-
-      <Modal
-        title="操作结果"
-        open={resultModalVisible}
-        onCancel={() => setResultModalVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setResultModalVisible(false)}>
-            关闭
-          </Button>,
-          <Button
-            key="refresh"
-            type="primary"
-            onClick={() => {
-              setResultModalVisible(false);
-              fetchAPIKeys();
-            }}
-          >
-            刷新数据
-          </Button>,
-        ]}
-        width={500}
-      >
-        {selectedItem && operationResults.get(selectedItem.id) && (
-          <div className={styles.resultCard}>
-            <Result
-              icon={
-                operationResults.get(selectedItem.id)?.status === 'success' ? (
-                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                ) : (
-                  <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
-                )
-              }
-              title={operationResults.get(selectedItem.id)?.message}
-              subTitle={operationResults.get(selectedItem.id)?.details}
-            />
-            <Divider />
-            <Descriptions column={1} size="small">
-              <Descriptions.Item label="API Key">{selectedItem.name}</Descriptions.Item>
-              <Descriptions.Item label="提供商">
-                {selectedItem.provider.toUpperCase()}
-              </Descriptions.Item>
-              <Descriptions.Item label="当前健康状态">
-                <span className={styles.statusLightRow}>
-                  <span
-                    className={`${styles.statusDot} ${healthDotClass(selectedItem.health_status)}`}
-                    aria-hidden
-                  />
-                  <span className={styles.statusLightLabel}>
-                    {healthLabel(selectedItem.health_status)}
-                  </span>
-                </span>
-              </Descriptions.Item>
-              <Descriptions.Item label="当前验证状态">
-                <span className={styles.statusLightRow}>
-                  <span
-                    className={`${styles.statusDot} ${verificationDotClass(selectedItem.verification_result)}`}
-                    aria-hidden
-                  />
-                  <span className={styles.statusLightLabel}>
-                    {verificationLabel(selectedItem.verification_result)}
-                  </span>
-                </span>
-              </Descriptions.Item>
-              {selectedItem.health_error_category && (
-                <Descriptions.Item label="健康错误分类">
-                  <Tag color="error">
-                    {toHealthCategoryCN(selectedItem.health_error_category)}
-                  </Tag>
-                </Descriptions.Item>
-              )}
-              {selectedItem.health_error_code && (
-                <Descriptions.Item label="健康错误码">
-                  <Tag color="volcano">{selectedItem.health_error_code}</Tag>
-                </Descriptions.Item>
-              )}
-              {selectedItem.health_error_message && (
-                <Descriptions.Item label="健康错误信息">
-                  <span style={{ color: '#ff4d4f' }}>{selectedItem.health_error_message}</span>
-                </Descriptions.Item>
-              )}
-            </Descriptions>
-          </div>
-        )}
       </Modal>
 
       <Modal

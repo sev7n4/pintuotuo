@@ -663,11 +663,6 @@ func resolveResponseProvider(c *gin.Context, db *sql.DB, model string, userID in
 	}
 	execCfg.GatewayMode = services.ResolveRouteModeWithProvider("", cfg.ProviderRegion)
 
-	endpointURL := services.ResolveEndpoint(execCfg)
-	if endpointURL != "" {
-		execCfg.APIBaseURL = endpointURL
-	}
-
 	decryptedKey, err := getDecryptedAPIKeyForProvider(db, provider, userID)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("failed to get API key: %w", err)

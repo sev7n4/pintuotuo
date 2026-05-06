@@ -17,6 +17,7 @@ func TestEndpointTypeConstants_Complete(t *testing.T) {
 		"EndpointTypeAudioTranslations":   EndpointTypeAudioTranslations,
 		"EndpointTypeAudioSpeech":         EndpointTypeAudioSpeech,
 		"EndpointTypeModerations":         EndpointTypeModerations,
+		"EndpointTypeResponses":           EndpointTypeResponses,
 	}
 
 	values := map[string]string{
@@ -29,6 +30,7 @@ func TestEndpointTypeConstants_Complete(t *testing.T) {
 		"EndpointTypeAudioTranslations":   "audio_translations",
 		"EndpointTypeAudioSpeech":         "audio_speech",
 		"EndpointTypeModerations":         "moderations",
+		"EndpointTypeResponses":           "responses",
 	}
 
 	for name, constant := range expected {
@@ -49,6 +51,7 @@ func TestEndpointPathSuffixes(t *testing.T) {
 		EndpointTypeAudioTranslations:   "/v1/audio/translations",
 		EndpointTypeAudioSpeech:         "/v1/audio/speech",
 		EndpointTypeModerations:         "/v1/moderations",
+		EndpointTypeResponses:           "/v1/responses",
 	}
 
 	for endpointType, expectedSuffix := range expected {
@@ -118,6 +121,11 @@ func TestResolveEndpointByType_AllEndpointTypes(t *testing.T) {
 			expected:     "https://api.openai.com/v1/moderations",
 		},
 		{
+			name:         "responses",
+			endpointType: EndpointTypeResponses,
+			expected:     "https://api.openai.com/v1/responses",
+		},
+		{
 			name:         "unknown defaults to chat_completions",
 			endpointType: "unknown_type",
 			expected:     "https://api.openai.com/v1/chat/completions",
@@ -145,7 +153,7 @@ func TestResolveEndpointByType_WithEndpoints(t *testing.T) {
 	}
 
 	result := ResolveEndpointByType(cfg, EndpointTypeEmbeddings)
-	assert.Equal(t, "https://api.openai.com/v1/v1/embeddings", result)
+	assert.Equal(t, "https://api.openai.com/v1/embeddings", result)
 }
 
 func TestResolveEndpointByType_EmptyConfig(t *testing.T) {

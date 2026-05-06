@@ -309,6 +309,11 @@ func TestEndpointTypeConstants(t *testing.T) {
 			constant: EndpointTypeModerations,
 			expected: "moderations",
 		},
+		{
+			name:     "EndpointTypeResponses",
+			constant: EndpointTypeResponses,
+			expected: "responses",
+		},
 	}
 
 	for _, tt := range tests {
@@ -338,7 +343,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeChatCompletions,
-			expected:     "https://api.openai.com/v1/v1/chat/completions",
+			expected:     "https://api.openai.com/v1/chat/completions",
 		},
 		{
 			name: "embeddings endpoint from direct mode",
@@ -353,7 +358,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeEmbeddings,
-			expected:     "https://api.openai.com/v1/v1/embeddings",
+			expected:     "https://api.openai.com/v1/embeddings",
 		},
 		{
 			name: "images_generations endpoint from direct mode",
@@ -368,7 +373,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeImagesGenerations,
-			expected:     "https://api.openai.com/v1/v1/images/generations",
+			expected:     "https://api.openai.com/v1/images/generations",
 		},
 		{
 			name: "images_variations endpoint from direct mode",
@@ -383,7 +388,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeImagesVariations,
-			expected:     "https://api.openai.com/v1/v1/images/variations",
+			expected:     "https://api.openai.com/v1/images/variations",
 		},
 		{
 			name: "images_edits endpoint from direct mode",
@@ -398,7 +403,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeImagesEdits,
-			expected:     "https://api.openai.com/v1/v1/images/edits",
+			expected:     "https://api.openai.com/v1/images/edits",
 		},
 		{
 			name: "audio_speech endpoint from direct mode",
@@ -413,7 +418,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeAudioSpeech,
-			expected:     "https://api.openai.com/v1/v1/audio/speech",
+			expected:     "https://api.openai.com/v1/audio/speech",
 		},
 		{
 			name: "audio_transcriptions endpoint from direct mode",
@@ -428,7 +433,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeAudioTranscriptions,
-			expected:     "https://api.openai.com/v1/v1/audio/transcriptions",
+			expected:     "https://api.openai.com/v1/audio/transcriptions",
 		},
 		{
 			name: "audio_translations endpoint from direct mode",
@@ -443,7 +448,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeAudioTranslations,
-			expected:     "https://api.openai.com/v1/v1/audio/translations",
+			expected:     "https://api.openai.com/v1/audio/translations",
 		},
 		{
 			name: "moderations endpoint from direct mode",
@@ -458,7 +463,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				},
 			},
 			endpointType: EndpointTypeModerations,
-			expected:     "https://api.openai.com/v1/v1/moderations",
+			expected:     "https://api.openai.com/v1/moderations",
 		},
 		{
 			name: "fallback to APIBaseURL when no endpoints configured",
@@ -469,7 +474,7 @@ func TestResolveEndpointByType(t *testing.T) {
 				Endpoints:      nil,
 			},
 			endpointType: EndpointTypeChatCompletions,
-			expected:     "https://api.openai.com/v1/v1/chat/completions",
+			expected:     "https://api.openai.com/v1/chat/completions",
 		},
 	}
 

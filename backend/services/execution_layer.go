@@ -17,7 +17,9 @@ const (
 	RouteModeAuto      = "auto"
 	regionDomestic     = "domestic"
 	regionOverseas     = "overseas"
+)
 
+const (
 	EndpointTypeChatCompletions     = "chat_completions"
 	EndpointTypeEmbeddings          = "embeddings"
 	EndpointTypeImagesGenerations   = "images_generations"
@@ -30,19 +32,82 @@ const (
 	EndpointTypeResponses           = "responses"
 )
 
+var endpointPathSuffixes = map[string]string{
+	EndpointTypeChatCompletions:     "/v1/chat/completions",
+	EndpointTypeEmbeddings:          "/v1/embeddings",
+	EndpointTypeImagesGenerations:   "/v1/images/generations",
+	EndpointTypeImagesVariations:    "/v1/images/variations",
+	EndpointTypeImagesEdits:         "/v1/images/edits",
+	EndpointTypeAudioTranscriptions: "/v1/audio/transcriptions",
+	EndpointTypeAudioTranslations:   "/v1/audio/translations",
+	EndpointTypeAudioSpeech:         "/v1/audio/speech",
+	EndpointTypeModerations:         "/v1/moderations",
+	EndpointTypeResponses:           "/v1/responses",
+}
+
+func ResolveEndpointByType(cfg *ExecutionProviderConfig, endpointType string) string {
+	if cfg == nil {
+		return ""
+	}
+
+	suffix, ok := endpointPathSuffixes[endpointType]
+	if !ok {
+		suffix = endpointPathSuffixes[EndpointTypeChatCompletions]
+	}
+
+	baseURL := ResolveEndpoint(cfg)
+	if baseURL == "" {
+		baseURL = cfg.APIBaseURL
+	}
+	if baseURL == "" {
+		return ""
+	}
+
+	baseURL = strings.TrimRight(baseURL, "/")
+	if strings.HasSuffix(baseURL, "/v1") {
+		baseURL = baseURL[:len(baseURL)-3]
+	}
+
+	return baseURL + suffix
+}
+
+func ResolveEndpoint(cfg *ExecutionProviderConfig) string {
+	if cfg == nil {
+		return ""
+	}
+	layer := &ExecutionLayer{}
+	return layer.resolveEndpoint(cfg)
+}
+
+func ResolveRouteModeWithProvider(routeMode, providerRegion string) string {
+	if routeMode != "" && routeMode != RouteModeAuto {
+		validModes := map[string]bool{
+			GatewayModeDirect:  true,
+			GatewayModeLitellm: true,
+			GatewayModeProxy:   true,
+		}
+		if validModes[routeMode] {
+			return routeMode
+		}
+		return GatewayModeDirect
+	}
+	return resolveAutoRouteMode(providerRegion)
+}
+
 func resolveAutoRouteMode(providerRegion string) string {
-	if providerRegion == regionOverseas {
-		httpsProxy := os.Getenv("HTTPS_PROXY")
-		if httpsProxy == "" {
-			httpsProxy = os.Getenv("https_proxy")
-		}
-		if httpsProxy != "" {
-			return GatewayModeProxy
-		}
-		litellmURL := os.Getenv("LLM_GATEWAY_LITELLM_URL")
-		if litellmURL != "" {
-			return GatewayModeLitellm
-		}
+	if providerRegion == regionDomestic {
+		return GatewayModeDirect
+	}
+	proxyURL := os.Getenv("HTTPS_PROXY")
+	if proxyURL == "" {
+		proxyURL = os.Getenv("https_proxy")
+	}
+	if proxyURL != "" {
+		return GatewayModeProxy
+	}
+	litellmURL := os.Getenv("LLM_GATEWAY_LITELLM_URL")
+	if litellmURL != "" {
+		return GatewayModeLitellm
 	}
 	return GatewayModeDirect
 }
@@ -235,26 +300,17 @@ func (l *ExecutionLayer) GetProviderConfig(ctx context.Context, providerCode str
 	}
 
 	query := `
-		SELECT code, name, 
-			   COALESCE(api_base_url, ''), 
-			   COALESCE(api_format, 'openai'),
-			   COALESCE(provider_region, 'domestic'),
-			   COALESCE(route_strategy, '{}'::jsonb),
-			   COALESCE(endpoints, '{}'::jsonb)
+		SELECT code, name, COALESCE(api_base_url, ''), COALESCE(api_format, 'openai')
 		FROM model_providers
 		WHERE code = $1 AND status = 'active'
 	`
 
 	var cfg ExecutionProviderConfig
-	var routeStrategyJSON, endpointsJSON []byte
 	err := l.db.QueryRowContext(ctx, query, providerCode).Scan(
 		&cfg.Code,
 		&cfg.Name,
 		&cfg.APIBaseURL,
 		&cfg.APIFormat,
-		&cfg.ProviderRegion,
-		&routeStrategyJSON,
-		&endpointsJSON,
 	)
 
 	if err == sql.ErrNoRows {
@@ -264,25 +320,10 @@ func (l *ExecutionLayer) GetProviderConfig(ctx context.Context, providerCode str
 		return nil, fmt.Errorf("failed to query provider config: %w", err)
 	}
 
-	if len(routeStrategyJSON) > 0 {
-		if err := json.Unmarshal(routeStrategyJSON, &cfg.RouteStrategy); err != nil {
-			cfg.RouteStrategy = make(map[string]interface{})
-		}
-	}
-	if len(endpointsJSON) > 0 {
-		if err := json.Unmarshal(endpointsJSON, &cfg.Endpoints); err != nil {
-			cfg.Endpoints = make(map[string]interface{})
-		}
-	}
-
 	return &cfg, nil
 }
 
 func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
-	return ResolveEndpoint(cfg)
-}
-
-func ResolveEndpoint(cfg *ExecutionProviderConfig) string {
 	if cfg == nil {
 		return ""
 	}
@@ -363,33 +404,6 @@ func ResolveEndpoint(cfg *ExecutionProviderConfig) string {
 	}
 }
 
-func ResolveEndpointByType(cfg *ExecutionProviderConfig, endpointType string) string {
-	baseURL := ResolveEndpoint(cfg)
-	if baseURL == "" {
-		return ""
-	}
-	baseURL = strings.TrimRight(baseURL, "/")
-
-	suffix, ok := endpointPathSuffixes[endpointType]
-	if !ok {
-		suffix = "/v1/chat/completions"
-	}
-	return baseURL + suffix
-}
-
-var endpointPathSuffixes = map[string]string{
-	EndpointTypeChatCompletions:     "/v1/chat/completions",
-	EndpointTypeEmbeddings:          "/v1/embeddings",
-	EndpointTypeImagesGenerations:   "/v1/images/generations",
-	EndpointTypeImagesVariations:    "/v1/images/variations",
-	EndpointTypeImagesEdits:         "/v1/images/edits",
-	EndpointTypeAudioTranscriptions: "/v1/audio/transcriptions",
-	EndpointTypeAudioTranslations:   "/v1/audio/translations",
-	EndpointTypeAudioSpeech:         "/v1/audio/speech",
-	EndpointTypeModerations:         "/v1/moderations",
-	EndpointTypeResponses:           "/v1/responses",
-}
-
 func (l *ExecutionLayer) resolveAuthToken(cfg *ExecutionProviderConfig, originalAPIKey string) string {
 	if cfg == nil {
 		return originalAPIKey
@@ -413,35 +427,9 @@ func (l *ExecutionLayer) determineGatewayMode(cfg *ExecutionProviderConfig) stri
 		return GatewayModeDirect
 	}
 
-	if cfg.BYOKRouteMode != "" && cfg.BYOKRouteMode != RouteModeAuto {
+	if cfg.BYOKRouteMode != "" && cfg.BYOKRouteMode != "auto" {
 		return cfg.BYOKRouteMode
 	}
 
-	return resolveAutoRouteMode(cfg.ProviderRegion)
-}
-
-func ApplyBYOKConfig(cfg *ExecutionProviderConfig, byokEndpointURL, byokRouteMode string, byokRouteConfig map[string]interface{}, byokFallbackURL string) {
-	if cfg == nil {
-		return
-	}
-	cfg.BYOKEndpointURL = byokEndpointURL
-	cfg.BYOKRouteMode = byokRouteMode
-	cfg.BYOKRouteConfig = byokRouteConfig
-	cfg.BYOKFallbackURL = byokFallbackURL
-}
-
-func ResolveRouteMode(routeMode string) string {
-	return ResolveRouteModeWithProvider(routeMode, "")
-}
-
-func ResolveRouteModeWithProvider(routeMode string, providerRegion string) string {
-	mode := strings.TrimSpace(strings.ToLower(routeMode))
-	switch mode {
-	case GatewayModeDirect, GatewayModeLitellm, GatewayModeProxy:
-		return mode
-	case RouteModeAuto, "":
-		return resolveAutoRouteMode(providerRegion)
-	default:
-		return GatewayModeDirect
-	}
+	return GatewayModeDirect
 }
