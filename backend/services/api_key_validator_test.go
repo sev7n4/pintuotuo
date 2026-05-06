@@ -242,3 +242,76 @@ func TestLitellmProviderPrefix(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveLitellmModelName(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		model    string
+		want     string
+		wantErr  bool
+	}{
+		{
+			name:     "model without slash - alibaba",
+			provider: "alibaba",
+			model:    "qwen-turbo",
+			want:     "dashscope/qwen-turbo",
+			wantErr:  false,
+		},
+		{
+			name:     "model with slash - alibaba kimi prefix",
+			provider: "alibaba",
+			model:    "kimi/kimi-k2.6",
+			want:     "dashscope/kimi-k2.6",
+			wantErr:  false,
+		},
+		{
+			name:     "model with slash - openai prefix",
+			provider: "openai",
+			model:    "openai/gpt-4",
+			want:     "openai/gpt-4",
+			wantErr:  false,
+		},
+		{
+			name:     "model with slash - unknown prefix",
+			provider: "alibaba",
+			model:    "unknown/model-name",
+			want:     "dashscope/model-name",
+			wantErr:  false,
+		},
+		{
+			name:     "bytedance unsupported",
+			provider: "bytedance",
+			model:    "doubao-lite",
+			want:     "",
+			wantErr:  true,
+		},
+		{
+			name:     "deepseek model without slash",
+			provider: "deepseek",
+			model:    "deepseek-chat",
+			want:     "deepseek/deepseek-chat",
+			wantErr:  false,
+		},
+		{
+			name:     "google model with gemini prefix",
+			provider: "google",
+			model:    "gemini/gemini-pro",
+			want:     "gemini/gemini-pro",
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := resolveLitellmModelName(tt.provider, tt.model)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("resolveLitellmModelName(%q, %q) error = %v, wantErr %v", tt.provider, tt.model, err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("resolveLitellmModelName(%q, %q) = %q, want %q", tt.provider, tt.model, got, tt.want)
+			}
+		})
+	}
+}
