@@ -248,77 +248,111 @@ func TestBillingEngine_GetUnitPrice(t *testing.T) {
 		name         string
 		endpointType string
 		providerCode string
+		unitType     BillingUnit
 		wantMinPrice float64
 		wantMaxPrice float64
 	}{
 		{
-			name:         "chat_completions default price",
+			name:         "chat_completions token price",
 			endpointType: "chat_completions",
 			providerCode: "openai",
+			unitType:     BillingUnitToken,
 			wantMinPrice: 0.0001,
 			wantMaxPrice: 0.01,
 		},
 		{
-			name:         "embeddings default price",
+			name:         "embeddings token price",
 			endpointType: "embeddings",
 			providerCode: "openai",
+			unitType:     BillingUnitToken,
 			wantMinPrice: 0.00001,
 			wantMaxPrice: 0.001,
 		},
 		{
-			name:         "images_generations default price",
+			name:         "images_generations image price",
 			endpointType: "images_generations",
 			providerCode: "openai",
+			unitType:     BillingUnitImage,
 			wantMinPrice: 1.0,
 			wantMaxPrice: 50.0,
 		},
 		{
-			name:         "images_variations default price",
+			name:         "images_variations image price",
 			endpointType: "images_variations",
 			providerCode: "openai",
+			unitType:     BillingUnitImage,
 			wantMinPrice: 1.0,
 			wantMaxPrice: 50.0,
 		},
 		{
-			name:         "images_edits default price",
+			name:         "images_edits image price",
 			endpointType: "images_edits",
 			providerCode: "openai",
+			unitType:     BillingUnitImage,
 			wantMinPrice: 1.0,
 			wantMaxPrice: 50.0,
 		},
 		{
-			name:         "audio_speech default price",
+			name:         "audio_speech character price",
 			endpointType: "audio_speech",
 			providerCode: "openai",
+			unitType:     BillingUnitCharacter,
 			wantMinPrice: 0.00001,
 			wantMaxPrice: 0.001,
 		},
 		{
-			name:         "audio_transcriptions default price",
+			name:         "audio_transcriptions second price",
 			endpointType: "audio_transcriptions",
 			providerCode: "openai",
+			unitType:     BillingUnitSecond,
 			wantMinPrice: 0.001,
 			wantMaxPrice: 0.01,
 		},
 		{
-			name:         "audio_translations default price",
+			name:         "audio_translations second price",
 			endpointType: "audio_translations",
 			providerCode: "openai",
+			unitType:     BillingUnitSecond,
 			wantMinPrice: 0.001,
 			wantMaxPrice: 0.01,
 		},
 		{
-			name:         "moderations default price",
+			name:         "moderations token price",
 			endpointType: "moderations",
 			providerCode: "openai",
+			unitType:     BillingUnitToken,
 			wantMinPrice: 0.0,
 			wantMaxPrice: 0.0,
+		},
+		{
+			name:         "responses token price",
+			endpointType: "responses",
+			providerCode: "openai",
+			unitType:     BillingUnitToken,
+			wantMinPrice: 0.0001,
+			wantMaxPrice: 0.01,
+		},
+		{
+			name:         "responses request price",
+			endpointType: "responses",
+			providerCode: "openai",
+			unitType:     BillingUnitRequest,
+			wantMinPrice: 0.001,
+			wantMaxPrice: 1.0,
+		},
+		{
+			name:         "responses image price",
+			endpointType: "responses",
+			providerCode: "openai",
+			unitType:     BillingUnitImage,
+			wantMinPrice: 1.0,
+			wantMaxPrice: 50.0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			price := engine.getUnitPrice(tt.endpointType, tt.providerCode)
+			price := engine.getUnitPrice(tt.endpointType, tt.providerCode, tt.unitType)
 			if price < tt.wantMinPrice || price > tt.wantMaxPrice {
 				t.Errorf("getUnitPrice() = %v, want between %v and %v", price, tt.wantMinPrice, tt.wantMaxPrice)
 			}
@@ -402,7 +436,7 @@ func TestBillingEngine_PreDeductBalanceV2(t *testing.T) {
 			UserID:       1,
 			EndpointType: "moderations",
 			ProviderCode: "openai",
-			UnitType:     BillingUnitRequest,
+			UnitType:     BillingUnitToken,
 			Quantity:     10,
 			RequestID:    "test-req-5",
 			Reason:       "test",

@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/pintuotuo/backend/config"
@@ -13,6 +14,7 @@ type ResponseCleanupScheduler struct {
 	interval  time.Duration
 	stopChan  chan struct{}
 	isRunning bool
+	mu        sync.Mutex
 }
 
 func NewResponseCleanupScheduler(interval time.Duration) *ResponseCleanupScheduler {
@@ -24,11 +26,14 @@ func NewResponseCleanupScheduler(interval time.Duration) *ResponseCleanupSchedul
 }
 
 func (s *ResponseCleanupScheduler) Start() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.isRunning {
 		return
 	}
 
 	s.isRunning = true
+	s.stopChan = make(chan struct{})
 	ticker := time.NewTicker(s.interval)
 
 	go func() {
@@ -47,6 +52,8 @@ func (s *ResponseCleanupScheduler) Start() {
 }
 
 func (s *ResponseCleanupScheduler) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if !s.isRunning {
 		return
 	}

@@ -31,11 +31,11 @@ func (s *ResponseStorageService) StoreResponse(ctx context.Context, resp *models
 	}
 
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO stored_responses (response_id, user_id, merchant_id, model, input, output, tool_calls, usage, status, background_job_id, expires_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		`INSERT INTO stored_responses (response_id, user_id, merchant_id, model, input, output, tool_calls, usage, status, background_job_id, error_message, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 		resp.ResponseID, resp.UserID, resp.MerchantID, resp.Model,
 		resp.Input, resp.Output, resp.ToolCalls, resp.Usage,
-		resp.Status, resp.BackgroundJobID, resp.ExpiresAt,
+		resp.Status, resp.BackgroundJobID, resp.ErrorMessage, resp.ExpiresAt,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to store response: %w", err)
@@ -46,12 +46,12 @@ func (s *ResponseStorageService) StoreResponse(ctx context.Context, resp *models
 func (s *ResponseStorageService) GetResponse(ctx context.Context, responseID string) (*models.StoredResponse, error) {
 	resp := &models.StoredResponse{}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, response_id, user_id, merchant_id, model, input, output, tool_calls, usage, status, background_job_id, created_at, expires_at, deleted_at
+		`SELECT id, response_id, user_id, merchant_id, model, input, output, tool_calls, usage, status, background_job_id, error_message, created_at, expires_at, deleted_at
 		 FROM stored_responses WHERE response_id = $1 AND deleted_at IS NULL`,
 		responseID,
 	).Scan(&resp.ID, &resp.ResponseID, &resp.UserID, &resp.MerchantID, &resp.Model,
 		&resp.Input, &resp.Output, &resp.ToolCalls, &resp.Usage, &resp.Status,
-		&resp.BackgroundJobID, &resp.CreatedAt, &resp.ExpiresAt, &resp.DeletedAt,
+		&resp.BackgroundJobID, &resp.ErrorMessage, &resp.CreatedAt, &resp.ExpiresAt, &resp.DeletedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -97,7 +97,7 @@ func (s *ResponseStorageService) UpdateStatusWithError(ctx context.Context, resp
 
 func (s *ResponseStorageService) UpdateOutput(ctx context.Context, responseID string, output, usage []byte) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE stored_responses SET output = $1, usage = $2, status = 'completed' WHERE response_id = $3`,
+		`UPDATE stored_responses SET output = $1, usage = $2, status = 'completed', error_message = NULL WHERE response_id = $3`,
 		output, usage, responseID,
 	)
 	if err != nil {
@@ -109,12 +109,12 @@ func (s *ResponseStorageService) UpdateOutput(ctx context.Context, responseID st
 func (s *ResponseStorageService) GetByBackgroundJobID(ctx context.Context, jobID string) (*models.StoredResponse, error) {
 	resp := &models.StoredResponse{}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, response_id, user_id, merchant_id, model, input, output, tool_calls, usage, status, background_job_id, created_at, expires_at, deleted_at
+		`SELECT id, response_id, user_id, merchant_id, model, input, output, tool_calls, usage, status, background_job_id, error_message, created_at, expires_at, deleted_at
 		 FROM stored_responses WHERE background_job_id = $1`,
 		jobID,
 	).Scan(&resp.ID, &resp.ResponseID, &resp.UserID, &resp.MerchantID, &resp.Model,
 		&resp.Input, &resp.Output, &resp.ToolCalls, &resp.Usage, &resp.Status,
-		&resp.BackgroundJobID, &resp.CreatedAt, &resp.ExpiresAt, &resp.DeletedAt,
+		&resp.BackgroundJobID, &resp.ErrorMessage, &resp.CreatedAt, &resp.ExpiresAt, &resp.DeletedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -127,7 +127,7 @@ func (s *ResponseStorageService) GetByBackgroundJobID(ctx context.Context, jobID
 
 func (s *ResponseStorageService) CleanExpiredResponses(ctx context.Context) (int64, error) {
 	result, err := s.db.ExecContext(ctx,
-		`DELETE FROM stored_responses WHERE expires_at < NOW() AND deleted_at IS NULL`,
+		`UPDATE stored_responses SET deleted_at = NOW() WHERE expires_at < NOW() AND deleted_at IS NULL`,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to clean expired responses: %w", err)

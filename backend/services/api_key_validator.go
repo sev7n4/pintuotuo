@@ -1191,14 +1191,16 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 		return false, "QUOTA_PROBE_UPSTREAM_URL_MISSING", "upstream base URL not configured"
 	}
 
-	litellmModel := model
-	if !strings.Contains(model, "/") {
-		prefix := litellmProviderPrefix(provider)
-		if prefix == "" {
-			return false, "LITELLM_UNSUPPORTED_PROVIDER", fmt.Sprintf("provider %s is not supported by litellm (requires endpoint_id for bytedance)", provider)
-		}
-		litellmModel = prefix + "/" + model
+	prefix := litellmProviderPrefix(provider)
+	if prefix == "" {
+		return false, "LITELLM_UNSUPPORTED_PROVIDER", fmt.Sprintf("provider %s is not supported by litellm (requires endpoint_id for bytedance)", provider)
 	}
+
+	modelName := model
+	if idx := strings.LastIndex(model, "/"); idx >= 0 {
+		modelName = model[idx+1:]
+	}
+	litellmModel := prefix + "/" + modelName
 
 	userConfig := map[string]interface{}{
 		"model_list": []map[string]interface{}{

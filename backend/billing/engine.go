@@ -770,7 +770,7 @@ func (e *BillingEngine) CalculateCostForSettlement(provider, model string, input
 	return e.CalculateCost(provider, model, inputTokens, outputTokens)
 }
 
-func (e *BillingEngine) getUnitPrice(endpointType, providerCode string) float64 {
+func (e *BillingEngine) getUnitPrice(endpointType, providerCode string, unitType BillingUnit) float64 {
 	if e.db == nil {
 		e.db = config.GetDB()
 	}
@@ -778,6 +778,14 @@ func (e *BillingEngine) getUnitPrice(endpointType, providerCode string) float64 
 	if e.db != nil {
 		var unitPrice float64
 		err := e.db.QueryRow(
+			"SELECT unit_price FROM endpoint_pricing WHERE endpoint_type = $1 AND provider_code = $2 AND unit_type = $3",
+			endpointType, providerCode, string(unitType),
+		).Scan(&unitPrice)
+		if err == nil {
+			return unitPrice
+		}
+
+		err = e.db.QueryRow(
 			"SELECT unit_price FROM endpoint_pricing WHERE endpoint_type = $1 AND provider_code = $2",
 			endpointType, providerCode,
 		).Scan(&unitPrice)
@@ -786,20 +794,26 @@ func (e *BillingEngine) getUnitPrice(endpointType, providerCode string) float64 
 		}
 	}
 
-	defaultPrices := map[string]float64{
-		"chat_completions":     0.001,
-		"embeddings":           0.0001,
-		"images_generations":   20.0,
-		"images_variations":    20.0,
-		"images_edits":         20.0,
-		"audio_speech":         0.000015,
-		"audio_transcriptions": 0.006,
-		"audio_translations":   0.006,
-		"moderations":          0.0,
-		"responses":            0.001,
+	type priceKey struct {
+		endpointType string
+		unitType     BillingUnit
+	}
+	defaultPrices := map[priceKey]float64{
+		{endpointType: "chat_completions", unitType: BillingUnitToken}:      0.001,
+		{endpointType: "embeddings", unitType: BillingUnitToken}:            0.0001,
+		{endpointType: "images_generations", unitType: BillingUnitImage}:    20.0,
+		{endpointType: "images_variations", unitType: BillingUnitImage}:     20.0,
+		{endpointType: "images_edits", unitType: BillingUnitImage}:          20.0,
+		{endpointType: "audio_speech", unitType: BillingUnitCharacter}:      0.000015,
+		{endpointType: "audio_transcriptions", unitType: BillingUnitSecond}: 0.006,
+		{endpointType: "audio_translations", unitType: BillingUnitSecond}:   0.006,
+		{endpointType: "moderations", unitType: BillingUnitToken}:           0.0,
+		{endpointType: "responses", unitType: BillingUnitToken}:             0.001,
+		{endpointType: "responses", unitType: BillingUnitRequest}:           0.01,
+		{endpointType: "responses", unitType: BillingUnitImage}:             20.0,
 	}
 
-	if price, ok := defaultPrices[endpointType]; ok {
+	if price, ok := defaultPrices[priceKey{endpointType: endpointType, unitType: unitType}]; ok {
 		return price
 	}
 
@@ -807,7 +821,7 @@ func (e *BillingEngine) getUnitPrice(endpointType, providerCode string) float64 
 }
 
 func (e *BillingEngine) calculateAmountFromRequest(req BillingRequest) float64 {
-	unitPrice := e.getUnitPrice(req.EndpointType, req.ProviderCode)
+	unitPrice := e.getUnitPrice(req.EndpointType, req.ProviderCode, req.UnitType)
 	return float64(req.Quantity) * unitPrice
 }
 
@@ -820,8 +834,8 @@ func (e *BillingEngine) PreDeductBalanceV2(req BillingRequest) error {
 	return e.PreDeductBalance(req.UserID, amountInt, req.Reason, req.RequestID)
 }
 
-func (e *BillingEngine) SettlePreDeductV2(userID int, requestID string, actualQuantity int64, endpointType, providerCode string) error {
-	unitPrice := e.getUnitPrice(endpointType, providerCode)
+func (e *BillingEngine) SettlePreDeductV2(userID int, requestID string, actualQuantity int64, endpointType, providerCode string, unitType BillingUnit) error {
+	unitPrice := e.getUnitPrice(endpointType, providerCode, unitType)
 	actualAmount := int64(float64(actualQuantity) * unitPrice)
 	return e.SettlePreDeduct(userID, requestID, actualAmount)
 }
