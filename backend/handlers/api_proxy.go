@@ -968,8 +968,6 @@ func resolveRouteMode(apiKey *models.MerchantAPIKey) string {
 	}
 }
 
-
-
 func resolveEndpointURL(routeMode string, apiKey *models.MerchantAPIKey, providerBaseURL string) string {
 	switch routeMode {
 	case routeModeDirect:
