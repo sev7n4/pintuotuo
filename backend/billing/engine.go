@@ -799,18 +799,18 @@ func (e *BillingEngine) getUnitPrice(endpointType, providerCode string, unitType
 		unitType     BillingUnit
 	}
 	defaultPrices := map[priceKey]float64{
-		{endpointType: "chat_completions", unitType: BillingUnitToken}:     0.001,
-		{endpointType: "embeddings", unitType: BillingUnitToken}:          0.0001,
-		{endpointType: "images_generations", unitType: BillingUnitImage}:  20.0,
-		{endpointType: "images_variations", unitType: BillingUnitImage}:   20.0,
-		{endpointType: "images_edits", unitType: BillingUnitImage}:        20.0,
-		{endpointType: "audio_speech", unitType: BillingUnitCharacter}:    0.000015,
+		{endpointType: "chat_completions", unitType: BillingUnitToken}:      0.001,
+		{endpointType: "embeddings", unitType: BillingUnitToken}:            0.0001,
+		{endpointType: "images_generations", unitType: BillingUnitImage}:    20.0,
+		{endpointType: "images_variations", unitType: BillingUnitImage}:     20.0,
+		{endpointType: "images_edits", unitType: BillingUnitImage}:          20.0,
+		{endpointType: "audio_speech", unitType: BillingUnitCharacter}:      0.000015,
 		{endpointType: "audio_transcriptions", unitType: BillingUnitSecond}: 0.006,
-		{endpointType: "audio_translations", unitType: BillingUnitSecond}:  0.006,
-		{endpointType: "moderations", unitType: BillingUnitToken}:         0.0,
-		{endpointType: "responses", unitType: BillingUnitToken}:           0.001,
-		{endpointType: "responses", unitType: BillingUnitRequest}:         0.01,
-		{endpointType: "responses", unitType: BillingUnitImage}:           20.0,
+		{endpointType: "audio_translations", unitType: BillingUnitSecond}:   0.006,
+		{endpointType: "moderations", unitType: BillingUnitToken}:           0.0,
+		{endpointType: "responses", unitType: BillingUnitToken}:             0.001,
+		{endpointType: "responses", unitType: BillingUnitRequest}:           0.01,
+		{endpointType: "responses", unitType: BillingUnitImage}:             20.0,
 	}
 
 	if price, ok := defaultPrices[priceKey{endpointType: endpointType, unitType: unitType}]; ok {

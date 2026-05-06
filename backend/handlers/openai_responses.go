@@ -23,6 +23,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const responseStatusFailed = "failed"
+
 type ResponseInput struct {
 	Text  string                     `json:"-"`
 	Parts []ResponseInputMessagePart `json:"-"`
@@ -232,7 +234,7 @@ func OpenAIResponsesGet(c *gin.Context) {
 		Status:    resp.Status,
 		CreatedAt: resp.CreatedAt.Unix(),
 	}
-	if resp.ErrorMessage.Valid && resp.Status == "failed" {
+	if resp.ErrorMessage.Valid && resp.Status == responseStatusFailed {
 		apiResp.Error = map[string]string{
 			"message": resp.ErrorMessage.String,
 			"type":    "upstream_error",
@@ -293,7 +295,7 @@ func OpenAIResponsesStatus(c *gin.Context) {
 	if resp.Status == "completed" {
 		statusResp.ResponseID = resp.ResponseID
 	}
-	if resp.Status == "failed" && resp.ErrorMessage.Valid {
+	if resp.Status == responseStatusFailed && resp.ErrorMessage.Valid {
 		statusResp.Error = resp.ErrorMessage.String
 	}
 
@@ -517,7 +519,7 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 			if r := recover(); r != nil {
 				log.Printf("background response goroutine panic: %v", r)
 				ctx := context.Background()
-				storageSvc.UpdateStatusWithError(ctx, responseID, "failed", fmt.Sprintf("internal error: %v", r))
+				storageSvc.UpdateStatusWithError(ctx, responseID, responseStatusFailed, fmt.Sprintf("internal error: %v", r))
 				billingEngine.CancelPreDeduct(userID, requestID)
 			}
 		}()
@@ -529,7 +531,7 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 		upstreamJSON, _ := json.Marshal(upstreamBody)
 		httpReq, err := http.NewRequestWithContext(ctx, "POST", endpointURL, strings.NewReader(string(upstreamJSON)))
 		if err != nil {
-			storageSvc.UpdateStatusWithError(ctx, responseID, "failed", err.Error())
+			storageSvc.UpdateStatusWithError(ctx, responseID, responseStatusFailed, err.Error())
 			billingEngine.CancelPreDeduct(userID, requestID)
 			return
 		}
@@ -539,7 +541,7 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 		client := &http.Client{Timeout: 300 * time.Second}
 		resp, err := client.Do(httpReq)
 		if err != nil {
-			storageSvc.UpdateStatusWithError(ctx, responseID, "failed", err.Error())
+			storageSvc.UpdateStatusWithError(ctx, responseID, responseStatusFailed, err.Error())
 			billingEngine.CancelPreDeduct(userID, requestID)
 			return
 		}
@@ -553,14 +555,14 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 			} else {
 				errMsg = fmt.Sprintf("upstream returned status %d", resp.StatusCode)
 			}
-			storageSvc.UpdateStatusWithError(ctx, responseID, "failed", errMsg)
+			storageSvc.UpdateStatusWithError(ctx, responseID, responseStatusFailed, errMsg)
 			billingEngine.CancelPreDeduct(userID, requestID)
 			return
 		}
 
 		var apiResp ResponseAPIResponse
 		if err := json.Unmarshal(body, &apiResp); err != nil {
-			storageSvc.UpdateStatusWithError(ctx, responseID, "failed", err.Error())
+			storageSvc.UpdateStatusWithError(ctx, responseID, responseStatusFailed, err.Error())
 			billingEngine.CancelPreDeduct(userID, requestID)
 			return
 		}
