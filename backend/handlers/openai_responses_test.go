@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"testing"
 
 	"github.com/pintuotuo/backend/billing"
+	"github.com/pintuotuo/backend/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -184,6 +186,47 @@ func TestCalculateToolBilling_NoTools(t *testing.T) {
 	assert.Len(t, entries, 0)
 }
 
+func TestCalculateToolBilling_AllToolTypes(t *testing.T) {
+	output := []ResponseOutputItem{
+		{Type: "web_search_call", Status: "completed"},
+		{Type: "file_search_call", Status: "completed"},
+		{Type: "computer_call", Status: "completed"},
+		{Type: "code_interpreter", Status: "completed"},
+		{Type: "mcp_call", Status: "completed"},
+		{Type: "image_generation", Status: "completed"},
+		{Type: "function_call", Status: "completed"},
+	}
+	entries := calculateToolBilling(output)
+	assert.Len(t, entries, 3)
+
+	entryMap := map[billing.BillingUnit]int{}
+	for _, e := range entries {
+		entryMap[e.UnitType] = e.Count
+	}
+	assert.Equal(t, 5, entryMap[billing.BillingUnitRequest])
+	assert.Equal(t, 1, entryMap[billing.BillingUnitImage])
+	assert.Equal(t, 1, entryMap[billing.BillingUnitToken])
+}
+
+func TestCalculateToolBilling_MultipleSameType(t *testing.T) {
+	output := []ResponseOutputItem{
+		{Type: "web_search_call", Status: "completed"},
+		{Type: "web_search_call", Status: "completed"},
+		{Type: "image_generation", Status: "completed"},
+		{Type: "image_generation", Status: "completed"},
+		{Type: "image_generation", Status: "completed"},
+	}
+	entries := calculateToolBilling(output)
+	assert.Len(t, entries, 2)
+
+	entryMap := map[billing.BillingUnit]int{}
+	for _, e := range entries {
+		entryMap[e.UnitType] = e.Count
+	}
+	assert.Equal(t, 2, entryMap[billing.BillingUnitRequest])
+	assert.Equal(t, 3, entryMap[billing.BillingUnitImage])
+}
+
 func TestReasoningOutput_Parse(t *testing.T) {
 	raw := `{
 		"type": "reasoning",
@@ -218,4 +261,146 @@ func TestResponseAPIResponse_Parse(t *testing.T) {
 	assert.Len(t, resp.Output, 1)
 	assert.Equal(t, 15, resp.Usage.TotalTokens)
 	assert.Equal(t, "completed", resp.Status)
+}
+
+func TestBackgroundStatusResponse_WithErrorMessage(t *testing.T) {
+	resp := &models.StoredResponse{
+		ResponseID:   "resp_001",
+		Status:       "failed",
+		ErrorMessage: sql.NullString{String: "upstream timeout", Valid: true},
+	}
+
+	statusResp := BackgroundStatusResponse{
+		ID:     resp.ResponseID,
+		Object: "response",
+		Status: resp.Status,
+	}
+	if resp.Status == "completed" {
+		statusResp.ResponseID = resp.ResponseID
+	}
+	if resp.Status == "failed" && resp.ErrorMessage.Valid {
+		statusResp.Error = resp.ErrorMessage.String
+	}
+
+	assert.Equal(t, "resp_001", statusResp.ID)
+	assert.Equal(t, "failed", statusResp.Status)
+	assert.Equal(t, "upstream timeout", statusResp.Error)
+	assert.Empty(t, statusResp.ResponseID)
+}
+
+func TestBackgroundStatusResponse_Completed(t *testing.T) {
+	resp := &models.StoredResponse{
+		ResponseID: "resp_001",
+		Status:     "completed",
+	}
+
+	statusResp := BackgroundStatusResponse{
+		ID:     resp.ResponseID,
+		Object: "response",
+		Status: resp.Status,
+	}
+	if resp.Status == "completed" {
+		statusResp.ResponseID = resp.ResponseID
+	}
+
+	assert.Equal(t, "completed", statusResp.Status)
+	assert.Equal(t, "resp_001", statusResp.ResponseID)
+}
+
+func TestResponseAPIResponse_WithError(t *testing.T) {
+	resp := &models.StoredResponse{
+		ResponseID:   "resp_001",
+		Model:        "gpt-4o",
+		Status:       "failed",
+		ErrorMessage: sql.NullString{String: "rate limit exceeded", Valid: true},
+	}
+
+	apiResp := ResponseAPIResponse{
+		ID:        resp.ResponseID,
+		Object:    "response",
+		Model:     resp.Model,
+		Status:    resp.Status,
+	}
+	if resp.ErrorMessage.Valid && resp.Status == "failed" {
+		apiResp.Error = map[string]string{
+			"message": resp.ErrorMessage.String,
+			"type":    "upstream_error",
+		}
+	}
+
+	assert.Equal(t, "failed", apiResp.Status)
+	errObj, ok := apiResp.Error.(map[string]string)
+	assert.True(t, ok)
+	assert.Equal(t, "rate limit exceeded", errObj["message"])
+	assert.Equal(t, "upstream_error", errObj["type"])
+}
+
+func TestBuildUpstreamRequestBody_WithReasoning(t *testing.T) {
+	req := &ResponseRequest{
+		Model:     "o3-mini",
+		Input:     ResponseInput{Text: "Solve this"},
+		Reasoning: map[string]interface{}{"effort": "high"},
+	}
+
+	body := buildUpstreamRequestBody(req, nil)
+	assert.Equal(t, "o3-mini", body["model"])
+	assert.Equal(t, "Solve this", body["input"])
+	reasoning, ok := body["reasoning"].(map[string]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "high", reasoning["effort"])
+}
+
+func TestBuildUpstreamRequestBody_WithTruncate(t *testing.T) {
+	truncate := 100
+	req := &ResponseRequest{
+		Model:     "gpt-4o",
+		Input:     ResponseInput{Text: "Hello"},
+		Truncate:  &truncate,
+	}
+
+	body := buildUpstreamRequestBody(req, nil)
+	assert.Equal(t, 100, body["truncate"])
+}
+
+func TestBuildUpstreamRequestBody_WithMetadata(t *testing.T) {
+	req := &ResponseRequest{
+		Model:     "gpt-4o",
+		Input:     ResponseInput{Text: "Hello"},
+		Metadata:  map[string]interface{}{"user_id": "123"},
+	}
+
+	body := buildUpstreamRequestBody(req, nil)
+	metadata, ok := body["metadata"].(map[string]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "123", metadata["user_id"])
+}
+
+func TestBuildUpstreamRequestBody_InputArray(t *testing.T) {
+	req := &ResponseRequest{
+		Model: "gpt-4o",
+		Input: ResponseInput{
+			Parts: []ResponseInputMessagePart{
+				{Role: "user", Content: json.RawMessage(`"Hello"`)},
+				{Role: "assistant", Content: json.RawMessage(`"Hi there"`)},
+			},
+		},
+	}
+
+	body := buildUpstreamRequestBody(req, nil)
+	assert.Equal(t, "gpt-4o", body["model"])
+	parts, ok := body["input"].([]ResponseInputMessagePart)
+	assert.True(t, ok)
+	assert.Len(t, parts, 2)
+}
+
+func TestEstimateResponseTokens_WithParts(t *testing.T) {
+	req := &ResponseRequest{
+		Input: ResponseInput{
+			Parts: []ResponseInputMessagePart{
+				{Role: "user", Content: json.RawMessage(`"This is a longer message for token estimation"`)},
+			},
+		},
+	}
+	tokens := estimateResponseTokens(req)
+	assert.Greater(t, tokens, 0)
 }

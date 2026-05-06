@@ -223,7 +223,7 @@ func OpenAIResponsesGet(c *gin.Context) {
 		json.Unmarshal(resp.Usage, &usage)
 	}
 
-	c.JSON(http.StatusOK, ResponseAPIResponse{
+	apiResp := ResponseAPIResponse{
 		ID:        resp.ResponseID,
 		Object:    "response",
 		Model:     resp.Model,
@@ -231,7 +231,15 @@ func OpenAIResponsesGet(c *gin.Context) {
 		Usage:     usage,
 		Status:    resp.Status,
 		CreatedAt: resp.CreatedAt.Unix(),
-	})
+	}
+	if resp.ErrorMessage.Valid && resp.Status == "failed" {
+		apiResp.Error = map[string]string{
+			"message": resp.ErrorMessage.String,
+			"type":    "upstream_error",
+		}
+	}
+
+	c.JSON(http.StatusOK, apiResp)
 }
 
 func OpenAIResponsesDelete(c *gin.Context) {
@@ -239,7 +247,17 @@ func OpenAIResponsesDelete(c *gin.Context) {
 	db := config.GetDB()
 	storageSvc := services.NewResponseStorageService(db)
 
-	err := storageSvc.DeleteResponse(c.Request.Context(), responseID)
+	resp, err := storageSvc.GetResponse(c.Request.Context(), responseID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if resp == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "response not found"})
+		return
+	}
+
+	err = storageSvc.DeleteResponse(c.Request.Context(), responseID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -274,6 +292,9 @@ func OpenAIResponsesStatus(c *gin.Context) {
 	}
 	if resp.Status == "completed" {
 		statusResp.ResponseID = resp.ResponseID
+	}
+	if resp.Status == "failed" && resp.ErrorMessage.Valid {
+		statusResp.Error = resp.ErrorMessage.String
 	}
 
 	c.JSON(http.StatusOK, statusResp)
@@ -325,7 +346,7 @@ func handleSyncResponse(c *gin.Context, db *sql.DB, billingEngine *billing.Billi
 	if actualTokens == 0 {
 		actualTokens = apiResp.Usage.InputTokens + apiResp.Usage.OutputTokens
 	}
-	billingEngine.SettlePreDeductV2(userID, requestID, int64(actualTokens), services.EndpointTypeResponses, "openai")
+	billingEngine.SettlePreDeductV2(userID, requestID, int64(actualTokens), services.EndpointTypeResponses, "openai", billing.BillingUnitToken)
 
 	toolBillingEntries := calculateToolBilling(apiResp.Output)
 	settleToolBilling(billingEngine, userID, requestID, toolBillingEntries)
@@ -442,7 +463,7 @@ func handleStreamResponse(c *gin.Context, db *sql.DB, billingEngine *billing.Bil
 
 	estimatedInputTokens := estimateResponseTokens(&req)
 	totalTokens := estimatedInputTokens + totalOutputTokens
-	billingEngine.SettlePreDeductV2(userID, requestID, int64(totalTokens), services.EndpointTypeResponses, "openai")
+	billingEngine.SettlePreDeductV2(userID, requestID, int64(totalTokens), services.EndpointTypeResponses, "openai", billing.BillingUnitToken)
 
 	toolBillingEntries := calculateToolBilling(outputItems)
 	settleToolBilling(billingEngine, userID, requestID, toolBillingEntries)
@@ -492,6 +513,15 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 	}
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("background response goroutine panic: %v", r)
+				ctx := context.Background()
+				storageSvc.UpdateStatusWithError(ctx, responseID, "failed", fmt.Sprintf("internal error: %v", r))
+				billingEngine.CancelPreDeduct(userID, requestID)
+			}
+		}()
+
 		ctx := context.Background()
 		storageSvc.UpdateStatus(ctx, responseID, "running")
 
@@ -539,7 +569,7 @@ func handleBackgroundRequest(c *gin.Context, db *sql.DB, billingEngine *billing.
 		if actualTokens == 0 {
 			actualTokens = apiResp.Usage.InputTokens + apiResp.Usage.OutputTokens
 		}
-		billingEngine.SettlePreDeductV2(userID, requestID, int64(actualTokens), services.EndpointTypeResponses, "openai")
+		billingEngine.SettlePreDeductV2(userID, requestID, int64(actualTokens), services.EndpointTypeResponses, "openai", billing.BillingUnitToken)
 
 		toolBillingEntries := calculateToolBilling(apiResp.Output)
 		settleToolBilling(billingEngine, userID, requestID, toolBillingEntries)
@@ -664,7 +694,7 @@ func settleToolBilling(billingEngine *billing.BillingEngine, userID int, request
 			Reason:       "Response API tool calls (" + string(entry.UnitType) + ")",
 		}
 		billingEngine.PreDeductBalanceV2(toolReq)
-		billingEngine.SettlePreDeductV2(userID, requestID+"_tools_"+string(entry.UnitType), int64(entry.Count), services.EndpointTypeResponses, "openai")
+		billingEngine.SettlePreDeductV2(userID, requestID+"_tools_"+string(entry.UnitType), int64(entry.Count), services.EndpointTypeResponses, "openai", entry.UnitType)
 	}
 }
 
