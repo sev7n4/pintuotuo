@@ -76,13 +76,29 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
     return validateEndpoints(endpoints);
   }, [value]);
 
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [selectedRouteType, setSelectedRouteType] = useState<string>('');
+
   const handleAddEndpoint = () => {
-    const newKey = `endpoint_${Date.now()}`;
+    setAddModalVisible(true);
+  };
+
+  const handleConfirmAdd = () => {
+    if (!selectedRouteType) {
+      message.warning('请选择路由类型');
+      return;
+    }
+    if (value[selectedRouteType]) {
+      message.warning(`${routeTypes.find((t) => t.value === selectedRouteType)?.label || selectedRouteType}端点已存在`);
+      return;
+    }
     const newEndpoints = {
       ...value,
-      [newKey]: { domestic: '', overseas: '' },
+      [selectedRouteType]: { domestic: '', overseas: '' },
     };
     onChange?.(newEndpoints);
+    setAddModalVisible(false);
+    setSelectedRouteType('');
   };
 
   const handleRemoveEndpoint = (key: string) => {
@@ -303,6 +319,51 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
           </Col>
         )}
       </Row>
+
+      <Modal
+        title="添加端点配置"
+        open={addModalVisible}
+        onCancel={() => { setAddModalVisible(false); setSelectedRouteType(''); }}
+        onOk={handleConfirmAdd}
+        okText="添加"
+        cancelText="取消"
+      >
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Alert
+            message="选择要添加的路由类型端点"
+            description="每种路由类型只能添加一个端点配置。如果已存在则无法重复添加。"
+            type="info"
+            showIcon
+          />
+          {routeTypes.map((rt) => {
+            const exists = !!value[rt.value];
+            return (
+              <Card
+                key={rt.value}
+                size="small"
+                hoverable={!exists}
+                onClick={() => !exists && setSelectedRouteType(rt.value)}
+                style={{
+                  borderColor: selectedRouteType === rt.value ? '#1890ff' : undefined,
+                  backgroundColor: exists ? '#f5f5f5' : undefined,
+                  cursor: exists ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <Space>
+                  <Tag color={rt.color} icon={rt.icon}>
+                    {rt.label}
+                  </Tag>
+                  {exists ? (
+                    <Text type="secondary">已配置</Text>
+                  ) : (
+                    <Text>{selectedRouteType === rt.value ? '已选择' : '点击选择'}</Text>
+                  )}
+                </Space>
+              </Card>
+            );
+          })}
+        </Space>
+      </Modal>
 
       <Modal
         title="端点探测结果"
