@@ -24,7 +24,7 @@ import (
 )
 
 type ResponseInput struct {
-	Text  string `json:"-"`
+	Text  string                     `json:"-"`
 	Parts []ResponseInputMessagePart `json:"-"`
 }
 
