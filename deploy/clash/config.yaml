@@ -10,7 +10,7 @@ external-ui: /etc/mihomo/ui
 proxy-providers:
   xiguajiasu:
     type: http
-    url: "http://43.248.192.4:60001/api/v1/client/subscribe?token=27508e6dba6ee86f6e9ef759d569e977"
+    url: "http://43.248.192.4:60001/api/v1/client/subscribe?token=bab44a156d6d5c38328f7df473193e6c"
     interval: 86400
     path: ./providers/xiguajiasu.yaml
     health-check:
