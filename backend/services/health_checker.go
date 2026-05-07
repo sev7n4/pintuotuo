@@ -600,29 +600,6 @@ func (s *HealthChecker) resolveProxyEndpoint(ctx context.Context, apiKey *models
 	return "", fmt.Errorf("Proxy endpoint not configured")
 }
 
-func (s *HealthChecker) resolveAutoEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
-	providerRegion := s.getProviderRegion(apiKey.Provider)
-	resolvedMode := resolveAutoRouteMode(providerRegion)
-
-	logger.LogInfo(ctx, "health_checker", "Auto mode resolved route", map[string]interface{}{
-		"api_key_id":      apiKey.ID,
-		"provider":        apiKey.Provider,
-		"provider_region": providerRegion,
-		"resolved_mode":   resolvedMode,
-	})
-
-	switch resolvedMode {
-	case GatewayModeProxy:
-		return s.resolveProxyEndpoint(ctx, apiKey)
-	case GatewayModeLitellm:
-		return s.resolveLitellmEndpoint(ctx, apiKey)
-	case GatewayModeDirect:
-		return s.resolveDirectEndpoint(ctx, apiKey)
-	default:
-		return s.resolveDirectEndpoint(ctx, apiKey)
-	}
-}
-
 func (s *HealthChecker) getProviderBaseURL(ctx context.Context, provider string) (string, bool) {
 	db := config.GetDB()
 	if db == nil {
