@@ -3,11 +3,17 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/billing"
+	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResponseInput_UnmarshalJSON_String(t *testing.T) {
@@ -353,9 +359,9 @@ func TestBuildUpstreamRequestBody_WithReasoning(t *testing.T) {
 func TestBuildUpstreamRequestBody_WithTruncate(t *testing.T) {
 	truncate := 100
 	req := &ResponseRequest{
-		Model:     "gpt-4o",
-		Input:     ResponseInput{Text: "Hello"},
-		Truncate:  &truncate,
+		Model:    "gpt-4o",
+		Input:    ResponseInput{Text: "Hello"},
+		Truncate: &truncate,
 	}
 
 	body := buildUpstreamRequestBody(req, nil)
@@ -364,9 +370,9 @@ func TestBuildUpstreamRequestBody_WithTruncate(t *testing.T) {
 
 func TestBuildUpstreamRequestBody_WithMetadata(t *testing.T) {
 	req := &ResponseRequest{
-		Model:     "gpt-4o",
-		Input:     ResponseInput{Text: "Hello"},
-		Metadata:  map[string]interface{}{"user_id": "123"},
+		Model:    "gpt-4o",
+		Input:    ResponseInput{Text: "Hello"},
+		Metadata: map[string]interface{}{"user_id": "123"},
 	}
 
 	body := buildUpstreamRequestBody(req, nil)
@@ -403,4 +409,118 @@ func TestEstimateResponseTokens_WithParts(t *testing.T) {
 	}
 	tokens := estimateResponseTokens(req)
 	assert.Greater(t, tokens, 0)
+}
+
+func setupResponseTestRouter(t *testing.T) (*gin.Engine, sqlmock.Sqlmock) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		panic(err)
+	}
+	origDB := config.DB
+	config.DB = db
+	t.Cleanup(func() {
+		config.DB = origDB
+		db.Close()
+	})
+	return r, mock
+}
+
+func TestOpenAIResponsesGet_NotFound(t *testing.T) {
+	r, mock := setupResponseTestRouter(t)
+
+	mock.ExpectQuery(`SELECT .+ FROM stored_responses WHERE response_id = .+ AND deleted_at IS NULL`).
+		WithArgs("resp_nonexist").
+		WillReturnError(sql.ErrNoRows)
+
+	r.GET("/v1/responses/:id", func(c *gin.Context) {
+		OpenAIResponsesGet(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/v1/responses/resp_nonexist", nil)
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestOpenAIResponsesDelete_NotFound(t *testing.T) {
+	r, mock := setupResponseTestRouter(t)
+	
+
+	mock.ExpectQuery(`SELECT .+ FROM stored_responses WHERE response_id = .+ AND deleted_at IS NULL`).
+		WithArgs("resp_nonexist").
+		WillReturnError(sql.ErrNoRows)
+
+	r.DELETE("/v1/responses/:id", func(c *gin.Context) {
+		OpenAIResponsesDelete(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/v1/responses/resp_nonexist", nil)
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestOpenAIResponsesStatus_NotFound(t *testing.T) {
+	r, mock := setupResponseTestRouter(t)
+	
+
+	mock.ExpectQuery(`SELECT .+ FROM stored_responses WHERE response_id = .+ AND deleted_at IS NULL`).
+		WithArgs("resp_nonexist").
+		WillReturnError(sql.ErrNoRows)
+
+	r.GET("/v1/responses/:id/status", func(c *gin.Context) {
+		OpenAIResponsesStatus(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/v1/responses/resp_nonexist/status", nil)
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestOpenAIResponsesGet_DBError(t *testing.T) {
+	r, mock := setupResponseTestRouter(t)
+	
+
+	mock.ExpectQuery(`SELECT .+ FROM stored_responses WHERE response_id = .+ AND deleted_at IS NULL`).
+		WithArgs("resp_001").
+		WillReturnError(sql.ErrConnDone)
+
+	r.GET("/v1/responses/:id", func(c *gin.Context) {
+		OpenAIResponsesGet(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/v1/responses/resp_001", nil)
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestOpenAIResponsesStatus_DBError(t *testing.T) {
+	r, mock := setupResponseTestRouter(t)
+
+	mock.ExpectQuery(`SELECT .+ FROM stored_responses WHERE response_id = .+ AND deleted_at IS NULL`).
+		WithArgs("resp_001").
+		WillReturnError(sql.ErrConnDone)
+
+	r.GET("/v1/responses/:id/status", func(c *gin.Context) {
+		OpenAIResponsesStatus(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/v1/responses/resp_001/status", nil)
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	require.NoError(t, mock.ExpectationsWereMet())
 }

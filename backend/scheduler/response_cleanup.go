@@ -33,33 +33,37 @@ func (s *ResponseCleanupScheduler) Start() {
 	}
 
 	s.isRunning = true
-	s.stopChan = make(chan struct{})
+	stopChan := make(chan struct{})
+	s.stopChan = stopChan
 	ticker := time.NewTicker(s.interval)
 
-	go func() {
+	go func(stop <-chan struct{}) {
 		for {
 			select {
 			case <-ticker.C:
 				s.cleanExpiredResponses()
-			case <-s.stopChan:
+			case <-stop:
 				ticker.Stop()
 				return
 			}
 		}
-	}()
+	}(stopChan)
 
 	log.Println("Response cleanup scheduler started")
 }
 
 func (s *ResponseCleanupScheduler) Stop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if !s.isRunning {
+		s.mu.Unlock()
 		return
 	}
-
+	stopChan := s.stopChan
 	s.isRunning = false
-	close(s.stopChan)
+	s.stopChan = nil
+	s.mu.Unlock()
+
+	close(stopChan)
 	log.Println("Response cleanup scheduler stopped")
 }
 
