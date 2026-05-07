@@ -188,7 +188,9 @@ var predefinedModels = map[string][]string{
 	"deepseek":  {"deepseek-chat", "deepseek-coder"},
 	"moonshot":  {"moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"},
 	"zhipu":     {"glm-4", "glm-4-flash", "glm-3-turbo"},
+	"alibaba":   {"qwen-turbo", "qwen-plus", "qwen-max"},
 	"qwen":      {"qwen-turbo", "qwen-plus", "qwen-max"},
+	"google":    {"gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"},
 }
 
 func GetPredefinedModels(provider string) []string {

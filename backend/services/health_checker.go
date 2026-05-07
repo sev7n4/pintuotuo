@@ -15,6 +15,7 @@ import (
 	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
+	"github.com/pintuotuo/backend/logger"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/utils"
 )
@@ -485,15 +486,26 @@ func (s *HealthChecker) resolveEndpoint(ctx context.Context, apiKey *models.Merc
 }
 
 func (s *HealthChecker) resolveEndpointWithRouteMode(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
-	switch apiKey.RouteMode {
+	routeMode := apiKey.RouteMode
+	if routeMode == RouteModeAuto || routeMode == string(GoalAuto) || routeMode == "" {
+		providerRegion := s.getProviderRegion(apiKey.Provider)
+		resolved := resolveAutoRouteMode(providerRegion)
+		logger.LogInfo(ctx, "health_checker", "Resolved auto route mode", map[string]interface{}{
+			"api_key_id":      apiKey.ID,
+			"original_mode":   routeMode,
+			"resolved_mode":   resolved,
+			"provider_region": providerRegion,
+		})
+		routeMode = resolved
+	}
+
+	switch routeMode {
 	case GatewayModeDirect:
 		return s.resolveDirectEndpoint(ctx, apiKey)
 	case GatewayModeLitellm:
 		return s.resolveLitellmEndpoint(ctx, apiKey)
 	case GatewayModeProxy:
 		return s.resolveProxyEndpoint(ctx, apiKey)
-	case string(GoalAuto):
-		return s.resolveAutoEndpoint(ctx, apiKey)
 	default:
 		return s.resolveDirectEndpoint(ctx, apiKey)
 	}
@@ -558,14 +570,22 @@ func (s *HealthChecker) resolveLitellmEndpoint(ctx context.Context, apiKey *mode
 }
 
 func (s *HealthChecker) resolveProxyEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
+	if baseURL, ok := s.getProviderBaseURL(ctx, apiKey.Provider); ok && baseURL != "" {
+		logger.LogInfo(ctx, "health_checker", "Proxy mode using api_base_url via HTTPS_PROXY", map[string]interface{}{
+			"provider":     apiKey.Provider,
+			"api_base_url": baseURL,
+		})
+		return baseURL, nil
+	}
+
 	if apiKey.RouteConfig != nil {
 		if endpoints, ok := apiKey.RouteConfig["endpoints"].(map[string]interface{}); ok {
 			if proxyEndpoints, ok := endpoints[GatewayModeProxy].(map[string]interface{}); ok {
-				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
+				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" && !strings.Contains(gaapURL, "example.com") {
 					return gaapURL, nil
 				}
 				for _, v := range proxyEndpoints {
-					if url, ok := v.(string); ok && url != "" {
+					if url, ok := v.(string); ok && url != "" && !strings.Contains(url, "example.com") {
 						return url, nil
 					}
 				}
@@ -581,27 +601,26 @@ func (s *HealthChecker) resolveProxyEndpoint(ctx context.Context, apiKey *models
 }
 
 func (s *HealthChecker) resolveAutoEndpoint(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
-	priority := []string{GatewayModeDirect, GatewayModeLitellm, GatewayModeProxy}
+	providerRegion := s.getProviderRegion(apiKey.Provider)
+	resolvedMode := resolveAutoRouteMode(providerRegion)
 
-	for _, mode := range priority {
-		var endpoint string
-		var err error
+	logger.LogInfo(ctx, "health_checker", "Auto mode resolved route", map[string]interface{}{
+		"api_key_id":      apiKey.ID,
+		"provider":        apiKey.Provider,
+		"provider_region": providerRegion,
+		"resolved_mode":   resolvedMode,
+	})
 
-		switch mode {
-		case GatewayModeDirect:
-			endpoint, err = s.resolveDirectEndpoint(ctx, apiKey)
-		case GatewayModeLitellm:
-			endpoint, err = s.resolveLitellmEndpoint(ctx, apiKey)
-		case GatewayModeProxy:
-			endpoint, err = s.resolveProxyEndpoint(ctx, apiKey)
-		}
-
-		if err == nil && endpoint != "" {
-			return endpoint, nil
-		}
+	switch resolvedMode {
+	case GatewayModeProxy:
+		return s.resolveProxyEndpoint(ctx, apiKey)
+	case GatewayModeLitellm:
+		return s.resolveLitellmEndpoint(ctx, apiKey)
+	case GatewayModeDirect:
+		return s.resolveDirectEndpoint(ctx, apiKey)
+	default:
+		return s.resolveDirectEndpoint(ctx, apiKey)
 	}
-
-	return "", fmt.Errorf("no available endpoint for auto mode")
 }
 
 func (s *HealthChecker) getProviderBaseURL(ctx context.Context, provider string) (string, bool) {
@@ -625,6 +644,22 @@ func (s *HealthChecker) getProviderBaseURL(ctx context.Context, provider string)
 		return "", false
 	}
 	return baseURL, true
+}
+
+func (s *HealthChecker) getProviderRegion(provider string) string {
+	db := config.GetDB()
+	if db == nil {
+		return regionDomestic
+	}
+	var providerRegion string
+	err := db.QueryRow(
+		"SELECT COALESCE(provider_region, 'domestic') FROM model_providers WHERE code = $1",
+		provider,
+	).Scan(&providerRegion)
+	if err != nil {
+		return regionDomestic
+	}
+	return providerRegion
 }
 
 func (s *HealthChecker) getDecryptedAPIKey(apiKey *models.MerchantAPIKey) string {

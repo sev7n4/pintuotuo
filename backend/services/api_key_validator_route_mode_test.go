@@ -64,7 +64,7 @@ func TestResolveEndpointByRouteMode(t *testing.T) {
 			routeConfig: map[string]interface{}{
 				"endpoints": map[string]interface{}{
 					"proxy": map[string]interface{}{
-						"gaap": "https://proxy.example.com",
+						"gaap": "https://proxy.gaap-real.com",
 					},
 				},
 			},
@@ -226,7 +226,7 @@ func TestResolveProxyEndpoint(t *testing.T) {
 			routeConfig: map[string]interface{}{
 				"endpoints": map[string]interface{}{
 					"proxy": map[string]interface{}{
-						"gaap": "https://proxy.example.com",
+						"gaap": "https://proxy.gaap-real.com",
 					},
 				},
 			},
@@ -236,7 +236,7 @@ func TestResolveProxyEndpoint(t *testing.T) {
 			name:     "Priority 2: proxy_url",
 			provider: "openai",
 			routeConfig: map[string]interface{}{
-				"proxy_url": "https://proxy.example.com",
+				"proxy_url": "https://proxy.real-proxy.com",
 			},
 			wantErr: false,
 		},
@@ -245,6 +245,19 @@ func TestResolveProxyEndpoint(t *testing.T) {
 			provider:    "openai",
 			routeConfig: map[string]interface{}{},
 			wantErr:     true,
+		},
+		{
+			name:     "Skip example.com proxy endpoints",
+			provider: "openai",
+			routeConfig: map[string]interface{}{
+				"endpoints": map[string]interface{}{
+					"proxy": map[string]interface{}{
+						"gaap":     "https://google-gaap.example.com",
+						"nginx_hk": "https://google-proxy-hk.example.com",
+					},
+				},
+			},
+			wantErr: true,
 		},
 	}
 
