@@ -17,6 +17,7 @@ import {
   Checkbox,
   Segmented,
   Alert,
+  AutoComplete,
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, TagsOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
@@ -40,6 +41,8 @@ const AdminSPUs = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSPU, setEditingSPU] = useState<SPU | null>(null);
   const [form] = Form.useForm();
+  const [providerModelOptions, setProviderModelOptions] = useState<{ value: string; label: string }[]>([]);
+  const [syncingModels, setSyncingModels] = useState(false);
   const [listScope, setListScope] = useState<'active' | 'all'>('active');
   const [filters, setFilters] = useState({
     provider: '',
@@ -97,6 +100,45 @@ const AdminSPUs = () => {
     }
   };
 
+  const fetchProviderModels = async (providerCode: string) => {
+    if (!providerCode) {
+      setProviderModelOptions([]);
+      return;
+    }
+    try {
+      const response = await skuService.getProviderModels(providerCode);
+      const models = response.data.models || [];
+      setProviderModelOptions(
+        models.map((m) => ({ value: m.model_id, label: m.model_id }))
+      );
+    } catch {
+      setProviderModelOptions([]);
+    }
+  };
+
+  const handleSyncProviderModels = async () => {
+    const providerCode = form.getFieldValue('model_provider');
+    if (!providerCode) {
+      message.warning('请先选择模型厂商');
+      return;
+    }
+    setSyncingModels(true);
+    try {
+      const response = await skuService.syncProviderModels(providerCode);
+      message.success(`同步完成，共 ${response.data.synced_count} 个模型`);
+      await fetchProviderModels(providerCode);
+    } catch {
+      message.error('同步模型列表失败');
+    } finally {
+      setSyncingModels(false);
+    }
+  };
+
+  const handleProviderChange = (value: string) => {
+    form.setFieldsValue({ model_name: undefined });
+    fetchProviderModels(value);
+  };
+
   const confirmDeactivateWithActiveSkus = (activeSkuCount: number): Promise<boolean> =>
     new Promise((resolve) => {
       Modal.confirm({
@@ -112,6 +154,7 @@ const AdminSPUs = () => {
   const handleAdd = () => {
     setEditingSPU(null);
     form.resetFields();
+    setProviderModelOptions([]);
     const timestamp = Date.now().toString(36).toUpperCase().slice(-6);
     form.setFieldsValue({
       spu_code: `SPU-${timestamp}`,
@@ -128,6 +171,9 @@ const AdminSPUs = () => {
     setEditingSPU(record);
     form.setFieldsValue(record);
     setModalVisible(true);
+    if (record.model_provider) {
+      fetchProviderModels(record.model_provider);
+    }
     try {
       const res = await skuService.getSPU(record.id);
       const fresh = res.data.data;
@@ -518,7 +564,7 @@ const AdminSPUs = () => {
                 label="模型厂商"
                 rules={[{ required: true, message: '请选择模型厂商' }]}
               >
-                <Select placeholder="请选择">
+                <Select placeholder="请选择" onChange={handleProviderChange}>
                   {providers.map((p) => (
                     <Select.Option key={p.code} value={p.code}>
                       {p.name}
@@ -533,9 +579,28 @@ const AdminSPUs = () => {
                 name="model_name"
                 label="模型名称"
                 rules={[{ required: true, message: '请输入模型名称' }]}
-                extra="API调用时使用的模型标识"
+                extra={
+                  <Space size={4}>
+                    <span>API调用时使用的模型标识</span>
+                    <Button
+                      type="link"
+                      size="small"
+                      loading={syncingModels}
+                      onClick={handleSyncProviderModels}
+                      style={{ padding: 0, height: 'auto', fontSize: 12 }}
+                    >
+                      从厂商同步模型列表
+                    </Button>
+                  </Space>
+                }
               >
-                <Input placeholder="deepseek-chat" />
+                <AutoComplete
+                  options={providerModelOptions}
+                  placeholder="deepseek-chat"
+                  filterOption={(input, option) =>
+                    (option?.label as string)?.toLowerCase().includes(input.toLowerCase()) ?? false
+                  }
+                />
               </Form.Item>
             </Col>
           </Row>
