@@ -197,6 +197,11 @@ const MerchantAPIKeys = () => {
   const [verificationModalVisible, setVerificationModalVisible] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [verificationLoading, setVerificationLoading] = useState(false);
+
+  const [probeModelModalVisible, setProbeModelModalVisible] = useState(false);
+  const [probeModelTargetId, setProbeModelTargetId] = useState<number | null>(null);
+  const [selectedProbeModel, setSelectedProbeModel] = useState<string | undefined>(undefined);
+  const [cachedModels, setCachedModels] = useState<Map<number, string[]>>(new Map());
   const [modelProviders, setModelProviders] = useState<ModelProvider[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [merchantSKUs, setMerchantSKUs] = useState<MerchantSKUDetail[]>([]);
@@ -381,15 +386,15 @@ const MerchantAPIKeys = () => {
     }
   };
 
-  const handleVerify = async (id: number, mode: 'light' | 'deep' = 'light') => {
+  const handleVerify = async (id: number, mode: 'light' | 'deep' = 'light', probeModel?: string) => {
     setVerificationModalVisible(true);
     setVerificationLoading(true);
     setVerificationResult(null);
 
     try {
-      await api.post(`/merchants/api-keys/${id}/verify`, {
-        verification_mode: mode,
-      });
+      const body: Record<string, string> = { verification_mode: mode };
+      if (probeModel) body.probe_model = probeModel;
+      await api.post(`/merchants/api-keys/${id}/verify`, body);
       message.success(
         mode === 'deep'
           ? '深度验证已启动（包含配额探测，支持的提供商会执行）'
@@ -400,6 +405,27 @@ const MerchantAPIKeys = () => {
     } catch (error) {
       message.error('启动验证失败');
       setVerificationLoading(false);
+    }
+  };
+
+  const openProbeModelSelector = (id: number) => {
+    setProbeModelTargetId(id);
+    const existing = cachedModels.get(id) || [];
+    setSelectedProbeModel(existing.length > 0 ? existing[0] : undefined);
+    setProbeModelModalVisible(true);
+  };
+
+  const confirmProbeModel = () => {
+    setProbeModelModalVisible(false);
+    if (probeModelTargetId !== null) {
+      handleVerify(probeModelTargetId, 'deep', selectedProbeModel);
+    }
+  };
+
+  const skipProbeModel = () => {
+    setProbeModelModalVisible(false);
+    if (probeModelTargetId !== null) {
+      handleVerify(probeModelTargetId, 'deep');
     }
   };
 
@@ -449,6 +475,14 @@ const MerchantAPIKeys = () => {
         const result = buildVerificationView(id, response.data);
 
         setVerificationResult(result);
+
+        if (result.models_found && result.models_found.length > 0) {
+          setCachedModels(prev => {
+            const next = new Map(prev);
+            next.set(id, result.models_found!);
+            return next;
+          });
+        }
 
         if (result.status === 'pending' || result.status === 'in_progress') {
           attempts++;
@@ -698,7 +732,7 @@ const MerchantAPIKeys = () => {
             </Button>
           </Tooltip>
           <Tooltip title="深度验证（api_format=openai 的厂商会探测 /chat/completions 是否可用，含上游余额类错误）">
-            <Button type="link" size="small" onClick={() => handleVerify(record.id, 'deep')}>
+            <Button type="link" size="small" onClick={() => openProbeModelSelector(record.id)}>
               深度验证
             </Button>
           </Tooltip>
@@ -1111,6 +1145,40 @@ const MerchantAPIKeys = () => {
             </Form.Item>
           )}
         </Form>
+      </Modal>
+
+      <Modal
+        title="深度验证 - 探测模型选择"
+        open={probeModelModalVisible}
+        onCancel={() => setProbeModelModalVisible(false)}
+        width={480}
+        footer={[
+          <Button key="default" onClick={skipProbeModel}>
+            使用默认模型
+          </Button>,
+          <Button key="confirm" type="primary" onClick={confirmProbeModel}>
+            开始深度验证
+          </Button>,
+        ]}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ marginBottom: 8, color: 'rgba(0,0,0,0.65)' }}>
+            选择用于配额探测的模型，不选择将使用默认模型。
+          </p>
+          <Select
+            style={{ width: '100%' }}
+            placeholder="选择探测模型（可选）"
+            allowClear
+            showSearch
+            value={selectedProbeModel}
+            onChange={(val) => setSelectedProbeModel(val)}
+            options={(cachedModels.get(probeModelTargetId || 0) || []).map(m => ({
+              label: m,
+              value: m,
+            }))}
+            notFoundContent="暂无模型列表，将使用默认模型"
+          />
+        </div>
       </Modal>
 
       <Modal

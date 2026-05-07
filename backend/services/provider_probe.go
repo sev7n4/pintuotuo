@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 )
@@ -85,6 +86,7 @@ func ProbeProviderModels(ctx context.Context, client *http.Client, modelsURL str
 		return result, nil
 	}
 	result.Success = true
+	sort.Strings(models)
 	result.Models = models
 	return result, nil
 }

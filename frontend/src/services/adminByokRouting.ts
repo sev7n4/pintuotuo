@@ -76,9 +76,12 @@ const triggerLightVerify = async (
 };
 
 const triggerDeepVerify = async (
-  id: number
+  id: number,
+  probeModel?: string
 ): Promise<{ data: { message: string; api_key_id: number; verification_type: string } }> => {
-  return api.post(`/admin/byok-routing/${id}/deep-verify`);
+  const body: Record<string, string> = {};
+  if (probeModel) body.probe_model = probeModel;
+  return api.post(`/admin/byok-routing/${id}/deep-verify`, body);
 };
 
 export interface VerificationResult {

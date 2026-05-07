@@ -1106,6 +1106,7 @@ func VerifyMerchantAPIKey(c *gin.Context) {
 	validator := services.GetAPIKeyValidator()
 	var req struct {
 		VerificationMode string `json:"verification_mode"`
+		ProbeModel       string `json:"probe_model"`
 	}
 	_ = c.ShouldBindJSON(&req)
 
@@ -1116,7 +1117,7 @@ func VerifyMerchantAPIKey(c *gin.Context) {
 
 	err = validator.ValidateAsyncWithRouteMode(
 		apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, verificationType,
-		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region,
+		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region, req.ProbeModel,
 	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -1266,7 +1267,7 @@ func LightVerifyMerchantAPIKey(c *gin.Context) {
 	validator := services.GetAPIKeyValidator()
 	err = validator.ValidateAsyncWithRouteMode(
 		apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "merchant_light",
-		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region,
+		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region, "",
 	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -1345,9 +1346,14 @@ func DeepVerifyMerchantAPIKey(c *gin.Context) {
 	}
 
 	validator := services.GetAPIKeyValidator()
+	var req struct {
+		ProbeModel string `json:"probe_model"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
 	err = validator.ValidateAsyncWithRouteMode(
 		apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "merchant_deep",
-		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region,
+		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region, req.ProbeModel,
 	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(

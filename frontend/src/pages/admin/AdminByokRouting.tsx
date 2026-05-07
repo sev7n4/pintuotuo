@@ -192,6 +192,11 @@ const AdminByokRouting = () => {
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [verificationLoading, setVerificationLoading] = useState(false);
 
+  const [probeModelModalVisible, setProbeModelModalVisible] = useState(false);
+  const [probeModelTarget, setProbeModelTarget] = useState<BYOKRoutingItem | null>(null);
+  const [selectedProbeModel, setSelectedProbeModel] = useState<string | undefined>(undefined);
+  const [cachedModels, setCachedModels] = useState<Map<number, string[]>>(new Map());
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -381,18 +386,39 @@ const AdminByokRouting = () => {
     }
   };
 
-  const handleDeepVerify = async (record: BYOKRoutingItem) => {
+  const handleDeepVerify = async (record: BYOKRoutingItem, probeModel?: string) => {
     setVerificationModalVisible(true);
     setVerificationLoading(true);
     setVerificationResult(null);
 
     try {
-      await adminByokRoutingService.triggerDeepVerify(record.id);
+      await adminByokRoutingService.triggerDeepVerify(record.id, probeModel);
       message.success('深度验证已启动，正在后台执行...');
       await pollVerificationResult(record.id);
     } catch (error) {
       message.error('启动深度验证失败');
       setVerificationLoading(false);
+    }
+  };
+
+  const openProbeModelSelector = (record: BYOKRoutingItem) => {
+    setProbeModelTarget(record);
+    const existing = cachedModels.get(record.id) || record.models_supported || [];
+    setSelectedProbeModel(existing.length > 0 ? existing[0] : undefined);
+    setProbeModelModalVisible(true);
+  };
+
+  const confirmProbeModel = () => {
+    setProbeModelModalVisible(false);
+    if (probeModelTarget) {
+      handleDeepVerify(probeModelTarget, selectedProbeModel);
+    }
+  };
+
+  const skipProbeModel = () => {
+    setProbeModelModalVisible(false);
+    if (probeModelTarget) {
+      handleDeepVerify(probeModelTarget);
     }
   };
 
@@ -409,6 +435,14 @@ const AdminByokRouting = () => {
 
         if (latest) {
           setVerificationResult(latest);
+
+          if (latest.models_found && latest.models_found.length > 0) {
+            setCachedModels(prev => {
+              const next = new Map(prev);
+              next.set(id, latest.models_found!);
+              return next;
+            });
+          }
 
           if (latest.status === 'pending' || latest.status === 'in_progress') {
             attempts++;
@@ -500,7 +534,7 @@ const AdminByokRouting = () => {
           <Button
             size="small"
             icon={isLoading ? <SyncOutlined spin /> : <SafetyCertificateOutlined />}
-            onClick={() => handleDeepVerify(record)}
+            onClick={() => openProbeModelSelector(record)}
             loading={isLoading}
           />
         </Tooltip>
@@ -907,6 +941,42 @@ const AdminByokRouting = () => {
             </Descriptions>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        title="深度验证 - 探测模型选择"
+        open={probeModelModalVisible}
+        onCancel={() => setProbeModelModalVisible(false)}
+        onOk={confirmProbeModel}
+        width={480}
+        okText="开始深度验证"
+        footer={[
+          <Button key="default" onClick={skipProbeModel}>
+            使用默认模型
+          </Button>,
+          <Button key="confirm" type="primary" onClick={confirmProbeModel}>
+            开始深度验证
+          </Button>,
+        ]}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ marginBottom: 8, color: 'rgba(0,0,0,0.65)' }}>
+            选择用于配额探测的模型，不选择将使用默认模型。
+          </p>
+          <Select
+            style={{ width: '100%' }}
+            placeholder="选择探测模型（可选）"
+            allowClear
+            showSearch
+            value={selectedProbeModel}
+            onChange={(val) => setSelectedProbeModel(val)}
+            options={(cachedModels.get(probeModelTarget?.id || 0) || probeModelTarget?.models_supported || []).map(m => ({
+              label: m,
+              value: m,
+            }))}
+            notFoundContent="暂无模型列表，将使用默认模型"
+          />
+        </div>
       </Modal>
 
       <Modal

@@ -150,7 +150,7 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 
 	routeMode, routeConfig, region := v.getAPIKeyRouteConfig(apiKeyID, provider)
 	if routeMode != "" && routeMode != GatewayModeDirect {
-		v.performVerificationWithRouteMode(apiKeyID, provider, encryptedKey, verificationType, routeMode, routeConfig, region, retryCount)
+		v.performVerificationWithRouteMode(apiKeyID, provider, encryptedKey, verificationType, routeMode, routeConfig, region, retryCount, "")
 		return
 	}
 
@@ -606,7 +606,7 @@ func (v *APIKeyValidator) probeQuota(providerConfig map[string]string, provider,
 	if baseURL == "" {
 		return false, "QUOTA_PROBE_CONFIG_ERROR", "provider api_base_url is empty"
 	}
-	model := selectProbeModel(provider, models)
+	model := selectProbeModel(provider, models, "")
 	if model == "" {
 		return false, "QUOTA_PROBE_MODEL_MISSING", "no model available for quota probe"
 	}
@@ -687,7 +687,10 @@ func (v *APIKeyValidator) getProviderRegion(provider string) string {
 	return providerRegion
 }
 
-func selectProbeModel(provider string, models []string) string {
+func selectProbeModel(provider string, models []string, userSelected string) string {
+	if userSelected != "" {
+		return userSelected
+	}
 	if len(models) > 0 {
 		return models[0]
 	}
@@ -714,6 +717,7 @@ func (v *APIKeyValidator) ValidateAsyncWithRouteMode(
 	provider, encryptedKey, verificationType, routeMode string,
 	routeConfig map[string]interface{},
 	region string,
+	probeModel string,
 ) error {
 	if apiKeyID <= 0 {
 		return fmt.Errorf("invalid API key ID")
@@ -725,7 +729,7 @@ func (v *APIKeyValidator) ValidateAsyncWithRouteMode(
 		return fmt.Errorf("encrypted key cannot be empty")
 	}
 
-	go v.performVerificationWithRouteMode(apiKeyID, provider, encryptedKey, verificationType, routeMode, routeConfig, region, 0)
+	go v.performVerificationWithRouteMode(apiKeyID, provider, encryptedKey, verificationType, routeMode, routeConfig, region, 0, probeModel)
 
 	return nil
 }
@@ -736,6 +740,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 	routeConfig map[string]interface{},
 	region string,
 	retryCount int,
+	probeModel string,
 ) {
 	ctx := context.Background()
 	startTime := time.Now()
@@ -902,7 +907,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 			probeSupported := apiFmt == modelProviderOpenAI
 			result.PricingVerified = probeSupported
 			if probeSupported {
-				quotaOK, quotaCode, quotaMsg := v.probeQuotaWithEndpoint(endpoint, provider, authToken, result.ModelsFound, routeMode, decryptedKey)
+				quotaOK, quotaCode, quotaMsg := v.probeQuotaWithEndpoint(endpoint, provider, authToken, result.ModelsFound, routeMode, decryptedKey, probeModel)
 				if !quotaOK {
 					v.handleVerificationError(ctx, verificationID, apiKeyID, quotaCode, quotaMsg, startTime)
 					return
@@ -1098,12 +1103,12 @@ func (v *APIKeyValidator) resolveAuthToken(routeMode string, originalAPIKey stri
 	}
 }
 
-func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey string, models []string, routeMode, originalAPIKey string) (bool, string, string) {
+func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey string, models []string, routeMode, originalAPIKey, probeModel string) (bool, string, string) {
 	baseURL := strings.TrimRight(endpoint, "/")
 	if baseURL == "" {
 		return false, "QUOTA_PROBE_CONFIG_ERROR", "endpoint is empty"
 	}
-	model := selectProbeModel(provider, models)
+	model := selectProbeModel(provider, models, probeModel)
 	if model == "" {
 		return false, "QUOTA_PROBE_MODEL_MISSING", "no model available for quota probe"
 	}
