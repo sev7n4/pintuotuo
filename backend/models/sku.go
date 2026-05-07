@@ -4,6 +4,20 @@ import (
 	"time"
 )
 
+type ProviderModel struct {
+	ID                   int        `json:"id"`
+	ProviderCode         string     `json:"provider_code"`
+	ModelID              string     `json:"model_id"`
+	DisplayName          string     `json:"display_name,omitempty"`
+	ReferenceInputPrice  *float64   `json:"reference_input_price,omitempty"`
+	ReferenceOutputPrice *float64   `json:"reference_output_price,omitempty"`
+	ReferenceCurrency    string     `json:"reference_currency,omitempty"`
+	IsActive             bool       `json:"is_active"`
+	SyncedAt             *time.Time `json:"synced_at,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+}
+
 type ModelProvider struct {
 	ID          int    `json:"id"`
 	Code        string `json:"code"`
