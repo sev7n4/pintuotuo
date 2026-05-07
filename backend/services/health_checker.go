@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -128,6 +129,27 @@ func NewHealthChecker() *HealthChecker {
 	}
 }
 
+func (s *HealthChecker) routeAwareHTTPClient(routeMode string) *http.Client {
+	if routeMode == GatewayModeProxy {
+		httpsProxy := os.Getenv("HTTPS_PROXY")
+		if httpsProxy == "" {
+			httpsProxy = os.Getenv("https_proxy")
+		}
+		if httpsProxy != "" {
+			proxyURL, err := url.Parse(httpsProxy)
+			if err == nil {
+				transport := http.DefaultTransport.(*http.Transport).Clone()
+				transport.Proxy = http.ProxyURL(proxyURL)
+				return &http.Client{
+					Timeout:   10 * time.Second,
+					Transport: transport,
+				}
+			}
+		}
+	}
+	return s.httpClient
+}
+
 func (s *HealthChecker) GetHealthCheckInterval(level string) int {
 	levelEnum := HealthCheckLevel(level)
 	if interval, ok := healthCheckIntervalMap[levelEnum]; ok {
@@ -157,16 +179,18 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 		}, nil
 	}
 
+	resolvedMode := s.resolvedRouteMode(ctx, apiKey)
 	authToken := s.getDecryptedAPIKey(apiKey)
-	if apiKey.RouteMode == GatewayModeLitellm {
+	if resolvedMode == GatewayModeLitellm {
 		if masterKey := os.Getenv("LITELLM_MASTER_KEY"); masterKey != "" {
 			authToken = strings.TrimSpace(masterKey)
 		}
 	}
 	SetProviderAuthHeaders(req, apiKey.Provider, authToken)
 
+	client := s.routeAwareHTTPClient(resolvedMode)
 	start := time.Now()
-	resp, err := s.httpClient.Do(req)
+	resp, err := client.Do(req)
 	latencyMs := int(time.Since(start).Milliseconds())
 
 	if err != nil {
@@ -210,13 +234,15 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 	}
 
 	modelsEndpoint := openAICompatModelsProbeURL(endpoint)
+	resolvedMode := s.resolvedRouteMode(ctx, apiKey)
 	authToken := s.getDecryptedAPIKey(apiKey)
-	if apiKey.RouteMode == GatewayModeLitellm {
+	if resolvedMode == GatewayModeLitellm {
 		if masterKey := os.Getenv("LITELLM_MASTER_KEY"); masterKey != "" {
 			authToken = strings.TrimSpace(masterKey)
 		}
 	}
-	probe, err := ProbeProviderModels(ctx, s.httpClient, modelsEndpoint, authToken, apiKey.Provider)
+	client := s.routeAwareHTTPClient(resolvedMode)
+	probe, err := ProbeProviderModels(ctx, client, modelsEndpoint, authToken, apiKey.Provider)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -485,6 +511,15 @@ func (s *HealthChecker) resolveEndpoint(ctx context.Context, apiKey *models.Merc
 	return s.resolveEndpointWithRouteMode(ctx, apiKey)
 }
 
+func (s *HealthChecker) resolvedRouteMode(ctx context.Context, apiKey *models.MerchantAPIKey) string {
+	routeMode := apiKey.RouteMode
+	if routeMode == RouteModeAuto || routeMode == string(GoalAuto) || routeMode == "" {
+		providerRegion := s.getProviderRegion(apiKey.Provider)
+		routeMode = resolveAutoRouteMode(providerRegion)
+	}
+	return routeMode
+}
+
 func (s *HealthChecker) resolveEndpointWithRouteMode(ctx context.Context, apiKey *models.MerchantAPIKey) (string, error) {
 	routeMode := apiKey.RouteMode
 	if routeMode == RouteModeAuto || routeMode == string(GoalAuto) || routeMode == "" {
@@ -747,19 +782,26 @@ func PerformHealthCheckAsync(apiKeyID int) {
 	checker := NewHealthChecker()
 
 	var key models.MerchantAPIKey
+	var routeConfigBytes []byte
 	db := config.GetDB()
 	if db == nil {
 		return
 	}
 
 	err := db.QueryRowContext(ctx, `
-		SELECT id, merchant_id, provider, api_key_encrypted, endpoint_url, health_check_level, health_status
+		SELECT id, merchant_id, provider, api_key_encrypted, COALESCE(endpoint_url, ''), health_check_level, health_status,
+		       COALESCE(route_mode, ''), route_config, COALESCE(region, '')
 		FROM merchant_api_keys WHERE id = $1`,
 		apiKeyID,
-	).Scan(&key.ID, &key.MerchantID, &key.Provider, &key.APIKeyEncrypted, &key.EndpointURL, &key.HealthCheckLevel, &key.HealthStatus)
+	).Scan(&key.ID, &key.MerchantID, &key.Provider, &key.APIKeyEncrypted, &key.EndpointURL, &key.HealthCheckLevel, &key.HealthStatus,
+		&key.RouteMode, &routeConfigBytes, &key.Region)
 
 	if err != nil {
 		return
+	}
+
+	if len(routeConfigBytes) > 0 {
+		_ = json.Unmarshal(routeConfigBytes, &key.RouteConfig)
 	}
 
 	if !checker.ShouldPerformCheck(&key) {
@@ -859,15 +901,17 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 	}
 
 	authToken := s.getDecryptedAPIKey(apiKey)
-	if apiKey.RouteMode == GatewayModeLitellm {
+	resolvedMode := s.resolvedRouteMode(ctx, apiKey)
+	if resolvedMode == GatewayModeLitellm {
 		if masterKey := os.Getenv("LITELLM_MASTER_KEY"); masterKey != "" {
 			authToken = strings.TrimSpace(masterKey)
 		}
 	}
 	SetProviderAuthHeaders(req, apiKey.Provider, authToken)
 
+	client := s.routeAwareHTTPClient(resolvedMode)
 	start := time.Now()
-	resp, err := s.httpClient.Do(req)
+	resp, err := client.Do(req)
 	latencyMs := int(time.Since(start).Milliseconds())
 
 	if err != nil {
