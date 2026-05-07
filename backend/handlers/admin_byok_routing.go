@@ -444,7 +444,7 @@ func LightVerifyBYOK(c *gin.Context) {
 	validator := services.GetAPIKeyValidator()
 	err = validator.ValidateAsyncWithRouteMode(
 		apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "admin_light",
-		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region,
+		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region, "",
 	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -517,9 +517,14 @@ func DeepVerifyBYOK(c *gin.Context) {
 	}
 
 	validator := services.GetAPIKeyValidator()
+	var req struct {
+		ProbeModel string `json:"probe_model"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
 	err = validator.ValidateAsyncWithRouteMode(
 		apiKey.ID, apiKey.Provider, apiKey.APIKeyEncrypted, "admin_deep",
-		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region,
+		apiKey.RouteMode, apiKey.RouteConfig, apiKey.Region, req.ProbeModel,
 	)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
