@@ -16,8 +16,13 @@ func SyncProviderModels(c *gin.Context) {
 		return
 	}
 
+	var req struct {
+		APIKeyID int `json:"api_key_id"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
 	syncService := services.NewProviderModelSyncService()
-	syncedCount, err := syncService.SyncProviderModels(c.Request.Context(), providerCode)
+	syncedCount, err := syncService.SyncProviderModels(c.Request.Context(), providerCode, req.APIKeyID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -10,6 +10,7 @@ import (
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/logger"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/utils"
 )
 
 type ProviderModelSyncService struct{}
@@ -18,18 +19,18 @@ func NewProviderModelSyncService() *ProviderModelSyncService {
 	return &ProviderModelSyncService{}
 }
 
-func (s *ProviderModelSyncService) SyncProviderModels(ctx context.Context, providerCode string) (int, error) {
+func (s *ProviderModelSyncService) SyncProviderModels(ctx context.Context, providerCode string, apiKeyID int) (int, error) {
 	db := config.GetDB()
 	if db == nil {
 		return 0, fmt.Errorf("database not initialized")
 	}
 
-	var apiBaseURL, apiFormat string
+	var apiBaseURL string
 	err := db.QueryRowContext(ctx,
-		`SELECT COALESCE(NULLIF(TRIM(api_base_url), ''), ''), COALESCE(api_format, 'openai')
+		`SELECT COALESCE(NULLIF(TRIM(api_base_url), ''), '')
 		 FROM model_providers WHERE code = $1 AND status = 'active'`,
 		providerCode,
-	).Scan(&apiBaseURL, &apiFormat)
+	).Scan(&apiBaseURL)
 	if err != nil {
 		return 0, fmt.Errorf("provider %s not found or inactive: %w", providerCode, err)
 	}
@@ -38,11 +39,16 @@ func (s *ProviderModelSyncService) SyncProviderModels(ctx context.Context, provi
 		return 0, fmt.Errorf("provider %s has no api_base_url configured", providerCode)
 	}
 
+	apiKey, err := s.getDecryptedAPIKey(ctx, providerCode, apiKeyID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get API key for provider %s: %w", providerCode, err)
+	}
+
 	modelsURL := buildModelsURL(apiBaseURL)
 
 	client := newProxyAwareHTTPClient(15*time.Second, resolveProviderRouteMode(providerCode))
 
-	probe, err := ProbeProviderModels(ctx, client, modelsURL, "", providerCode)
+	probe, err := ProbeProviderModels(ctx, client, modelsURL, apiKey, providerCode)
 	if err != nil {
 		return 0, fmt.Errorf("failed to probe models for provider %s: %w", providerCode, err)
 	}
@@ -63,6 +69,34 @@ func (s *ProviderModelSyncService) SyncProviderModels(ctx context.Context, provi
 	})
 
 	return syncedCount, nil
+}
+
+func (s *ProviderModelSyncService) getDecryptedAPIKey(ctx context.Context, providerCode string, apiKeyID int) (string, error) {
+	db := config.GetDB()
+
+	var encryptedKey string
+	var query string
+	var args []interface{}
+
+	if apiKeyID > 0 {
+		query = `SELECT api_key_encrypted FROM merchant_api_keys WHERE id = $1 AND provider = $2 AND status = 'active'`
+		args = []interface{}{apiKeyID, providerCode}
+	} else {
+		query = `SELECT api_key_encrypted FROM merchant_api_keys WHERE provider = $1 AND status = 'active' ORDER BY id LIMIT 1`
+		args = []interface{}{providerCode}
+	}
+
+	err := db.QueryRowContext(ctx, query, args...).Scan(&encryptedKey)
+	if err != nil {
+		return "", fmt.Errorf("no active API key found for provider %s", providerCode)
+	}
+
+	decrypted, err := utils.Decrypt(encryptedKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt API key: %w", err)
+	}
+
+	return decrypted, nil
 }
 
 func (s *ProviderModelSyncService) upsertModels(ctx context.Context, providerCode string, modelIDs []string) (int, error) {

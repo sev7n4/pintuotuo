@@ -55,8 +55,11 @@ export const skuService = {
       params: { provider, active_only: true },
     }),
 
-  syncProviderModels: (providerCode: string) =>
-    api.post<{ message: string; provider_code: string; synced_count: number }>(`/admin/model-providers/${providerCode}/sync-models`),
+  syncProviderModels: (providerCode: string, apiKeyID?: number) =>
+    api.post<{ message: string; provider_code: string; synced_count: number }>(
+      `/admin/model-providers/${providerCode}/sync-models`,
+      apiKeyID ? { api_key_id: apiKeyID } : {}
+    ),
 
   getSKUs: (params?: {
     page?: number;
