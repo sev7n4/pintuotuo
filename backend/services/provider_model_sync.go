@@ -163,7 +163,7 @@ func buildModelsURL(apiBaseURL string) string {
 
 func resolveProviderRouteMode(providerCode string) string {
 	region := getProviderRegionStatic(providerCode)
-	if region == "" || region == "domestic" {
+	if region == "" || region == regionDomestic {
 		return GatewayModeDirect
 	}
 	httpsProxy := os.Getenv("HTTPS_PROXY")
@@ -179,15 +179,15 @@ func resolveProviderRouteMode(providerCode string) string {
 func getProviderRegionStatic(provider string) string {
 	db := config.GetDB()
 	if db == nil {
-		return "domestic"
+		return regionDomestic
 	}
 	var region string
 	err := db.QueryRow(
-		"SELECT COALESCE(provider_region, 'domestic') FROM model_providers WHERE code = $1",
-		provider,
+		"SELECT COALESCE(provider_region, $1) FROM model_providers WHERE code = $2",
+		regionDomestic, provider,
 	).Scan(&region)
 	if err != nil {
-		return "domestic"
+		return regionDomestic
 	}
 	return region
 }
