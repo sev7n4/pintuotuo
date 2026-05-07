@@ -15,6 +15,7 @@ import {
   Tabs,
   Divider,
   Tooltip,
+  Spin,
 } from 'antd';
 import {
   EditOutlined,
@@ -23,9 +24,11 @@ import {
   InfoCircleOutlined,
   QuestionCircleOutlined,
   GlobalOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
 import { routeConfigService } from '@/services/routeConfig';
+import { adminByokRoutingService, BYOKRoutingItem } from '@/services/adminByokRouting';
 import type { ModelProvider } from '@/types/sku';
 import RouteStrategyConfig from '@/components/admin/RouteStrategyConfig';
 import EndpointsConfig from '@/components/admin/EndpointsConfig';
@@ -42,6 +45,13 @@ const AdminModelProviders = () => {
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('basic');
   const isFallbackEditing = modalMode === 'edit' && editing?.code === fallbackCode;
+
+  const [syncModalVisible, setSyncModalVisible] = useState(false);
+  const [syncingProvider, setSyncingProvider] = useState<ModelProvider | null>(null);
+  const [apiKeyList, setApiKeyList] = useState<BYOKRoutingItem[]>([]);
+  const [apiKeyListLoading, setApiKeyListLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [selectedAPIKeyID, setSelectedAPIKeyID] = useState<number | undefined>(undefined);
 
   const fetchList = async () => {
     setLoading(true);
@@ -162,6 +172,52 @@ const AdminModelProviders = () => {
     }
   };
 
+  const handleOpenSyncModal = async (record: ModelProvider) => {
+    setSyncingProvider(record);
+    setSelectedAPIKeyID(undefined);
+    setSyncModalVisible(true);
+    setApiKeyListLoading(true);
+    
+    try {
+      const response = await adminByokRoutingService.getByokRoutingList({
+        provider: record.code,
+      });
+      const keys = response.data.data || [];
+      setApiKeyList(keys);
+      if (keys.length > 0) {
+        setSelectedAPIKeyID(keys[0].id);
+      }
+    } catch {
+      message.error('获取API Key列表失败');
+      setApiKeyList([]);
+    } finally {
+      setApiKeyListLoading(false);
+    }
+  };
+
+  const handleSyncModels = async () => {
+    if (!syncingProvider) return;
+    
+    setSyncing(true);
+    try {
+      const response = await skuService.syncProviderModels(
+        syncingProvider.code,
+        selectedAPIKeyID
+      );
+      message.success(
+        `同步成功，共同步 ${response.data.synced_count} 个模型`
+      );
+      setSyncModalVisible(false);
+      setSyncingProvider(null);
+    } catch (error) {
+      message.error(
+        error instanceof Error ? error.message : '同步失败'
+      );
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const columns = [
     {
       title: '代码',
@@ -235,12 +291,24 @@ const AdminModelProviders = () => {
     {
       title: '操作',
       key: 'action',
-      width: 80,
+      width: 160,
       fixed: 'right' as const,
       render: (_: unknown, record: ModelProvider) => (
-        <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-          编辑
-        </Button>
+        <Space size="small">
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+            编辑
+          </Button>
+          {record.code !== fallbackCode && (
+            <Button
+              type="link"
+              size="small"
+              icon={<SyncOutlined />}
+              onClick={() => handleOpenSyncModal(record)}
+            >
+              同步模型
+            </Button>
+          )}
+        </Space>
       ),
     },
   ];
@@ -458,6 +526,88 @@ const AdminModelProviders = () => {
         <Form form={form} layout="vertical">
           <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
         </Form>
+      </Modal>
+
+      <Modal
+        title={
+          <Space>
+            <SyncOutlined />
+            同步模型 - {syncingProvider?.name || syncingProvider?.code}
+          </Space>
+        }
+        open={syncModalVisible}
+        onOk={handleSyncModels}
+        onCancel={() => {
+          setSyncModalVisible(false);
+          setSyncingProvider(null);
+        }}
+        confirmLoading={syncing}
+        okText="开始同步"
+        cancelText="取消"
+        width={600}
+      >
+        <Alert
+          message="同步厂商模型列表"
+          description={
+            <div>
+              <p>从厂商的 /v1/models 接口获取最新的模型列表，并更新到系统数据库中。</p>
+              <p style={{ marginTop: 8 }}>
+                <InfoCircleOutlined style={{ marginRight: 4 }} />
+                需要选择一个有效的 API Key 用于认证，如果该厂商没有可用的 API Key，请先在 BYOK 路由管理中添加。
+              </p>
+            </div>
+          }
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+
+        {apiKeyListLoading ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <Spin />
+            <div style={{ marginTop: 8, color: '#999' }}>加载 API Key 列表...</div>
+          </div>
+        ) : apiKeyList.length === 0 ? (
+          <Alert
+            message="无可用的 API Key"
+            description={
+              <div>
+                <p>该厂商没有可用的 BYOK API Key，无法同步模型列表。</p>
+                <p style={{ marginTop: 8 }}>
+                  请先在 <a href="/admin/byok-routing">BYOK 路由管理</a> 中为该厂商添加 API Key。
+                </p>
+              </div>
+            }
+            type="warning"
+            showIcon
+          />
+        ) : (
+          <Form layout="vertical">
+            <Form.Item
+              label="选择 API Key"
+              required
+              tooltip="选择用于认证的 API Key，将使用该 Key 访问厂商的 /v1/models 接口"
+            >
+              <Select
+                value={selectedAPIKeyID}
+                onChange={setSelectedAPIKeyID}
+                placeholder="请选择 API Key"
+                options={apiKeyList.map((key) => ({
+                  value: key.id,
+                  label: (
+                    <Space>
+                      <span>{key.name}</span>
+                      <Tag color={key.health_status === 'healthy' ? 'green' : 'default'}>
+                        {key.health_status === 'healthy' ? '健康' : key.health_status}
+                      </Tag>
+                      <Tag color="blue">{key.company_name}</Tag>
+                    </Space>
+                  ),
+                }))}
+              />
+            </Form.Item>
+          </Form>
+        )}
       </Modal>
     </div>
   );
