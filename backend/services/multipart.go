@@ -36,11 +36,6 @@ func ParseFileField(c *gin.Context, fieldName string) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("file size %d exceeds maximum allowed size %d bytes", header.Size, maxFileSize)
 	}
 
-	contentType := header.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = detectMIMEType(header.Filename)
-	}
-
 	buf := make([]byte, header.Size)
 	_, err = file.Read(buf)
 	if err != nil {

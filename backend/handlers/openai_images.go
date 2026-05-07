@@ -68,6 +68,7 @@ var imageSizePricing = map[string]float64{
 }
 
 const defaultImagePrice = 20.0
+const defaultImageSize = "1024x1024"
 
 func getImagePrice(size string) float64 {
 	if price, ok := imageSizePricing[size]; ok {
@@ -97,7 +98,7 @@ func OpenAIImagesGenerations(c *gin.Context) {
 		req.N = 1
 	}
 	if req.Size == "" {
-		req.Size = "1024x1024"
+		req.Size = defaultImageSize
 	}
 
 	pricePerImage := getImagePrice(req.Size)
@@ -109,11 +110,11 @@ func OpenAIImagesGenerations(c *gin.Context) {
 		EndpointType: services.EndpointTypeImagesGenerations,
 		ProviderCode: "openai",
 		UnitType:     billing.BillingUnitImage,
-		Quantity:     int64(totalPrice / getImagePrice("1024x1024")),
+		Quantity:     int64(totalPrice / getImagePrice(defaultImageSize)),
 		RequestID:    requestID,
 		Reason:       "Images generations pre-deduct",
 	}
-	if err := billingEngine.PreDeductBalanceV2(preDeductReq); err != nil {
+	if preDeductErr := billingEngine.PreDeductBalanceV2(preDeductReq); preDeductErr != nil {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "insufficient balance"})
 		return
 	}
@@ -211,7 +212,7 @@ func OpenAIImagesVariations(c *gin.Context) {
 	n := services.ParseFormInt(c, "n", 1)
 	size := c.PostForm("size")
 	if size == "" {
-		size = "1024x1024"
+		size = defaultImageSize
 	}
 	responseFormat := c.PostForm("response_format")
 	model := c.PostForm("model")
@@ -225,11 +226,11 @@ func OpenAIImagesVariations(c *gin.Context) {
 		EndpointType: services.EndpointTypeImagesVariations,
 		ProviderCode: "openai",
 		UnitType:     billing.BillingUnitImage,
-		Quantity:     int64(totalPrice / getImagePrice("1024x1024")),
+		Quantity:     int64(totalPrice / getImagePrice(defaultImageSize)),
 		RequestID:    requestID,
 		Reason:       "Images variations pre-deduct",
 	}
-	if err := billingEngine.PreDeductBalanceV2(preDeductReq); err != nil {
+	if preDeductErr := billingEngine.PreDeductBalanceV2(preDeductReq); preDeductErr != nil {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "insufficient balance"})
 		return
 	}
@@ -338,7 +339,7 @@ func OpenAIImagesEdits(c *gin.Context) {
 	n := services.ParseFormInt(c, "n", 1)
 	size := c.PostForm("size")
 	if size == "" {
-		size = "1024x1024"
+		size = defaultImageSize
 	}
 	responseFormat := c.PostForm("response_format")
 	model := c.PostForm("model")
@@ -352,11 +353,11 @@ func OpenAIImagesEdits(c *gin.Context) {
 		EndpointType: services.EndpointTypeImagesEdits,
 		ProviderCode: "openai",
 		UnitType:     billing.BillingUnitImage,
-		Quantity:     int64(totalPrice / getImagePrice("1024x1024")),
+		Quantity:     int64(totalPrice / getImagePrice(defaultImageSize)),
 		RequestID:    requestID,
 		Reason:       "Images edits pre-deduct",
 	}
-	if err := billingEngine.PreDeductBalanceV2(preDeductReq); err != nil {
+	if preDeductErr := billingEngine.PreDeductBalanceV2(preDeductReq); preDeductErr != nil {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "insufficient balance"})
 		return
 	}

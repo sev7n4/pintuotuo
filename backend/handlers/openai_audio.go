@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -238,17 +237,17 @@ func OpenAIAudioTranscriptions(c *gin.Context) {
 		RequestID:    requestID,
 		Reason:       "Audio transcriptions pre-deduct",
 	}
-	if err := billingEngine.PreDeductBalanceV2(preDeductReq); err != nil {
+	if preDeductErr := billingEngine.PreDeductBalanceV2(preDeductReq); preDeductErr != nil {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "insufficient balance"})
 		return
 	}
 
 	db := config.GetDB()
 
-	providerCfg, decryptedKey, modelName, err := resolveResponseProvider(c, db, model, userIDInt)
-	if err != nil {
+	providerCfg, decryptedKey, modelName, resolveErr := resolveResponseProvider(c, db, model, userIDInt)
+	if resolveErr != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": resolveErr.Error()})
 		return
 	}
 
@@ -261,8 +260,8 @@ func OpenAIAudioTranscriptions(c *gin.Context) {
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
-	part, err := writer.CreateFormFile("file", "audio.mp3")
-	if err != nil {
+	part, partErr := writer.CreateFormFile("file", "audio.mp3")
+	if partErr != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create multipart form"})
 		return
@@ -371,17 +370,17 @@ func OpenAIAudioTranslations(c *gin.Context) {
 		RequestID:    requestID,
 		Reason:       "Audio translations pre-deduct",
 	}
-	if err := billingEngine.PreDeductBalanceV2(preDeductReq); err != nil {
+	if preDeductErr := billingEngine.PreDeductBalanceV2(preDeductReq); preDeductErr != nil {
 		c.JSON(http.StatusPaymentRequired, gin.H{"error": "insufficient balance"})
 		return
 	}
 
 	db := config.GetDB()
 
-	providerCfg, decryptedKey, modelName, err := resolveResponseProvider(c, db, model, userIDInt)
-	if err != nil {
+	providerCfg, decryptedKey, modelName, resolveErr := resolveResponseProvider(c, db, model, userIDInt)
+	if resolveErr != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": resolveErr.Error()})
 		return
 	}
 
@@ -394,8 +393,8 @@ func OpenAIAudioTranslations(c *gin.Context) {
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
-	part, err := writer.CreateFormFile("file", "audio.mp3")
-	if err != nil {
+	part, partErr := writer.CreateFormFile("file", "audio.mp3")
+	if partErr != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create multipart form"})
 		return
@@ -459,8 +458,4 @@ func OpenAIAudioTranslations(c *gin.Context) {
 	}
 
 	c.Data(http.StatusOK, "application/json", respBody)
-}
-
-func init() {
-	_ = fmt.Sprintf
 }
