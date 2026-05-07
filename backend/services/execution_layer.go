@@ -372,13 +372,16 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 		return cfg.APIBaseURL
 
 	case GatewayModeProxy:
+		if cfg.APIBaseURL != "" {
+			return cfg.APIBaseURL
+		}
 		if cfg.Endpoints != nil {
 			if proxyEndpoints, ok := cfg.Endpoints[GatewayModeProxy].(map[string]interface{}); ok {
-				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
+				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" && !strings.Contains(gaapURL, "example.com") {
 					return gaapURL
 				}
 				for _, v := range proxyEndpoints {
-					if url, ok := v.(string); ok && url != "" {
+					if url, ok := v.(string); ok && url != "" && !strings.Contains(url, "example.com") {
 						return url
 					}
 				}

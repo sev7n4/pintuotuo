@@ -80,7 +80,13 @@ jobs:
             sleep $((i * 20))
           done
           echo "Starting containers (no server-side build)..."
-          IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway up -d
+          if [ -f docker-compose.proxy.override.yml ]; then
+            echo "Proxy override file found, including in compose stack"
+            IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml -f docker-compose.proxy.override.yml --profile llm-gateway up -d
+          else
+            echo "No proxy override file, starting without proxy"
+            IMAGE_TAG=${{ github.sha }} docker-compose -f docker-compose.prod.yml -f docker-compose.prod.images.yml --profile llm-gateway up -d
+          fi
           echo "Running database migrations..."
           for migration_file in backend/migrations/*.sql; do
             filename=$(basename "$migration_file")

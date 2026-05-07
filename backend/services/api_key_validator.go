@@ -700,6 +700,10 @@ func selectProbeModel(provider string, models []string) string {
 		return "claude-3-5-sonnet-20241022"
 	case modelProviderDeepseek:
 		return "deepseek-chat"
+	case modelProviderAlibaba:
+		return "qwen-turbo"
+	case modelProviderGoogle:
+		return "gemini-2.0-flash"
 	default:
 		return ""
 	}
@@ -1026,14 +1030,25 @@ func (v *APIKeyValidator) resolveLitellmEndpoint(ctx context.Context, routeConfi
 }
 
 func (v *APIKeyValidator) resolveProxyEndpoint(ctx context.Context, provider string, routeConfig map[string]interface{}) (string, error) {
+	providerConfig, err := v.getProviderConfig(provider)
+	if err == nil {
+		if baseURL := strings.TrimRight(providerConfig["api_base_url"], "/"); baseURL != "" {
+			logger.LogInfo(ctx, "api_key_validator", "Proxy mode using api_base_url via HTTPS_PROXY", map[string]interface{}{
+				"provider":     provider,
+				"api_base_url": baseURL,
+			})
+			return baseURL, nil
+		}
+	}
+
 	if routeConfig != nil {
 		if endpoints, ok := routeConfig["endpoints"].(map[string]interface{}); ok {
 			if proxyEndpoints, ok := endpoints[GatewayModeProxy].(map[string]interface{}); ok {
-				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" {
+				if gaapURL, ok := proxyEndpoints["gaap"].(string); ok && gaapURL != "" && !strings.Contains(gaapURL, "example.com") {
 					return gaapURL, nil
 				}
 				for _, v := range proxyEndpoints {
-					if url, ok := v.(string); ok && url != "" {
+					if url, ok := v.(string); ok && url != "" && !strings.Contains(url, "example.com") {
 						return url, nil
 					}
 				}
@@ -1045,44 +1060,29 @@ func (v *APIKeyValidator) resolveProxyEndpoint(ctx context.Context, provider str
 		}
 	}
 
-	providerConfig, err := v.getProviderConfig(provider)
-	if err != nil {
-		return "", fmt.Errorf("Proxy endpoint not configured and provider not found: %w", err)
-	}
-
-	if baseURL := strings.TrimRight(providerConfig["api_base_url"], "/"); baseURL != "" {
-		return baseURL, nil
-	}
-
 	return "", fmt.Errorf("Proxy endpoint not configured")
 }
 
 func (v *APIKeyValidator) resolveAutoEndpoint(ctx context.Context, provider string, routeConfig map[string]interface{}, region string) (string, error) {
-	priority := []string{GatewayModeDirect, GatewayModeLitellm, GatewayModeProxy}
+	providerRegion := v.getProviderRegion(provider)
+	resolvedMode := resolveAutoRouteMode(providerRegion)
 
-	for _, mode := range priority {
-		var endpoint string
-		var err error
+	logger.LogInfo(ctx, "api_key_validator", "Auto mode resolved route", map[string]interface{}{
+		"provider":        provider,
+		"provider_region": providerRegion,
+		"resolved_mode":   resolvedMode,
+	})
 
-		switch mode {
-		case GatewayModeDirect:
-			endpoint, err = v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
-		case GatewayModeLitellm:
-			endpoint, err = v.resolveLitellmEndpoint(ctx, routeConfig, region)
-		case GatewayModeProxy:
-			endpoint, err = v.resolveProxyEndpoint(ctx, provider, routeConfig)
-		}
-
-		if err == nil && endpoint != "" {
-			logger.LogInfo(ctx, "api_key_validator", "Auto mode selected endpoint", map[string]interface{}{
-				"selected_mode": mode,
-				"endpoint":      endpoint,
-			})
-			return endpoint, nil
-		}
+	switch resolvedMode {
+	case GatewayModeProxy:
+		return v.resolveProxyEndpoint(ctx, provider, routeConfig)
+	case GatewayModeLitellm:
+		return v.resolveLitellmEndpoint(ctx, routeConfig, region)
+	case GatewayModeDirect:
+		return v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
+	default:
+		return v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
 	}
-
-	return "", fmt.Errorf("no available endpoint for auto mode")
 }
 
 func (v *APIKeyValidator) resolveAuthToken(routeMode string, originalAPIKey string) string {
