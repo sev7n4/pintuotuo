@@ -367,6 +367,10 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.POST("/endpoint-pricing", handlers.AdminCreateEndpointPricing)
 		admin.PUT("/endpoint-pricing/:id", handlers.AdminUpdateEndpointPricing)
 		admin.DELETE("/endpoint-pricing/:id", handlers.AdminDeleteEndpointPricing)
+
+		admin.GET("/response-storage", handlers.AdminListResponseStorage)
+		admin.DELETE("/response-storage/:id", handlers.AdminDeleteResponseStorage)
+		admin.POST("/response-storage/clean-expired", handlers.AdminCleanExpiredResponses)
 	}
 }
 

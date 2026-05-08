@@ -1106,6 +1106,25 @@ const MerchantAPIKeys = () => {
             </Select>
           </Form.Item>
 
+          <Divider>端点权限配置</Divider>
+
+          <Form.Item name="allowed_endpoint_types" label="允许的端点类型">
+            <Checkbox.Group
+              options={[
+                { label: '对话补全', value: 'chat_completions' },
+                { label: 'Response API', value: 'responses' },
+                { label: '嵌入', value: 'embeddings' },
+                { label: '图像生成', value: 'images_generations' },
+                { label: '图像变体', value: 'images_variations' },
+                { label: '图像编辑', value: 'images_edits' },
+                { label: '语音转文字', value: 'audio_transcriptions' },
+                { label: '音频翻译', value: 'audio_translations' },
+                { label: '语音合成', value: 'audio_speech' },
+                { label: '内容审核', value: 'moderations' },
+              ]}
+            />
+          </Form.Item>
+
           <Divider>成本定价配置</Divider>
 
           <Form.Item name="cost_input_rate" label="输入成本率（元/1K tokens）">

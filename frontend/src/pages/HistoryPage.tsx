@@ -12,6 +12,7 @@ import {
   message,
   Tag,
   Spin,
+  Select,
 } from 'antd';
 import {
   HistoryOutlined,
@@ -33,6 +34,7 @@ export default function HistoryPage() {
   const [history, setHistory] = useState<BrowseHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [endpointTypeFilter, setEndpointTypeFilter] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -112,6 +114,22 @@ export default function HistoryPage() {
             浏览历史
           </Title>
           <Space>
+            <Select
+              placeholder="端点类型"
+              allowClear
+              style={{ width: 140 }}
+              value={endpointTypeFilter}
+              onChange={(v) => setEndpointTypeFilter(v)}
+              size="small"
+              options={[
+                { value: 'chat_completions', label: '对话补全' },
+                { value: 'responses', label: 'Response API' },
+                { value: 'embeddings', label: '嵌入' },
+                { value: 'images_generations', label: '图像生成' },
+                { value: 'audio_speech', label: '语音合成' },
+                { value: 'moderations', label: '内容审核' },
+              ]}
+            />
             <Text type="secondary">共 {total} 件商品</Text>
             {total > 0 && (
               <Popconfirm
