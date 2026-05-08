@@ -16,7 +16,7 @@ type litellmTemplateEntry struct {
 }
 
 var (
-	litellmCacheMu      sync.RWMutex
+	litellmCacheMu       sync.RWMutex
 	litellmTemplateCache map[string]litellmTemplateEntry
 	litellmCacheLoaded   bool
 	litellmCacheLoadOnce sync.Once
