@@ -42,11 +42,26 @@ def load_master_key(env_file: str | None) -> str:
     sys.exit(1)
 
 
+def _normalize_model_name_token(raw: str) -> str:
+    t = raw.strip()
+    if len(t) >= 2 and t[0] == t[-1] and t[0] in "\"'":
+        t = t[1:-1]
+    return t.strip()
+
+
 def parse_model_names(yaml_path: str) -> list[str]:
     text = Path(yaml_path).read_text(encoding="utf-8", errors="replace")
-    # 与 yaml 中 `  - model_name: xxx` 对齐；忽略行尾注释
     found = re.findall(r"^\s*-\s*model_name:\s*([^\s#]+)", text, re.MULTILINE)
-    return list(dict.fromkeys(found))
+    out: list[str] = []
+    seen: dict[str, None] = {}
+    for raw in found:
+        n = _normalize_model_name_token(raw)
+        if not n or "*" in n:
+            continue
+        if n not in seen:
+            seen[n] = None
+            out.append(n)
+    return out
 
 
 def short_err(body: str, limit: int = 220) -> str:
@@ -180,8 +195,15 @@ def main() -> None:
     models = parse_model_names(str(ypath))
     print(f"YAML: {ypath}")
     print(f"LiteLLM: {args.url}")
-    print(f"model_name 数: {len(models)} | max_tokens={args.max_tokens} | timeout={args.timeout}s")
+    print(f"model_name 数（已排除通配）: {len(models)} | max_tokens={args.max_tokens} | timeout={args.timeout}s")
     print("=" * 100)
+
+    if not models:
+        print(
+            "提示: 当前为通配 model_list，yaml 中无可逐条探测的具体 model_name；"
+            "真实链路请经业务 api_proxy + BYOK（user_config）验证。"
+        )
+        sys.exit(0)
 
     rows: list[tuple[str, ...]] = []
     any_non_200 = False

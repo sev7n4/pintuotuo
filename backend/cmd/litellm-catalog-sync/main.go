@@ -1,15 +1,10 @@
-// Command litellm-catalog-sync: 以 DB 商品目录为单一事实来源，生成或校验 LiteLLM model_list 与 litellm_proxy_config.yaml 一致。
+// Command litellm-catalog-sync: 从 DB 生成或校验 LiteLLM model_list。
 //
-// 厂商→LiteLLM 上游与密钥环境变量：主 SSOT 为 PostgreSQL model_providers（litellm_model_template 等列）；
-// 可选 deploy/litellm/provider_gateway_map.json 通过 -map 与 DB 合并（同名 code 以文件为准，用于应急/本地）。
+// 默认仓库 yaml 为通配 BYOK：verify 若发现 model_name: '*' 则跳过与目录逐项对齐。
+// 可选 -write-full-proxy-config 生成显式列表（审计/合规）。
+// 可选 deploy/litellm/provider_gateway_map.json 通过 -map 与 DB 合并。
 //
-// 用法:
-//
-//	go run ./cmd/litellm-catalog-sync -verify -config ../../deploy/litellm/litellm_proxy_config.yaml
-//	go run ./cmd/litellm-catalog-sync -generate -out generated.yaml
-//	go run ./cmd/litellm-catalog-sync -verify -config ../../deploy/litellm/litellm_proxy_config.yaml -map ../../deploy/litellm/provider_gateway_map.json
-//
-// 环境变量: DATABASE_URL（verify / generate 必填）
+// 环境变量: DATABASE_URL（必填）
 package main
 
 import (
@@ -48,20 +43,27 @@ func (e providerMapEntry) upstreamLitellmModel(modelID string) string {
 }
 
 func main() {
-	verify := flag.Bool("verify", false, "校验 yaml 中 model_name 覆盖库内 active SPU（需在 map 中的 provider）")
+	verify := flag.Bool("verify", false, "校验 yaml 与目录；通配 model_list（含 '*'）时跳过逐项对齐")
 	generate := flag.Bool("generate", false, "从库生成 model_list 片段 YAML 到 -out")
+	writeFull := flag.String("write-full-proxy-config", "", "写出完整 litellm_proxy_config.yaml（与 -verify/-generate 三选一）")
 	soft := flag.Bool("soft", false, "verify 时仅打印缺失项并以 0 退出（用于迁移期种子库与网关 P0 列表不一致）")
 	configPath := flag.String("config", "", "litellm_proxy_config.yaml 路径")
 	mapPath := flag.String("map", "", "可选：provider_gateway_map.json，与 DB 合并（同名 code 以文件为准）")
 	outPath := flag.String("out", "", "generate 输出文件路径（默认 stdout）")
 	flag.Parse()
 
-	if *verify && *generate {
-		fmt.Fprintln(os.Stderr, "specify only one of -verify or -generate")
-		os.Exit(2)
+	modes := 0
+	if *verify {
+		modes++
 	}
-	if !*verify && !*generate {
-		fmt.Fprintln(os.Stderr, "specify -verify or -generate")
+	if *generate {
+		modes++
+	}
+	if strings.TrimSpace(*writeFull) != "" {
+		modes++
+	}
+	if modes != 1 {
+		fmt.Fprintln(os.Stderr, "specify exactly one of -verify, -generate, -write-full-proxy-config")
 		os.Exit(2)
 	}
 
@@ -95,10 +97,19 @@ func main() {
 			os.Exit(1)
 		}
 		if ok {
-			fmt.Println("verify: OK — 库内已映射厂商的 active SPU 均在 LiteLLM 配置中有对应 model_name")
+			fmt.Println("verify: OK")
 		} else {
 			fmt.Println("verify: soft mode — 已输出缺失项，未阻断（请逐步对齐 yaml 或目录）")
 		}
+		return
+	}
+
+	if strings.TrimSpace(*writeFull) != "" {
+		if err := runWriteFullProxyConfig(db, mapping, strings.TrimSpace(*writeFull)); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("write-full-proxy-config: wrote %s\n", strings.TrimSpace(*writeFull))
 		return
 	}
 
@@ -288,6 +299,11 @@ func runVerify(db *sql.DB, configPath string, mapping map[string]providerMapEntr
 		}
 	}
 
+	if _, wildcard := names["*"]; wildcard {
+		fmt.Println("verify: 通配 model_list（含 model_name: '*'）— 跳过目录与 model_name 逐项对齐；BYOK 与路由由后端 user_config + model_providers 把关")
+		return true, nil
+	}
+
 	ctx := context.Background()
 	rows, err := db.QueryContext(ctx, `
 		SELECT mp.code,
@@ -355,7 +371,27 @@ func nameSetContainsCI(names map[string]struct{}, want string) bool {
 	return false
 }
 
-func runGenerate(db *sql.DB, mapping map[string]providerMapEntry, outPath string) error {
+const litellmProxyYAMLHeader = `# LiteLLM Proxy — 与本项目 docker-compose.prod.yml 配套
+#
+# 本文件由 litellm-catalog-sync -write-full-proxy-config 生成时为「显式 BYOK 列表」；
+# 仓库默认亦可维护通配 model_list（见 deploy/litellm/README.md）。
+#
+
+`
+
+const litellmProxyYAMLTail = `router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  timeout: 120
+
+litellm_settings:
+  drop_params: true
+  callbacks:
+    - prometheus
+`
+
+// appendActiveSPUModelListWithMode 将 active SPU（且 provider 在 gateway map 中）追加为 model_list 子项（BYOK：configurable_clientside_auth_params）。
+func appendActiveSPUModelListWithMode(sb *strings.Builder, db *sql.DB, mapping map[string]providerMapEntry, logPrefix string) (int, error) {
 	ctx := context.Background()
 	rows, err := db.QueryContext(ctx, `
 		SELECT mp.code,
@@ -366,18 +402,15 @@ func runGenerate(db *sql.DB, mapping map[string]providerMapEntry, outPath string
 		ORDER BY mp.sort_order NULLS LAST, sp.sort_order NULLS LAST, sp.id
 	`)
 	if err != nil {
-		return fmt.Errorf("db: %w", err)
+		return 0, fmt.Errorf("db: %w", err)
 	}
 	defer rows.Close()
 
-	var sb strings.Builder
-	sb.WriteString("# 由 litellm-catalog-sync -generate 生成；请勿手改本段（重新运行生成覆盖）\n")
-	sb.WriteString("# 合并到 litellm_proxy_config.yaml 的 model_list 或用于与手工 P0 条目对照。\n\n")
-
+	n := 0
 	for rows.Next() {
 		var code, modelID string
 		if err := rows.Scan(&code, &modelID); err != nil {
-			return err
+			return n, err
 		}
 		modelID = strings.TrimSpace(modelID)
 		if modelID == "" {
@@ -385,7 +418,7 @@ func runGenerate(db *sql.DB, mapping map[string]providerMapEntry, outPath string
 		}
 		ent, ok := mapping[code]
 		if !ok {
-			fmt.Fprintf(os.Stderr, "generate: skip provider %q (not in map)\n", code)
+			fmt.Fprintf(os.Stderr, "%s: skip provider %q (not in map)\n", logPrefix, code)
 			continue
 		}
 		litellmModel := ent.upstreamLitellmModel(modelID)
@@ -393,13 +426,41 @@ func runGenerate(db *sql.DB, mapping map[string]providerMapEntry, outPath string
 		sb.WriteString(fmt.Sprintf("  - model_name: %s\n", shortName))
 		sb.WriteString("    litellm_params:\n")
 		sb.WriteString(fmt.Sprintf("      model: %s\n", litellmModel))
-		sb.WriteString(fmt.Sprintf("      api_key: os.environ/%s\n", ent.APIKeyEnv))
+		sb.WriteString("      configurable_clientside_auth_params: [\"api_key\", \"api_base\"]\n")
 		if b := strings.TrimSpace(ent.APIBase); b != "" {
 			sb.WriteString(fmt.Sprintf("      api_base: %s\n", b))
 		}
 		sb.WriteString("\n")
+		n++
 	}
-	if err := rows.Err(); err != nil {
+	return n, rows.Err()
+}
+
+func runWriteFullProxyConfig(db *sql.DB, mapping map[string]providerMapEntry, path string) error {
+	var sb strings.Builder
+	sb.WriteString(litellmProxyYAMLHeader)
+	sb.WriteString("model_list:\n")
+	n, err := appendActiveSPUModelListWithMode(&sb, db, mapping, "write-full-proxy-config")
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		fmt.Fprintln(os.Stderr, "write-full-proxy-config: warning: model_list is empty (no active SPU matched gateway map)")
+	}
+	sb.WriteByte('\n')
+	sb.WriteString(litellmProxyYAMLTail)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(sb.String()), 0644)
+}
+
+func runGenerate(db *sql.DB, mapping map[string]providerMapEntry, outPath string) error {
+	var sb strings.Builder
+	sb.WriteString("# 由 litellm-catalog-sync -generate 生成；请勿手改本段（重新运行生成覆盖）\n")
+	sb.WriteString("# 合并到 litellm_proxy_config.yaml 的 model_list 或用于与手工 P0 条目对照。\n\n")
+	if _, err := appendActiveSPUModelListWithMode(&sb, db, mapping, "generate"); err != nil {
 		return err
 	}
 

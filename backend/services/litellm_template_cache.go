@@ -12,7 +12,10 @@ import (
 type LitellmTemplateEntry struct {
 	Template  string
 	APIKeyEnv string
-	APIBase   string
+	// APIBase：model_providers.litellm_gateway_api_base（网关专用覆盖，通常为空）
+	APIBase string
+	// ProviderAPIBaseURL：model_providers.api_base_url（厂商 OpenAI 兼容根地址；与 api_key_validator 探测一致）
+	ProviderAPIBaseURL string
 }
 
 var (
@@ -32,7 +35,8 @@ func LoadLitellmTemplateCache() {
 		SELECT code,
 		       COALESCE(NULLIF(TRIM(litellm_model_template), ''), ''),
 		       COALESCE(NULLIF(TRIM(litellm_gateway_api_key_env), ''), ''),
-		       COALESCE(NULLIF(TRIM(litellm_gateway_api_base), ''), '')
+		       COALESCE(NULLIF(TRIM(litellm_gateway_api_base), ''), ''),
+		       COALESCE(NULLIF(TRIM(api_base_url), ''), '')
 		FROM model_providers
 		WHERE status = 'active'
 	`)
@@ -43,8 +47,8 @@ func LoadLitellmTemplateCache() {
 
 	newCache := make(map[string]LitellmTemplateEntry)
 	for rows.Next() {
-		var code, tpl, keyEnv, apiBase string
-		if err := rows.Scan(&code, &tpl, &keyEnv, &apiBase); err != nil {
+		var code, tpl, keyEnv, gwBase, providerBase string
+		if err := rows.Scan(&code, &tpl, &keyEnv, &gwBase, &providerBase); err != nil {
 			continue
 		}
 		code = strings.TrimSpace(code)
@@ -53,9 +57,10 @@ func LoadLitellmTemplateCache() {
 			continue
 		}
 		newCache[code] = LitellmTemplateEntry{
-			Template:  tpl,
-			APIKeyEnv: strings.TrimSpace(keyEnv),
-			APIBase:   strings.TrimSpace(apiBase),
+			Template:           tpl,
+			APIKeyEnv:          strings.TrimSpace(keyEnv),
+			APIBase:            strings.TrimSpace(gwBase),
+			ProviderAPIBaseURL: strings.TrimSpace(providerBase),
 		}
 	}
 
@@ -143,7 +148,12 @@ func ResolveLitellmUpstreamBaseURL(provider string) string {
 		return ""
 	}
 
-	return entry.APIBase
+	// 与 probeQuotaViaLitellmUserConfig 对齐：优先厂商 api_base_url，其次 litellm_gateway_api_base
+	chosen := strings.TrimSpace(entry.ProviderAPIBaseURL)
+	if chosen == "" {
+		chosen = strings.TrimSpace(entry.APIBase)
+	}
+	return strings.TrimRight(chosen, "/")
 }
 
 var errCacheNotLoaded = fmt.Errorf("litellm template cache not loaded")

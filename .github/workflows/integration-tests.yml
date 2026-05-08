@@ -73,12 +73,12 @@ jobs:
           echo "Seeding test data..."
           psql "$DATABASE_URL" -f ../scripts/db/seed_test_data.sql || echo "Seed completed with warnings"
 
-      - name: LiteLLM catalog sync (soft verify)
+      - name: LiteLLM catalog sync (verify committed yaml)
         working-directory: ./backend
         env:
           DATABASE_URL: postgres://pintuotuo:test_password@localhost:5432/pintuotuo_test?sslmode=disable
         run: |
-          go run ./cmd/litellm-catalog-sync -verify -soft \
+          go run ./cmd/litellm-catalog-sync -verify \
             -config ../deploy/litellm/litellm_proxy_config.yaml
 
       - name: Run integration tests

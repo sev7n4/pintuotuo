@@ -101,10 +101,19 @@ litellm-catalog-verify-soft: ## 同上，-soft 仅警告（种子库与 P0 全�
 	cd backend && go run ./cmd/litellm-catalog-sync -verify -soft \
 		-config ../deploy/litellm/litellm_proxy_config.yaml
 
-litellm-catalog-generate: ## 由 DB 生成 model_list 片段 YAML（需 DATABASE_URL；可选 -map 覆盖见 SSOT_ROUTING）
+litellm-catalog-generate: ## 由 DB 生成 model_list 片段 YAML（需 DATABASE_URL；可选 -map 见 deploy/litellm/README.md）
 	@echo "$(BLUE)Generating LiteLLM model_list fragment from DB...$(NC)"
 	cd backend && go run ./cmd/litellm-catalog-sync -generate \
 		-out ../deploy/litellm/generated_model_list.fragment.yaml
+
+# 可选覆盖：make litellm-catalog-assemble LITELLM_CATALOG_MAP=../path/to/map.json
+LITELLM_CATALOG_MAP ?= ../deploy/litellm/provider_gateway_map.json
+
+litellm-catalog-assemble: ## 由 DB 写出完整 litellm_proxy_config.yaml（显式 BYOK 列表；需 DATABASE_URL）
+	@echo "$(BLUE)Assembling deploy/litellm/litellm_proxy_config.yaml from DB...$(NC)"
+	cd backend && go run ./cmd/litellm-catalog-sync -write-full-proxy-config \
+		../deploy/litellm/litellm_proxy_config.yaml \
+		-map $(LITELLM_CATALOG_MAP)
 
 probe-litellm: ## 读取 litellm_proxy_config.yaml 并探测网关 POST /v1/chat/completions（需 LITELLM_MASTER_KEY；可选 LITELLM_URL）
 	@python3 scripts/probe_litellm_all_models.py --url "$${LITELLM_URL:-http://127.0.0.1:4000}"

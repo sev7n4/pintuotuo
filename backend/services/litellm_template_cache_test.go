@@ -195,4 +195,20 @@ func TestResolveLitellmUpstreamBaseURL(t *testing.T) {
 			t.Errorf("ResolveLitellmUpstreamBaseURL(\"unknown\") = %q, want empty", got)
 		}
 	})
+
+	t.Run("prefers ProviderAPIBaseURL over gateway APIBase", func(t *testing.T) {
+		cache := map[string]LitellmTemplateEntry{
+			"moonshot": {
+				Template:           "moonshot/{model_id}",
+				APIBase:            "https://override-gateway.example/v1",
+				ProviderAPIBaseURL: "https://api.moonshot.cn/v1",
+			},
+		}
+		SetLitellmCacheForTest(cache)
+		defer ResetLitellmCacheForTest()
+		got := ResolveLitellmUpstreamBaseURL("moonshot")
+		if got != "https://api.moonshot.cn/v1" {
+			t.Errorf("ResolveLitellmUpstreamBaseURL(\"moonshot\") = %q, want provider api_base_url", got)
+		}
+	})
 }

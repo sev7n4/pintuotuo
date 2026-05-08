@@ -1,30 +1,57 @@
-# LiteLLM Proxy — 纯BYOK模式配置
-# 所有配置从 merchant_api_keys + merchant_skus 动态获取
+# LiteLLM Proxy — 通配 BYOK（默认）
+#
+# 上游 Key 由业务后端在 route_mode=litellm 时通过请求体 user_config（及 litellm_params 内 api_key/api_base）注入；
+# 与 api_proxy.buildLitellmUserConfig、api_key_validator.probeQuotaViaLitellmUserConfig 对齐。
+# 上新模型一般无需改本文件（门禁在后端目录与权益）；可选 make litellm-catalog-assemble 生成显式列表。
+#
 # 文档：https://docs.litellm.ai/docs/proxy/clientside_auth
+#
 
 model_list:
   - model_name: "*"
     litellm_params:
       model: "*"
       configurable_clientside_auth_params: ["api_key", "api_base"]
-  
-  - model_name: openai/*
+
+  - model_name: "openai/*"
     litellm_params:
-      model: openai/*
+      model: "openai/*"
       configurable_clientside_auth_params: ["api_key", "api_base"]
-  - model_name: anthropic/*
+
+  - model_name: "anthropic/*"
     litellm_params:
-      model: anthropic/*
+      model: "anthropic/*"
       configurable_clientside_auth_params: ["api_key", "api_base"]
-  - model_name: zai/*
+
+  - model_name: "zai/*"
     litellm_params:
-      model: zai/*
+      model: "zai/*"
       configurable_clientside_auth_params: ["api_key", "api_base"]
-  
-  - model_name: gpt-3.5-turbo
+
+  - model_name: "moonshot/*"
     litellm_params:
-      model: openai/gpt-3.5-turbo
-      api_key: os.environ/OPENAI_API_KEY
+      model: "moonshot/*"
+      configurable_clientside_auth_params: ["api_key", "api_base"]
+
+  - model_name: "minimax/*"
+    litellm_params:
+      model: "minimax/*"
+      configurable_clientside_auth_params: ["api_key", "api_base"]
+
+  - model_name: "gemini/*"
+    litellm_params:
+      model: "gemini/*"
+      configurable_clientside_auth_params: ["api_key", "api_base"]
+
+  - model_name: "deepseek/*"
+    litellm_params:
+      model: "deepseek/*"
+      configurable_clientside_auth_params: ["api_key", "api_base"]
+
+  - model_name: "dashscope/*"
+    litellm_params:
+      model: "dashscope/*"
+      configurable_clientside_auth_params: ["api_key", "api_base"]
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
