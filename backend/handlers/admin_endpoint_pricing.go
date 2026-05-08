@@ -197,7 +197,7 @@ func AdminUpdateEndpointPricing(c *gin.Context) {
 	}
 
 	var req EndpointPricingUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
 		return
 	}
