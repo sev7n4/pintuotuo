@@ -322,10 +322,10 @@ func TestResponseAPIResponse_WithError(t *testing.T) {
 	}
 
 	apiResp := ResponseAPIResponse{
-		ID:        resp.ResponseID,
-		Object:    "response",
-		Model:     resp.Model,
-		Status:    resp.Status,
+		ID:     resp.ResponseID,
+		Object: "response",
+		Model:  resp.Model,
+		Status: resp.Status,
 	}
 	if resp.ErrorMessage.Valid && resp.Status == "failed" {
 		apiResp.Error = map[string]string{
@@ -448,7 +448,6 @@ func TestOpenAIResponsesGet_NotFound(t *testing.T) {
 
 func TestOpenAIResponsesDelete_NotFound(t *testing.T) {
 	r, mock := setupResponseTestRouter(t)
-	
 
 	mock.ExpectQuery(`SELECT .+ FROM stored_responses WHERE response_id = .+ AND deleted_at IS NULL`).
 		WithArgs("resp_nonexist").
@@ -468,7 +467,6 @@ func TestOpenAIResponsesDelete_NotFound(t *testing.T) {
 
 func TestOpenAIResponsesStatus_NotFound(t *testing.T) {
 	r, mock := setupResponseTestRouter(t)
-	
 
 	mock.ExpectQuery(`SELECT .+ FROM stored_responses WHERE response_id = .+ AND deleted_at IS NULL`).
 		WithArgs("resp_nonexist").
@@ -488,7 +486,6 @@ func TestOpenAIResponsesStatus_NotFound(t *testing.T) {
 
 func TestOpenAIResponsesGet_DBError(t *testing.T) {
 	r, mock := setupResponseTestRouter(t)
-	
 
 	mock.ExpectQuery(`SELECT .+ FROM stored_responses WHERE response_id = .+ AND deleted_at IS NULL`).
 		WithArgs("resp_001").

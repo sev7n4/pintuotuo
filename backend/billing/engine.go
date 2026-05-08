@@ -807,7 +807,7 @@ func (e *BillingEngine) getUnitPrice(endpointType, providerCode string, unitType
 		{endpointType: "audio_speech", unitType: BillingUnitCharacter}:      0.000015,
 		{endpointType: "audio_transcriptions", unitType: BillingUnitSecond}: 0.006,
 		{endpointType: "audio_translations", unitType: BillingUnitSecond}:   0.006,
-		{endpointType: "moderations", unitType: BillingUnitToken}:           0.0,
+		{endpointType: "moderations", unitType: BillingUnitRequest}:         0.0,
 		{endpointType: "responses", unitType: BillingUnitToken}:             0.001,
 		{endpointType: "responses", unitType: BillingUnitRequest}:           0.01,
 		{endpointType: "responses", unitType: BillingUnitImage}:             20.0,

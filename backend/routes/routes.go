@@ -95,6 +95,14 @@ func RegisterOpenAICompatRoutes(router *gin.RouterGroup) {
 		openai.GET("/responses/:id", handlers.OpenAIResponsesGet)
 		openai.DELETE("/responses/:id", handlers.OpenAIResponsesDelete)
 		openai.GET("/responses/:id/status", handlers.OpenAIResponsesStatus)
+		openai.POST("/images/generations", handlers.OpenAIImagesGenerations)
+		openai.POST("/images/variations", handlers.OpenAIImagesVariations)
+		openai.POST("/images/edits", handlers.OpenAIImagesEdits)
+		openai.POST("/audio/speech", handlers.OpenAIAudioSpeech)
+		openai.POST("/audio/transcriptions", handlers.OpenAIAudioTranscriptions)
+		openai.POST("/audio/translations", handlers.OpenAIAudioTranslations)
+		openai.POST("/embeddings", handlers.OpenAIEmbeddings)
+		openai.POST("/moderations", handlers.OpenAIModerations)
 	}
 }
 
