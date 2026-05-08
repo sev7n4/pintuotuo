@@ -102,6 +102,9 @@ export const skuService = {
     status?: string;
     sort_order?: number;
     compat_prefixes?: string[];
+    litellm_model_template?: string;
+    litellm_gateway_api_key_env?: string;
+    litellm_gateway_api_base?: string;
   }) => api.post<{ data: ModelProvider }>('/admin/model-providers', data),
 
   patchModelProvider: (
@@ -114,6 +117,9 @@ export const skuService = {
       status: string;
       sort_order: number;
       compat_prefixes: string[];
+      litellm_model_template: string;
+      litellm_gateway_api_key_env: string;
+      litellm_gateway_api_base: string;
     }>
   ) => api.patch<{ data: ModelProvider }>(`/admin/model-providers/${id}`, data),
 

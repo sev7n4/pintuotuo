@@ -1169,7 +1169,7 @@ func litellmProviderPrefix(provider string) string {
 	case modelProviderAlibaba:
 		return "dashscope"
 	case modelProviderZhipu:
-		return modelProviderZhipu
+		return "zai"
 	case modelProviderMoonshot:
 		return modelProviderMoonshot
 	case modelProviderMinimax:
@@ -1183,6 +1183,43 @@ func litellmProviderPrefix(provider string) string {
 	default:
 		return provider
 	}
+}
+
+func (v *APIKeyValidator) resolveLitellmModelNameFromDB(provider, model string) (string, error) {
+	cached, err := ResolveLitellmModelFromCache(provider, model)
+	if err == nil {
+		return cached, nil
+	}
+
+	db := v.ensureDB()
+	if db == nil {
+		return "", fmt.Errorf("database not available")
+	}
+
+	var template string
+	err = db.QueryRow(
+		"SELECT COALESCE(litellm_model_template, '') FROM model_providers WHERE code = $1 AND status = 'active'",
+		strings.TrimSpace(provider),
+	).Scan(&template)
+	if err != nil {
+		return "", fmt.Errorf("provider %s not found: %w", provider, err)
+	}
+
+	template = strings.TrimSpace(template)
+	if template == "" {
+		return "", fmt.Errorf("provider %s has no litellm_model_template configured", provider)
+	}
+
+	modelName := model
+	if idx := strings.LastIndex(model, "/"); idx >= 0 {
+		modelName = model[idx+1:]
+	}
+
+	if strings.Contains(template, "{model_id}") {
+		return strings.ReplaceAll(template, "{model_id}", modelName), nil
+	}
+
+	return template + "/" + modelName, nil
 }
 
 func resolveLitellmModelName(provider, model string) (string, error) {
@@ -1209,9 +1246,12 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 		return false, "QUOTA_PROBE_UPSTREAM_URL_MISSING", "upstream base URL not configured"
 	}
 
-	litellmModel, err := resolveLitellmModelName(provider, model)
+	litellmModel, err := v.resolveLitellmModelNameFromDB(provider, model)
 	if err != nil {
-		return false, "LITELLM_UNSUPPORTED_PROVIDER", err.Error()
+		litellmModel, err = resolveLitellmModelName(provider, model)
+		if err != nil {
+			return false, "LITELLM_UNSUPPORTED_PROVIDER", err.Error()
+		}
 	}
 
 	userConfig := map[string]interface{}{

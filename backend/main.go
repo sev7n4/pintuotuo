@@ -61,6 +61,7 @@ func main() {
 	services.GetSmartRouter().ReloadRoutingStrategies()
 	services.StartRoutingStrategiesListener(config.DatabaseURL())
 	services.StartPlatformSettingsListener(config.DatabaseURL())
+	services.InitLitellmCache()
 
 	if err := cache.Init(); err != nil {
 		log.Fatalf("Failed to initialize Redis: %v", err)

@@ -222,7 +222,7 @@ func TestLitellmProviderPrefix(t *testing.T) {
 		{"anthropic", "anthropic"},
 		{"deepseek", "deepseek"},
 		{"alibaba", "dashscope"},
-		{"zhipu", "zhipu"},
+		{"zhipu", "zai"},
 		{"moonshot", "moonshot"},
 		{"minimax", "minimax"},
 		{"google", "gemini"},
