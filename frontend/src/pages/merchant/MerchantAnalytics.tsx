@@ -220,6 +220,19 @@ export const MerchantAnalytics: React.FC = () => {
                 { value: 'vip', label: 'VIP用户' },
               ]}
             />
+            <Select
+              placeholder="端点类型"
+              allowClear
+              style={{ width: 140 }}
+              options={[
+                { value: 'chat_completions', label: '对话补全' },
+                { value: 'responses', label: 'Response API' },
+                { value: 'embeddings', label: '嵌入' },
+                { value: 'images_generations', label: '图像生成' },
+                { value: 'audio_speech', label: '语音合成' },
+                { value: 'moderations', label: '内容审核' },
+              ]}
+            />
             <Button icon={<ReloadOutlined />} onClick={handleReset}>
               重置
             </Button>

@@ -843,6 +843,25 @@ export const ProductListPage: React.FC = () => {
               <Option value="vision">Vision</Option>
             </Select>
             <Select
+              placeholder="端点类型"
+              allowClear
+              style={{ width: screens.xs ? '100%' : 140 }}
+              value={searchParams.get('endpoint_type') || undefined}
+              onChange={(value) => {
+                const next = new URLSearchParams(searchParams);
+                if (value) next.set('endpoint_type', value);
+                else next.delete('endpoint_type');
+                navigate(`/catalog?${next.toString()}`);
+              }}
+            >
+              <Option value="chat_completions">对话补全</Option>
+              <Option value="responses">Response API</Option>
+              <Option value="embeddings">嵌入</Option>
+              <Option value="images_generations">图像生成</Option>
+              <Option value="audio_speech">语音合成</Option>
+              <Option value="moderations">内容审核</Option>
+            </Select>
+            <Select
               placeholder="排序"
               allowClear
               style={{ width: screens.xs ? '100%' : 140 }}

@@ -13,6 +13,7 @@ import {
   Tabs,
   Empty,
   message,
+  Select,
 } from 'antd';
 import {
   DollarOutlined,
@@ -323,6 +324,19 @@ const MerchantBills = () => {
             picker="month"
             onChange={(dates) => setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs] | null)}
             placeholder={['开始月份', '结束月份']}
+          />
+          <Select
+            placeholder="端点类型"
+            allowClear
+            style={{ width: 140, marginLeft: 8 }}
+            options={[
+              { value: 'chat_completions', label: '对话补全' },
+              { value: 'responses', label: 'Response API' },
+              { value: 'embeddings', label: '嵌入' },
+              { value: 'images_generations', label: '图像生成' },
+              { value: 'audio_speech', label: '语音合成' },
+              { value: 'moderations', label: '内容审核' },
+            ]}
           />
         </div>
         <Table

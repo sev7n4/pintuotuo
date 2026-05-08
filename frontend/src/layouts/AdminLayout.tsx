@@ -74,6 +74,11 @@ const menuItems = [
     label: '端点计费配置',
   },
   {
+    key: '/admin/response-storage',
+    icon: <DatabaseOutlined />,
+    label: 'Response 存储',
+  },
+  {
     key: '/admin/model-providers',
     icon: <ApiOutlined />,
     label: '厂商配置',

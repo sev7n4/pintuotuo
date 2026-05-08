@@ -13,6 +13,7 @@ export interface AdminStats {
   order_conversion_rate: number;
   payment_success_rate: number;
   cancellation_rate: number;
+  by_endpoint_type?: { endpoint_type: string; count: number; tokens: number }[];
 }
 
 export interface ProbeEndpointResponse {

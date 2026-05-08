@@ -68,6 +68,7 @@ import AdminReconciliation from '@pages/admin/AdminReconciliation';
 import AdminEntitlementPackages from '@pages/admin/AdminEntitlementPackages';
 import AdminAPIKeyStatus from '@pages/admin/AdminAPIKeyStatus';
 import AdminEndpointPricing from '@pages/admin/AdminEndpointPricing';
+import AdminResponseStorage from '@pages/admin/AdminResponseStorage';
 import AdminRouteDecisionLogs from '@pages/admin/AdminRouteDecisionLogs';
 import AdminGatewayStats from '@pages/admin/AdminGatewayStats';
 import AdminRateLimiter from '@pages/admin/AdminRateLimiter';
@@ -191,6 +192,7 @@ function App() {
             <Route path="fuel-station" element={<AdminFuelStation />} />
             <Route path="entitlement-packages" element={<AdminEntitlementPackages />} />
             <Route path="endpoint-pricing" element={<AdminEndpointPricing />} />
+            <Route path="response-storage" element={<AdminResponseStorage />} />
           </Route>
         </Routes>
       </BrowserRouter>

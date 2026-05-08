@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Spin, Typography, Alert } from 'antd';
+import { Card, Row, Col, Statistic, Spin, Typography, Alert, Tag, Space } from 'antd';
 import {
   UserOutlined,
   ShopOutlined,
@@ -8,8 +8,10 @@ import {
   LineChartOutlined,
   CheckCircleOutlined,
   StopOutlined,
+  ApiOutlined,
 } from '@ant-design/icons';
 import { adminService, AdminStats } from '@/services/admin';
+import { ENDPOINT_TYPE_LABELS, ENDPOINT_TYPE_COLORS } from '@/types/sku';
 
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -132,6 +134,41 @@ const AdminDashboard: React.FC = () => {
             />
           </Card>
         </Col>
+      </Row>
+
+      <Typography.Title level={4} style={{ marginTop: 32, marginBottom: 16 }}>
+        端点类型调用分布
+      </Typography.Title>
+      <Row gutter={[16, 16]}>
+        {stats.by_endpoint_type && stats.by_endpoint_type.length > 0 ? (
+          stats.by_endpoint_type.map((et: { endpoint_type: string; count: number; tokens: number }) => (
+            <Col xs={24} sm={12} lg={6} key={et.endpoint_type}>
+              <Card style={{ borderRadius: 12 }}>
+                <Statistic
+                  title={
+                    <Space>
+                      <Tag color={ENDPOINT_TYPE_COLORS[et.endpoint_type] || 'default'}>
+                        {ENDPOINT_TYPE_LABELS[et.endpoint_type] || et.endpoint_type}
+                      </Tag>
+                      调用量
+                    </Space>
+                  }
+                  value={et.count}
+                  prefix={<ApiOutlined />}
+                />
+                <div style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
+                  Token 消耗: {et.tokens.toLocaleString()}
+                </div>
+              </Card>
+            </Col>
+          ))
+        ) : (
+          <Col span={24}>
+            <Card style={{ borderRadius: 12, textAlign: 'center', color: '#8c8c8c' }}>
+              暂无端点类型统计数据
+            </Card>
+          </Col>
+        )}
       </Row>
     </div>
   );
