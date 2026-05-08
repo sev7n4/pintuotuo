@@ -29,6 +29,7 @@ func GetConsumptionRecords(c *gin.Context) {
 	endDate := c.Query("end_date")
 	provider := c.Query("provider")
 	modelFilter := c.Query("model")
+	endpointTypeFilter := c.Query("endpoint_type")
 	pageStr := c.DefaultQuery("page", "1")
 	pageSizeStr := c.DefaultQuery("page_size", "20")
 
@@ -71,6 +72,11 @@ func GetConsumptionRecords(c *gin.Context) {
 		args = append(args, modelFilter)
 		argIndex++
 	}
+	if endpointTypeFilter != "" {
+		baseQuery += " AND endpoint_type = $" + strconv.Itoa(argIndex)
+		args = append(args, endpointTypeFilter)
+		argIndex++
+	}
 
 	var total int
 	countQuery := "SELECT COUNT(*) " + baseQuery
@@ -78,7 +84,7 @@ func GetConsumptionRecords(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 	// C 端不返回 cost（内部/商户记账）；用户可见扣减口径为 输入+输出 tokens
-	dataQuery := "SELECT id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, created_at " + baseQuery + " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(argIndex) + " OFFSET $" + strconv.Itoa(argIndex+1)
+	dataQuery := "SELECT id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, endpoint_type, created_at " + baseQuery + " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(argIndex) + " OFFSET $" + strconv.Itoa(argIndex+1)
 	args = append(args, pageSize, offset)
 
 	rows, err := db.Query(dataQuery, args...)
@@ -92,9 +98,10 @@ func GetConsumptionRecords(c *gin.Context) {
 	for rows.Next() {
 		var id, statusCode, latencyMs, inputTokens, outputTokens int
 		var requestID, provider, model, method, path string
+		var endpointType string
 		var createdAt time.Time
 
-		err := rows.Scan(&id, &requestID, &provider, &model, &method, &path, &statusCode, &latencyMs, &inputTokens, &outputTokens, &createdAt)
+		err := rows.Scan(&id, &requestID, &provider, &model, &method, &path, &statusCode, &latencyMs, &inputTokens, &outputTokens, &endpointType, &createdAt)
 		if err != nil {
 			continue
 		}
@@ -110,6 +117,7 @@ func GetConsumptionRecords(c *gin.Context) {
 			"latency_ms":    latencyMs,
 			"input_tokens":  inputTokens,
 			"output_tokens": outputTokens,
+			"endpoint_type": endpointType,
 			"created_at":    createdAt,
 		})
 	}
@@ -138,6 +146,7 @@ func GetConsumptionStats(c *gin.Context) {
 	endDate := c.Query("end_date")
 	provider := c.Query("provider")
 	modelFilter := c.Query("model")
+	endpointTypeFilter := c.Query("endpoint_type")
 
 	db := config.GetDB()
 	if db == nil {
@@ -167,6 +176,11 @@ func GetConsumptionStats(c *gin.Context) {
 	if modelFilter != "" {
 		baseQuery += " AND model = $" + strconv.Itoa(argIndex)
 		args = append(args, modelFilter)
+		argIndex++
+	}
+	if endpointTypeFilter != "" {
+		baseQuery += " AND endpoint_type = $" + strconv.Itoa(argIndex)
+		args = append(args, endpointTypeFilter)
 	}
 
 	var stats struct {
@@ -199,6 +213,28 @@ func GetConsumptionStats(c *gin.Context) {
 			"count":    count,
 			"tokens":   tokens,
 		})
+	}
+
+	endpointTypeQuery := "SELECT COALESCE(endpoint_type, 'chat_completions') as et, COUNT(*) as count, COALESCE(SUM((input_tokens::bigint + output_tokens::bigint)), 0) as tokens " + baseQuery + " GROUP BY et ORDER BY tokens DESC"
+	etRows, etErr := db.Query(endpointTypeQuery, args...)
+	if etErr == nil {
+		defer etRows.Close()
+	}
+	byEndpointType := make([]map[string]interface{}, 0)
+	if etErr == nil {
+		for etRows.Next() {
+			var et string
+			var count int
+			var tokens int64
+			if err := etRows.Scan(&et, &count, &tokens); err != nil {
+				continue
+			}
+			byEndpointType = append(byEndpointType, map[string]interface{}{
+				"endpoint_type": et,
+				"count":         count,
+				"tokens":        tokens,
+			})
+		}
 	}
 
 	distinctModels := make([]string, 0)
@@ -252,6 +288,7 @@ func GetConsumptionStats(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"stats":            stats,
 		"by_provider":      byProvider,
+		"by_endpoint_type": byEndpointType,
 		"models_in_range":  distinctModels,
 		"model_comparison": modelComparison,
 	})

@@ -69,6 +69,11 @@ const menuItems = [
     label: '套餐包管理',
   },
   {
+    key: '/admin/endpoint-pricing',
+    icon: <DollarOutlined />,
+    label: '端点计费配置',
+  },
+  {
     key: '/admin/model-providers',
     icon: <ApiOutlined />,
     label: '厂商配置',

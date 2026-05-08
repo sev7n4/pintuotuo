@@ -362,6 +362,11 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.POST("/entitlement-packages", handlers.CreateAdminEntitlementPackage)
 		admin.PUT("/entitlement-packages/:id", handlers.UpdateAdminEntitlementPackage)
 		admin.DELETE("/entitlement-packages/:id", handlers.DeleteAdminEntitlementPackage)
+
+		admin.GET("/endpoint-pricing", handlers.AdminListEndpointPricing)
+		admin.POST("/endpoint-pricing", handlers.AdminCreateEndpointPricing)
+		admin.PUT("/endpoint-pricing/:id", handlers.AdminUpdateEndpointPricing)
+		admin.DELETE("/endpoint-pricing/:id", handlers.AdminDeleteEndpointPricing)
 	}
 }
 
