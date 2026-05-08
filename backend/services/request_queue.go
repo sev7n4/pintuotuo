@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/pintuotuo/backend/metrics"
 )
 
 type RequestQueue interface {
@@ -83,6 +85,7 @@ func (pq *PriorityQueue) Enqueue(ctx context.Context, req *QueuedRequest) error 
 		pq.stats.mu.Lock()
 		pq.stats.Dropped++
 		pq.stats.mu.Unlock()
+		metrics.RecordRequestQueueDropped("default")
 		return nil
 	}
 
@@ -246,6 +249,7 @@ func (f *QueueFactory) GetQueue(key string, maxSize int) *PriorityQueue {
 		f.queues[key] = queue
 	}
 
+	metrics.SetRequestQueueSize(key, queue.Size())
 	return queue
 }
 

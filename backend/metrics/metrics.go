@@ -545,7 +545,92 @@ var (
 		},
 		[]string{"provider", "endpoint_type"},
 	)
+
+	APIKeyRequestTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "api_key_requests_total",
+			Help: "Total number of API proxy requests by provider and status",
+		},
+		[]string{"provider", "status"},
+	)
+
+	APIKeyRequestErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "api_key_request_errors_total",
+			Help: "Total number of API proxy request errors by provider and error_type",
+		},
+		[]string{"provider", "error_type"},
+	)
+
+	APIKeyRequestLatency = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "api_key_request_latency_seconds",
+			Help:    "API proxy request latency in seconds by provider",
+			Buckets: []float64{.05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60},
+		},
+		[]string{"provider"},
+	)
+
+	RateLimiterTokensRemaining = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "rate_limiter_tokens_remaining",
+			Help: "Remaining tokens in the rate limiter bucket",
+		},
+		[]string{"limiter_key"},
+	)
+
+	RateLimiterDeniedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "rate_limiter_denied_total",
+			Help: "Total number of rate-limited (denied) requests",
+		},
+		[]string{"limiter_key"},
+	)
+
+	RequestQueueSize = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "request_queue_size",
+			Help: "Current number of requests in the queue",
+		},
+		[]string{"queue_name"},
+	)
+
+	RequestQueueDroppedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "request_queue_dropped_total",
+			Help: "Total number of dropped requests due to queue overflow",
+		},
+		[]string{"queue_name"},
+	)
 )
+
+func RecordAPIKeyRequest(provider, status string) {
+	APIKeyRequestTotal.WithLabelValues(provider, status).Inc()
+}
+
+func RecordAPIKeyRequestError(provider, errorType string) {
+	APIKeyRequestErrors.WithLabelValues(provider, errorType).Inc()
+}
+
+func RecordAPIKeyRequestLatency(provider string, durationSeconds float64) {
+	APIKeyRequestLatency.WithLabelValues(provider).Observe(durationSeconds)
+}
+
+func SetRateLimiterTokensRemaining(key string, tokens float64) {
+	RateLimiterTokensRemaining.WithLabelValues(key).Set(tokens)
+}
+
+func RecordRateLimiterDenied(key string) {
+	RateLimiterDeniedTotal.WithLabelValues(key).Inc()
+}
+
+func SetRequestQueueSize(queueName string, size int) {
+	RequestQueueSize.WithLabelValues(queueName).Set(float64(size))
+}
+
+func RecordRequestQueueDropped(queueName string) {
+	RequestQueueDroppedTotal.WithLabelValues(queueName).Inc()
+}
 
 // RecordRoutingDecision records a routing decision
 func RecordRoutingDecision(provider, merchantRegion, merchantType, mode string, durationSeconds float64) {
