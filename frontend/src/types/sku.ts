@@ -16,16 +16,15 @@ export interface ModelProvider {
   api_base_url?: string;
   api_format: string;
   billing_type?: string;
-  /** OpenAI 兼容入口：无前缀 model 名按最长前缀匹配到本厂商 */
   compat_prefixes?: string[];
   cache_enabled: boolean;
   cache_discount_rate?: number;
-  /** 厂商区域：domestic(国内), overseas(海外) */
   provider_region?: string;
-  /** 路由策略配置 */
   route_strategy?: Record<string, any>;
-  /** 端点配置 */
   endpoints?: Record<string, any>;
+  litellm_model_template?: string;
+  litellm_gateway_api_key_env?: string;
+  litellm_gateway_api_base?: string;
   status: string;
   sort_order: number;
   created_at: string;

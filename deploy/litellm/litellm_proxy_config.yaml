@@ -16,6 +16,10 @@ model_list:
     litellm_params:
       model: anthropic/*
       configurable_clientside_auth_params: ["api_key", "api_base"]
+  - model_name: zai/*
+    litellm_params:
+      model: zai/*
+      configurable_clientside_auth_params: ["api_key", "api_base"]
   
   - model_name: gpt-3.5-turbo
     litellm_params:

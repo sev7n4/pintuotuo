@@ -25,6 +25,7 @@ import {
   QuestionCircleOutlined,
   GlobalOutlined,
   SyncOutlined,
+  ApiOutlined,
 } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
 import { routeConfigService } from '@/services/routeConfig';
@@ -102,6 +103,12 @@ const AdminModelProviders = () => {
       provider_region: record.provider_region || 'domestic',
       route_strategy: record.route_strategy || {},
       endpoints: record.endpoints || {},
+      litellm_prefix: record.litellm_model_template
+        ? record.litellm_model_template.replace('/{model_id}', '')
+        : undefined,
+      litellm_model_template: record.litellm_model_template || undefined,
+      litellm_gateway_api_key_env: record.litellm_gateway_api_key_env || undefined,
+      litellm_gateway_api_base: record.litellm_gateway_api_base || undefined,
     });
     setModalVisible(true);
   };
@@ -121,6 +128,9 @@ const AdminModelProviders = () => {
           compat_prefixes: Array.isArray(values.compat_prefixes)
             ? (values.compat_prefixes as string[]).map((s) => String(s).trim()).filter(Boolean)
             : undefined,
+          litellm_model_template: values.litellm_model_template?.trim() || undefined,
+          litellm_gateway_api_key_env: values.litellm_gateway_api_key_env?.trim() || undefined,
+          litellm_gateway_api_base: values.litellm_gateway_api_base?.trim() || undefined,
         });
         if (values.provider_region || values.route_strategy || values.endpoints) {
           try {
@@ -149,6 +159,9 @@ const AdminModelProviders = () => {
           compat_prefixes: Array.isArray(values.compat_prefixes)
             ? (values.compat_prefixes as string[]).map((s) => String(s).trim()).filter(Boolean)
             : [],
+          litellm_model_template: values.litellm_model_template?.trim() || '',
+          litellm_gateway_api_key_env: values.litellm_gateway_api_key_env?.trim() || '',
+          litellm_gateway_api_base: values.litellm_gateway_api_base?.trim() || '',
         });
         if (!isFallbackEditing) {
           try {
@@ -276,6 +289,16 @@ const AdminModelProviders = () => {
       },
     },
     {
+      title: 'LiteLLM',
+      key: 'litellm_config',
+      width: 100,
+      render: (_: unknown, record: ModelProvider) => {
+        if (!record.litellm_model_template) return <Tag color="default">未配置</Tag>;
+        const prefix = record.litellm_model_template.replace('/{model_id}', '');
+        return <Tag color="green">{prefix}</Tag>;
+      },
+    },
+    {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
@@ -318,6 +341,27 @@ const AdminModelProviders = () => {
     { value: 'anthropic', label: 'anthropic（/messages + x-api-key）' },
     { value: 'baidu', label: 'baidu（千帆等，需与代理实现一致）' },
   ];
+
+  const commonLitellmPrefixes = [
+    { value: 'openai', label: 'openai（OpenAI）' },
+    { value: 'anthropic', label: 'anthropic（Anthropic）' },
+    { value: 'deepseek', label: 'deepseek（DeepSeek）' },
+    { value: 'zai', label: 'zai（智谱 Z.AI 海外）' },
+    { value: 'dashscope', label: 'dashscope（阿里通义）' },
+    { value: 'gemini', label: 'gemini（Google）' },
+    { value: 'moonshot', label: 'moonshot（Moonshot）' },
+    { value: 'minimax', label: 'minimax（MiniMax）' },
+  ];
+
+  const deriveLitellmConfig = (prefix: string) => {
+    const p = (prefix || '').trim().toLowerCase();
+    if (!p) return { template: '', envVar: '', apiBase: '' };
+    return {
+      template: `${p}/{model_id}`,
+      envVar: `${p.toUpperCase().replace(/-/g, '_')}_API_KEY`,
+      apiBase: '',
+    };
+  };
 
   const BasicInfoTab = () => (
     <>
@@ -455,6 +499,123 @@ const AdminModelProviders = () => {
     </>
   );
 
+  const LitellmConfigTab = () => {
+    const litellmPrefix = Form.useWatch('litellm_prefix', form);
+    const derived = deriveLitellmConfig(litellmPrefix);
+
+    const handlePrefixChange = (prefix: string) => {
+      const d = deriveLitellmConfig(prefix);
+      form.setFieldsValue({
+        litellm_prefix: prefix,
+        litellm_model_template: d.template || undefined,
+        litellm_gateway_api_key_env: d.envVar || undefined,
+      });
+    };
+
+    return (
+      <>
+        <Alert
+          message="LiteLLM 网关配置"
+          description={
+            <div>
+              <p>配置厂商在 LiteLLM 网关中的模型名称映射。只需填写 LiteLLM Provider 前缀，系统会自动生成模板和环境变量名。</p>
+              <p style={{ marginTop: 8 }}>
+                <InfoCircleOutlined style={{ marginRight: 4 }} />
+                此配置为 BYOK 深度验证和 LiteLLM 路由模式的核心数据源（SSOT）。
+              </p>
+            </div>
+          }
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+
+        <Form.Item
+          name="litellm_prefix"
+          label={
+            <Space>
+              <span>LiteLLM Provider 前缀</span>
+              <Tooltip title="输入 LiteLLM 官方前缀，系统会自动推导模型模板和环境变量名。如不确定，请查阅 litellm.ai/docs/providers">
+                <QuestionCircleOutlined style={{ color: '#999' }} />
+              </Tooltip>
+            </Space>
+          }
+        >
+          <Select
+            showSearch
+            allowClear
+            placeholder="选择或输入前缀"
+            options={commonLitellmPrefixes}
+            onChange={handlePrefixChange}
+            disabled={isFallbackEditing}
+            filterOption={(input, option) =>
+              (option?.label as string)?.toLowerCase().includes(input.toLowerCase()) ||
+              (option?.value as string)?.toLowerCase().includes(input.toLowerCase())
+            }
+          />
+        </Form.Item>
+
+        {derived.template && (
+          <Alert
+            style={{ marginBottom: 16 }}
+            type="success"
+            showIcon
+            message="自动推导预览"
+            description={
+              <div style={{ fontSize: 13 }}>
+                <div>模型模板：<code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3 }}>{derived.template}</code></div>
+                <div style={{ marginTop: 4 }}>环境变量：<code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3 }}>{derived.envVar}</code></div>
+                <div style={{ marginTop: 4 }}>示例：<code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3 }}>glm-4.5 → {derived.template.replace('{model_id}', 'glm-4.5')}</code></div>
+              </div>
+            }
+          />
+        )}
+
+        <Form.Item
+          name="litellm_model_template"
+          label={
+            <Space>
+              <span>模型模板</span>
+              <Tooltip title="自动生成，通常无需修改。格式：prefix/{model_id}">
+                <QuestionCircleOutlined style={{ color: '#999' }} />
+              </Tooltip>
+            </Space>
+          }
+        >
+          <Input placeholder="例如 zai/{model_id}" disabled={isFallbackEditing} />
+        </Form.Item>
+
+        <Form.Item
+          name="litellm_gateway_api_key_env"
+          label={
+            <Space>
+              <span>API Key 环境变量名</span>
+              <Tooltip title="LiteLLM 容器内读取 API Key 的环境变量名，自动生成，通常无需修改">
+                <QuestionCircleOutlined style={{ color: '#999' }} />
+              </Tooltip>
+            </Space>
+          }
+        >
+          <Input placeholder="例如 ZAI_API_KEY" disabled={isFallbackEditing} />
+        </Form.Item>
+
+        <Form.Item
+          name="litellm_gateway_api_base"
+          label={
+            <Space>
+              <span>自定义 API Base</span>
+              <Tooltip title="仅 OpenAI 兼容厂商需要填写（如阶跃星辰），大多数厂商留空即可">
+                <QuestionCircleOutlined style={{ color: '#999' }} />
+              </Tooltip>
+            </Space>
+          }
+        >
+          <Input placeholder="仅 OpenAI 兼容厂商需要，如 https://api.stepfun.com/v1" disabled={isFallbackEditing} />
+        </Form.Item>
+      </>
+    );
+  };
+
   const tabItems = [
     { key: 'basic', label: '基础信息', children: <BasicInfoTab /> },
     {
@@ -467,6 +628,17 @@ const AdminModelProviders = () => {
       key: 'endpoints',
       label: '端点配置',
       children: <EndpointsTab />,
+      disabled: isFallbackEditing,
+    },
+    {
+      key: 'litellm',
+      label: (
+        <Space size={4}>
+          <ApiOutlined />
+          LiteLLM 配置
+        </Space>
+      ),
+      children: <LitellmConfigTab />,
       disabled: isFallbackEditing,
     },
   ];
