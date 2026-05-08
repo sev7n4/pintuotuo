@@ -7,7 +7,7 @@ import (
 func TestResolveLitellmModelFromCache(t *testing.T) {
 	tests := []struct {
 		name     string
-		cache    map[string]litellmTemplateEntry
+		cache    map[string]LitellmTemplateEntry
 		provider string
 		model    string
 		want     string
@@ -15,7 +15,7 @@ func TestResolveLitellmModelFromCache(t *testing.T) {
 	}{
 		{
 			name: "zhipu with zai template",
-			cache: map[string]litellmTemplateEntry{
+			cache: map[string]LitellmTemplateEntry{
 				"zhipu": {Template: "zai/{model_id}", APIKeyEnv: "ZAI_API_KEY"},
 			},
 			provider: "zhipu",
@@ -25,7 +25,7 @@ func TestResolveLitellmModelFromCache(t *testing.T) {
 		},
 		{
 			name: "alibaba with dashscope template",
-			cache: map[string]litellmTemplateEntry{
+			cache: map[string]LitellmTemplateEntry{
 				"alibaba": {Template: "dashscope/{model_id}", APIKeyEnv: "DASHSCOPE_API_KEY"},
 			},
 			provider: "alibaba",
@@ -35,7 +35,7 @@ func TestResolveLitellmModelFromCache(t *testing.T) {
 		},
 		{
 			name: "google with gemini template",
-			cache: map[string]litellmTemplateEntry{
+			cache: map[string]LitellmTemplateEntry{
 				"google": {Template: "gemini/{model_id}", APIKeyEnv: "GOOGLE_API_KEY"},
 			},
 			provider: "google",
@@ -45,7 +45,7 @@ func TestResolveLitellmModelFromCache(t *testing.T) {
 		},
 		{
 			name: "stepfun with openai template and api_base",
-			cache: map[string]litellmTemplateEntry{
+			cache: map[string]LitellmTemplateEntry{
 				"stepfun": {Template: "openai/{model_id}", APIKeyEnv: "STEPFUN_API_KEY", APIBase: "https://api.stepfun.com/v1"},
 			},
 			provider: "stepfun",
@@ -55,7 +55,7 @@ func TestResolveLitellmModelFromCache(t *testing.T) {
 		},
 		{
 			name: "model with existing slash strips prefix",
-			cache: map[string]litellmTemplateEntry{
+			cache: map[string]LitellmTemplateEntry{
 				"zhipu": {Template: "zai/{model_id}", APIKeyEnv: "ZAI_API_KEY"},
 			},
 			provider: "zhipu",
@@ -65,7 +65,7 @@ func TestResolveLitellmModelFromCache(t *testing.T) {
 		},
 		{
 			name: "template without placeholder appends slash",
-			cache: map[string]litellmTemplateEntry{
+			cache: map[string]LitellmTemplateEntry{
 				"custom": {Template: "custom_prefix", APIKeyEnv: "CUSTOM_API_KEY"},
 			},
 			provider: "custom",
@@ -75,7 +75,7 @@ func TestResolveLitellmModelFromCache(t *testing.T) {
 		},
 		{
 			name:     "provider not in cache",
-			cache:    map[string]litellmTemplateEntry{},
+			cache:    map[string]LitellmTemplateEntry{},
 			provider: "unknown",
 			model:    "model-x",
 			want:     "",
@@ -83,7 +83,7 @@ func TestResolveLitellmModelFromCache(t *testing.T) {
 		},
 		{
 			name: "empty template in cache skipped",
-			cache: map[string]litellmTemplateEntry{
+			cache: map[string]LitellmTemplateEntry{
 				"empty": {Template: "", APIKeyEnv: "EMPTY_API_KEY"},
 			},
 			provider: "empty",
@@ -119,7 +119,7 @@ func TestResolveLitellmModelFromCacheNotLoaded(t *testing.T) {
 }
 
 func TestGetLitellmTemplateCache(t *testing.T) {
-	cache := map[string]litellmTemplateEntry{
+	cache := map[string]LitellmTemplateEntry{
 		"zhipu":   {Template: "zai/{model_id}", APIKeyEnv: "ZAI_API_KEY"},
 		"alibaba": {Template: "dashscope/{model_id}", APIKeyEnv: "DASHSCOPE_API_KEY"},
 	}
@@ -136,7 +136,7 @@ func TestGetLitellmTemplateCache(t *testing.T) {
 }
 
 func TestResolveLitellmModelFromCacheFallback(t *testing.T) {
-	cache := map[string]litellmTemplateEntry{
+	cache := map[string]LitellmTemplateEntry{
 		"zhipu": {Template: "zai/{model_id}", APIKeyEnv: "ZAI_API_KEY"},
 	}
 	SetLitellmCacheForTest(cache)
@@ -157,4 +157,42 @@ func TestResolveLitellmModelFromCacheFallback(t *testing.T) {
 	if fallbackGot != got {
 		t.Errorf("cache result %q != fallback result %q, should be consistent", got, fallbackGot)
 	}
+}
+
+func TestResolveLitellmUpstreamBaseURL(t *testing.T) {
+	cache := map[string]LitellmTemplateEntry{
+		"stepfun":  {Template: "openai/{model_id}", APIBase: "https://api.stepfun.com/v1"},
+		"deepseek": {Template: "openai/{model_id}", APIBase: "https://api.deepseek.com"},
+		"zhipu":    {Template: "zai/{model_id}", APIBase: ""},
+	}
+	SetLitellmCacheForTest(cache)
+	defer ResetLitellmCacheForTest()
+
+	t.Run("returns api_base for known provider", func(t *testing.T) {
+		got := ResolveLitellmUpstreamBaseURL("stepfun")
+		if got != "https://api.stepfun.com/v1" {
+			t.Errorf("ResolveLitellmUpstreamBaseURL(\"stepfun\") = %q, want %q", got, "https://api.stepfun.com/v1")
+		}
+	})
+
+	t.Run("returns api_base for another provider", func(t *testing.T) {
+		got := ResolveLitellmUpstreamBaseURL("deepseek")
+		if got != "https://api.deepseek.com" {
+			t.Errorf("ResolveLitellmUpstreamBaseURL(\"deepseek\") = %q, want %q", got, "https://api.deepseek.com")
+		}
+	})
+
+	t.Run("returns empty for provider with empty api_base", func(t *testing.T) {
+		got := ResolveLitellmUpstreamBaseURL("zhipu")
+		if got != "" {
+			t.Errorf("ResolveLitellmUpstreamBaseURL(\"zhipu\") = %q, want empty", got)
+		}
+	})
+
+	t.Run("returns empty for unknown provider", func(t *testing.T) {
+		got := ResolveLitellmUpstreamBaseURL("unknown")
+		if got != "" {
+			t.Errorf("ResolveLitellmUpstreamBaseURL(\"unknown\") = %q, want empty", got)
+		}
+	})
 }

@@ -490,3 +490,63 @@ func TestProviderRuntimeConfig_EmptyFields(t *testing.T) {
 	assert.Nil(t, cfg.RouteStrategy)
 	assert.Nil(t, cfg.Endpoints)
 }
+
+func TestBuildLitellmUserConfig(t *testing.T) {
+	services.SetLitellmCacheForTest(map[string]services.LitellmTemplateEntry{
+		"stepfun":  {Template: "openai/{model_id}", APIBase: "https://api.stepfun.com/v1"},
+		"deepseek": {Template: "openai/{model_id}", APIBase: "https://api.deepseek.com/v1"},
+	})
+	defer services.ResetLitellmCacheForTest()
+
+	t.Run("stepfun model with cache hit", func(t *testing.T) {
+		result := buildLitellmUserConfig("stepfun", "step-1-8k", "sk-test-key", "https://api.stepfun.com/v1")
+
+		ml, ok := result["model_list"].([]map[string]interface{})
+		require.True(t, ok)
+		require.Len(t, ml, 1)
+
+		assert.Equal(t, "step-1-8k", ml[0]["model_name"])
+
+		params, ok := ml[0]["litellm_params"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, "openai/step-1-8k", params["model"])
+		assert.Equal(t, "sk-test-key", params["api_key"])
+		assert.Equal(t, "https://api.stepfun.com/v1", params["api_base"])
+	})
+
+	t.Run("model with slash prefix", func(t *testing.T) {
+		result := buildLitellmUserConfig("stepfun", "stepfun/step-1-8k", "sk-key", "https://api.stepfun.com/v1")
+
+		ml := result["model_list"].([]map[string]interface{})
+		params := ml[0]["litellm_params"].(map[string]interface{})
+		assert.Equal(t, "openai/step-1-8k", params["model"])
+		assert.Equal(t, "stepfun/step-1-8k", ml[0]["model_name"])
+	})
+
+	t.Run("empty decrypted key omits api_key", func(t *testing.T) {
+		result := buildLitellmUserConfig("deepseek", "deepseek-v3", "", "https://api.deepseek.com/v1")
+
+		ml := result["model_list"].([]map[string]interface{})
+		params := ml[0]["litellm_params"].(map[string]interface{})
+		_, hasKey := params["api_key"]
+		assert.False(t, hasKey)
+		assert.Equal(t, "https://api.deepseek.com/v1", params["api_base"])
+	})
+
+	t.Run("empty upstream base URL omits api_base", func(t *testing.T) {
+		result := buildLitellmUserConfig("stepfun", "step-1-8k", "sk-key", "")
+
+		ml := result["model_list"].([]map[string]interface{})
+		params := ml[0]["litellm_params"].(map[string]interface{})
+		_, hasBase := params["api_base"]
+		assert.False(t, hasBase)
+	})
+
+	t.Run("unknown provider falls back to raw model name", func(t *testing.T) {
+		result := buildLitellmUserConfig("unknown_provider", "some-model", "sk-key", "https://api.unknown.com/v1")
+
+		ml := result["model_list"].([]map[string]interface{})
+		params := ml[0]["litellm_params"].(map[string]interface{})
+		assert.Equal(t, "some-model", params["model"])
+	})
+}

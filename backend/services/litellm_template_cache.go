@@ -9,7 +9,7 @@ import (
 	"github.com/pintuotuo/backend/config"
 )
 
-type litellmTemplateEntry struct {
+type LitellmTemplateEntry struct {
 	Template  string
 	APIKeyEnv string
 	APIBase   string
@@ -17,7 +17,7 @@ type litellmTemplateEntry struct {
 
 var (
 	litellmCacheMu       sync.RWMutex
-	litellmTemplateCache map[string]litellmTemplateEntry
+	litellmTemplateCache map[string]LitellmTemplateEntry
 	litellmCacheLoaded   bool
 	litellmCacheLoadOnce sync.Once
 )
@@ -41,7 +41,7 @@ func LoadLitellmTemplateCache() {
 	}
 	defer rows.Close()
 
-	newCache := make(map[string]litellmTemplateEntry)
+	newCache := make(map[string]LitellmTemplateEntry)
 	for rows.Next() {
 		var code, tpl, keyEnv, apiBase string
 		if err := rows.Scan(&code, &tpl, &keyEnv, &apiBase); err != nil {
@@ -52,7 +52,7 @@ func LoadLitellmTemplateCache() {
 		if tpl == "" {
 			continue
 		}
-		newCache[code] = litellmTemplateEntry{
+		newCache[code] = LitellmTemplateEntry{
 			Template:  tpl,
 			APIKeyEnv: strings.TrimSpace(keyEnv),
 			APIBase:   strings.TrimSpace(apiBase),
@@ -104,11 +104,11 @@ func ResolveLitellmModelFromCache(provider, model string) (string, error) {
 	return tpl + "/" + modelName, nil
 }
 
-func GetLitellmTemplateCache() map[string]litellmTemplateEntry {
+func GetLitellmTemplateCache() map[string]LitellmTemplateEntry {
 	litellmCacheMu.RLock()
 	defer litellmCacheMu.RUnlock()
 
-	result := make(map[string]litellmTemplateEntry, len(litellmTemplateCache))
+	result := make(map[string]LitellmTemplateEntry, len(litellmTemplateCache))
 	for k, v := range litellmTemplateCache {
 		result[k] = v
 	}
@@ -123,11 +123,27 @@ func ResetLitellmCacheForTest() {
 	litellmCacheLoadOnce = sync.Once{}
 }
 
-func SetLitellmCacheForTest(cache map[string]litellmTemplateEntry) {
+func SetLitellmCacheForTest(cache map[string]LitellmTemplateEntry) {
 	litellmCacheMu.Lock()
 	defer litellmCacheMu.Unlock()
 	litellmTemplateCache = cache
 	litellmCacheLoaded = true
+}
+
+func ResolveLitellmUpstreamBaseURL(provider string) string {
+	litellmCacheMu.RLock()
+	defer litellmCacheMu.RUnlock()
+
+	if !litellmCacheLoaded {
+		return ""
+	}
+
+	entry, ok := litellmTemplateCache[strings.TrimSpace(provider)]
+	if !ok {
+		return ""
+	}
+
+	return entry.APIBase
 }
 
 var errCacheNotLoaded = fmt.Errorf("litellm template cache not loaded")
