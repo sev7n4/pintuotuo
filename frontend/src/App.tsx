@@ -67,6 +67,7 @@ import AdminRoutingStrategies from '@pages/admin/AdminRoutingStrategies';
 import AdminReconciliation from '@pages/admin/AdminReconciliation';
 import AdminEntitlementPackages from '@pages/admin/AdminEntitlementPackages';
 import AdminAPIKeyStatus from '@pages/admin/AdminAPIKeyStatus';
+import AdminEndpointPricing from '@pages/admin/AdminEndpointPricing';
 import AdminRouteDecisionLogs from '@pages/admin/AdminRouteDecisionLogs';
 import AdminGatewayStats from '@pages/admin/AdminGatewayStats';
 import AdminRateLimiter from '@pages/admin/AdminRateLimiter';
@@ -189,6 +190,7 @@ function App() {
             <Route path="flash-sales" element={<AdminFlashSales />} />
             <Route path="fuel-station" element={<AdminFuelStation />} />
             <Route path="entitlement-packages" element={<AdminEntitlementPackages />} />
+            <Route path="endpoint-pricing" element={<AdminEndpointPricing />} />
           </Route>
         </Routes>
       </BrowserRouter>

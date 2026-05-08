@@ -54,6 +54,7 @@ interface ConsumptionRecord {
   latency_ms: number;
   input_tokens: number;
   output_tokens: number;
+  endpoint_type?: string;
   created_at: string;
 }
 
@@ -173,13 +174,14 @@ const Consumption: React.FC = () => {
   ]);
   const [provider, setProvider] = useState<string>('all');
   const [model, setModel] = useState<string>('');
+  const [endpointType, setEndpointType] = useState<string>('');
   const screens = useBreakpoint();
 
   const isMobile = screens.xs || (screens.sm && !screens.md);
 
   useEffect(() => {
     fetchConsumptionData();
-  }, [dateRange, provider, model]);
+  }, [dateRange, provider, model, endpointType]);
 
   const fetchConsumptionData = async () => {
     setLoading(true);
@@ -192,6 +194,9 @@ const Consumption: React.FC = () => {
       });
       if (model.trim()) {
         params.set('model', model.trim());
+      }
+      if (endpointType) {
+        params.set('endpoint_type', endpointType);
       }
 
       const [recordsRes, statsRes] = await Promise.all([
@@ -309,6 +314,27 @@ const Consumption: React.FC = () => {
         render: (provider: string) => (
           <Tag color={getProviderColor(provider)}>{provider.toUpperCase()}</Tag>
         ),
+      },
+      {
+        title: '端点',
+        dataIndex: 'endpoint_type',
+        key: 'endpoint_type',
+        width: 100,
+        render: (et: string) => {
+          const labels: Record<string, string> = {
+            chat_completions: '对话', responses: 'Response', embeddings: '嵌入',
+            images_generations: '图像生成', images_variations: '图像变体', images_edits: '图像编辑',
+            audio_transcriptions: '语音转文字', audio_translations: '音频翻译', audio_speech: '语音合成',
+            moderations: '审核',
+          };
+          const colors: Record<string, string> = {
+            chat_completions: 'blue', responses: 'purple', embeddings: 'cyan',
+            images_generations: 'orange', images_variations: 'gold', images_edits: 'volcano',
+            audio_transcriptions: 'green', audio_translations: 'lime', audio_speech: 'magenta',
+            moderations: 'red',
+          };
+          return <Tag color={colors[et] || 'default'}>{labels[et] || et || '对话'}</Tag>;
+        },
       },
       ...(screens.md
         ? [
@@ -545,6 +571,26 @@ const Consumption: React.FC = () => {
             size={isMobile ? 'small' : 'middle'}
             options={modelOptions}
             notFoundContent={modelOptions.length ? undefined : '先选日期并刷新'}
+          />
+          <Select
+            value={endpointType || undefined}
+            onChange={(v) => setEndpointType(v ?? '')}
+            allowClear
+            placeholder="端点类型"
+            style={{ width: isMobile ? 120 : 140 }}
+            size={isMobile ? 'small' : 'middle'}
+            options={[
+              { value: 'chat_completions', label: '对话补全' },
+              { value: 'responses', label: 'Response API' },
+              { value: 'embeddings', label: '嵌入' },
+              { value: 'images_generations', label: '图像生成' },
+              { value: 'images_variations', label: '图像变体' },
+              { value: 'images_edits', label: '图像编辑' },
+              { value: 'audio_transcriptions', label: '语音转文字' },
+              { value: 'audio_translations', label: '音频翻译' },
+              { value: 'audio_speech', label: '语音合成' },
+              { value: 'moderations', label: '内容审核' },
+            ]}
           />
           <Button
             icon={<ReloadOutlined />}

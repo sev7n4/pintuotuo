@@ -315,3 +315,75 @@ export const SUBSCRIPTION_PERIOD_LABELS: Record<string, string> = {
   quarterly: '季度',
   yearly: '年度',
 };
+
+export type EndpointType =
+  | 'chat_completions'
+  | 'responses'
+  | 'embeddings'
+  | 'images_generations'
+  | 'images_variations'
+  | 'images_edits'
+  | 'audio_transcriptions'
+  | 'audio_translations'
+  | 'audio_speech'
+  | 'moderations';
+
+export type BillingUnit = 'token' | 'image' | 'second' | 'character' | 'request';
+
+export interface EndpointPricing {
+  id: number;
+  endpoint_type: string;
+  provider_code: string;
+  unit_type: string;
+  unit_price: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EndpointPricingCreateRequest {
+  endpoint_type: string;
+  provider_code: string;
+  unit_type: string;
+  unit_price: number;
+}
+
+export interface EndpointPricingUpdateRequest {
+  endpoint_type?: string;
+  provider_code?: string;
+  unit_type?: string;
+  unit_price?: number;
+}
+
+export const ENDPOINT_TYPE_LABELS: Record<string, string> = {
+  chat_completions: '对话补全',
+  responses: 'Response API',
+  embeddings: '嵌入',
+  images_generations: '图像生成',
+  images_variations: '图像变体',
+  images_edits: '图像编辑',
+  audio_transcriptions: '语音转文字',
+  audio_translations: '音频翻译',
+  audio_speech: '语音合成',
+  moderations: '内容审核',
+};
+
+export const ENDPOINT_TYPE_COLORS: Record<string, string> = {
+  chat_completions: 'blue',
+  responses: 'purple',
+  embeddings: 'cyan',
+  images_generations: 'orange',
+  images_variations: 'gold',
+  images_edits: 'volcano',
+  audio_transcriptions: 'green',
+  audio_translations: 'lime',
+  audio_speech: 'magenta',
+  moderations: 'red',
+};
+
+export const BILLING_UNIT_LABELS: Record<string, string> = {
+  token: 'Token',
+  image: '图像',
+  second: '秒',
+  character: '字符',
+  request: '请求',
+};
