@@ -163,6 +163,12 @@ func ProxyAPIRequest(c *gin.Context) {
 }
 
 func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startTime time.Time, req APIProxyRequest, requestPath string) {
+	provider := req.Provider
+	defer func() {
+		latencySec := time.Since(startTime).Seconds()
+		metrics.RecordAPIKeyRequestLatency(provider, latencySec)
+	}()
+
 	db := config.GetDB()
 	if db == nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -194,6 +200,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	}
 
 	if tokenBalance <= 0 {
+		metrics.RecordAPIKeyRequest(provider, "error")
+		metrics.RecordAPIKeyRequestError(provider, "insufficient_balance")
 		middleware.RespondWithError(c, apperrors.ErrInsufficientBalance)
 		return
 	}
@@ -313,6 +321,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	if err != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		if errors.Is(err, sql.ErrNoRows) {
+			metrics.RecordAPIKeyRequest(provider, "error")
+			metrics.RecordAPIKeyRequestError(provider, "key_not_authorized")
 			logger.LogWarn(c.Request.Context(), "api_proxy", "API key authorization miss", map[string]interface{}{
 				"request_id":        requestID,
 				"request_path":      requestPath,
@@ -678,6 +688,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			info := providerInfoFromUpstreamFailure(0, nil, nil, execErr)
 			services.GetSmartRouter().RecordRequestResult(pk.ID, false)
 			recordHealthCheckerProxyOutcome(c, pk.ID, false, startTime)
+			metrics.RecordAPIKeyRequestError(att.provider, "transport_error")
 			if attemptIdx < len(attempts)-1 && services.SuggestModelFallbackAfterFailure(info) {
 				logger.LogInfo(c.Request.Context(), "api_proxy", "model fallback after transport error", map[string]interface{}{
 					"request_id": requestID, "attempt": att.provider + "/" + att.model,
@@ -804,6 +815,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	}
 
 	if cost > 0 {
+		metrics.RecordAPIKeyRequest(billProv, "success")
 		billReq := req
 		billReq.Provider = billProv
 		billReq.Model = billModel

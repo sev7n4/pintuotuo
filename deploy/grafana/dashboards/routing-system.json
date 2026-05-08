@@ -25,9 +25,7 @@
       "dashes": false,
       "datasource": "Prometheus",
       "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
+        "defaults": {},
         "overrides": []
       },
       "fill": 1,
@@ -66,19 +64,19 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum(rate(api_key_request_latency_seconds_bucket[5m])) by (le, api_key_id)) * 1000",
+          "expr": "histogram_quantile(0.5, sum(rate(api_key_request_latency_seconds_bucket[5m])) by (le, provider)) * 1000",
           "interval": "",
           "legendFormat": "P50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(api_key_request_latency_seconds_bucket[5m])) by (le, api_key_id)) * 1000",
+          "expr": "histogram_quantile(0.95, sum(rate(api_key_request_latency_seconds_bucket[5m])) by (le, provider)) * 1000",
           "interval": "",
           "legendFormat": "P95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(api_key_request_latency_seconds_bucket[5m])) by (le, api_key_id)) * 1000",
+          "expr": "histogram_quantile(0.99, sum(rate(api_key_request_latency_seconds_bucket[5m])) by (le, provider)) * 1000",
           "interval": "",
           "legendFormat": "P99",
           "refId": "C"
@@ -132,9 +130,7 @@
       "dashes": false,
       "datasource": "Prometheus",
       "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
+        "defaults": {},
         "overrides": []
       },
       "fill": 1,
@@ -173,9 +169,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(rate(api_key_request_errors_total[5m])) by (api_key_id) / sum(rate(api_key_requests_total[5m])) by (api_key_id) * 100",
+          "expr": "sum(rate(api_key_request_errors_total[5m])) by (provider) / sum(rate(api_key_requests_total{status=\"success\"}[5m])) by (provider) * 100",
           "interval": "",
-          "legendFormat": "错误率",
+          "legendFormat": "{{provider}}",
           "refId": "A"
         }
       ],
@@ -236,9 +232,7 @@
       "dashes": false,
       "datasource": "Prometheus",
       "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
+        "defaults": {},
         "overrides": []
       },
       "fill": 1,
@@ -277,9 +271,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(rate(api_key_requests_total[5m])) by (api_key_id)",
+          "expr": "sum(rate(api_key_requests_total[5m])) by (provider, status)",
           "interval": "",
-          "legendFormat": "请求数",
+          "legendFormat": "{{provider}}/{{status}}",
           "refId": "A"
         }
       ],
@@ -331,9 +325,7 @@
       "dashes": false,
       "datasource": "Prometheus",
       "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
+        "defaults": {},
         "overrides": []
       },
       "fill": 1,
@@ -372,9 +364,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(rate(routing_decision_seconds_sum[5m])) by (strategy) / sum(rate(routing_decision_seconds_count[5m])) by (strategy) * 1000",
+          "expr": "sum(rate(routing_decision_duration_seconds_sum[5m])) by (provider) / sum(rate(routing_decision_duration_seconds_count[5m])) by (provider) * 1000",
           "interval": "",
-          "legendFormat": "{{strategy}}",
+          "legendFormat": "{{provider}}",
           "refId": "A"
         }
       ],
@@ -426,9 +418,7 @@
       "dashes": false,
       "datasource": "Prometheus",
       "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
+        "defaults": {},
         "overrides": []
       },
       "fill": 1,
@@ -467,9 +457,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(rate(rate_limiter_tokens_remaining[5m])) by (api_key_id)",
+          "expr": "rate_limiter_tokens_remaining",
           "interval": "",
-          "legendFormat": "剩余令牌",
+          "legendFormat": "{{limiter_key}}",
           "refId": "A"
         }
       ],
@@ -521,9 +511,7 @@
       "dashes": false,
       "datasource": "Prometheus",
       "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
+        "defaults": {},
         "overrides": []
       },
       "fill": 1,
@@ -562,7 +550,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(rate(request_queue_size[5m])) by (queue_name)",
+          "expr": "request_queue_size",
           "interval": "",
           "legendFormat": "{{queue_name}}",
           "refId": "A"
@@ -649,5 +637,5 @@
   "timezone": "",
   "title": "智能路由系统监控",
   "uid": "routing-system",
-  "version": 1
+  "version": 2
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/pintuotuo/backend/metrics"
 )
 
 type RateLimiter interface {
@@ -163,7 +165,18 @@ func (f *RateLimiterFactory) GetLimiter(key string, rate, burst int) *TokenBucke
 
 func (f *RateLimiterFactory) Allow(key string, rate, burst int) bool {
 	limiter := f.GetLimiter(key, rate, burst)
-	return limiter.Allow()
+	allowed := limiter.Allow()
+	if !allowed {
+		metrics.RecordRateLimiterDenied(key)
+	}
+	metrics.SetRateLimiterTokensRemaining(key, limiter.Tokens())
+	return allowed
+}
+
+func (tb *TokenBucket) Tokens() float64 {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+	return tb.tokens
 }
 
 func (f *RateLimiterFactory) SetRate(key string, rate, burst int) {
