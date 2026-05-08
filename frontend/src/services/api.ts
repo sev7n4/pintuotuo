@@ -34,7 +34,10 @@ instance.interceptors.response.use(
         url.includes('/users/login') ||
         url.includes('/users/sms/login') ||
         url.includes('/email/magic/verify');
-      if (!isAuthLogin) {
+      const isUpstreamProxy =
+        url.includes('/openai/') ||
+        url.includes('/proxy/');
+      if (!isAuthLogin && !isUpstreamProxy) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('remember_me');
         sessionStorage.removeItem('auth_token');

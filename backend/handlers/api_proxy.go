@@ -473,6 +473,10 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				"messages": req.Messages,
 				"stream":   true,
 			}
+			if resolveRouteMode(&pk) == routeModeLitellm {
+				upstreamBase := services.ResolveLitellmUpstreamBaseURL(att.provider)
+				rb["user_config"] = buildLitellmUserConfig(att.provider, att.model, dk, upstreamBase)
+			}
 			if req.Options != nil {
 				var options map[string]interface{}
 				if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
@@ -636,6 +640,10 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			"model":    att.model,
 			"messages": req.Messages,
 			"stream":   req.Stream,
+		}
+		if resolveRouteMode(&pk) == routeModeLitellm {
+			upstreamBase := services.ResolveLitellmUpstreamBaseURL(att.provider)
+			rb["user_config"] = buildLitellmUserConfig(att.provider, att.model, dk, upstreamBase)
 		}
 		if req.Options != nil {
 			var options map[string]interface{}
@@ -1021,6 +1029,36 @@ func resolveAuthTokenFromRouteMode(routeMode string, fallbackToken string) strin
 		}
 	}
 	return fallbackToken
+}
+
+func buildLitellmUserConfig(provider, model, decryptedKey, upstreamBaseURL string) map[string]interface{} {
+	litellmModel, err := services.ResolveLitellmModelFromCache(provider, model)
+	if err != nil || litellmModel == "" {
+		modelName := model
+		if idx := strings.LastIndex(model, "/"); idx >= 0 {
+			modelName = model[idx+1:]
+		}
+		litellmModel = modelName
+	}
+
+	params := map[string]interface{}{
+		"model": litellmModel,
+	}
+	if decryptedKey != "" {
+		params["api_key"] = decryptedKey
+	}
+	if upstreamBaseURL != "" {
+		params["api_base"] = upstreamBaseURL
+	}
+
+	return map[string]interface{}{
+		"model_list": []map[string]interface{}{
+			{
+				"model_name":     model,
+				"litellm_params": params,
+			},
+		},
+	}
 }
 
 func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTokens, outputTokens int, strictPricingVID *int) (float64, error) {
