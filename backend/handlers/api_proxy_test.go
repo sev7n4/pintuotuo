@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -549,4 +550,11 @@ func TestBuildLitellmUserConfig(t *testing.T) {
 		params := ml[0]["litellm_params"].(map[string]interface{})
 		assert.Equal(t, "some-model", params["model"])
 	})
+}
+
+func TestMapLLMProxyHTTPStatusForClient(t *testing.T) {
+	assert.Equal(t, http.StatusBadGateway, mapLLMProxyHTTPStatusForClient(http.StatusUnauthorized, routeModeLitellm))
+	assert.Equal(t, http.StatusBadGateway, mapLLMProxyHTTPStatusForClient(http.StatusForbidden, routeModeLitellm))
+	assert.Equal(t, http.StatusOK, mapLLMProxyHTTPStatusForClient(http.StatusOK, routeModeLitellm))
+	assert.Equal(t, http.StatusUnauthorized, mapLLMProxyHTTPStatusForClient(http.StatusUnauthorized, routeModeDirect))
 }

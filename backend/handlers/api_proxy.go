@@ -553,9 +553,10 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 					})
 					continue
 				}
-				traceSpan.SetStatusCode(r.StatusCode)
+				st := mapLLMProxyHTTPStatusForClient(r.StatusCode, resolveRouteMode(&pk))
+				traceSpan.SetStatusCode(st)
 				billingEngine.CancelPreDeduct(userIDInt, requestID)
-				c.Data(r.StatusCode, "application/json", bRead)
+				c.Data(st, "application/json", bRead)
 				return
 			}
 
@@ -751,9 +752,10 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			continue
 		}
 
-		traceSpan.SetStatusCode(r.StatusCode)
+		st := mapLLMProxyHTTPStatusForClient(r.StatusCode, resolveRouteMode(&pk))
+		traceSpan.SetStatusCode(st)
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		c.Data(r.StatusCode, "application/json", bRead)
+		c.Data(st, "application/json", bRead)
 		return
 	}
 
@@ -774,10 +776,11 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	var apiResp APIProxyResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		traceSpan.SetStatusCode(resp.StatusCode)
+		st := mapLLMProxyHTTPStatusForClient(resp.StatusCode, resolveRouteMode(&winningKey))
+		traceSpan.SetStatusCode(st)
 		traceSpan.SetErrorCode("UNMARSHAL_PROXY_RESPONSE_FAILED")
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
-		c.Data(resp.StatusCode, "application/json", body)
+		c.Data(st, "application/json", body)
 		return
 	}
 
@@ -925,8 +928,9 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, winningKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCount)
 	}
 
-	traceSpan.SetStatusCode(resp.StatusCode)
-	c.Data(resp.StatusCode, "application/json", body)
+	stOK := mapLLMProxyHTTPStatusForClient(resp.StatusCode, resolveRouteMode(&winningKey))
+	traceSpan.SetStatusCode(stOK)
+	c.Data(stOK, "application/json", body)
 }
 
 // applyProxyUpstreamHeaders 将本请求的追踪关联信息传给上游（含 LiteLLM），便于与网关 /metrics、日志对齐定界。
@@ -1058,6 +1062,19 @@ func buildLitellmUserConfig(provider, model, decryptedKey, upstreamBaseURL strin
 				"litellm_params": params,
 			},
 		},
+	}
+}
+
+// mapLLMProxyHTTPStatusForClient 将 LiteLLM/上游鉴权类错误映射为 502，避免前端误当作平台 JWT 失效（与 api.ts 对 /openai/、/proxy/ 豁免互补）。
+func mapLLMProxyHTTPStatusForClient(upstream int, routeMode string) int {
+	if routeMode != routeModeLitellm {
+		return upstream
+	}
+	switch upstream {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return http.StatusBadGateway
+	default:
+		return upstream
 	}
 }
 
