@@ -30,6 +30,7 @@ import {
   FireOutlined,
   SearchOutlined,
   ReloadOutlined,
+  ApiOutlined,
 } from '@ant-design/icons';
 import { useMerchantStore } from '@/stores/merchantStore';
 import styles from './Merchant.module.css';
@@ -345,6 +346,34 @@ export const MerchantAnalytics: React.FC = () => {
                   </Text>
                 </div>
               ))}
+            </Card>
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+          <Col xs={24}>
+            <Card title="端点类型使用分布" extra={<ApiOutlined />}>
+              <Row gutter={[16, 16]}>
+                {[
+                  { type: 'chat_completions', label: '对话补全', color: 'blue' },
+                  { type: 'responses', label: 'Response API', color: 'purple' },
+                  { type: 'embeddings', label: '嵌入', color: 'cyan' },
+                  { type: 'images_generations', label: '图像生成', color: 'orange' },
+                  { type: 'audio_speech', label: '语音合成', color: 'magenta' },
+                  { type: 'moderations', label: '内容审核', color: 'red' },
+                ].map((ep) => (
+                  <Col xs={12} sm={8} md={4} key={ep.type}>
+                    <Card size="small" style={{ textAlign: 'center' }}>
+                      <Tag color={ep.color} style={{ marginBottom: 8 }}>{ep.label}</Tag>
+                      <Statistic
+                        value={0}
+                        suffix="次"
+                        valueStyle={{ fontSize: 16 }}
+                      />
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
             </Card>
           </Col>
         </Row>

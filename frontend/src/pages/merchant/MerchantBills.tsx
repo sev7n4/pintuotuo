@@ -33,6 +33,9 @@ interface BillDetail {
   sales: number;
   refund: number;
   net_sales: number;
+  endpoint_type?: string;
+  unit_type?: string;
+  unit_count?: number;
 }
 
 interface MonthlyBill {
@@ -267,6 +270,27 @@ const MerchantBills = () => {
       dataIndex: 'net_sales',
       key: 'net_sales',
       render: (v: number) => `¥${v.toFixed(6)}`,
+    },
+    {
+      title: '端点类型',
+      dataIndex: 'endpoint_type',
+      key: 'endpoint_type',
+      width: 100,
+      render: (v: string) => v ? <Tag color="blue">{v}</Tag> : '-',
+    },
+    {
+      title: '计费单位',
+      dataIndex: 'unit_type',
+      key: 'unit_type',
+      width: 80,
+      render: (v: string) => v || '-',
+    },
+    {
+      title: '单位数量',
+      dataIndex: 'unit_count',
+      key: 'unit_count',
+      width: 80,
+      render: (v: number) => v ?? '-',
     },
   ];
 

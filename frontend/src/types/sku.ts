@@ -99,9 +99,12 @@ export interface SPU {
   sort_order: number;
   total_sales_count: number;
   average_rating?: number;
-  /** 管理端列表/详情：关联 SKU 总数 */
+  endpoint_type?: EndpointType;
+  billing_unit?: BillingUnit;
+  image_sizes?: string[];
+  audio_voices?: string[];
+  max_audio_duration?: number;
   sku_count?: number;
-  /** 管理端列表/详情：在售 SKU 数 */
   active_sku_count?: number;
   created_at: string;
   updated_at: string;
@@ -149,6 +152,12 @@ export interface SKU {
     discount?: number;
   }>;
   sales_count: number;
+  endpoint_type?: EndpointType;
+  image_count?: number;
+  image_size?: string;
+  character_count?: number;
+  audio_duration?: number;
+  cost_per_unit?: number;
   created_at: string;
   updated_at: string;
   model_provider?: string;
@@ -235,6 +244,11 @@ export interface SPUCreateRequest {
   description?: string;
   features?: string[];
   thumbnail_url?: string;
+  endpoint_type?: EndpointType;
+  billing_unit?: BillingUnit;
+  image_sizes?: string[];
+  audio_voices?: string[];
+  max_audio_duration?: number;
   status?: string;
   sort_order?: number;
 }
@@ -243,6 +257,12 @@ export interface SKUCreateRequest {
   spu_id: number;
   sku_code: string;
   sku_type: 'token_pack' | 'subscription' | 'concurrent' | 'trial';
+  endpoint_type?: EndpointType;
+  image_count?: number;
+  image_size?: string;
+  character_count?: number;
+  audio_duration?: number;
+  cost_per_unit?: number;
   token_amount?: number;
   compute_points?: number;
   subscription_period?: 'monthly' | 'quarterly' | 'yearly';
@@ -271,6 +291,12 @@ export interface SKUCreateRequest {
 }
 
 export interface SKUUpdateRequest {
+  endpoint_type?: EndpointType;
+  image_count?: number;
+  image_size?: string;
+  character_count?: number;
+  audio_duration?: number;
+  cost_per_unit?: number;
   retail_price?: number;
   wholesale_price?: number;
   original_price?: number;

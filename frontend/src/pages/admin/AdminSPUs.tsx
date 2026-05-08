@@ -21,8 +21,8 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, TagsOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
-import type { SPU, ModelProvider, SPUCreateRequest } from '@/types/sku';
-import { MODEL_TIER_LABELS } from '@/types/sku';
+import type { SPU, ModelProvider, SPUCreateRequest, EndpointType } from '@/types/sku';
+import { MODEL_TIER_LABELS, ENDPOINT_TYPE_LABELS, BILLING_UNIT_LABELS } from '@/types/sku';
 import { getApiErrorMessage } from '@/utils/apiError';
 
 interface SPUScenario {
@@ -655,6 +655,71 @@ const AdminSPUs = () => {
               </Form.Item>
             </Col>
           </Row>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item name="endpoint_type" label="端点类型">
+                <Select placeholder="请选择" allowClear>
+                  {Object.entries(ENDPOINT_TYPE_LABELS).map(([value, label]) => (
+                    <Select.Option key={value} value={value}>{label}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="billing_unit" label="计费单位">
+                <Select placeholder="请选择" allowClear>
+                  {Object.entries(BILLING_UNIT_LABELS).map(([value, label]) => (
+                    <Select.Option key={value} value={value}>{label}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.endpoint_type !== cur.endpoint_type}>
+            {() => {
+              const et = form.getFieldValue('endpoint_type') as EndpointType | undefined;
+              const isImage = et?.startsWith('images_');
+              const isAudioSpeech = et === 'audio_speech';
+              const isAudioSTT = et === 'audio_transcriptions' || et === 'audio_translations';
+              return (
+                <>
+                  {isImage && (
+                    <Form.Item name="image_sizes" label="支持图像尺寸">
+                      <Checkbox.Group
+                        options={[
+                          { label: '256x256', value: '256x256' },
+                          { label: '512x512', value: '512x512' },
+                          { label: '1024x1024', value: '1024x1024' },
+                          { label: '1024x1792', value: '1024x1792' },
+                          { label: '1792x1024', value: '1792x1024' },
+                          { label: '1792x1792', value: '1792x1792' },
+                        ]}
+                      />
+                    </Form.Item>
+                  )}
+                  {isAudioSpeech && (
+                    <Form.Item name="audio_voices" label="支持语音">
+                      <Checkbox.Group
+                        options={[
+                          { label: 'alloy', value: 'alloy' },
+                          { label: 'echo', value: 'echo' },
+                          { label: 'fable', value: 'fable' },
+                          { label: 'onyx', value: 'onyx' },
+                          { label: 'nova', value: 'nova' },
+                          { label: 'shimmer', value: 'shimmer' },
+                        ]}
+                      />
+                    </Form.Item>
+                  )}
+                  {isAudioSTT && (
+                    <Form.Item name="max_audio_duration" label="最大音频时长(秒)">
+                      <InputNumber min={1} max={600} style={{ width: '100%' }} placeholder="120" />
+                    </Form.Item>
+                  )}
+                </>
+              );
+            }}
+          </Form.Item>
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="context_window" label="上下文窗口 (K)">

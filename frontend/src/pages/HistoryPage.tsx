@@ -40,12 +40,12 @@ export default function HistoryPage() {
     if (isAuthenticated) {
       fetchHistory();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, endpointTypeFilter]);
 
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const response = await browseHistoryService.getHistory();
+      const response = await browseHistoryService.getHistory(endpointTypeFilter ? { endpoint_type: endpointTypeFilter } : undefined);
       if (response.data?.data) {
         setHistory(response.data.data.items || []);
         setTotal(response.data.data.total || 0);

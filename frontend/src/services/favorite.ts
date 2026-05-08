@@ -72,9 +72,9 @@ export const favoriteService = {
 };
 
 export const browseHistoryService = {
-  getHistory: (page = 1, pageSize = 20) =>
+  getHistory: (params?: { endpoint_type?: string }, page = 1, pageSize = 20) =>
     api.get<APIResponse<BrowseHistoryListResponse>>('/browse-history', {
-      params: { page, page_size: pageSize },
+      params: { page, page_size: pageSize, ...params },
     }),
 
   addHistory: (skuId: number) =>

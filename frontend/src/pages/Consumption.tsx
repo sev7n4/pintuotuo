@@ -39,6 +39,7 @@ import {
 } from 'recharts';
 import styles from './Consumption.module.css';
 import { formatLedgerUnits } from '@/utils/ledgerDisplay';
+import { ENDPOINT_TYPE_LABELS, ENDPOINT_TYPE_COLORS } from '@/types/sku';
 
 const { useBreakpoint } = Grid;
 const { RangePicker } = DatePicker;
@@ -62,6 +63,7 @@ interface ConsumptionStats {
   total_requests: number;
   total_token_deduction: number;
   avg_latency_ms: number;
+  by_endpoint_type?: { endpoint_type: string; count: number; tokens: number }[];
 }
 
 interface ProviderStats {
@@ -666,6 +668,28 @@ const Consumption: React.FC = () => {
                     suffix={`次 / 扣减 ${formatLedgerUnits(p.tokens)} Tokens`}
                     valueStyle={{ fontSize: isMobile ? 14 : 16 }}
                   />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Card>
+      )}
+
+      {mainView !== 'charts' && stats?.by_endpoint_type && stats.by_endpoint_type.length > 0 && (
+        <Card className={styles.providerCard} title="按端点类型统计" style={{ marginTop: 16 }}>
+          <Row gutter={[16, 16]}>
+            {stats.by_endpoint_type.map((ep: { endpoint_type: string; count: number; tokens: number }) => (
+              <Col xs={12} sm={12} md={6} key={ep.endpoint_type}>
+                <Card size="small">
+                  <Statistic
+                    title={<Tag color={ENDPOINT_TYPE_COLORS[ep.endpoint_type] || 'default'}>{ENDPOINT_TYPE_LABELS[ep.endpoint_type] || ep.endpoint_type}</Tag>}
+                    value={ep.count}
+                    suffix="次"
+                    valueStyle={{ fontSize: isMobile ? 14 : 16 }}
+                  />
+                  <div style={{ marginTop: 4, color: '#8c8c8c', fontSize: 12 }}>
+                    Token: {formatLedgerUnits(ep.tokens)}
+                  </div>
                 </Card>
               </Col>
             ))}
