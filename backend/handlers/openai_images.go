@@ -184,11 +184,10 @@ func OpenAIImagesGenerations(c *gin.Context) {
 		return
 	}
 
-	actualQuantity := int64(req.N)
+	actualQuantity := int64(float64(req.N) * pricePerImage / getImagePrice(defaultImageSize))
 	billingEngine.SettlePreDeductV2(userIDInt, requestID, actualQuantity, services.EndpointTypeImagesGenerations, providerCfg.Code, billing.BillingUnitImage)
 
 	logBillingUsage(userIDInt, requestID, services.EndpointTypeImagesGenerations, modelName, int(time.Since(startTime).Milliseconds()), actualQuantity)
-
 	c.Data(http.StatusOK, "application/json", respBody)
 }
 
@@ -305,7 +304,7 @@ func OpenAIImagesVariations(c *gin.Context) {
 		return
 	}
 
-	actualQuantity := int64(n)
+	actualQuantity := int64(float64(n) * pricePerImage / getImagePrice(defaultImageSize))
 	billingEngine.SettlePreDeductV2(userIDInt, requestID, actualQuantity, services.EndpointTypeImagesVariations, providerCfg.Code, billing.BillingUnitImage)
 
 	logBillingUsage(userIDInt, requestID, services.EndpointTypeImagesVariations, modelName, int(time.Since(startTime).Milliseconds()), actualQuantity)
@@ -439,7 +438,7 @@ func OpenAIImagesEdits(c *gin.Context) {
 		return
 	}
 
-	actualQuantity := int64(n)
+	actualQuantity := int64(float64(n) * pricePerImage / getImagePrice(defaultImageSize))
 	billingEngine.SettlePreDeductV2(userIDInt, requestID, actualQuantity, services.EndpointTypeImagesEdits, providerCfg.Code, billing.BillingUnitImage)
 
 	logBillingUsage(userIDInt, requestID, services.EndpointTypeImagesEdits, modelName, int(time.Since(startTime).Milliseconds()), actualQuantity)

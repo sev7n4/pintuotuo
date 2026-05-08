@@ -37,6 +37,7 @@ import { useCartStore } from '@stores/cartStore';
 import { skuService } from '@/services/sku';
 import api from '@/services/api';
 import type { SKUWithSPU } from '@/types/sku';
+import { ENDPOINT_TYPE_LABELS, ENDPOINT_TYPE_COLORS } from '@/types/sku';
 import dayjs from 'dayjs';
 import { ScenarioFilter } from '@/components/ScenarioFilter';
 import { CatalogFilterDrawer, type CatalogFilterValues } from '@/components/CatalogFilterDrawer';
@@ -927,6 +928,11 @@ export const ProductListPage: React.FC = () => {
                     <Space direction="vertical" size={4} style={{ width: '100%' }}>
                       <Space wrap size={4}>
                         {renderSkuTypeTag(record.sku_type)}
+                        {record.endpoint_type && record.endpoint_type !== 'chat_completions' && (
+                          <Tag color={ENDPOINT_TYPE_COLORS[record.endpoint_type] || 'default'}>
+                            {ENDPOINT_TYPE_LABELS[record.endpoint_type] || record.endpoint_type}
+                          </Tag>
+                        )}
                         {record.group_enabled && (
                           <Tag color="red">
                             {record.min_group_size}-{record.max_group_size}人团

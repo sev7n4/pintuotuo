@@ -23,8 +23,8 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
-import type { SKUWithSPU, SPU, SKUCreateRequest, SKUUpdateRequest } from '@/types/sku';
-import { SKU_TYPE_LABELS, MODEL_TIER_LABELS, SUBSCRIPTION_PERIOD_LABELS } from '@/types/sku';
+import type { SKUWithSPU, SPU, SKUCreateRequest, SKUUpdateRequest, EndpointType } from '@/types/sku';
+import { SKU_TYPE_LABELS, MODEL_TIER_LABELS, SUBSCRIPTION_PERIOD_LABELS, ENDPOINT_TYPE_LABELS } from '@/types/sku';
 import { getApiErrorMessage } from '@/utils/apiError';
 
 /** 管理端 InputNumber 可能产生小数，PostgreSQL 整型列会拒绝（生产曾出现 stock=9.9 导致更新失败） */
@@ -615,6 +615,76 @@ const AdminSKUs = () => {
             </Col>
           </Row>
 
+          <Divider>端点计费配置</Divider>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item name="endpoint_type" label="端点类型">
+                <Select placeholder="请选择" allowClear>
+                  {Object.entries(ENDPOINT_TYPE_LABELS).map(([value, label]) => (
+                    <Select.Option key={value} value={value}>{label}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="cost_per_unit" label="单位成本(元)">
+                <InputNumber min={0} step={0.000001} precision={6} style={{ width: '100%' }} placeholder="0.001" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.endpoint_type !== cur.endpoint_type}>
+            {() => {
+              const et = form.getFieldValue('endpoint_type') as EndpointType | undefined;
+              const isImage = et?.startsWith('images_');
+              const isAudioSpeech = et === 'audio_speech';
+              const isAudioSTT = et === 'audio_transcriptions' || et === 'audio_translations';
+              return (
+                <>
+                  {isImage && (
+                    <Row gutter={16}>
+                      <Col span={8}>
+                        <Form.Item name="image_count" label="图像数量">
+                          <InputNumber min={1} max={10} style={{ width: '100%' }} placeholder="1" />
+                        </Form.Item>
+                      </Col>
+                      <Col span={8}>
+                        <Form.Item name="image_size" label="图像尺寸">
+                          <Select placeholder="请选择" allowClear>
+                            <Select.Option value="256x256">256x256</Select.Option>
+                            <Select.Option value="512x512">512x512</Select.Option>
+                            <Select.Option value="1024x1024">1024x1024</Select.Option>
+                            <Select.Option value="1024x1792">1024x1792</Select.Option>
+                            <Select.Option value="1792x1024">1792x1024</Select.Option>
+                            <Select.Option value="1792x1792">1792x1792</Select.Option>
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  )}
+                  {isAudioSpeech && (
+                    <Row gutter={16}>
+                      <Col span={8}>
+                        <Form.Item name="character_count" label="字符数量">
+                          <InputNumber min={1} style={{ width: '100%' }} placeholder="1000" />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  )}
+                  {isAudioSTT && (
+                    <Row gutter={16}>
+                      <Col span={8}>
+                        <Form.Item name="audio_duration" label="音频时长(秒)">
+                          <InputNumber min={1} style={{ width: '100%' }} placeholder="60" />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  )}
+                </>
+              );
+            }}
+          </Form.Item>
+
+          <Divider>SKU 类型配置</Divider>
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item

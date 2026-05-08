@@ -1125,6 +1125,28 @@ const MerchantAPIKeys = () => {
             />
           </Form.Item>
 
+          <Form.Item noStyle shouldUpdate={(prev, cur) => {
+            const prevHas = (prev.allowed_endpoint_types || []).includes('responses');
+            const curHas = (cur.allowed_endpoint_types || []).includes('responses');
+            return prevHas !== curHas;
+          }}>
+            {() => {
+              const types = form.getFieldValue('allowed_endpoint_types') as string[] || [];
+              return types.includes('responses') ? (
+                <Form.Item name="allowed_tools" label="Response API 工具权限">
+                  <Checkbox.Group
+                    options={[
+                      { label: 'Web Search', value: 'web_search' },
+                      { label: 'File Search', value: 'file_search' },
+                      { label: 'Code Interpreter', value: 'code_interpreter' },
+                      { label: 'Image Generation', value: 'image_generation' },
+                    ]}
+                  />
+                </Form.Item>
+              ) : null;
+            }}
+          </Form.Item>
+
           <Divider>成本定价配置</Divider>
 
           <Form.Item name="cost_input_rate" label="输入成本率（元/1K tokens）">

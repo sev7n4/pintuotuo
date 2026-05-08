@@ -15,6 +15,9 @@ import {
   Alert,
   Modal,
   Descriptions,
+  Checkbox,
+  Select,
+  Divider,
 } from 'antd';
 import {
   PlusOutlined,
@@ -31,6 +34,12 @@ import {
 } from '@ant-design/icons';
 import { validateEndpoints } from '@utils/routeConfigValidation';
 import { adminService, ProbeEndpointResponse } from '@services/admin';
+import {
+  ENDPOINT_TYPE_LABELS,
+  BILLING_UNIT_LABELS,
+  type EndpointType,
+  type BillingUnit,
+} from '@/types/sku';
 
 const { Text } = Typography;
 
@@ -40,11 +49,19 @@ interface EndpointConfig {
   [key: string]: string | undefined;
 }
 
+interface EndpointTypeConfig {
+  enabled: boolean;
+  url_template: string;
+  billing_unit: BillingUnit;
+}
+
 interface EndpointsConfigProps {
   value?: Record<string, EndpointConfig>;
   onChange?: (value: Record<string, EndpointConfig>) => void;
   providerCode?: string;
   apiKey?: string;
+  endpointTypes?: Record<string, EndpointTypeConfig>;
+  onEndpointTypesChange?: (value: Record<string, EndpointTypeConfig>) => void;
 }
 
 const routeTypes = [
@@ -53,11 +70,31 @@ const routeTypes = [
   { value: 'direct', label: '直连', icon: <ApiOutlined />, color: 'orange' },
 ];
 
+const endpointTypeOptions: { value: EndpointType; label: string; defaultUrl: string; defaultBillingUnit: BillingUnit }[] = [
+  { value: 'chat_completions', label: '对话补全', defaultUrl: '/v1/chat/completions', defaultBillingUnit: 'token' },
+  { value: 'responses', label: 'Response API', defaultUrl: '/v1/responses', defaultBillingUnit: 'token' },
+  { value: 'embeddings', label: '嵌入', defaultUrl: '/v1/embeddings', defaultBillingUnit: 'token' },
+  { value: 'images_generations', label: '图像生成', defaultUrl: '/v1/images/generations', defaultBillingUnit: 'image' },
+  { value: 'images_variations', label: '图像变体', defaultUrl: '/v1/images/variations', defaultBillingUnit: 'image' },
+  { value: 'images_edits', label: '图像编辑', defaultUrl: '/v1/images/edits', defaultBillingUnit: 'image' },
+  { value: 'audio_transcriptions', label: '语音转文字', defaultUrl: '/v1/audio/transcriptions', defaultBillingUnit: 'second' },
+  { value: 'audio_translations', label: '音频翻译', defaultUrl: '/v1/audio/translations', defaultBillingUnit: 'second' },
+  { value: 'audio_speech', label: '语音合成', defaultUrl: '/v1/audio/speech', defaultBillingUnit: 'character' },
+  { value: 'moderations', label: '内容审核', defaultUrl: '/v1/moderations', defaultBillingUnit: 'request' },
+];
+
+const billingUnitOptions = Object.entries(BILLING_UNIT_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
 const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
   value = {},
   onChange,
   providerCode,
   apiKey,
+  endpointTypes = {},
+  onEndpointTypesChange,
 }) => {
   const [testingEndpoint, setTestingEndpoint] = useState<string | null>(null);
   const [probeResult, setProbeResult] = useState<ProbeEndpointResponse | null>(null);
@@ -118,6 +155,36 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
     onChange?.(newEndpoints);
   };
 
+  const handleEndpointTypeToggle = (checkedValues: EndpointType[]) => {
+    const newEndpointTypes: Record<string, EndpointTypeConfig> = {};
+    checkedValues.forEach((et) => {
+      const existing = endpointTypes[et];
+      const option = endpointTypeOptions.find((o) => o.value === et);
+      newEndpointTypes[et] = existing || {
+        enabled: true,
+        url_template: option?.defaultUrl || `/v1/${et.replace(/_/g, '/')}`,
+        billing_unit: option?.defaultBillingUnit || 'token',
+      };
+    });
+    Object.entries(endpointTypes).forEach(([key]) => {
+      if (!checkedValues.includes(key as EndpointType)) {
+        return;
+      }
+    });
+    onEndpointTypesChange?.(newEndpointTypes);
+  };
+
+  const handleEndpointTypeConfigChange = (et: string, field: 'url_template' | 'billing_unit', val: string) => {
+    const newEndpointTypes = {
+      ...endpointTypes,
+      [et]: {
+        ...endpointTypes[et],
+        [field]: val,
+      },
+    };
+    onEndpointTypesChange?.(newEndpointTypes);
+  };
+
   const handleTestEndpoint = async (endpoint: string) => {
     if (!endpoint) {
       message.warning('请先输入端点地址');
@@ -160,6 +227,8 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
     }
   };
 
+  const enabledEndpointTypes = Object.keys(endpointTypes).filter((k) => endpointTypes[k].enabled);
+
   return (
     <Card
       size="small"
@@ -178,6 +247,66 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
       }
       style={{ marginBottom: 16 }}
     >
+      <Divider orientation="left" style={{ fontSize: 13, marginTop: 0 }}>
+        端点类型启用
+      </Divider>
+      <Checkbox.Group
+        value={enabledEndpointTypes as string[]}
+        onChange={(vals) => handleEndpointTypeToggle(vals as EndpointType[])}
+        style={{ width: '100%' }}
+      >
+        <Row gutter={[8, 8]}>
+          {endpointTypeOptions.map((opt) => (
+            <Col xs={12} sm={8} md={6} key={opt.value}>
+              <Checkbox value={opt.value}>{opt.label}</Checkbox>
+            </Col>
+          ))}
+        </Row>
+      </Checkbox.Group>
+
+      {enabledEndpointTypes.length > 0 && (
+        <>
+          <Divider orientation="left" style={{ fontSize: 13 }}>
+            端点类型详细配置
+          </Divider>
+          <Row gutter={[16, 12]}>
+            {enabledEndpointTypes.map((et) => {
+              const config = endpointTypes[et];
+              const label = ENDPOINT_TYPE_LABELS[et] || et;
+              return (
+                <Col xs={24} sm={12} md={8} key={et}>
+                  <Card size="small" type="inner" style={{ backgroundColor: '#fafafa' }}>
+                    <Space direction="vertical" style={{ width: '100%' }} size={8}>
+                      <Tag color="blue">{label}</Tag>
+                      <Form.Item label="URL 模板" style={{ marginBottom: 0 }}>
+                        <Input
+                          size="small"
+                          placeholder="/v1/..."
+                          value={config?.url_template || ''}
+                          onChange={(e) => handleEndpointTypeConfigChange(et, 'url_template', e.target.value)}
+                        />
+                      </Form.Item>
+                      <Form.Item label="计费单位" style={{ marginBottom: 0 }}>
+                        <Select
+                          size="small"
+                          value={config?.billing_unit || 'token'}
+                          onChange={(v) => handleEndpointTypeConfigChange(et, 'billing_unit', v)}
+                          options={billingUnitOptions}
+                        />
+                      </Form.Item>
+                    </Space>
+                  </Card>
+                </Col>
+              );
+            })}
+          </Row>
+        </>
+      )}
+
+      <Divider orientation="left" style={{ fontSize: 13 }}>
+        路由模式端点地址
+      </Divider>
+
       {validationResult.errors.length > 0 && (
         <Alert
           message="端点配置验证失败"
@@ -313,7 +442,7 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
             >
               <Space direction="vertical">
                 <ApiOutlined style={{ fontSize: 32, color: '#d9d9d9' }} />
-                <Text type="secondary">暂无端点配置，点击右上角添加</Text>
+                <Text type="secondary">暂无路由端点配置，点击右上角添加</Text>
               </Space>
             </Card>
           </Col>
