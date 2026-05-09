@@ -90,6 +90,27 @@ func TestResolveRouteMode(t *testing.T) {
 	}
 }
 
+func TestResolveEndpointURL_LitellmIgnoresMerchantEndpointURL(t *testing.T) {
+	t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000")
+	key := &models.MerchantAPIKey{EndpointURL: "https://api.stepfun.com/v1"}
+	got := resolveEndpointURL(routeModeLitellm, key, "https://provider-fallback.example/v1")
+	assert.Equal(t, "http://litellm:4000/v1", got)
+}
+
+func TestResolveEndpointURL_LitellmEmptyEnv(t *testing.T) {
+	t.Setenv("LLM_GATEWAY_LITELLM_URL", "")
+	key := &models.MerchantAPIKey{EndpointURL: "https://api.stepfun.com/v1"}
+	got := resolveEndpointURL(routeModeLitellm, key, "https://provider-fallback.example/v1")
+	assert.Equal(t, "", got)
+}
+
+func TestResolveEndpointURL_DirectStillUsesMerchantEndpointURL(t *testing.T) {
+	t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000")
+	key := &models.MerchantAPIKey{EndpointURL: "https://api.stepfun.com/v1"}
+	got := resolveEndpointURL(routeModeDirect, key, "https://fallback.example/v1")
+	assert.Equal(t, "https://api.stepfun.com/v1", got)
+}
+
 func TestResolveRouteModeWithProvider(t *testing.T) {
 	tests := []struct {
 		name           string
