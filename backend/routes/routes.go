@@ -106,6 +106,18 @@ func RegisterOpenAICompatRoutes(router *gin.RouterGroup) {
 	}
 }
 
+// RegisterAnthropicCompatRoutes exposes Anthropic Messages API–shaped paths for Claude Code 等客户端。
+// 完整 URL：/api/v1/anthropic/v1/messages、/api/v1/anthropic/v1/models
+func RegisterAnthropicCompatRoutes(router *gin.RouterGroup) {
+	anth := router.Group("/anthropic/v1")
+	anth.Use(middleware.APIKeyOrJWTAuthMiddleware())
+	anth.Use(middleware.RateLimitMiddleware())
+	{
+		anth.GET("/models", handlers.AnthropicListModels)
+		anth.POST("/messages", handlers.AnthropicMessages)
+	}
+}
+
 func RegisterConsumptionRoutes(router *gin.RouterGroup) {
 	consumption := router.Group("/consumption")
 	consumption.Use(middleware.AuthMiddleware())

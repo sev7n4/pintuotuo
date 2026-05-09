@@ -560,9 +560,15 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				return
 			}
 
-			executeProxyChatCompletionStreamFromUpstream(c, r, requestID, userIDInt, req, att.provider, att.model, requestPath, startTime, db,
-				billingEngine, pk, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
-				decisionStart, traceSpan, strategySnapshot, retryCountStream)
+			if ac, anthOK := anthropicCompatFromContext(c); anthOK {
+				executeProxyAnthropicStreamFromUpstream(c, r, requestID, userIDInt, req, att.provider, att.model, ac.ClientModel, requestPath, startTime, db,
+					billingEngine, pk, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
+					decisionStart, traceSpan, strategySnapshot, retryCountStream)
+			} else {
+				executeProxyChatCompletionStreamFromUpstream(c, r, requestID, userIDInt, req, att.provider, att.model, requestPath, startTime, db,
+					billingEngine, pk, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
+					decisionStart, traceSpan, strategySnapshot, retryCountStream)
+			}
 			return
 		}
 
@@ -930,6 +936,12 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	stOK := mapLLMProxyHTTPStatusForClient(resp.StatusCode, resolveRouteMode(&winningKey))
 	traceSpan.SetStatusCode(stOK)
+	if ac, anthOK := anthropicCompatFromContext(c); anthOK {
+		if anthBody, convErr := openAICompletionToAnthropicMessage(body, ac.ClientModel); convErr == nil {
+			c.JSON(stOK, anthBody)
+			return
+		}
+	}
 	c.Data(stOK, "application/json", body)
 }
 

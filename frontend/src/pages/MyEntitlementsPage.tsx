@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  Alert,
   Card,
   Col,
   Empty,
@@ -209,6 +210,36 @@ export default function MyEntitlementsPage() {
             }
           >
             <Skeleton loading={loadingExtras} active paragraph={{ rows: 3 }}>
+              {usageGuide?.claude_code_hint &&
+                usageGuide?.anthropic_compat_path &&
+                typeof window !== 'undefined' && (
+                  <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                    message="Claude Code（Anthropic 协议）"
+                    description={
+                      <Space direction="vertical" size={8}>
+                        <Paragraph style={{ marginBottom: 0 }}>{usageGuide.claude_code_hint}</Paragraph>
+                        <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
+                          若 API 网关域名与本页不同（例如独立服务器），请将下列 URL 的域名替换为实际 API 地址。
+                        </Paragraph>
+                        <Paragraph copyable style={{ marginBottom: 0 }}>
+                          <Text type="secondary">Anthropic Base URL：</Text>
+                          <Text code>
+                            {`${window.location.origin}${usageGuide.anthropic_compat_path}`}
+                          </Text>
+                        </Paragraph>
+                        <Paragraph copyable style={{ marginBottom: 0 }}>
+                          <Text type="secondary">OpenAI 兼容 Base URL（curl / OpenAI SDK）：</Text>
+                          <Text code>
+                            {`${window.location.origin}${usageGuide.openai_compat_path ?? '/api/v1/openai/v1'}`}
+                          </Text>
+                        </Paragraph>
+                      </Space>
+                    }
+                  />
+                )}
               {(usageGuide?.items?.length || 0) === 0 ? (
                 <Empty description="暂无可调用模型，请先购买套餐或订阅" />
               ) : (
