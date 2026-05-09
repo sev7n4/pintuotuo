@@ -161,6 +161,8 @@ const AdminSPUs = () => {
       base_compute_points: 1.0,
       provider_input_rate: 0,
       provider_output_rate: 0,
+      sync_baseline_pricing: true,
+      sync_pricing_versions: [1],
       status: 'active',
       sort_order: 0,
     });
@@ -169,7 +171,11 @@ const AdminSPUs = () => {
 
   const handleEdit = async (record: SPU) => {
     setEditingSPU(record);
-    form.setFieldsValue(record);
+    form.setFieldsValue({
+      ...record,
+      sync_baseline_pricing: true,
+      sync_pricing_versions: [1],
+    });
     setModalVisible(true);
     if (record.model_provider) {
       fetchProviderModels(record.model_provider);
@@ -179,7 +185,11 @@ const AdminSPUs = () => {
       const fresh = res.data.data;
       if (fresh) {
         setEditingSPU(fresh);
-        form.setFieldsValue(fresh);
+        form.setFieldsValue({
+          ...fresh,
+          sync_baseline_pricing: true,
+          sync_pricing_versions: [1],
+        });
       }
     } catch (e) {
       message.warning(getApiErrorMessage(e, '已用列表数据编辑，SKU 计数可能不是最新'));
@@ -652,6 +662,49 @@ const AdminSPUs = () => {
                 rules={[{ required: true, message: '请输入参考输出成本' }]}
               >
                 <InputNumber min={0} step={0.000001} precision={6} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={24}>
+              <Alert
+                type="info"
+                showIcon
+                message="价目快照同步"
+                description="开启后保存 SPU 时会同步写入 pricing_version_spu_rates，供 strict 用户计费使用。默认同步 baseline（id=1）。"
+                style={{ marginBottom: 12 }}
+              />
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="sync_baseline_pricing"
+                label="同步 baseline 快照"
+                valuePropName="checked"
+                initialValue={true}
+              >
+                <Checkbox>保存时同步到 baseline（id=1）</Checkbox>
+              </Form.Item>
+            </Col>
+            <Col span={16}>
+              <Form.Item
+                noStyle
+                shouldUpdate={(prev, cur) => prev.sync_baseline_pricing !== cur.sync_baseline_pricing}
+              >
+                {() => (
+                  <Form.Item
+                    name="sync_pricing_versions"
+                    label="同步价目版本"
+                    tooltip="可扩展多版本；当前默认 baseline（id=1）"
+                  >
+                    <Select
+                      mode="multiple"
+                      allowClear
+                      disabled={!form.getFieldValue('sync_baseline_pricing')}
+                      options={[{ value: 1, label: 'baseline (id=1)' }]}
+                      placeholder="选择要同步的 pricing_version_id"
+                    />
+                  </Form.Item>
+                )}
               </Form.Item>
             </Col>
           </Row>

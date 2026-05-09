@@ -241,6 +241,8 @@ export interface SPUCreateRequest {
   base_compute_points?: number;
   provider_input_rate?: number;
   provider_output_rate?: number;
+  sync_baseline_pricing?: boolean;
+  sync_pricing_versions?: number[];
   description?: string;
   features?: string[];
   thumbnail_url?: string;

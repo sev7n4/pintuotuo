@@ -26,9 +26,56 @@ import (
 const (
 	adminSKUListScopeSellable = "sellable"
 	adminSKUListScopeAll      = "all"
+	baselinePricingVersionID  = 1
 )
 
 const modelProviderFallbackCode = "__default__"
+
+func normalizePricingVersionIDs(ids []int) []int {
+	seen := make(map[int]struct{}, len(ids))
+	out := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
+func resolveSPUSyncPricingVersionIDs(syncBaseline *bool, syncIDs []int) []int {
+	ids := normalizePricingVersionIDs(syncIDs)
+	if len(ids) > 0 {
+		return ids
+	}
+	if syncBaseline != nil && *syncBaseline {
+		return []int{baselinePricingVersionID}
+	}
+	return nil
+}
+
+func syncSPUPricingVersionRates(tx *sql.Tx, spuID int, inputRate, outputRate float64, versionIDs []int) error {
+	if tx == nil || len(versionIDs) == 0 || spuID <= 0 {
+		return nil
+	}
+	for _, vid := range versionIDs {
+		if _, err := tx.Exec(
+			`INSERT INTO pricing_version_spu_rates (pricing_version_id, spu_id, provider_input_rate, provider_output_rate)
+			 VALUES ($1, $2, $3, $4)
+			 ON CONFLICT (pricing_version_id, spu_id)
+			 DO UPDATE SET provider_input_rate = EXCLUDED.provider_input_rate,
+			               provider_output_rate = EXCLUDED.provider_output_rate`,
+			vid, spuID, inputRate, outputRate,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func ensureAdmin(c *gin.Context) bool {
 	userRole, exists := c.Get("user_role")
@@ -307,10 +354,21 @@ func CreateSPU(c *gin.Context) {
 	if req.Status == "" {
 		req.Status = merchantStatusActive
 	}
+	syncVersionIDs := resolveSPUSyncPricingVersionIDs(req.SyncBaselinePricing, req.SyncPricingVersions)
 
 	db := config.GetDB()
+	tx, err := db.Begin()
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SPU_CREATION_FAILED",
+			"创建SPU失败",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
 	var spu models.SPU
-	err := db.QueryRow(
+	err = tx.QueryRow(
 		`INSERT INTO spus (spu_code, name, model_provider, model_name, model_version, model_tier, context_window, max_output_tokens, base_compute_points, provider_input_rate, provider_output_rate, description, thumbnail_url, status, sort_order) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
 		 RETURNING id, spu_code, name, model_provider, model_name, model_version, model_tier, context_window, base_compute_points, provider_input_rate, provider_output_rate, description, status, sort_order, created_at, updated_at`,
@@ -318,6 +376,26 @@ func CreateSPU(c *gin.Context) {
 	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.BaseComputePoints, &spu.ProviderInputRate, &spu.ProviderOutputRate, &spu.Description, &spu.Status, &spu.SortOrder, &spu.CreatedAt, &spu.UpdatedAt)
 
 	if err != nil {
+		_ = tx.Rollback()
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SPU_CREATION_FAILED",
+			"创建SPU失败",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+	if err := syncSPUPricingVersionRates(tx, spu.ID, spu.ProviderInputRate, spu.ProviderOutputRate, syncVersionIDs); err != nil {
+		_ = tx.Rollback()
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SPU_SYNC_PRICING_RATES_FAILED",
+			"同步价目快照失败",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+	if err := tx.Commit(); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SPU_CREATION_FAILED",
 			"创建SPU失败",
@@ -397,9 +475,20 @@ func UpdateSPU(c *gin.Context) {
 	if req.SortOrder != nil {
 		sortOrder = *req.SortOrder
 	}
+	syncVersionIDs := resolveSPUSyncPricingVersionIDs(req.SyncBaselinePricing, req.SyncPricingVersions)
 
 	var spu models.SPU
-	err := db.QueryRow(
+	tx, err := db.Begin()
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SPU_UPDATE_FAILED",
+			"更新SPU失败",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+	err = tx.QueryRow(
 		`UPDATE spus SET 
 		 name = COALESCE($1, name), 
 		 model_provider = COALESCE($2, model_provider),
@@ -420,6 +509,26 @@ func UpdateSPU(c *gin.Context) {
 	).Scan(&spu.ID, &spu.SPUCode, &spu.Name, &spu.ModelProvider, &spu.ModelName, &spu.ModelVersion, &spu.ModelTier, &spu.ContextWindow, &spu.MaxOutputTokens, &spu.BaseComputePoints, &spu.ProviderInputRate, &spu.ProviderOutputRate, &spu.Description, &spu.Status, &spu.SortOrder, &spu.CreatedAt, &spu.UpdatedAt)
 
 	if err != nil {
+		_ = tx.Rollback()
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SPU_UPDATE_FAILED",
+			"更新SPU失败",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+	if err := syncSPUPricingVersionRates(tx, spu.ID, spu.ProviderInputRate, spu.ProviderOutputRate, syncVersionIDs); err != nil {
+		_ = tx.Rollback()
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"SPU_SYNC_PRICING_RATES_FAILED",
+			"同步价目快照失败",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+	if err := tx.Commit(); err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"SPU_UPDATE_FAILED",
 			"更新SPU失败",
