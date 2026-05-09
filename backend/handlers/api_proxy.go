@@ -1000,9 +1000,9 @@ func resolveEndpointURL(routeMode string, apiKey *models.MerchantAPIKey, provide
 		}
 		return strings.TrimRight(providerBaseURL, "/")
 	case routeModeLitellm:
-		if apiKey != nil && apiKey.EndpointURL != "" {
-			return strings.TrimRight(apiKey.EndpointURL, "/")
-		}
+		// 出站 HTTP 必须打 LiteLLM 网关；商户 endpoint_url 表示「直连时的厂商根地址」，
+		// 若在此误用作 host，会把 LITELLM_MASTER_KEY 当 Bearer 发到 StepFun/OpenAI，复现 invalid_api_key。
+		// 上游 api_base + BYOK 密钥由 user_config 注入，见 buildLitellmUserConfig。
 		if base := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL")); base != "" {
 			return strings.TrimRight(base, "/") + "/v1"
 		}
