@@ -26,6 +26,10 @@ type APIUsageGuideResponse struct {
 	Items               []APIUsageGuideItem `json:"items"`
 	DefaultModelExample string              `json:"default_model_example,omitempty"`
 	Disclaimer          string              `json:"disclaimer"`
+	// OpenAICompatPath / AnthropicCompatPath 为相对 API 前缀（需拼接站点 origin），与 Claude Code / OpenAI SDK 配置一致。
+	OpenAICompatPath    string `json:"openai_compat_path,omitempty"`
+	AnthropicCompatPath string `json:"anthropic_compat_path,omitempty"`
+	ClaudeCodeHint      string `json:"claude_code_hint,omitempty"`
 }
 
 // GetAPIUsageGuide aggregates model hints from active subscriptions and paid/completed orders.
@@ -134,8 +138,12 @@ func GetAPIUsageGuide(c *gin.Context) {
 	}
 
 	out := APIUsageGuideResponse{
-		Items:      items,
-		Disclaimer: "以下为根据您当前有效订阅与已支付订单汇总的模型调用示例；实际以路由与商户可用密钥为准。也可使用「厂商代码/模型名」形式显式指定上游。",
+		Items:               items,
+		Disclaimer:          "以下为根据您当前有效订阅与已支付订单汇总的模型调用示例；实际以路由与商户可用密钥为准。也可使用「厂商代码/模型名」形式显式指定上游。",
+		OpenAICompatPath:    "/api/v1/openai/v1",
+		AnthropicCompatPath: "/api/v1/anthropic/v1",
+		ClaudeCodeHint: "Claude Code：将 ANTHROPIC_BASE_URL 设为「本站域名 + /api/v1/anthropic/v1」（无末尾斜杠），" +
+			"ANTHROPIC_API_KEY 或 ANTHROPIC_AUTH_TOKEN 填平台 API Key（ptd_ / ptt_ 开头）。模型 ID 与下列「厂商/模型」一致，例如列表中的 alibaba/xxx。",
 	}
 	if len(items) > 0 {
 		out.DefaultModelExample = items[0].ProviderSlashExample

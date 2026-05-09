@@ -17,23 +17,22 @@ import (
 // for OpenAI-compatible endpoints used by external clients (OpenAI SDK, IDE plugins, etc.).
 func APIKeyOrJWTAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var tokenString string
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			respondOpenAIAuthError(c, http.StatusUnauthorized, "Missing Authorization header")
-			c.Abort()
-			return
-		}
-
 		const bearerPrefix = "Bearer "
-		if !strings.HasPrefix(authHeader, bearerPrefix) {
-			respondOpenAIAuthError(c, http.StatusUnauthorized, "Authorization must use Bearer scheme")
-			c.Abort()
-			return
+		if authHeader != "" {
+			if !strings.HasPrefix(authHeader, bearerPrefix) {
+				respondOpenAIAuthError(c, http.StatusUnauthorized, "Authorization must use Bearer scheme")
+				c.Abort()
+				return
+			}
+			tokenString = strings.TrimSpace(strings.TrimPrefix(authHeader, bearerPrefix))
 		}
-
-		tokenString := strings.TrimSpace(strings.TrimPrefix(authHeader, bearerPrefix))
 		if tokenString == "" {
-			respondOpenAIAuthError(c, http.StatusUnauthorized, "Empty bearer token")
+			tokenString = strings.TrimSpace(c.GetHeader("x-api-key"))
+		}
+		if tokenString == "" {
+			respondOpenAIAuthError(c, http.StatusUnauthorized, "Missing credentials (Authorization: Bearer or x-api-key)")
 			c.Abort()
 			return
 		}

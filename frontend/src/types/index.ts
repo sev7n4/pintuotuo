@@ -228,6 +228,11 @@ export interface APIUsageGuideResponse {
   items: APIUsageGuideItem[];
   default_model_example?: string;
   disclaimer: string;
+  /** 相对路径，拼接 window.location.origin 即为 OpenAI 兼容 Base URL */
+  openai_compat_path?: string;
+  /** 相对路径，拼接 origin 即为 Anthropic 兼容 Base URL（Claude Code） */
+  anthropic_compat_path?: string;
+  claude_code_hint?: string;
 }
 
 // Payment related types
