@@ -16,6 +16,12 @@ import (
 	"github.com/pintuotuo/backend/services"
 )
 
+// Anthropic Messages API stop_reason 常用值（与 goconst / 客户端约定一致）
+const (
+	anthropicStopEndTurn   = "end_turn"
+	anthropicStopMaxTokens = "max_tokens"
+)
+
 // ctxKeyAnthropicCompat 标记本请求需将上游 OpenAI 兼容结果转为 Anthropic Messages API 形态。
 const ctxKeyAnthropicCompat = "ptd_anthropic_compat"
 
@@ -273,13 +279,13 @@ func openAICompletionToAnthropicMessage(body []byte, clientModel string) (map[st
 	if len(apiResp.Choices) > 0 && apiResp.Choices[0].Message != nil {
 		text = apiResp.Choices[0].Message.Content
 	}
-	stopReason := "end_turn"
+	stopReason := anthropicStopEndTurn
 	if len(apiResp.Choices) > 0 {
 		switch apiResp.Choices[0].FinishReason {
 		case "length":
-			stopReason = "max_tokens"
+			stopReason = anthropicStopMaxTokens
 		case "stop", "":
-			stopReason = "end_turn"
+			stopReason = anthropicStopEndTurn
 		default:
 			stopReason = apiResp.Choices[0].FinishReason
 		}

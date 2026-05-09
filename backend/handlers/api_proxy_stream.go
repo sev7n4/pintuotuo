@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -251,7 +252,7 @@ func executeProxyAnthropicStreamFromUpstream(
 	var lastUsage *APIUsage
 	blockOpen := false
 	blockIndex := 0
-	closed := false
+	var finishOnce sync.Once
 
 	closeContent := func() error {
 		if !blockOpen {
@@ -293,6 +294,12 @@ func executeProxyAnthropicStreamFromUpstream(
 		return writeEvent("message_stop", map[string]interface{}{"type": "message_stop"})
 	}
 
+	finishOnceWith := func(reason string) {
+		finishOnce.Do(func() {
+			_ = finishStream(reason)
+		})
+	}
+
 	for {
 		line, err := br.ReadBytes('\n')
 		if len(line) > 0 {
@@ -301,10 +308,7 @@ func executeProxyAnthropicStreamFromUpstream(
 			if bytes.HasPrefix(trim, []byte("data: ")) {
 				payload := bytes.TrimSpace(trim[6:])
 				if bytes.Equal(payload, []byte("[DONE]")) {
-					if !closed {
-						_ = finishStream("end_turn")
-						closed = true
-					}
+					finishOnceWith(anthropicStopEndTurn)
 					break
 				}
 				if len(payload) > 0 {
@@ -336,30 +340,21 @@ func executeProxyAnthropicStreamFromUpstream(
 							})
 						}
 						if fr := openAIStreamChunkFinishReason(chunk); fr != "" {
-							if !closed {
-								_ = finishStream(mapOpenAIStopToAnthropic(fr))
-								closed = true
-							}
+							finishOnceWith(mapOpenAIStopToAnthropic(fr))
 						}
 					}
 				}
 			}
 		}
 		if err == io.EOF {
-			if !closed {
-				_ = finishStream("end_turn")
-				closed = true
-			}
+			finishOnceWith(anthropicStopEndTurn)
 			break
 		}
 		if err != nil {
 			logger.LogWarn(c.Request.Context(), "api_proxy", "anthropic stream read error", map[string]interface{}{
 				"request_id": requestID, "error": err.Error(),
 			})
-			if !closed {
-				_ = finishStream("end_turn")
-				closed = true
-			}
+			finishOnceWith(anthropicStopEndTurn)
 			break
 		}
 	}
@@ -482,11 +477,11 @@ func openAIStreamChunkFinishReason(chunk map[string]interface{}) string {
 func mapOpenAIStopToAnthropic(fr string) string {
 	switch fr {
 	case "length":
-		return "max_tokens"
+		return anthropicStopMaxTokens
 	case "stop", "":
-		return "end_turn"
+		return anthropicStopEndTurn
 	default:
-		return "end_turn"
+		return anthropicStopEndTurn
 	}
 }
 
