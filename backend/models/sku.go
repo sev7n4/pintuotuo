@@ -217,42 +217,46 @@ type UserSubscriptionWithSKU struct {
 }
 
 type SPUCreateRequest struct {
-	SPUCode            string   `json:"spu_code" binding:"required"`
-	Name               string   `json:"name" binding:"required"`
-	ModelProvider      string   `json:"model_provider" binding:"required"`
-	ModelName          string   `json:"model_name" binding:"required"`
-	ModelVersion       string   `json:"model_version"`
-	ModelTier          string   `json:"model_tier" binding:"required"`
-	ContextWindow      int      `json:"context_window"`
-	MaxOutputTokens    int      `json:"max_output_tokens"`
-	SupportedFunctions []string `json:"supported_functions"`
-	BaseComputePoints  float64  `json:"base_compute_points"`
-	Description        string   `json:"description"`
-	Features           []string `json:"features"`
-	ThumbnailURL       string   `json:"thumbnail_url"`
-	ProviderInputRate  float64  `json:"provider_input_rate"`
-	ProviderOutputRate float64  `json:"provider_output_rate"`
-	Status             string   `json:"status"`
-	SortOrder          int      `json:"sort_order"`
+	SPUCode             string   `json:"spu_code" binding:"required"`
+	Name                string   `json:"name" binding:"required"`
+	ModelProvider       string   `json:"model_provider" binding:"required"`
+	ModelName           string   `json:"model_name" binding:"required"`
+	ModelVersion        string   `json:"model_version"`
+	ModelTier           string   `json:"model_tier" binding:"required"`
+	ContextWindow       int      `json:"context_window"`
+	MaxOutputTokens     int      `json:"max_output_tokens"`
+	SupportedFunctions  []string `json:"supported_functions"`
+	BaseComputePoints   float64  `json:"base_compute_points"`
+	Description         string   `json:"description"`
+	Features            []string `json:"features"`
+	ThumbnailURL        string   `json:"thumbnail_url"`
+	ProviderInputRate   float64  `json:"provider_input_rate"`
+	ProviderOutputRate  float64  `json:"provider_output_rate"`
+	SyncBaselinePricing *bool    `json:"sync_baseline_pricing,omitempty"`
+	SyncPricingVersions []int    `json:"sync_pricing_versions,omitempty"`
+	Status              string   `json:"status"`
+	SortOrder           int      `json:"sort_order"`
 }
 
 type SPUUpdateRequest struct {
-	Name               *string  `json:"name"`
-	ModelProvider      *string  `json:"model_provider"`
-	ModelName          *string  `json:"model_name"`
-	ModelVersion       *string  `json:"model_version"`
-	ModelTier          *string  `json:"model_tier"`
-	ContextWindow      *int     `json:"context_window"`
-	MaxOutputTokens    *int     `json:"max_output_tokens"`
-	SupportedFunctions []string `json:"supported_functions"`
-	BaseComputePoints  *float64 `json:"base_compute_points"`
-	Description        *string  `json:"description"`
-	Features           []string `json:"features"`
-	ThumbnailURL       *string  `json:"thumbnail_url"`
-	ProviderInputRate  *float64 `json:"provider_input_rate"`
-	ProviderOutputRate *float64 `json:"provider_output_rate"`
-	Status             *string  `json:"status"`
-	SortOrder          *int     `json:"sort_order"`
+	Name                *string  `json:"name"`
+	ModelProvider       *string  `json:"model_provider"`
+	ModelName           *string  `json:"model_name"`
+	ModelVersion        *string  `json:"model_version"`
+	ModelTier           *string  `json:"model_tier"`
+	ContextWindow       *int     `json:"context_window"`
+	MaxOutputTokens     *int     `json:"max_output_tokens"`
+	SupportedFunctions  []string `json:"supported_functions"`
+	BaseComputePoints   *float64 `json:"base_compute_points"`
+	Description         *string  `json:"description"`
+	Features            []string `json:"features"`
+	ThumbnailURL        *string  `json:"thumbnail_url"`
+	ProviderInputRate   *float64 `json:"provider_input_rate"`
+	ProviderOutputRate  *float64 `json:"provider_output_rate"`
+	SyncBaselinePricing *bool    `json:"sync_baseline_pricing,omitempty"`
+	SyncPricingVersions []int    `json:"sync_pricing_versions,omitempty"`
+	Status              *string  `json:"status"`
+	SortOrder           *int     `json:"sort_order"`
 }
 
 type SKUCreateRequest struct {
