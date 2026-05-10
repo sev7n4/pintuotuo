@@ -449,7 +449,7 @@ func GetCategories(c *gin.Context) {
 // GetHomeData retrieves all data needed for homepage
 func GetHomeData(c *gin.Context) {
 	ctx := context.Background()
-	cacheKey := "home:data:sku:v2"
+	cacheKey := "home:data:sku:v3"
 
 	// Try cache first
 	if cachedData, err := cache.Get(ctx, cacheKey); err == nil {

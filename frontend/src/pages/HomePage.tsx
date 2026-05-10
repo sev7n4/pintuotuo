@@ -29,6 +29,7 @@ import {
   pushRecentSearch,
   readRecentSearches,
 } from '@/utils/productDisplay';
+import { getProviderCardSurfaceStyle, getProviderLogoUrl } from '@/utils/providerBrand';
 import styles from './HomePage.module.css';
 
 const { Title, Text } = Typography;
@@ -73,6 +74,66 @@ const quickNavItems: QuickNav[] = [
     link: '/fuel-station',
   },
 ];
+
+function coverImageUrl(p: Product) {
+  return p.image_url || p.thumbnail_url;
+}
+
+function HomeProductCardCover({
+  product,
+  showGroupTag,
+  discount,
+}: {
+  product: Product;
+  showGroupTag: boolean;
+  discount: number;
+}) {
+  const imgUrl = coverImageUrl(product);
+  const brandUrl =
+    !imgUrl && product.model_provider ? getProviderLogoUrl(product.model_provider) : null;
+  const surface =
+    !imgUrl && product.model_provider
+      ? getProviderCardSurfaceStyle(product.model_provider)
+      : undefined;
+  const [brandBroken, setBrandBroken] = useState(false);
+
+  return (
+    <div className={styles.productImage} style={surface ? { background: surface } : undefined}>
+      {imgUrl ? (
+        <img
+          src={imgUrl}
+          alt=""
+          className={styles.productCoverImg}
+          loading="lazy"
+          decoding="async"
+        />
+      ) : brandUrl && !brandBroken ? (
+        <img
+          src={brandUrl}
+          alt=""
+          className={styles.productBrandLogo}
+          loading="lazy"
+          decoding="async"
+          onError={() => setBrandBroken(true)}
+        />
+      ) : (
+        <div className={styles.productPlaceholder}>
+          <Text type="secondary">{product.name.substring(0, 2)}</Text>
+        </div>
+      )}
+      {discount > 0 && (
+        <Tag className={styles.discountTag} bordered={false}>
+          -{discount}%
+        </Tag>
+      )}
+      {showGroupTag && (
+        <Tag color="#52c41a" className={styles.groupTag}>
+          拼团
+        </Tag>
+      )}
+    </div>
+  );
+}
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -132,14 +193,11 @@ const HomePage = () => {
     return `¥${price.toFixed(2)}`;
   };
 
-  const coverImageUrl = (p: Product) => p.image_url || p.thumbnail_url;
-
   const renderProductCard = (product: Product, showGroupTag = false) => {
     const discount =
       product.original_price && product.original_price > product.price
         ? Math.round((1 - product.price / product.original_price) * 100)
         : 0;
-    const imgUrl = coverImageUrl(product);
     const subtitle = getProductCardSubtitle(product);
 
     return (
@@ -147,31 +205,7 @@ const HomePage = () => {
         hoverable
         className={styles.productCard}
         cover={
-          <div className={styles.productImage}>
-            {imgUrl ? (
-              <img
-                src={imgUrl}
-                alt=""
-                className={styles.productCoverImg}
-                loading="lazy"
-                decoding="async"
-              />
-            ) : (
-              <div className={styles.productPlaceholder}>
-                <Text type="secondary">{product.name.substring(0, 2)}</Text>
-              </div>
-            )}
-            {discount > 0 && (
-              <Tag className={styles.discountTag} bordered={false}>
-                -{discount}%
-              </Tag>
-            )}
-            {showGroupTag && (
-              <Tag color="#52c41a" className={styles.groupTag}>
-                拼团
-              </Tag>
-            )}
-          </div>
+          <HomeProductCardCover product={product} showGroupTag={showGroupTag} discount={discount} />
         }
         onClick={() => handleProductClick(product.id)}
       >
