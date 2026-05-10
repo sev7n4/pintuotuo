@@ -155,8 +155,8 @@ deploy/*
 !deploy/scripts/
 !deploy/scripts/**
 
-# Docs folder (keep local only)
-docs/
+# 仅忽略仓库根目录 docs/（勿用 docs/：会误伤 frontend/public/docs/）
+/docs/
 
 # Backend temp docs
 backend/HANDLER_CACHING_GUIDE.md

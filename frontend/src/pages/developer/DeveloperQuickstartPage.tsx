@@ -261,9 +261,13 @@ export default function DeveloperQuickstartPage() {
         showIcon
         message="更多说明"
         description={
-          <a href="/docs/developer/openai.md" target="_blank" rel="noreferrer">
-            OpenAI 兼容接入（Markdown）
-          </a>
+          <span>
+            <a href="/docs/developer/openai.md" target="_blank" rel="noreferrer">
+              OpenAI 兼容接入
+            </a>
+            {' · '}
+            <a href="/developer/ide-clients">IDE / CLI（Claude Code、Cursor、Codex 等）</a>
+          </span>
         }
       />
     </Space>

@@ -1,0 +1,107 @@
+.panel {
+  max-height: min(72vh, 720px);
+  overflow: auto;
+}
+
+.markdownBody {
+  font-size: 14px;
+  line-height: 1.65;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.markdownBody :global(h1) {
+  font-size: 1.35rem;
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+}
+
+.markdownBody :global(h2) {
+  font-size: 1.15rem;
+  margin: 1.25rem 0 0.5rem;
+  font-weight: 600;
+}
+
+.markdownBody :global(h3) {
+  font-size: 1.05rem;
+  margin: 1rem 0 0.4rem;
+  font-weight: 600;
+}
+
+.markdownBody :global(p) {
+  margin: 0.5rem 0;
+}
+
+.markdownBody :global(ul),
+.markdownBody :global(ol) {
+  margin: 0.5rem 0;
+  padding-left: 1.35rem;
+}
+
+.markdownBody :global(li) {
+  margin: 0.25rem 0;
+}
+
+.markdownBody :global(blockquote) {
+  margin: 0.75rem 0;
+  padding: 0.25rem 0.75rem;
+  border-left: 3px solid #1677ff;
+  background: rgba(22, 119, 255, 0.06);
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.markdownBody :global(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 13px;
+}
+
+.markdownBody :global(th),
+.markdownBody :global(td) {
+  border: 1px solid #f0f0f0;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdownBody :global(th) {
+  background: #fafafa;
+  font-weight: 600;
+}
+
+.markdownBody :global(a) {
+  color: #1677ff;
+}
+
+.markdownBody :global(a:hover) {
+  text-decoration: underline;
+}
+
+.markdownBody :global(code:not(pre code)) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.88em;
+  background: #f5f5f5;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+}
+
+.markdownBody :global(pre) {
+  margin: 0.75rem 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  overflow: auto;
+  background: #f6f8fa;
+  border: 1px solid #f0f0f0;
+}
+
+.markdownBody :global(pre code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.markdownBody :global(pre code.hljs) {
+  display: block;
+}

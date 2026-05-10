@@ -40,6 +40,7 @@ import DeveloperKeysPage from '@pages/developer/DeveloperKeysPage';
 import DeveloperUsagePage from '@pages/developer/DeveloperUsagePage';
 import DeveloperTroubleshootPage from '@pages/developer/DeveloperTroubleshootPage';
 import DeveloperModelsPage from '@pages/developer/DeveloperModelsPage';
+import DeveloperIdeClientsPage from '@pages/developer/DeveloperIdeClientsPage';
 
 // Merchant Pages
 import MerchantDashboard from '@pages/merchant/MerchantDashboard';
@@ -100,6 +101,7 @@ function App() {
             <Route index element={<Navigate to="quickstart" replace />} />
             <Route path="quickstart" element={<DeveloperQuickstartPage />} />
             <Route path="keys" element={<DeveloperKeysPage />} />
+            <Route path="ide-clients" element={<DeveloperIdeClientsPage />} />
             <Route path="usage" element={<DeveloperUsagePage />} />
             <Route path="troubleshoot" element={<DeveloperTroubleshootPage />} />
             <Route path="models" element={<DeveloperModelsPage />} />
