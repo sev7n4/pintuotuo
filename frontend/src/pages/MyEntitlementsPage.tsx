@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Alert,
+  Button,
   Card,
   Col,
   Empty,
@@ -33,15 +34,19 @@ type TokenBalanceResp = {
 export default function MyEntitlementsPage() {
   const [loadingMain, setLoadingMain] = useState(true);
   const [loadingExtras, setLoadingExtras] = useState(true);
+  const [loadMainError, setLoadMainError] = useState(false);
+  const [loadExtrasError, setLoadExtrasError] = useState(false);
   const [subs, setSubs] = useState<UserSubscriptionWithSKU[]>([]);
   const [packages, setPackages] = useState<EntitlementPackageUserView[]>([]);
   const [usageGuide, setUsageGuide] = useState<APIUsageGuideResponse | null>(null);
   const [balance, setBalance] = useState<TokenBalanceResp | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoadingMain(true);
+      setLoadMainError(false);
       try {
         const [subRes, pkgRes] = await Promise.all([
           skuService.getUserSubscriptions(),
@@ -53,6 +58,7 @@ export default function MyEntitlementsPage() {
         }
       } catch {
         if (!cancelled) {
+          setLoadMainError(true);
           setSubs([]);
           setPackages([]);
         }
@@ -63,12 +69,13 @@ export default function MyEntitlementsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadToken]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoadingExtras(true);
+      setLoadExtrasError(false);
       try {
         const [guideRes, balRes] = await Promise.all([
           tokenService.getAPIUsageGuide(),
@@ -82,6 +89,7 @@ export default function MyEntitlementsPage() {
         }
       } catch {
         if (!cancelled) {
+          setLoadExtrasError(true);
           setUsageGuide(null);
           setBalance(null);
         }
@@ -92,7 +100,7 @@ export default function MyEntitlementsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadToken]);
 
   const refreshBalance = useCallback(async () => {
     try {
@@ -105,6 +113,10 @@ export default function MyEntitlementsPage() {
     }
   }, []);
 
+  const handleRetryLoad = () => {
+    setReloadToken((t) => t + 1);
+  };
+
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: 16 }}>
       <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -116,6 +128,20 @@ export default function MyEntitlementsPage() {
             查看模型与套餐权益、订阅有效期及可扣费余额。
           </Paragraph>
         </div>
+
+        {(loadMainError || loadExtrasError) && (
+          <Alert
+            type="warning"
+            showIcon
+            message="部分数据加载失败"
+            description="可能是网络波动或未登录会话过期。请点击重试；若仍失败请稍后再试或联系客服。"
+            action={
+              <Button size="small" type="primary" loading={loadingMain || loadingExtras} onClick={handleRetryLoad}>
+                重试
+              </Button>
+            }
+          />
+        )}
 
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12}>

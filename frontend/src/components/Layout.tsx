@@ -24,6 +24,9 @@ import {
   GiftOutlined,
   ThunderboltOutlined,
   CodeOutlined,
+  TeamOutlined,
+  UserAddOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import './Layout.css';
@@ -38,6 +41,9 @@ function getMainNavSelectedKey(pathname: string): string[] {
   if (pathname.startsWith('/fuel-station')) return ['fuelStation'];
   if (pathname === '/cart' || pathname === '/checkout') return ['cart'];
   if (pathname.startsWith('/orders') || pathname.startsWith('/payment')) return ['orders'];
+  if (pathname.startsWith('/groups')) return ['groups'];
+  if (pathname.startsWith('/referral')) return ['referral'];
+  if (pathname.startsWith('/help')) return ['help'];
   return [];
 }
 
@@ -82,6 +88,21 @@ export default function Layout() {
         label: <Link to="/cart">购物车</Link>,
         icon: <ShoppingCartOutlined />,
       },
+      {
+        key: 'groups',
+        label: <Link to="/groups">拼团</Link>,
+        icon: <TeamOutlined />,
+      },
+      {
+        key: 'referral',
+        label: <Link to="/referral">邀请</Link>,
+        icon: <UserAddOutlined />,
+      },
+      {
+        key: 'help',
+        label: <Link to="/help">帮助</Link>,
+        icon: <QuestionCircleOutlined />,
+      },
       ...(isAuthenticated
         ? [
             {
@@ -111,6 +132,9 @@ export default function Layout() {
     fuelStation: '/fuel-station',
     cart: '/cart',
     orders: '/orders',
+    groups: '/groups',
+    referral: '/referral',
+    help: '/help',
   };
 
   const drawerMenuItems: MenuProps['items'] = useMemo(
@@ -139,6 +163,21 @@ export default function Layout() {
         key: 'cart',
         label: '购物车',
         icon: <ShoppingCartOutlined />,
+      },
+      {
+        key: 'groups',
+        label: '拼团',
+        icon: <TeamOutlined />,
+      },
+      {
+        key: 'referral',
+        label: '邀请',
+        icon: <UserAddOutlined />,
+      },
+      {
+        key: 'help',
+        label: '帮助',
+        icon: <QuestionCircleOutlined />,
       },
       ...(isAuthenticated
         ? [
@@ -236,6 +275,7 @@ export default function Layout() {
           ) : (
             <Space>
               <Link to="/login">登录</Link>
+              <Link to="/register">注册</Link>
             </Space>
           )}
         </div>
@@ -246,6 +286,8 @@ export default function Layout() {
       <Footer className="layout-footer">
         <p>
           &copy; 2026 拼脱脱 - AI Token 二级市场
+          {' · '}
+          <Link to="/help">帮助中心</Link>
           {' · '}
           <Link to="/developer/quickstart">开发者中心</Link>
         </p>

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { CartItem, Product } from '@/types';
 
 interface CartState {
@@ -12,62 +13,81 @@ interface CartState {
   getTotal: () => number;
 }
 
-export const useCartStore = create<CartState>((set, get) => ({
-  items: [],
-  total: 0,
+function computeTotal(items: CartItem[]): number {
+  return items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+}
 
-  addItem: (product, quantity, groupId) => {
-    set((state) => {
-      const existingItem = state.items.find(
-        (item) => item.sku_id === product.id && item.group_id === groupId
-      );
+export const useCartStore = create<CartState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      total: 0,
 
-      let newItems: CartItem[];
-      if (existingItem) {
-        newItems = state.items.map((item) =>
-          item.id === existingItem.id ? { ...item, quantity: item.quantity + quantity } : item
-        );
-      } else {
-        newItems = [
-          ...state.items,
-          {
-            id: `${product.id}-${groupId || 0}-${Date.now()}`,
-            sku_id: product.id,
-            product,
-            quantity,
-            group_id: groupId,
-          },
-        ];
-      }
+      addItem: (product, quantity, groupId) => {
+        set((state) => {
+          const existingItem = state.items.find(
+            (item) => item.sku_id === product.id && item.group_id === groupId
+          );
 
-      return {
-        items: newItems,
-        total: newItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-      };
-    });
-  },
+          let newItems: CartItem[];
+          if (existingItem) {
+            newItems = state.items.map((item) =>
+              item.id === existingItem.id ? { ...item, quantity: item.quantity + quantity } : item
+            );
+          } else {
+            newItems = [
+              ...state.items,
+              {
+                id: `${product.id}-${groupId || 0}-${Date.now()}`,
+                sku_id: product.id,
+                product,
+                quantity,
+                group_id: groupId,
+              },
+            ];
+          }
 
-  removeItem: (id) => {
-    set((state) => {
-      const newItems = state.items.filter((item) => item.id !== id);
-      return {
-        items: newItems,
-        total: newItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-      };
-    });
-  },
+          return {
+            items: newItems,
+            total: computeTotal(newItems),
+          };
+        });
+      },
 
-  updateQuantity: (id, quantity) => {
-    set((state) => {
-      const newItems = state.items.map((item) => (item.id === id ? { ...item, quantity } : item));
-      return {
-        items: newItems,
-        total: newItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-      };
-    });
-  },
+      removeItem: (id) => {
+        set((state) => {
+          const newItems = state.items.filter((item) => item.id !== id);
+          return {
+            items: newItems,
+            total: computeTotal(newItems),
+          };
+        });
+      },
 
-  clear: () => set({ items: [], total: 0 }),
+      updateQuantity: (id, quantity) => {
+        set((state) => {
+          const newItems = state.items.map((item) => (item.id === id ? { ...item, quantity } : item));
+          return {
+            items: newItems,
+            total: computeTotal(newItems),
+          };
+        });
+      },
 
-  getTotal: () => get().total,
-}));
+      clear: () => set({ items: [], total: 0 }),
+
+      getTotal: () => get().items.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+    }),
+    {
+      name: 'pintuotuo-cart',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ items: state.items }),
+      merge: (persisted, current) => {
+        const p = persisted as Partial<Pick<CartState, 'items'>>;
+        const items = Array.isArray(p.items) ? p.items : current.items;
+        const total = computeTotal(items);
+        return { ...current, items, total };
+      },
+    }
+  )
+);

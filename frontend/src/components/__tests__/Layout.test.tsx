@@ -70,11 +70,14 @@ describe('Layout Component', () => {
     expect(screen.getByText('首页')).toBeInTheDocument();
     expect(screen.getByText('卖场')).toBeInTheDocument();
     expect(screen.getByText('购物车')).toBeInTheDocument();
+    expect(screen.getByText('拼团')).toBeInTheDocument();
+    expect(screen.getByText('邀请')).toBeInTheDocument();
+    expect(screen.getByText('帮助')).toBeInTheDocument();
     expect(screen.queryByText('我的订单')).not.toBeInTheDocument();
 
     // 检查登录入口
     expect(screen.getByText('登录')).toBeInTheDocument();
-    expect(screen.queryByText('注册')).not.toBeInTheDocument();
+    expect(screen.getByText('注册')).toBeInTheDocument();
   });
 
   test('renders Layout with user dropdown when authenticated', () => {

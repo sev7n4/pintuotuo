@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '@stores/cartStore';
 import { useOrderStore } from '@stores/orderStore';
 import type { CartItem } from '@/types';
+import { getApiErrorMessage } from '@/utils/apiError';
 
 type PaymentMethod = 'alipay' | 'wechat';
 
@@ -84,7 +85,7 @@ const CheckoutPage: React.FC = () => {
       message.success('订单创建成功，正在跳转到支付页面');
       navigate(`/payment/${orderId}`);
     } catch (error) {
-      message.error('创建订单失败，请重试');
+      message.error(getApiErrorMessage(error, '创建订单失败，请重试'));
     }
   };
 

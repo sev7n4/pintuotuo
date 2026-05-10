@@ -41,7 +41,13 @@ instance.interceptors.response.use(
         localStorage.removeItem('auth_token');
         localStorage.removeItem('remember_me');
         sessionStorage.removeItem('auth_token');
-        window.location.href = '/login';
+        const path = window.location.pathname;
+        if (path === '/login' || path === '/register') {
+          window.location.href = '/login';
+        } else {
+          const next = `${path}${window.location.search}`;
+          window.location.href = `/login?redirect=${encodeURIComponent(next)}`;
+        }
       }
     }
     return Promise.reject(error);
