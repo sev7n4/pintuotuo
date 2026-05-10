@@ -4,9 +4,6 @@ import {
   Button,
   Card,
   Empty,
-  Form,
-  Input,
-  Modal,
   Popconfirm,
   Space,
   Table,
@@ -14,48 +11,22 @@ import {
   message,
   Tag,
 } from 'antd';
-import { PlusOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { useTokenStore } from '@/stores/tokenStore';
 import type { UserAPIKey } from '@/types';
 import { PlatformAPIKeySecretCell } from '@/components/user/PlatformAPIKeySecretCell';
-import { copyToClipboard } from '@/utils/clipboard';
+import { CreatePlatformAPIKeyModal } from '@/components/developer/CreatePlatformAPIKeyModal';
 
 const { Title, Paragraph, Text } = Typography;
 
 export default function DeveloperKeysPage() {
-  const {
-    apiKeys,
-    fetchAPIKeys,
-    createAPIKey,
-    deleteAPIKey,
-    isLoading,
-    error,
-  } = useTokenStore();
+  const { apiKeys, fetchAPIKeys, deleteAPIKey, isLoading } = useTokenStore();
   const [modalOpen, setModalOpen] = useState(false);
-  const [newKeyDisplay, setNewKeyDisplay] = useState<string | null>(null);
-  const [form] = Form.useForm();
 
   useEffect(() => {
     fetchAPIKeys();
   }, [fetchAPIKeys]);
-
-  const handleCreate = async () => {
-    try {
-      const values = await form.validateFields();
-      const key = await createAPIKey(values.name.trim());
-      if (key) {
-        message.success('API密钥创建成功');
-        setNewKeyDisplay(key);
-        form.resetFields();
-        fetchAPIKeys();
-      } else {
-        message.error(error || '创建失败');
-      }
-    } catch {
-      /* validation */
-    }
-  };
 
   const handleDelete = async (id: number) => {
     const ok = await deleteAPIKey(id);
@@ -82,9 +53,7 @@ export default function DeveloperKeysPage() {
         type="info"
         showIcon
         message="完整 Token 与充值仍在我的 Token"
-        description={
-          <Link to="/my-tokens">前往「我的 Token」查看余额、充值与流水</Link>
-        }
+        description={<Link to="/my-tokens">前往「我的 Token」查看余额、充值与流水</Link>}
       />
 
       <Card
@@ -135,55 +104,11 @@ export default function DeveloperKeysPage() {
         />
       </Card>
 
-      <Modal
-        title="创建 API 密钥"
+      <CreatePlatformAPIKeyModal
         open={modalOpen}
-        onOk={() => {
-          if (newKeyDisplay) {
-            setModalOpen(false);
-            setNewKeyDisplay(null);
-            return;
-          }
-          handleCreate();
-        }}
-        onCancel={() => {
-          setModalOpen(false);
-          form.resetFields();
-          setNewKeyDisplay(null);
-        }}
-        okText={newKeyDisplay ? '我已保存' : '创建'}
-        cancelText="取消"
-      >
-        {newKeyDisplay ? (
-          <>
-            <Paragraph type="warning">
-              密钥已加密保存，你可关闭本窗口，稍后通过列表右侧眼睛图标随时查看完整密钥。
-            </Paragraph>
-            <Paragraph>
-              <Text code style={{ wordBreak: 'break-all' }}>
-                {newKeyDisplay}
-              </Text>
-            </Paragraph>
-            <Button
-              type="primary"
-              icon={<CopyOutlined />}
-              onClick={async () => {
-                const ok = await copyToClipboard(newKeyDisplay);
-                if (ok) message.success('已复制完整密钥');
-                else message.error('复制失败，请手动选择文本复制');
-              }}
-            >
-              复制完整密钥
-            </Button>
-          </>
-        ) : (
-          <Form form={form} layout="vertical">
-            <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-              <Input placeholder="例如：本机开发" />
-            </Form.Item>
-          </Form>
-        )}
-      </Modal>
+        onClose={() => setModalOpen(false)}
+        onSuccess={() => fetchAPIKeys()}
+      />
     </Space>
   );
 }
