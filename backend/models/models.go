@@ -21,16 +21,16 @@ type User struct {
 
 // Product represents a token product
 type Product struct {
-	ID            int       `json:"id"`
-	MerchantID    int       `json:"merchant_id"`
-	SpuID         int       `json:"spu_id,omitempty"`
-	Name          string    `json:"name"`
-	Description   string    `json:"description"`
-	Price         float64   `json:"price"`
-	OriginalPrice float64   `json:"original_price,omitempty"`
-	Stock         int       `json:"stock"`
-	SoldCount     int       `json:"sold_count"`
-	Category      string    `json:"category,omitempty"`
+	ID            int     `json:"id"`
+	MerchantID    int     `json:"merchant_id"`
+	SpuID         int     `json:"spu_id,omitempty"`
+	Name          string  `json:"name"`
+	Description   string  `json:"description"`
+	Price         float64 `json:"price"`
+	OriginalPrice float64 `json:"original_price,omitempty"`
+	Stock         int     `json:"stock"`
+	SoldCount     int     `json:"sold_count"`
+	Category      string  `json:"category,omitempty"`
 	// ImageURL 来自 spus.thumbnail_url（卖场 SKU 卡片主图）
 	ImageURL      string    `json:"image_url,omitempty"`
 	ModelProvider string    `json:"model_provider,omitempty"`
