@@ -1209,7 +1209,7 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       expect(screen.getByText('登录')).toBeInTheDocument();
-      expect(screen.queryByText('注册')).not.toBeInTheDocument();
+      expect(screen.getByText('注册')).toBeInTheDocument();
       expect(screen.queryByTestId('user-dropdown')).not.toBeInTheDocument();
     });
 

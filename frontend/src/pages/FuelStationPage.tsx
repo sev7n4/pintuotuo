@@ -122,6 +122,20 @@ export default function FuelStationPage() {
             '面向已订购模型权益的用户提供加油补充。你订购了哪些在售模型，加油包余额即可用于对应模型调用。'}
         </Paragraph>
 
+        {!loading && !config && (
+          <Alert
+            type="warning"
+            showIcon
+            message="暂时无法加载加油站配置"
+            description="请检查网络后重试，或先到卖场搭配模型商品与加油包一起结算。"
+            action={
+              <Button type="primary" onClick={() => navigate('/catalog')}>
+                去卖场
+              </Button>
+            }
+          />
+        )}
+
         <Alert
           type="info"
           showIcon

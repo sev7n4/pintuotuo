@@ -18,6 +18,8 @@ import OrderDetailPage from '@pages/OrderDetailPage';
 import PaymentPage from '@pages/PaymentPage';
 import GroupListPage from '@pages/GroupListPage';
 import GroupProgressPage from '@pages/GroupProgressPage';
+import GroupJoinPage from '@pages/GroupJoinPage';
+import NotFoundPage from '@pages/NotFoundPage';
 import ReferralPage from '@pages/ReferralPage';
 import MyToken from '@pages/MyToken';
 import Profile from '@pages/Profile';
@@ -131,7 +133,8 @@ function App() {
             <Route path="/orders/:id" element={<OrderDetailPage />} />
             <Route path="/payment/:id" element={<PaymentPage />} />
 
-            {/* Groups */}
+            {/* Groups：参团落地须在 /groups/:id 之前注册 */}
+            <Route path="/groups/:groupId/join" element={<GroupJoinPage />} />
             <Route path="/groups" element={<GroupListPage />} />
             <Route path="/groups/:id" element={<GroupProgressPage />} />
 
@@ -164,8 +167,8 @@ function App() {
             <Route path="/agreement" element={<UserAgreementPage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
 
-            {/* Catch all */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* 未知路径：独立 404，便于用户与运营识别坏链 */}
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
 
           {/* Merchant routes */}

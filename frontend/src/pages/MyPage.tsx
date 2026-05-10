@@ -1,26 +1,57 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Row, Col, Avatar, List, Button, Divider, Tag, Space, Statistic } from 'antd';
+import { Card, Row, Col, Avatar, List, Button, Divider, Tag, Space, Statistic, Spin } from 'antd';
 import {
   UserOutlined,
-  SettingOutlined,
+  QuestionCircleOutlined,
   SafetyOutlined,
   RightOutlined,
   TrophyOutlined,
   CodeOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
+import { referralService } from '@/services/referral';
 import styles from './MyPage.module.css';
 
 const MyPage = () => {
   const { user, isAuthenticated, fetchUser } = useAuthStore();
   const navigate = useNavigate();
+  const [inviteCount, setInviteCount] = useState<number | null>(null);
+  const [inviteCountError, setInviteCountError] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && !user) {
       fetchUser();
     }
   }, [isAuthenticated, user, fetchUser]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setInviteCount(null);
+      setInviteCountError(false);
+      return;
+    }
+    let cancelled = false;
+    setInviteCount(null);
+    setInviteCountError(false);
+    referralService
+      .getReferralStats()
+      .then((res) => {
+        const n = res.data?.total_referrals;
+        if (!cancelled) {
+          setInviteCount(typeof n === 'number' ? n : 0);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInviteCountError(true);
+          setInviteCount(0);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const getRoleTag = (role: string) => {
     const roleMap: Record<string, { color: string; text: string }> = {
@@ -58,7 +89,7 @@ const MyPage = () => {
     },
     {
       title: '帮助中心',
-      icon: <SettingOutlined />,
+      icon: <QuestionCircleOutlined />,
       link: '/help',
     },
   ];
@@ -121,7 +152,18 @@ const MyPage = () => {
             <Statistic title="用户等级" value={userLevel.level} prefix="Lv." />
           </Col>
           <Col span={8}>
-            <Statistic title="邀请人数" value={0} suffix="人" />
+            {inviteCount === null ? (
+              <div style={{ paddingTop: 8 }}>
+                <Spin size="small" />
+                <div style={{ fontSize: 12, color: '#999', marginTop: 8 }}>邀请人数</div>
+              </div>
+            ) : (
+              <Statistic
+                title="邀请人数"
+                value={inviteCountError ? '—' : inviteCount}
+                suffix={inviteCountError ? '' : '人'}
+              />
+            )}
           </Col>
         </Row>
       </Card>

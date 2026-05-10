@@ -27,6 +27,7 @@ const mockProduct2: Product = {
 
 describe('CartStore', () => {
   beforeEach(() => {
+    useCartStore.persist.clearStorage();
     useCartStore.setState({ items: [], total: 0 });
   });
 

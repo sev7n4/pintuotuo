@@ -239,7 +239,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
       navigate('/merchant', { replace: true });
     } else {
       const params = new URLSearchParams(location.search);
-      const redirect = params.get('redirect');
+      const redirect = params.get('redirect') || params.get('next');
       if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
         navigate(redirect, { replace: true });
       } else {
