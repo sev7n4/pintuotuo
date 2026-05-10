@@ -209,6 +209,7 @@ func RegisterTokenRoutes(router *gin.RouterGroup) {
 		{
 			keys.GET("", handlers.ListAPIKeys)
 			keys.POST("", handlers.CreateAPIKey)
+			keys.POST("/:id/reveal", handlers.RevealAPIKey)
 			keys.PUT("/:id", handlers.UpdateAPIKey)
 			keys.DELETE("/:id", handlers.DeleteAPIKey)
 		}

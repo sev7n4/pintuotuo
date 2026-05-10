@@ -43,6 +43,8 @@ func setupAPIKeyTestDB() (*sql.DB, error) {
 		last_used_at TIMESTAMP,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		key_encrypted TEXT,
+		key_preview TEXT,
 		FOREIGN KEY (user_id) REFERENCES users(id)
 	);
 	`
@@ -87,6 +89,8 @@ func TestListAPIKeys(t *testing.T) {
 	config.DB = db
 	defer func() { config.DB = nil }()
 
+	assert.NoError(t, utils.InitEncryption())
+
 	// Insert test API key
 	_, err = db.Exec("INSERT INTO api_keys (user_id, key_hash, name, status) VALUES (?, ?, ?, ?)", 1, "test_hash", "Test Key", "active")
 	assert.NoError(t, err)
@@ -108,6 +112,8 @@ func TestListAPIKeys(t *testing.T) {
 	assert.Len(t, response, 1)
 	assert.Equal(t, "Test Key", response[0]["name"])
 	assert.Equal(t, "active", response[0]["status"])
+	assert.Equal(t, "", response[0]["key_preview"])
+	assert.Equal(t, false, response[0]["can_reveal"])
 }
 
 func TestCreateAPIKey(t *testing.T) {
@@ -118,6 +124,8 @@ func TestCreateAPIKey(t *testing.T) {
 	// Set the database
 	config.DB = db
 	defer func() { config.DB = nil }()
+
+	assert.NoError(t, utils.InitEncryption())
 
 	// Create gin context
 	w := httptest.NewRecorder()
@@ -148,6 +156,49 @@ func TestCreateAPIKey(t *testing.T) {
 	err = db.QueryRow("SELECT COUNT(*) FROM api_keys WHERE user_id = ?", 1).Scan(&count)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
+
+	var enc, preview string
+	err = db.QueryRow("SELECT key_encrypted, key_preview FROM api_keys WHERE user_id = ?", 1).Scan(&enc, &preview)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, enc)
+	assert.Contains(t, preview, "ptd_")
+}
+
+func TestRevealAPIKey(t *testing.T) {
+	db, err := setupAPIKeyTestDB()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	config.DB = db
+	defer func() { config.DB = nil }()
+
+	assert.NoError(t, utils.InitEncryption())
+
+	wCreate := httptest.NewRecorder()
+	cCreate, _ := gin.CreateTestContext(wCreate)
+	cCreate.Set("user_id", 1)
+	reqBody := map[string]string{"name": "Reveal Key"}
+	reqBodyBytes, _ := json.Marshal(reqBody)
+	cCreate.Request, _ = http.NewRequest("POST", "/tokens/keys", bytes.NewBuffer(reqBodyBytes))
+	cCreate.Request.Header.Set("Content-Type", "application/json")
+	CreateAPIKey(cCreate)
+	assert.Equal(t, http.StatusCreated, wCreate.Code)
+
+	var created map[string]interface{}
+	assert.NoError(t, json.Unmarshal(wCreate.Body.Bytes(), &created))
+	keyID := int(created["id"].(float64))
+	fullKey := created["key"].(string)
+
+	wReveal := httptest.NewRecorder()
+	cReveal, _ := gin.CreateTestContext(wReveal)
+	cReveal.Set("user_id", 1)
+	cReveal.Params = gin.Params{{Key: "id", Value: strconv.Itoa(keyID)}}
+	cReveal.Request, _ = http.NewRequest("POST", "/tokens/keys/"+strconv.Itoa(keyID)+"/reveal", nil)
+	RevealAPIKey(cReveal)
+	assert.Equal(t, http.StatusOK, wReveal.Code)
+	var out map[string]interface{}
+	assert.NoError(t, json.Unmarshal(wReveal.Body.Bytes(), &out))
+	assert.Equal(t, fullKey, out["key"])
 }
 
 func TestUpdateAPIKey(t *testing.T) {

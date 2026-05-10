@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -54,8 +56,11 @@ func ListAPIKeys(c *gin.Context) {
 		return
 	}
 
-	rows, err := db.Query(
-		"SELECT id, user_id, name, status, last_used_at, created_at, updated_at FROM api_keys WHERE user_id = $1 ORDER BY created_at DESC",
+	rows, err := db.Query(`
+		SELECT id, user_id, name, status, last_used_at, created_at, updated_at,
+		       COALESCE(NULLIF(TRIM(key_preview), ''), '') AS key_preview,
+		       key_encrypted
+		FROM api_keys WHERE user_id = $1 ORDER BY created_at DESC`,
 		userID,
 	)
 	if err != nil {
@@ -74,12 +79,16 @@ func ListAPIKeys(c *gin.Context) {
 		var name, status string
 		var createdAt, updatedAt time.Time
 		var lastUsedAt *time.Time
+		var keyPreview string
+		var keyEnc sql.NullString
 
-		err := rows.Scan(&id, &userIDScanned, &name, &status, &lastUsedAt, &createdAt, &updatedAt)
+		err := rows.Scan(&id, &userIDScanned, &name, &status, &lastUsedAt, &createdAt, &updatedAt, &keyPreview, &keyEnc)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
+
+		canReveal := keyEnc.Valid && strings.TrimSpace(keyEnc.String) != ""
 
 		apiKeys = append(apiKeys, map[string]interface{}{
 			"id":           id,
@@ -89,6 +98,8 @@ func ListAPIKeys(c *gin.Context) {
 			"last_used_at": lastUsedAt,
 			"created_at":   createdAt,
 			"updated_at":   updatedAt,
+			"key_preview":  keyPreview,
+			"can_reveal":   canReveal,
 		})
 	}
 
@@ -131,6 +142,17 @@ func CreateAPIKey(c *gin.Context) {
 
 	apiKey := "ptd_" + hex.EncodeToString(keyBytes)
 	keyHash := utils.HashUserAPIKey(apiKey)
+	keyPreview := utils.PlatformAPIKeyPreview(apiKey)
+	keyEncrypted, encErr := utils.Encrypt(apiKey)
+	if encErr != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_ENCRYPT_FAILED",
+			"Failed to encrypt API key",
+			http.StatusInternalServerError,
+			encErr,
+		))
+		return
+	}
 
 	db := config.GetDB()
 	if db == nil {
@@ -140,8 +162,9 @@ func CreateAPIKey(c *gin.Context) {
 
 	var id int
 	err = db.QueryRow(
-		"INSERT INTO api_keys (user_id, key_hash, name, status) VALUES ($1, $2, $3, $4) RETURNING id",
-		userID, keyHash, req.Name, "active",
+		`INSERT INTO api_keys (user_id, key_hash, name, status, key_encrypted, key_preview)
+		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+		userID, keyHash, req.Name, "active", keyEncrypted, keyPreview,
 	).Scan(&id)
 
 	if err != nil {
@@ -235,6 +258,64 @@ func UpdateAPIKey(c *gin.Context) {
 		"created_at": apiCreatedAt,
 		"updated_at": apiUpdatedAt,
 	})
+}
+
+// RevealAPIKey returns the full platform API key for the owner (decrypted from key_encrypted).
+func RevealAPIKey(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	id := c.Param("id")
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var ownerID int
+	var keyEnc sql.NullString
+	err := db.QueryRow(
+		`SELECT user_id, key_encrypted FROM api_keys WHERE id = $1`,
+		id,
+	).Scan(&ownerID, &keyEnc)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrAPIKeyNotFound)
+		return
+	}
+	if ownerID != userIDInt {
+		middleware.RespondWithError(c, apperrors.ErrForbidden)
+		return
+	}
+	if !keyEnc.Valid || strings.TrimSpace(keyEnc.String) == "" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"LEGACY_API_KEY_CANNOT_REVEAL",
+			"该密钥创建于加密存储上线前，无法再次查看完整内容。请新建密钥并停用或删除本密钥。",
+			http.StatusBadRequest,
+			nil,
+		))
+		return
+	}
+
+	plain, decErr := utils.Decrypt(keyEnc.String)
+	if decErr != nil || plain == "" {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_DECRYPT_FAILED",
+			"密钥解密失败，请联系管理员或新建密钥",
+			http.StatusInternalServerError,
+			decErr,
+		))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"key": plain})
 }
 
 // DeleteAPIKey deletes an API key

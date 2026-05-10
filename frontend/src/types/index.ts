@@ -207,7 +207,10 @@ export interface UserAPIKey {
   id: number;
   user_id: number;
   name: string;
+  /** 列表预览（非完整密钥），如 ptd_abcd…wxyz */
   key_preview?: string;
+  /** 后端是否存有可解密密文（历史密钥为 false） */
+  can_reveal?: boolean;
   status: 'active' | 'inactive';
   last_used_at?: string;
   created_at: string;
