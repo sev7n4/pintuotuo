@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card,
   Tabs,
@@ -34,26 +35,16 @@ import {
 import { useTokenStore } from '@/stores/tokenStore';
 import { tokenService } from '@/services/token';
 import { UserAPIKey, RechargeOrder, APIUsageGuideResponse, TokenLot } from '@/types';
+import { getOpenAICompatBaseURL } from '@/utils/openaiCompat';
 import styles from './MyToken.module.css';
 
 const { TabPane } = Tabs;
 const { Text, Paragraph } = Typography;
 
-function openAICompatBaseURL(): string {
-  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || '/api/v1';
-  const normalized = base.endsWith('/') ? base.slice(0, -1) : base;
-  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
-    return `${normalized}/openai/v1`;
-  }
-  if (typeof window !== 'undefined') {
-    return `${window.location.origin}${normalized}/openai/v1`;
-  }
-  return `${normalized}/openai/v1`;
-}
-
 const MyToken = () => {
+  const navigate = useNavigate();
   const allowMockRecharge = import.meta.env.VITE_ALLOW_MOCK_RECHARGE === 'true';
-  const openAICompatBase = useMemo(() => openAICompatBaseURL(), []);
+  const openAICompatBase = useMemo(() => getOpenAICompatBaseURL(), []);
 
   const {
     balance,
@@ -398,6 +389,22 @@ const MyToken = () => {
 
   return (
     <div className={styles.myToken}>
+      <Alert
+        type="info"
+        showIcon
+        closable
+        style={{ marginBottom: 16 }}
+        message="开发者中心已上线"
+        description={
+          <span>
+            接入引导、试调用、错误说明已集中到{' '}
+            <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate('/developer/quickstart')}>
+              开发者中心
+            </Button>
+            。
+          </span>
+        }
+      />
       <div
         style={{
           display: 'flex',
@@ -701,7 +708,8 @@ const MyToken = () => {
               <Text code>{openAICompatBase}</Text>，API Key 填本平台密钥；请求{' '}
               <Text code>POST /chat/completions</Text>。 模型可写 <Text code>厂商/模型</Text>（如{' '}
               <Text code>zhipu/glm-4-flash</Text>
-              ）或无前缀模型名（将按平台配置的兼容前缀推断厂商）。流式（stream）暂未支持。
+              ）或无前缀模型名（将按平台配置的兼容前缀推断厂商）。OpenAI 兼容路径支持{' '}
+              <Text code>stream: true</Text>（SSE）；详见开发者中心文档。
             </Paragraph>
             <div className={styles.tabHeader}>
               <Button

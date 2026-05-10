@@ -23,6 +23,7 @@ import {
   MenuOutlined,
   GiftOutlined,
   ThunderboltOutlined,
+  CodeOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import './Layout.css';
@@ -98,6 +99,7 @@ export default function Layout() {
     { key: 'my', label: '我的主页', icon: <UserOutlined /> },
     { key: 'services', label: '我的服务', icon: <CustomerServiceOutlined /> },
     { key: 'entitlements', label: '我的权益', icon: <GiftOutlined /> },
+    { key: 'developer', label: '开发者中心', icon: <CodeOutlined /> },
     { type: 'divider' as const },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined /> },
   ];
@@ -173,6 +175,9 @@ export default function Layout() {
       case 'entitlements':
         navigate('/my/entitlements');
         break;
+      case 'developer':
+        navigate('/developer/quickstart');
+        break;
     }
   };
 
@@ -239,7 +244,11 @@ export default function Layout() {
         <Outlet />
       </Content>
       <Footer className="layout-footer">
-        <p>&copy; 2026 拼脱脱 - AI Token 二级市场</p>
+        <p>
+          &copy; 2026 拼脱脱 - AI Token 二级市场
+          {' · '}
+          <Link to="/developer/quickstart">开发者中心</Link>
+        </p>
       </Footer>
     </AntLayout>
   );

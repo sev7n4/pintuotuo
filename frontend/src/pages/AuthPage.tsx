@@ -238,9 +238,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
     } else if (user.role === 'merchant') {
       navigate('/merchant', { replace: true });
     } else {
-      navigate('/', { replace: true });
+      const params = new URLSearchParams(location.search);
+      const redirect = params.get('redirect');
+      if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+        navigate(redirect, { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     }
-  }, [isAuthenticated, user, navigate, oauthCallbackPending]);
+  }, [isAuthenticated, user, navigate, oauthCallbackPending, location.search]);
 
   const cardTitle = '拼脱脱 - 登录 / 注册';
 
