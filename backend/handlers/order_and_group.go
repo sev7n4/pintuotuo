@@ -208,7 +208,7 @@ func CreateOrder(c *gin.Context) {
 		}
 
 		result, execErr := tx.Exec(
-			"UPDATE skus SET stock = stock - $1 WHERE id = $2 AND (stock = -1 OR stock >= $1)",
+			services.SQLReserveSKUStockForOrder,
 			in.Quantity, skuID,
 		)
 		if execErr != nil {
@@ -699,15 +699,7 @@ func CancelOrder(c *gin.Context) {
 	}
 
 	_, err = tx.Exec(
-		`UPDATE skus s
-		   SET stock = stock + oi.qty
-		  FROM (
-		    SELECT sku_id, SUM(quantity) AS qty
-		      FROM order_items
-		     WHERE order_id = $1
-		     GROUP BY sku_id
-		  ) oi
-		 WHERE s.id = oi.sku_id`,
+		services.SQLRestoreSKUStockFromOrderItems,
 		order.ID,
 	)
 	if err != nil {
