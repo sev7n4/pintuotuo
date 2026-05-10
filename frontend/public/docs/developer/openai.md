@@ -38,6 +38,7 @@ const client = new OpenAI({
 ## 进阶
 
 - Anthropic 兼容路径见 `GET /tokens/api-usage-guide` 返回的 `anthropic_compat_path`（若配置）
+- **Claude Code、Cursor、Codex 等 IDE/CLI**：见同目录分册（如 [`ide-overview.md`](./ide-overview.md)）或开发者中心 **「IDE 与 CLI 接入」**（多 Tab）
 - 多轮对话、工具调用等能力以后端与权益白名单为准；未在文档列出的参数可能不被支持
 
 ## 路线图（可选）

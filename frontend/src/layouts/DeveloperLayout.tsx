@@ -3,6 +3,7 @@ import { Layout, Menu, Button, Spin } from 'antd';
 import {
   RocketOutlined,
   KeyOutlined,
+  ReadOutlined,
   LineChartOutlined,
   BugOutlined,
   AppstoreOutlined,
@@ -17,6 +18,7 @@ const { Header, Sider, Content } = Layout;
 const menuItems = [
   { key: '/developer/quickstart', icon: <RocketOutlined />, label: '快速开始' },
   { key: '/developer/keys', icon: <KeyOutlined />, label: '密钥与安全' },
+  { key: '/developer/ide-clients', icon: <ReadOutlined />, label: 'IDE 与 CLI 接入' },
   { key: '/developer/usage', icon: <LineChartOutlined />, label: '用量与账单' },
   { key: '/developer/troubleshoot', icon: <BugOutlined />, label: '错误与排障' },
   { key: '/developer/models', icon: <AppstoreOutlined />, label: '模型与权益' },

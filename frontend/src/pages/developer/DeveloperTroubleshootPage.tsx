@@ -47,7 +47,8 @@ export default function DeveloperTroubleshootPage() {
       </Title>
       <Paragraph type="secondary">
         下列内容与前端 axios 拦截器、后端代理状态映射保持一致；更新实现时请同步修改{' '}
-        <Typography.Text code>public/docs/developer/*.md</Typography.Text>。
+        <Typography.Text code>public/docs/developer/*.md</Typography.Text>。IDE / CLI 总览见{' '}
+        <a href="/developer/ide-clients">IDE 与 CLI 接入</a>。
       </Paragraph>
 
       {err && (
