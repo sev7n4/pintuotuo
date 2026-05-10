@@ -17,6 +17,7 @@ import { getOpenAICompatBaseURL } from '@/utils/openaiCompat';
 import { useTokenStore } from '@/stores/tokenStore';
 import { EntitlementModelVerifyCard } from '@/components/entitlement/EntitlementModelVerifyCard';
 import { trackDevCenter } from '@/utils/devCenterAnalytics';
+import { copyToClipboard } from '@/utils/clipboard';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -55,12 +56,9 @@ export default function DeveloperQuickstartPage() {
   }, []);
 
   const copy = async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      message.success(`已复制${label}`);
-    } catch {
-      message.error('复制失败，请手动选择复制');
-    }
+    const ok = await copyToClipboard(text);
+    if (ok) message.success(`已复制${label}`);
+    else message.error('复制失败，请长按或手动选择文本复制');
   };
 
   const tokenBalance = balance?.balance ?? null;

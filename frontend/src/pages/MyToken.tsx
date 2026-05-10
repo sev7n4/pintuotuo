@@ -31,11 +31,14 @@ import {
   DeleteOutlined,
   SendOutlined,
   ReloadOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import { useTokenStore } from '@/stores/tokenStore';
 import { tokenService } from '@/services/token';
 import { UserAPIKey, RechargeOrder, APIUsageGuideResponse, TokenLot } from '@/types';
 import { getOpenAICompatBaseURL } from '@/utils/openaiCompat';
+import { copyToClipboard } from '@/utils/clipboard';
+import { PlatformAPIKeySecretCell } from '@/components/user/PlatformAPIKeySecretCell';
 import styles from './MyToken.module.css';
 
 const { TabPane } = Tabs;
@@ -208,9 +211,10 @@ const MyToken = () => {
     }
   };
 
-  const handleCopyKey = (key: string) => {
-    navigator.clipboard.writeText(key);
-    message.success('已复制到剪贴板');
+  const handleCopyKey = async (key: string) => {
+    const ok = await copyToClipboard(key);
+    if (ok) message.success('已复制到剪贴板');
+    else message.error('复制失败，请手动选择文本复制');
   };
 
   const transactionTypeMap: Record<string, { color: string; text: string }> = {
@@ -269,13 +273,8 @@ const MyToken = () => {
     },
     {
       title: '密钥',
-      dataIndex: 'key_preview',
-      key: 'key_preview',
-      render: (key: string) => (
-        <Text code copyable={{ text: key, onCopy: () => message.success('已复制') }}>
-          {key || '••••••••••••'}
-        </Text>
-      ),
+      key: 'secret',
+      render: (_: unknown, record: UserAPIKey) => <PlatformAPIKeySecretCell record={record} />,
     },
     {
       title: '状态',
@@ -756,12 +755,22 @@ const MyToken = () => {
       >
         {newKeyDisplay ? (
           <div className={styles.newKeyDisplay}>
-            <Paragraph type="warning">请妥善保存以下密钥，关闭后将无法再次查看完整密钥：</Paragraph>
-            <Paragraph copyable={{ onCopy: () => handleCopyKey(newKeyDisplay) }}>
+            <Paragraph type="warning">
+              密钥已加密保存；关闭窗口后可在列表中点击眼睛图标随时查看完整密钥。
+            </Paragraph>
+            <Paragraph>
               <Text code className={styles.keyText}>
                 {newKeyDisplay}
               </Text>
             </Paragraph>
+            <Button
+              type="primary"
+              icon={<CopyOutlined />}
+              onClick={() => handleCopyKey(newKeyDisplay)}
+              style={{ marginTop: 8 }}
+            >
+              复制完整密钥
+            </Button>
           </div>
         ) : (
           <Form form={keyForm} layout="vertical">

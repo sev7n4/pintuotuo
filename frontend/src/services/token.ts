@@ -44,6 +44,9 @@ export const tokenService = {
 
   deleteAPIKey: (id: number) => api.delete(`/tokens/keys/${id}`),
 
+  /** 解密并返回完整 ptd_ 密钥（需该行存在 key_encrypted） */
+  revealAPIKey: (id: number) => api.post<{ key: string }>(`/tokens/keys/${id}/reveal`, {}),
+
   createRechargeOrder: (amount: number, method: 'alipay' | 'wechat' | 'balance') =>
     api.post<APIResponse<RechargeOrder>>('/tokens/recharge', { amount, method }),
 

@@ -14,10 +14,12 @@ import {
   message,
   Tag,
 } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { useTokenStore } from '@/stores/tokenStore';
 import type { UserAPIKey } from '@/types';
+import { PlatformAPIKeySecretCell } from '@/components/user/PlatformAPIKeySecretCell';
+import { copyToClipboard } from '@/utils/clipboard';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -102,14 +104,9 @@ export default function DeveloperKeysPage() {
           columns={[
             { title: '名称', dataIndex: 'name', key: 'name' },
             {
-              title: '预览',
-              dataIndex: 'key_preview',
-              key: 'key_preview',
-              render: (k: string) => (
-                <Text code copyable={{ text: k, onCopy: () => message.success('已复制') }}>
-                  {k || '••••••••'}
-                </Text>
-              ),
+              title: '密钥',
+              key: 'secret',
+              render: (_: unknown, r: UserAPIKey) => <PlatformAPIKeySecretCell record={r} />,
             },
             {
               title: '状态',
@@ -159,10 +156,25 @@ export default function DeveloperKeysPage() {
       >
         {newKeyDisplay ? (
           <>
-            <Paragraph type="warning">请立即复制保存；关闭后将无法再次查看完整密钥。</Paragraph>
-            <Paragraph copyable>
-              <Text code>{newKeyDisplay}</Text>
+            <Paragraph type="warning">
+              密钥已加密保存，你可关闭本窗口，稍后通过列表右侧眼睛图标随时查看完整密钥。
             </Paragraph>
+            <Paragraph>
+              <Text code style={{ wordBreak: 'break-all' }}>
+                {newKeyDisplay}
+              </Text>
+            </Paragraph>
+            <Button
+              type="primary"
+              icon={<CopyOutlined />}
+              onClick={async () => {
+                const ok = await copyToClipboard(newKeyDisplay);
+                if (ok) message.success('已复制完整密钥');
+                else message.error('复制失败，请手动选择文本复制');
+              }}
+            >
+              复制完整密钥
+            </Button>
           </>
         ) : (
           <Form form={form} layout="vertical">
