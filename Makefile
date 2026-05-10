@@ -1,4 +1,4 @@
-.PHONY: help setup dev-backend dev-frontend dev test build clean docker-up docker-down migrate prompt-eval trace-verify
+.PHONY: help setup dev-backend dev-frontend dev dev-db test build clean docker-up docker-down migrate prompt-eval trace-verify
 
 # Go 模块缓存：部分 IDE/沙箱会把 GOMODCACHE 指到不完整路径，导致 go test 报「源文件不存在」。
 # 统一通过 scripts/ensure-go-modcache.sh 回退到 $HOME/go/pkg/mod（可被环境变量预先覆盖）。
@@ -76,6 +76,13 @@ docker-up: ## Start Docker containers
 	@echo "  PostgreSQL: localhost:5432"
 	@echo "  Redis: localhost:6379"
 	@echo "  Kafka: localhost:29092"
+
+# 仅数据库依赖：看完整首页需后端 + 本目标（或全量 docker-up），只开 Vite 时接口会失败、内容为空。
+dev-db: ## Start only Postgres + Redis (matches backend default DSN dev_password_123)
+	@echo "$(BLUE)Starting postgres + redis only...$(NC)"
+	DB_PASSWORD=dev_password_123 docker-compose up -d postgres redis
+	@echo "$(GREEN)✓ Postgres: localhost:5432  Redis: localhost:6379$(NC)"
+	@echo "  终端1: make dev-backend   终端2: make dev-frontend → http://localhost:5173/"
 
 docker-down: ## Stop Docker containers
 	@echo "$(BLUE)Stopping Docker containers...$(NC)"
