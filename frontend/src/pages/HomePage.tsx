@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Carousel,
@@ -89,33 +89,48 @@ function HomeProductCardCover({
   discount: number;
 }) {
   const imgUrl = coverImageUrl(product);
+  const [coverBroken, setCoverBroken] = useState(false);
+  const [brandBroken, setBrandBroken] = useState(false);
+
+  useEffect(() => {
+    setCoverBroken(false);
+    setBrandBroken(false);
+  }, [product.id, imgUrl]);
+
+  const showCoverImg = Boolean(imgUrl) && !coverBroken;
   const brandUrl =
-    !imgUrl && product.model_provider ? getProviderLogoUrl(product.model_provider) : null;
+    !showCoverImg && product.model_provider ? getProviderLogoUrl(product.model_provider) : null;
   const surface =
-    !imgUrl && product.model_provider
+    !showCoverImg && product.model_provider
       ? getProviderCardSurfaceStyle(product.model_provider)
       : undefined;
-  const [brandBroken, setBrandBroken] = useState(false);
+
+  const onCoverError = useCallback(() => {
+    setCoverBroken(true);
+  }, []);
 
   return (
     <div className={styles.productImage} style={surface ? { background: surface } : undefined}>
-      {imgUrl ? (
+      {showCoverImg ? (
         <img
-          src={imgUrl}
+          src={imgUrl!}
           alt=""
           className={styles.productCoverImg}
           loading="lazy"
           decoding="async"
+          onError={onCoverError}
         />
       ) : brandUrl && !brandBroken ? (
-        <img
-          src={brandUrl}
-          alt=""
-          className={styles.productBrandLogo}
-          loading="lazy"
-          decoding="async"
-          onError={() => setBrandBroken(true)}
-        />
+        <div className={styles.productBrandBadge} aria-hidden>
+          <img
+            src={brandUrl}
+            alt=""
+            className={styles.productBrandLogo}
+            loading="lazy"
+            decoding="async"
+            onError={() => setBrandBroken(true)}
+          />
+        </div>
       ) : (
         <div className={styles.productPlaceholder}>
           <Text type="secondary">{product.name.substring(0, 2)}</Text>
