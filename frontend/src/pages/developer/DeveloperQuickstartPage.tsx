@@ -1,15 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  Button,
-  Card,
-  Checkbox,
-  Space,
-  Steps,
-  Typography,
-  message,
-} from 'antd';
-import { CopyOutlined, LinkOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, Checkbox, Space, Steps, Typography, message } from 'antd';
+import { CopyOutlined, KeyOutlined, LinkOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { tokenService } from '@/services/token';
 import type { APIUsageGuideResponse } from '@/types';
@@ -18,6 +9,7 @@ import { useTokenStore } from '@/stores/tokenStore';
 import { EntitlementModelVerifyCard } from '@/components/entitlement/EntitlementModelVerifyCard';
 import { trackDevCenter } from '@/utils/devCenterAnalytics';
 import { copyToClipboard } from '@/utils/clipboard';
+import { CreatePlatformAPIKeyModal } from '@/components/developer/CreatePlatformAPIKeyModal';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -27,7 +19,10 @@ export default function DeveloperQuickstartPage() {
   const openaiBase = useMemo(() => getOpenAICompatBaseURL(), []);
   const [usageGuide, setUsageGuide] = useState<APIUsageGuideResponse | null>(null);
   const [usageGuideLoading, setUsageGuideLoading] = useState(true);
-  const [doneLocal, setDoneLocal] = useState(() => localStorage.getItem(LS_QUICKSTART_DONE) === '1');
+  const [doneLocal, setDoneLocal] = useState(
+    () => localStorage.getItem(LS_QUICKSTART_DONE) === '1'
+  );
+  const [createKeyModalOpen, setCreateKeyModalOpen] = useState(false);
 
   const { balance, fetchBalance, fetchAPIKeys, isLoading } = useTokenStore();
 
@@ -78,6 +73,11 @@ export default function DeveloperQuickstartPage() {
   -H "Content-Type: application/json" \\
   -d '{"model":"${usageGuide?.default_model_example || 'provider/model'}","messages":[{"role":"user","content":"hi"}],"max_tokens":32}'`;
 
+  const openCreateKeyModal = () => {
+    trackDevCenter('quickstart_cta_create_key', { path: '/developer/quickstart' });
+    setCreateKeyModalOpen(true);
+  };
+
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <div>
@@ -85,15 +85,73 @@ export default function DeveloperQuickstartPage() {
           快速开始
         </Title>
         <Paragraph type="secondary">
-          按步骤完成 Base URL、平台密钥（<Text code>ptd_</Text> 前缀）与一次试调用。与 OpenAI
-          SDK 兼容：将 <Text code>baseURL</Text> 指向下方地址即可。
+          按步骤完成平台密钥（<Text code>ptd_</Text> 前缀）、Base URL 与一次试调用。与 OpenAI SDK
+          兼容：将 <Text code>baseURL</Text> 指向下方地址即可。
         </Paragraph>
       </div>
+
+      <Card
+        styles={{ body: { padding: '20px 24px' } }}
+        style={{
+          background:
+            'linear-gradient(135deg, rgba(22, 119, 255, 0.1) 0%, rgba(114, 46, 209, 0.07) 50%, rgba(22, 119, 255, 0.05) 100%)',
+          borderColor: 'rgba(22, 119, 255, 0.35)',
+        }}
+      >
+        <Space
+          direction="vertical"
+          size="middle"
+          style={{ width: '100%' }}
+          styles={{ item: { width: '100%' } }}
+        >
+          <div>
+            <Title level={4} style={{ marginTop: 0, marginBottom: 8 }}>
+              还没有平台密钥？
+            </Title>
+            <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+              建议<strong>先创建</strong> <Text code>ptd_</Text> Bearer Token，再复制 Base URL 与
+              curl，避免粘了命令才发现没有 Key。
+            </Paragraph>
+          </div>
+          <Space wrap size="middle">
+            <Button type="primary" size="large" icon={<KeyOutlined />} onClick={openCreateKeyModal}>
+              创建平台密钥（ptd_）
+            </Button>
+            <Link to="/developer/keys">
+              <Button size="large">管理全部密钥</Button>
+            </Link>
+          </Space>
+        </Space>
+      </Card>
+
+      <CreatePlatformAPIKeyModal
+        open={createKeyModalOpen}
+        onClose={() => setCreateKeyModalOpen(false)}
+        onSuccess={() => fetchAPIKeys()}
+      />
 
       <Steps
         direction="vertical"
         current={-1}
         items={[
+          {
+            title: '平台 API Key',
+            description: (
+              <Card size="small" styles={{ body: { padding: 12 } }}>
+                <Paragraph style={{ marginBottom: 8 }}>
+                  将完整密钥填入请求头 <Text code>Authorization: Bearer &lt;ptd_…&gt;</Text>。
+                </Paragraph>
+                <Space wrap>
+                  <Button type="primary" icon={<KeyOutlined />} onClick={openCreateKeyModal}>
+                    创建平台密钥
+                  </Button>
+                  <Link to="/developer/keys">
+                    <Button icon={<LinkOutlined />}>密钥与安全（列表 / 删除）</Button>
+                  </Link>
+                </Space>
+              </Card>
+            ),
+          },
           {
             title: 'Base URL',
             description: (
@@ -111,24 +169,9 @@ export default function DeveloperQuickstartPage() {
                 </Space>
                 <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
                   请求路径：<Text code>POST …/chat/completions</Text>。支持{' '}
-                  <Text code>stream: true</Text>（OpenAI 兼容厂商路径；Anthropic 原生格式走单独端点）。
+                  <Text code>stream: true</Text>（OpenAI 兼容厂商路径；Anthropic
+                  原生格式走单独端点）。
                 </Paragraph>
-              </Card>
-            ),
-          },
-          {
-            title: '平台 API Key',
-            description: (
-              <Card size="small" styles={{ body: { padding: 12 } }}>
-                <Paragraph style={{ marginBottom: 8 }}>
-                  在「密钥与安全」创建密钥后，将完整密钥填入请求头{' '}
-                  <Text code>Authorization: Bearer &lt;ptd_…&gt;</Text>。
-                </Paragraph>
-                <Link to="/developer/keys">
-                  <Button type="link" icon={<LinkOutlined />} size="small">
-                    前往密钥与安全
-                  </Button>
-                </Link>
               </Card>
             ),
           },
