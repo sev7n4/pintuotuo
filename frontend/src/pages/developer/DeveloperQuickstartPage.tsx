@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Checkbox, Space, Steps, Typography, message } from 'antd';
-import { CopyOutlined, KeyOutlined, LinkOutlined } from '@ant-design/icons';
+import { CopyOutlined, KeyOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { tokenService } from '@/services/token';
 import type { APIUsageGuideResponse } from '@/types';
@@ -138,17 +138,11 @@ export default function DeveloperQuickstartPage() {
             title: '平台 API Key',
             description: (
               <Card size="small" styles={{ body: { padding: 12 } }}>
-                <Paragraph style={{ marginBottom: 8 }}>
-                  将完整密钥填入请求头 <Text code>Authorization: Bearer &lt;ptd_…&gt;</Text>。
+                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                  请求头使用 <Text code>Authorization: Bearer &lt;ptd_…&gt;</Text>。
+                  创建请用页面顶部主按钮；列表、删除与说明见{' '}
+                  <Link to="/developer/keys">密钥与安全</Link>。
                 </Paragraph>
-                <Space wrap>
-                  <Button type="primary" icon={<KeyOutlined />} onClick={openCreateKeyModal}>
-                    创建平台密钥
-                  </Button>
-                  <Link to="/developer/keys">
-                    <Button icon={<LinkOutlined />}>密钥与安全（列表 / 删除）</Button>
-                  </Link>
-                </Space>
               </Card>
             ),
           },
