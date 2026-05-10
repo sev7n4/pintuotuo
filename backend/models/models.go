@@ -31,6 +31,10 @@ type Product struct {
 	Stock         int       `json:"stock"`
 	SoldCount     int       `json:"sold_count"`
 	Category      string    `json:"category,omitempty"`
+	// ImageURL 来自 spus.thumbnail_url（卖场 SKU 卡片主图）
+	ImageURL      string    `json:"image_url,omitempty"`
+	ModelProvider string    `json:"model_provider,omitempty"`
+	ModelName     string    `json:"model_name,omitempty"`
 	Status        string    `json:"status"` // active, inactive, archived
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`

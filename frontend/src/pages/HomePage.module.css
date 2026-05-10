@@ -248,6 +248,14 @@
   font-weight: 600;
 }
 
+.productBrandLogo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  position: relative;
+  z-index: 0;
+}
+
 .discountTag {
   position: absolute;
   top: 8px;
@@ -430,6 +438,11 @@
   .productPlaceholder {
     width: 60px;
     height: 60px;
+  }
+
+  .productBrandLogo {
+    width: 56px;
+    height: 56px;
   }
 
   .productPlaceholder span {

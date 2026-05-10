@@ -33,6 +33,10 @@ export interface Product {
   /** 列表/卡片主图（若后端返回） */
   image_url?: string;
   thumbnail_url?: string;
+  /** 对接厂商 code，与 model_providers.code / spus.model_provider 一致 */
+  model_provider?: string;
+  /** SPU 模型展示名（若后端返回） */
+  model_name?: string;
   status: 'active' | 'inactive' | 'archived';
   created_at: string;
   updated_at: string;

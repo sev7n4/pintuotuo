@@ -14,9 +14,12 @@ func productFromSKU(
 	var p models.Product
 	var mid sql.NullInt64
 	var orig sql.NullFloat64
+	var imageURL, modelProvider, modelName sql.NullString
 	err := rows.Scan(
 		&p.ID, &mid, &p.SpuID, &p.Name, &p.Description, &p.Price, &orig,
-		&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt,
+		&p.Stock, &p.SoldCount, &p.Category,
+		&imageURL, &modelProvider, &modelName,
+		&p.Status, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		return p, err
@@ -28,6 +31,15 @@ func productFromSKU(
 		p.OriginalPrice = orig.Float64
 	} else {
 		p.OriginalPrice = p.Price
+	}
+	if imageURL.Valid {
+		p.ImageURL = imageURL.String
+	}
+	if modelProvider.Valid {
+		p.ModelProvider = modelProvider.String
+	}
+	if modelName.Valid {
+		p.ModelName = modelName.String
 	}
 	return p, nil
 }
@@ -44,6 +56,9 @@ SELECT s.id,
 	CASE WHEN s.stock = -1 THEN 999999 ELSE s.stock END AS stock,
 	COALESCE(s.sales_count, 0) AS sold_count,
 	COALESCE(sp.model_tier, '') AS category,
+	COALESCE(NULLIF(TRIM(sp.thumbnail_url), ''), '') AS image_url,
+	sp.model_provider,
+	sp.model_name,
 	s.status,
 	s.created_at,
 	s.updated_at
@@ -61,9 +76,12 @@ func getProductBySKUID(db *sql.DB, skuID int) (models.Product, error) {
 	var p models.Product
 	var mid sql.NullInt64
 	var orig sql.NullFloat64
+	var imageURL, modelProvider, modelName sql.NullString
 	err := row.Scan(
 		&p.ID, &mid, &p.SpuID, &p.Name, &p.Description, &p.Price, &orig,
-		&p.Stock, &p.SoldCount, &p.Category, &p.Status, &p.CreatedAt, &p.UpdatedAt,
+		&p.Stock, &p.SoldCount, &p.Category,
+		&imageURL, &modelProvider, &modelName,
+		&p.Status, &p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
 		return p, err
@@ -75,6 +93,15 @@ func getProductBySKUID(db *sql.DB, skuID int) (models.Product, error) {
 		p.OriginalPrice = orig.Float64
 	} else {
 		p.OriginalPrice = p.Price
+	}
+	if imageURL.Valid {
+		p.ImageURL = imageURL.String
+	}
+	if modelProvider.Valid {
+		p.ModelProvider = modelProvider.String
+	}
+	if modelName.Valid {
+		p.ModelName = modelName.String
 	}
 	return p, nil
 }
