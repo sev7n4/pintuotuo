@@ -1,5 +1,7 @@
 # LiteLLM 与本项目对齐说明
 
+运维向 **路由 / 出站 / 状态码** 单一说明见 [SSOT_ROUTING.md](./SSOT_ROUTING.md)；C 端摘要见前端 `public/docs/developer/routing-ssot.md`。
+
 ## 运行时两条主线（互补）
 
 ### 1. 同事 PR #475：`user_config` BYOK（route_mode = `litellm`）

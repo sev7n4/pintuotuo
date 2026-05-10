@@ -23,13 +23,10 @@ import {
   WalletOutlined,
 } from '@ant-design/icons';
 import api from '@/services/api';
-import type { APIUsageGuideItem, APIUsageGuideResponse } from '@/types';
+import type { APIUsageGuideResponse } from '@/types';
+import { modelValueFromItem } from '@/utils/apiUsageGuideModel';
 
 const { Paragraph, Text } = Typography;
-
-function modelValueFromItem(it: APIUsageGuideItem): string {
-  return (it.provider_slash_example || `${it.provider_code}/${it.model_example}`).trim();
-}
 
 type ChatCompletionResponse = {
   choices?: Array<{ message?: { content?: string } }>;
@@ -48,6 +45,8 @@ type Props = {
   tokenBalance: number | null;
   balanceLoading: boolean;
   onRefreshBalance: () => Promise<void>;
+  /** 验证成功并已刷新余额后回调（如开发者中心首调埋点） */
+  onVerifySuccess?: () => void;
 };
 
 /** 登录态 JWT 调用 OpenAI 兼容接口，仅用于权益页连通性验证（真实计费）。 */
@@ -57,6 +56,7 @@ export function EntitlementModelVerifyCard({
   tokenBalance,
   balanceLoading,
   onRefreshBalance,
+  onVerifySuccess,
 }: Props) {
   const items = useMemo(() => usageGuide?.items ?? [], [usageGuide]);
   const [model, setModel] = useState<string>('');
@@ -144,6 +144,7 @@ export function EntitlementModelVerifyCard({
       }
       message.success('验证成功');
       await onRefreshBalance();
+      onVerifySuccess?.();
     } catch (e: unknown) {
       let msg = '请求失败';
       if (typeof e === 'object' && e !== null && 'response' in e) {

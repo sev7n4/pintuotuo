@@ -34,6 +34,12 @@ import HistoryPage from '@pages/HistoryPage';
 import EntitlementPackagesPage from '@pages/EntitlementPackagesPage';
 import MyEntitlementsPage from '@pages/MyEntitlementsPage';
 import FuelStationPage from '@pages/FuelStationPage';
+import DeveloperLayout from '@layouts/DeveloperLayout';
+import DeveloperQuickstartPage from '@pages/developer/DeveloperQuickstartPage';
+import DeveloperKeysPage from '@pages/developer/DeveloperKeysPage';
+import DeveloperUsagePage from '@pages/developer/DeveloperUsagePage';
+import DeveloperTroubleshootPage from '@pages/developer/DeveloperTroubleshootPage';
+import DeveloperModelsPage from '@pages/developer/DeveloperModelsPage';
 
 // Merchant Pages
 import MerchantDashboard from '@pages/merchant/MerchantDashboard';
@@ -88,6 +94,16 @@ function App() {
           {/* Auth routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+
+          {/* C-end Developer Center（须在带 path="*" 的 Layout 之前，避免被 catch-all 吞掉） */}
+          <Route path="/developer" element={<DeveloperLayout />}>
+            <Route index element={<Navigate to="quickstart" replace />} />
+            <Route path="quickstart" element={<DeveloperQuickstartPage />} />
+            <Route path="keys" element={<DeveloperKeysPage />} />
+            <Route path="usage" element={<DeveloperUsagePage />} />
+            <Route path="troubleshoot" element={<DeveloperTroubleshootPage />} />
+            <Route path="models" element={<DeveloperModelsPage />} />
+          </Route>
 
           {/* App routes */}
           <Route element={<Layout />}>

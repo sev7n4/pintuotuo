@@ -7,6 +7,7 @@ import {
   SafetyOutlined,
   RightOutlined,
   TrophyOutlined,
+  CodeOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import styles from './MyPage.module.css';
@@ -126,9 +127,14 @@ const MyPage = () => {
       </Card>
 
       <div className={styles.servicesEntry}>
-        <Button type="primary" ghost onClick={() => navigate('/my/services')}>
-          进入我的服务
-        </Button>
+        <Space wrap>
+          <Button type="primary" ghost onClick={() => navigate('/my/services')}>
+            进入我的服务
+          </Button>
+          <Button type="default" icon={<CodeOutlined />} onClick={() => navigate('/developer/quickstart')}>
+            开发者中心
+          </Button>
+        </Space>
       </div>
 
       <Card className={styles.settingCard} title="设置">
