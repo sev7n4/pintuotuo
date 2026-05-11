@@ -62,11 +62,15 @@ const CategoryPage = () => {
   const filteredTiers = tierCategories.filter((c) => match(c.name));
 
   const goScenario = (code: string) => {
-    navigate(`/catalog?scenario=${encodeURIComponent(code)}`);
+    navigate(
+      `/catalog?scenario=${encodeURIComponent(code)}&from=${encodeURIComponent('categories')}`
+    );
   };
 
   const goTier = (tierName: string) => {
-    navigate(`/catalog?tier=${encodeURIComponent(tierName)}`);
+    navigate(
+      `/catalog?tier=${encodeURIComponent(tierName)}&from=${encodeURIComponent('categories')}`
+    );
   };
 
   const emptyAll = !loading && filteredScenarios.length === 0 && filteredTiers.length === 0;
@@ -75,10 +79,10 @@ const CategoryPage = () => {
     <div className={`${styles.categoryPage} ${styles.pageMinimal}`}>
       <div className={styles.header}>
         <Title level={3} className={styles.title}>
-          商品分类
+          浏览场景与层级
         </Title>
         <Text type="secondary" className={styles.subtitle}>
-          使用场景为主、模型层级为辅；点击跳转对应 SKU 列表。
+          使用场景为主、模型层级为辅；点击后进入卖场并带上筛选，可在卖场「当前筛选」中调整或清除。
         </Text>
         <Input
           placeholder="筛选名称..."

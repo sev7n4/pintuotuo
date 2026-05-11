@@ -1931,6 +1931,7 @@ func ListPublicSKUs(c *gin.Context) {
 	validMaxStr := strings.TrimSpace(c.Query("valid_days_max"))
 	sortParam := strings.TrimSpace(c.Query("sort"))
 	scenario := strings.TrimSpace(c.Query("scenario"))
+	endpointType := strings.TrimSpace(c.Query("endpoint_type"))
 
 	pageNum, _ := strconv.Atoi(page)
 	perPageNum, _ := strconv.Atoi(perPage)
@@ -2021,6 +2022,11 @@ func ListPublicSKUs(c *gin.Context) {
 	if scenario != "" {
 		where += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM spu_scenarios ss JOIN usage_scenarios us ON ss.scenario_id = us.id WHERE ss.spu_id = s.spu_id AND us.code = $%d)", argPos)
 		args = append(args, scenario)
+		argPos++
+	}
+	if endpointType != "" {
+		where += fmt.Sprintf(" AND COALESCE(s.endpoint_type, 'chat_completions') = $%d", argPos)
+		args = append(args, endpointType)
 		argPos++
 	}
 

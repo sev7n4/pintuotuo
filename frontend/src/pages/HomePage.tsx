@@ -244,9 +244,13 @@ const HomePage = () => {
             icon={<FilterOutlined />}
             onClick={() => navigate('/catalog?filters=1')}
           >
-            筛选
+            更多筛选
           </Button>
         </Space.Compact>
+        <Text type="secondary" style={{ fontSize: 12, marginTop: 6, display: 'block', maxWidth: 720 }}>
+          搜索为关键词直达卖场；下方场景 / 层级与「更多筛选」本质都是缩小列表，结果页 URL
+          可分享、可逐项清除。
+        </Text>
         {recentSearches.length > 0 && (
           <div className={styles.recentSearch}>
             <Text type="secondary" className={styles.recentLabel}>
@@ -315,7 +319,7 @@ const HomePage = () => {
               分类
             </Title>
             <Link to="/categories" className={styles.allCategoriesLink}>
-              全部分类 <RightOutlined />
+              浏览场景与层级 <RightOutlined />
             </Link>
           </div>
           {scenarioCategories.length > 0 && (

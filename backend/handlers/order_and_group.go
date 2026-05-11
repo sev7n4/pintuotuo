@@ -37,7 +37,20 @@ const (
 			ELSE ''
 		END,
 		COALESCE(s.sku_type, ''),
-		CASE WHEN s.valid_days IS NOT NULL THEN CONCAT(s.valid_days::text, ' 天有效') ELSE '' END,
+		CASE
+			WHEN COALESCE(s.sku_type, '') = 'subscription' AND NULLIF(TRIM(s.subscription_period), '') IS NOT NULL THEN
+				CONCAT(
+					CASE TRIM(s.subscription_period)
+						WHEN 'monthly' THEN '月度订阅'
+						WHEN 'quarterly' THEN '季度订阅'
+						WHEN 'yearly' THEN '年度订阅'
+						ELSE TRIM(s.subscription_period)
+					END,
+					CASE WHEN s.valid_days IS NOT NULL THEN CONCAT(' · ', s.valid_days::text, ' 天有效') ELSE '' END
+				)
+			WHEN s.valid_days IS NOT NULL THEN CONCAT(s.valid_days::text, ' 天有效')
+			ELSE ''
+		END,
 		s.group_discount_rate`
 	listGroupSKUJoin = `
 FROM groups g

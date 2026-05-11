@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Card,
   Button,
@@ -45,6 +45,7 @@ import { skuService } from '@services/sku';
 import type { Product, GroupPrice, Group } from '@/types';
 import type { SKUWithSPU } from '@/types/sku';
 import { normalizeGroupDiscountRate } from '@/utils/groupDiscount';
+import { getSkuCardSubtitle } from '@/utils/productDisplay';
 import styles from './ProductDetailPage.module.css';
 import { ProductCoverMedia } from '@/components/ProductCoverMedia';
 import { IconHintButton } from '@/components/IconHintButton';
@@ -336,21 +337,43 @@ export const ProductDetailPage: React.FC = () => {
     }
   };
 
-  const buildSkuSummary = (sku: SKUWithSPU) => {
-    const parts: string[] = [];
-    if (sku.token_amount) parts.push(`${sku.token_amount.toLocaleString()} tokens`);
-    if (sku.subscription_period) {
-      const periodMap: Record<string, string> = {
-        monthly: '月度',
-        quarterly: '季度',
-        yearly: '年度',
-      };
-      parts.push(periodMap[sku.subscription_period] || sku.subscription_period);
+  const spuProductInfoRows = useMemo(() => {
+    if (!product) return [];
+    const rows: { key: string; label: string; content: React.ReactNode }[] = [];
+    if (product.token_count != null && product.token_count > 0) {
+      rows.push({
+        key: 'token',
+        label: '包含 Token',
+        content: (
+          <Text strong>
+            {(product.token_count / 10000).toFixed(0)}万（{product.token_count.toLocaleString()}）
+          </Text>
+        ),
+      });
     }
-    if (sku.concurrent_requests) parts.push(`${sku.concurrent_requests} 并发`);
-    if (sku.valid_days) parts.push(`${sku.valid_days}天有效期`);
-    return parts.join(' · ');
-  };
+    if (product.models && product.models.length > 0) {
+      rows.push({
+        key: 'models',
+        label: '支持模型',
+        content: <Text strong>{product.models.join('、')}</Text>,
+      });
+    }
+    if (product.validity_period) {
+      rows.push({
+        key: 'validity',
+        label: '有效期',
+        content: <Text strong>{product.validity_period}</Text>,
+      });
+    }
+    if (product.context_length) {
+      rows.push({
+        key: 'context',
+        label: '上下文长度',
+        content: <Text strong>{product.context_length}</Text>,
+      });
+    }
+    return rows;
+  }, [product]);
 
   if (error) {
     return <Empty description={`错误: ${error}`} />;
@@ -454,8 +477,13 @@ export const ProductDetailPage: React.FC = () => {
 
             {selectedSKU ? (
               <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-                已选套餐：<Text strong>{selectedSKU.spu_name}</Text>
-                <Text type="secondary">（套餐用量与价格见下方卡片，商品级说明见「商品详情」）</Text>
+                已选套餐：
+                <Tooltip title={selectedSKU.spu_name}>
+                  <Text strong>{getSkuCardSubtitle(selectedSKU) || selectedSKU.spu_name}</Text>
+                </Tooltip>
+                <Text type="secondary">
+                  （完整套餐名见气泡；用量与价格见下方「选择套餐」，商品级说明见「商品详情」）
+                </Text>
               </Text>
             ) : null}
             <Button
@@ -510,8 +538,16 @@ export const ProductDetailPage: React.FC = () => {
                           </Tag>
                           <Tag color="geekblue">{sku.sku_code}</Tag>
                         </div>
-                        <span className={styles.skuPickName}>{sku.spu_name}</span>
-                        <div className={styles.skuPickSummary}>{buildSkuSummary(sku)}</div>
+                        <Text strong className={styles.skuPickName} ellipsis style={{ display: 'block' }}>
+                          {getSkuCardSubtitle(sku) || sku.spu_name}
+                        </Text>
+                        <Tooltip title={sku.spu_name}>
+                          <div className={styles.skuPickSummary}>
+                            <Text type="secondary" ellipsis style={{ fontSize: 12 }}>
+                              {sku.spu_name}
+                            </Text>
+                          </div>
+                        </Tooltip>
                       </div>
                       <div className={styles.skuPickPriceCol}>
                         <Text strong style={{ fontSize: 18, color: '#1890ff', display: 'block' }}>
@@ -897,45 +933,34 @@ export const ProductDetailPage: React.FC = () => {
               <Title level={5}>商品信息</Title>
               <Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 13 }}>
                 以下为商品（SPU）级字段，与目录/运营配置一致；套餐粒度的 Token 量、价与拼团等以
-                「选择套餐」卡片为准。
+                「选择套餐」卡片为准。无 SPU 数据时不展示占位的「—」行。
               </Paragraph>
-              <ul style={{ paddingLeft: 20 }}>
-                <li>
-                  包含 Token：
-                  {product.token_count != null && product.token_count > 0 ? (
-                    <Text strong>
-                      {(product.token_count / 10000).toFixed(0)}万（
-                      {product.token_count.toLocaleString()}）
-                    </Text>
-                  ) : (
-                    <Text type="secondary">—</Text>
-                  )}
-                </li>
-                <li>
-                  支持模型：
-                  {product.models && product.models.length > 0 ? (
-                    <Text strong>{product.models.join('、')}</Text>
-                  ) : (
-                    <Text type="secondary">—</Text>
-                  )}
-                </li>
-                <li>
-                  有效期：
-                  {product.validity_period ? (
-                    <Text strong>{product.validity_period}</Text>
-                  ) : (
-                    <Text type="secondary">—</Text>
-                  )}
-                </li>
-                <li>
-                  上下文长度：
-                  {product.context_length ? (
-                    <Text strong>{product.context_length}</Text>
-                  ) : (
-                    <Text type="secondary">—</Text>
-                  )}
-                </li>
-              </ul>
+              {spuProductInfoRows.length > 0 ? (
+                <ul style={{ paddingLeft: 20 }}>
+                  {spuProductInfoRows.map((r) => (
+                    <li key={r.key}>
+                      {r.label}：{r.content}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Alert
+                  type="info"
+                  showIcon
+                  message="暂无 SPU 级商品概要"
+                  description={
+                    selectedSKU ? (
+                      <>
+                        当前所选套餐摘要：
+                        <Text strong> {getSkuCardSubtitle(selectedSKU)}</Text>
+                        。未配置 SPU 级 token/模型/上下文等时，以套餐卡与订单为准。
+                      </>
+                    ) : (
+                      '请先在上方「选择套餐」；关键用量与价格以所选 SKU 为准。'
+                    )
+                  }
+                />
+              )}
 
               {product.description?.trim() ? (
                 <>
@@ -1060,9 +1085,20 @@ export const ProductDetailPage: React.FC = () => {
                     columns={[
                       {
                         title: '套餐',
-                        dataIndex: 'spu_name',
                         key: 'spu_name',
                         ellipsis: true,
+                        render: (_: unknown, r: SKUWithSPU) => (
+                          <Tooltip title={r.spu_name}>
+                            <Space direction="vertical" size={0}>
+                              <Text strong ellipsis style={{ maxWidth: 260 }}>
+                                {getSkuCardSubtitle(r) || r.spu_name}
+                              </Text>
+                              <Text type="secondary" ellipsis style={{ maxWidth: 260, fontSize: 12 }}>
+                                {r.sku_code}
+                              </Text>
+                            </Space>
+                          </Tooltip>
+                        ),
                       },
                       {
                         title: '类型',
@@ -1079,11 +1115,12 @@ export const ProductDetailPage: React.FC = () => {
                         },
                       },
                       {
-                        title: '规格摘要',
-                        key: 'spec',
+                        title: '套餐全名',
+                        key: 'spu_full',
+                        ellipsis: true,
                         render: (_: unknown, r: SKUWithSPU) => (
                           <Text type="secondary" style={{ fontSize: 12 }}>
-                            {buildSkuSummary(r)}
+                            {r.spu_name}
                           </Text>
                         ),
                       },

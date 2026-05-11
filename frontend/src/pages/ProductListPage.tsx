@@ -20,6 +20,7 @@ import {
   Badge,
   Segmented,
   Tooltip,
+  Alert,
 } from 'antd';
 import {
   SearchOutlined,
@@ -57,7 +58,6 @@ import {
 import { getSkuCardSubtitle, pushRecentSearch } from '@/utils/productDisplay';
 import styles from './ProductListPage.module.css';
 
-const { Option } = Select;
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
@@ -102,6 +102,24 @@ function parseIntParam(s: string | null): number | undefined {
   const n = parseInt(s, 10);
   return Number.isFinite(n) ? n : undefined;
 }
+
+/** 与筛选抽屉一致的 query 键；应用抽屉时先清空再写入，避免残留旧条件 */
+const FILTER_DRAWER_PARAM_KEYS = [
+  'q',
+  'search',
+  'category',
+  'model_name',
+  'provider',
+  'tier',
+  'type',
+  'endpoint_type',
+  'group_enabled',
+  'price_min',
+  'price_max',
+  'valid_days_min',
+  'valid_days_max',
+  'sort',
+] as const;
 
 export const ProductListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -224,6 +242,7 @@ export const ProductListPage: React.FC = () => {
       provider: searchParams.get('provider') || undefined,
       tier: searchParams.get('tier') || undefined,
       sku_type: searchParams.get('type') || undefined,
+      endpoint_type: searchParams.get('endpoint_type') || undefined,
       group_enabled: ge === 'true' || ge === '1',
       price_min: parseNum(searchParams.get('price_min')) ?? null,
       price_max: parseNum(searchParams.get('price_max')) ?? null,
@@ -235,7 +254,9 @@ export const ProductListPage: React.FC = () => {
 
   const applyCatalogFilters = useCallback(
     (values: CatalogFilterValues) => {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams(searchParams);
+      FILTER_DRAWER_PARAM_KEYS.forEach((k) => params.delete(k));
+
       const q = String(values.q ?? '').trim();
       if (q) params.set('q', q);
       if (values.category) params.set('category', String(values.category));
@@ -243,6 +264,7 @@ export const ProductListPage: React.FC = () => {
       if (values.provider) params.set('provider', String(values.provider));
       if (values.tier) params.set('tier', String(values.tier));
       if (values.sku_type) params.set('type', String(values.sku_type));
+      if (values.endpoint_type) params.set('endpoint_type', String(values.endpoint_type));
       if (values.group_enabled) params.set('group_enabled', 'true');
       if (values.price_min != null && Number.isFinite(Number(values.price_min)))
         params.set('price_min', String(values.price_min));
@@ -256,7 +278,7 @@ export const ProductListPage: React.FC = () => {
       const qs = params.toString();
       navigate(qs ? `/catalog?${qs}` : '/catalog');
     },
-    [navigate]
+    [navigate, searchParams]
   );
 
   const effectiveView = screens.xs ? 'grid' : viewMode;
@@ -325,6 +347,14 @@ export const ProductListPage: React.FC = () => {
     const modelName = searchParams.get('model_name');
     if (modelName) chips.push({ key: 'model_name', label: `模型：${modelName}` });
 
+    const endpointType = searchParams.get('endpoint_type');
+    if (endpointType) {
+      chips.push({
+        key: 'endpoint_type',
+        label: `端点：${ENDPOINT_TYPE_LABELS[endpointType] || endpointType}`,
+      });
+    }
+
     const vdMin = searchParams.get('valid_days_min');
     const vdMax = searchParams.get('valid_days_max');
     if (vdMin != null || vdMax != null) {
@@ -362,6 +392,38 @@ export const ProductListPage: React.FC = () => {
       }
     });
   };
+
+  const fromCategories = searchParams.get('from') === 'categories';
+
+  const showEntryPresetBanner = useMemo(
+    () =>
+      !isFlashSale &&
+      catalogView === 'skus' &&
+      (sortParam === 'hot' || sortParam === 'new' || groupCatalog),
+    [isFlashSale, catalogView, sortParam, groupCatalog]
+  );
+
+  const entryPresetDescription = useMemo(() => {
+    if (groupCatalog) return '当前为「超值拼团」视图，仅展示支持拼团的 SKU。';
+    if (sortParam === 'hot') return '当前为热销排序入口预设，仍可修改排序与筛选抽屉中的条件。';
+    if (sortParam === 'new') return '当前为新品排序入口预设，仍可修改排序与筛选抽屉中的条件。';
+    return '';
+  }, [groupCatalog, sortParam]);
+
+  const clearEntryPreset = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('sort');
+    next.delete('group_enabled');
+    const qs = next.toString();
+    navigate(qs ? `/catalog?${qs}` : '/catalog');
+  }, [navigate, searchParams]);
+
+  const clearCategoriesFromHint = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('from');
+    const qs = next.toString();
+    navigate(qs ? `/catalog?${qs}` : '/catalog', { replace: true });
+  }, [navigate, searchParams]);
 
   const loadFlashSales = async () => {
     setFlashLoading(true);
@@ -403,6 +465,7 @@ export const ProductListPage: React.FC = () => {
         valid_days_max: parseIntParam(searchParams.get('valid_days_max')),
         sort,
         scenario: searchParams.get('scenario') || undefined,
+        endpoint_type: searchParams.get('endpoint_type') || undefined,
       });
       const apiResponse = response.data;
       setSKUs(apiResponse.data || []);
@@ -871,6 +934,32 @@ export const ProductListPage: React.FC = () => {
         <>
           <ScenarioFilter variant="rail" />
 
+          {fromCategories && (
+            <Alert
+              type="info"
+              showIcon
+              closable
+              onClose={clearCategoriesFromHint}
+              message="已从「浏览场景与层级」进入"
+              description="当前 URL 已带上场景或层级筛选；可在下方「当前筛选」标签中逐项关闭，或点「清除全部」。"
+              style={{ marginBottom: 12 }}
+            />
+          )}
+
+          {showEntryPresetBanner && (
+            <Alert
+              type="info"
+              showIcon
+              message={entryPresetDescription}
+              action={
+                <Button size="small" type="link" onClick={clearEntryPreset}>
+                  清除活动筛选
+                </Button>
+              }
+              style={{ marginBottom: 12 }}
+            />
+          )}
+
           {filterChips.length > 0 && (
             <div className={styles.chipRow}>
               <span className={styles.chipLabel}>当前筛选</span>
@@ -910,77 +999,9 @@ export const ProductListPage: React.FC = () => {
             </Col>
             <Col xs={24} lg={14}>
               <Space wrap size="middle" style={{ width: '100%', justifyContent: 'flex-end' }}>
-                <Select
-                  placeholder="类型"
-                  allowClear
-                  style={{ width: screens.xs ? '100%' : 120 }}
-                  value={searchParams.get('type') || undefined}
-                  onChange={(value) => {
-                    const next = new URLSearchParams(searchParams);
-                    if (value) next.set('type', value);
-                    else next.delete('type');
-                    navigate(`/catalog?${next.toString()}`);
-                  }}
-                >
-                  <Option value="token_pack">Token包</Option>
-                  <Option value="subscription">订阅</Option>
-                  <Option value="concurrent">并发</Option>
-                  <Option value="trial">试用</Option>
-                </Select>
-                <Select
-                  placeholder="厂商"
-                  allowClear
-                  style={{ width: screens.xs ? '100%' : 120 }}
-                  value={searchParams.get('provider') || undefined}
-                  onChange={(value) => {
-                    const next = new URLSearchParams(searchParams);
-                    if (value) next.set('provider', value);
-                    else next.delete('provider');
-                    navigate(`/catalog?${next.toString()}`);
-                  }}
-                >
-                  <Option value="openai">OpenAI</Option>
-                  <Option value="anthropic">Anthropic</Option>
-                  <Option value="google">Google</Option>
-                  <Option value="deepseek">DeepSeek</Option>
-                  <Option value="zhipu">智谱</Option>
-                </Select>
-                <Select
-                  placeholder="层级"
-                  allowClear
-                  style={{ width: screens.xs ? '100%' : 100 }}
-                  value={searchParams.get('tier') || undefined}
-                  onChange={(value) => {
-                    const next = new URLSearchParams(searchParams);
-                    if (value) next.set('tier', value);
-                    else next.delete('tier');
-                    navigate(`/catalog?${next.toString()}`);
-                  }}
-                >
-                  <Option value="pro">Pro</Option>
-                  <Option value="lite">Lite</Option>
-                  <Option value="mini">Mini</Option>
-                  <Option value="vision">Vision</Option>
-                </Select>
-                <Select
-                  placeholder="端点类型"
-                  allowClear
-                  style={{ width: screens.xs ? '100%' : 140 }}
-                  value={searchParams.get('endpoint_type') || undefined}
-                  onChange={(value) => {
-                    const next = new URLSearchParams(searchParams);
-                    if (value) next.set('endpoint_type', value);
-                    else next.delete('endpoint_type');
-                    navigate(`/catalog?${next.toString()}`);
-                  }}
-                >
-                  <Option value="chat_completions">对话补全</Option>
-                  <Option value="responses">Response API</Option>
-                  <Option value="embeddings">嵌入</Option>
-                  <Option value="images_generations">图像生成</Option>
-                  <Option value="audio_speech">语音合成</Option>
-                  <Option value="moderations">内容审核</Option>
-                </Select>
+                <Text type="secondary" style={{ maxWidth: screens.xs ? '100%' : 200, fontSize: 12 }}>
+                  类型、厂商、层级、端点、价格与有效期在「筛选」抽屉
+                </Text>
                 <Select
                   placeholder="排序"
                   allowClear
