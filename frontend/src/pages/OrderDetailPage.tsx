@@ -24,6 +24,7 @@ import {
 import { useOrderStore } from '@/stores/orderStore';
 import { canReorderFromOrder, orderItemLineTitle } from '@/utils/orderSummary';
 import { getApiErrorMessage } from '@/utils/apiError';
+import { IconHintButton } from '@/components/IconHintButton';
 
 const { Title, Text } = Typography;
 
@@ -237,22 +238,20 @@ export const OrderDetailPage: React.FC = () => {
             )}
             {canReorderFromOrder(currentOrder) && (
               <>
-                <Button
+                <IconHintButton
                   size="large"
+                  hint="加入购物车"
                   icon={<ShoppingCartOutlined />}
                   loading={cartLoading}
                   onClick={() => void handleAddToCart()}
-                >
-                  加入购物车
-                </Button>
-                <Button
+                />
+                <IconHintButton
                   type="primary"
                   size="large"
+                  hint="同配置再下一单（生成新订单并去支付）"
                   icon={<ThunderboltOutlined />}
                   onClick={() => void handleQuickReorder()}
-                >
-                  同配置再下一单
-                </Button>
+                />
               </>
             )}
             {currentOrder.group_id && (

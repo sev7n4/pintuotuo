@@ -43,6 +43,7 @@ import { ENDPOINT_TYPE_LABELS, ENDPOINT_TYPE_COLORS } from '@/types/sku';
 import dayjs from 'dayjs';
 import { ScenarioFilter } from '@/components/ScenarioFilter';
 import { ProductCoverMedia } from '@/components/ProductCoverMedia';
+import { IconHintButton } from '@/components/IconHintButton';
 import { CatalogFilterDrawer, type CatalogFilterValues } from '@/components/CatalogFilterDrawer';
 import { productService } from '@/services/product';
 import { groupService, type GroupListScope } from '@/services/group';
@@ -741,19 +742,18 @@ export const ProductListPage: React.FC = () => {
                                       `已抢${product.stock_sold}/${product.stock_limit}`
                                     }
                                   />
-                                  <Button
+                                  <IconHintButton
                                     type="primary"
                                     danger
                                     block
-                                    icon={<ShoppingCartOutlined />}
+                                    hint={stockPercent <= 0 ? '已抢光' : '立即抢购（按秒杀价下单）'}
+                                    icon={<ThunderboltOutlined />}
                                     disabled={stockPercent <= 0}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleBuyFlashProduct(product);
                                     }}
-                                  >
-                                    {stockPercent <= 0 ? '已抢光' : '立即抢购'}
-                                  </Button>
+                                  />
                                 </Space>
                               }
                             />

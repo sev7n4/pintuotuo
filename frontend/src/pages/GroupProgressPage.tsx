@@ -32,7 +32,12 @@ import { groupService } from '@/services/group';
 import type { APIResponse, GroupMemberPublic } from '@/types';
 import { getApiErrorMessage } from '@/utils/apiError';
 import { copyTextToClipboard } from '@/utils/clipboardCopy';
-import { groupProgressBarStatus, groupStatusTagLabel, isGroupPastDeadline } from '@/utils/groupDisplay';
+import {
+  groupProgressBarStatus,
+  groupStatusTagLabel,
+  isGroupPastDeadline,
+} from '@/utils/groupDisplay';
+import { IconHintButton } from '@/components/IconHintButton';
 
 const { Title, Text } = Typography;
 
@@ -120,7 +125,12 @@ export const GroupProgressPage: React.FC = () => {
       title: '请手动复制链接',
       width: 520,
       content: (
-        <Input.TextArea readOnly autoSize={{ minRows: 2, maxRows: 4 }} value={shareUrl} style={{ marginTop: 8 }} />
+        <Input.TextArea
+          readOnly
+          autoSize={{ minRows: 2, maxRows: 4 }}
+          value={shareUrl}
+          style={{ marginTop: 8 }}
+        />
       ),
     });
   };
@@ -167,8 +177,7 @@ export const GroupProgressPage: React.FC = () => {
         : progressTagLabel === '已截止'
           ? 'warning'
           : statusInfo.color;
-  const tagIcon =
-    progressTagLabel === '已截止' ? <ExclamationCircleOutlined /> : statusInfo.icon;
+  const tagIcon = progressTagLabel === '已截止' ? <ExclamationCircleOutlined /> : statusInfo.icon;
   const isCreator = user?.id != null && currentGroup.creator_id === user.id;
 
   if (currentGroup.status === 'completed') {
@@ -300,14 +309,28 @@ export const GroupProgressPage: React.FC = () => {
         </Card>
 
         <Space direction="vertical" style={{ width: '100%' }}>
-          <Button type="primary" icon={<ShareAltOutlined />} onClick={() => void handleShare()} block size="large">
-            分享邀请
-          </Button>
-          <Button icon={<CopyOutlined />} onClick={() => void handleShare()} block aria-label="复制链接">
-            复制链接
-          </Button>
+          <IconHintButton
+            type="primary"
+            icon={<ShareAltOutlined />}
+            hint="复制邀请链接，分享给好友参团"
+            onClick={() => void handleShare()}
+            block
+            size="large"
+          />
+          <IconHintButton
+            icon={<CopyOutlined />}
+            hint="复制邀请链接"
+            onClick={() => void handleShare()}
+            block
+            size="large"
+          />
           {isCreator && (
-            <Button danger icon={<CloseOutlined />} onClick={() => setCancelModalVisible(true)} block>
+            <Button
+              danger
+              icon={<CloseOutlined />}
+              onClick={() => setCancelModalVisible(true)}
+              block
+            >
               取消拼团
             </Button>
           )}
@@ -330,7 +353,9 @@ export const GroupProgressPage: React.FC = () => {
         okButtonProps={{ danger: true }}
       >
         <p>确定要取消这个拼团吗？取消后需要重新发起拼团。</p>
-        <p style={{ color: '#999', fontSize: 13 }}>仅发起人可以取消整团；其他成员如需退出，请在订单中取消未支付订单。</p>
+        <p style={{ color: '#999', fontSize: 13 }}>
+          仅发起人可以取消整团；其他成员如需退出，请在订单中取消未支付订单。
+        </p>
       </Modal>
     </div>
   );

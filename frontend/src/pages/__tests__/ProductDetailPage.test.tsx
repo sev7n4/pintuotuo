@@ -226,10 +226,8 @@ describe('ProductDetailPage', () => {
       expect(screen.getByText('测试商品')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getAllByText('商品介绍')[0]);
-    await waitFor(() => {
-      expect(screen.getByText('这是一个测试商品')).toBeInTheDocument();
-    });
+    expect(screen.getByText('查看完整规格、商品介绍与常见问题')).toBeInTheDocument();
+    expect(screen.getByText('这是一个测试商品')).toBeInTheDocument();
     expect(screen.getByText('定价信息')).toBeInTheDocument();
     expect(screen.getByText('商品介绍')).toBeInTheDocument();
     expect(screen.getByText('单独购买')).toBeInTheDocument();

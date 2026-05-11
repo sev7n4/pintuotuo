@@ -119,12 +119,23 @@
 .secondaryRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
   margin-top: 12px;
   width: 100%;
+  align-items: center;
+}
+
+.iconToolbarBtn {
+  min-width: 44px;
+  min-height: 40px;
+  padding-inline: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tabsCard {
   margin-top: 16px;
   border-radius: 8px;
+  scroll-margin-top: 16px;
 }

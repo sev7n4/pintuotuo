@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Card,
   Button,
@@ -34,8 +34,10 @@ import {
   UserOutlined,
   ClockCircleOutlined,
   TagsOutlined,
+  UsergroupAddOutlined,
+  PlusCircleOutlined,
 } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useProductStore } from '@stores/productStore';
 import { useCartStore } from '@stores/cartStore';
 import { useGroupStore } from '@stores/groupStore';
@@ -46,6 +48,7 @@ import type { SKUWithSPU } from '@/types/sku';
 import { normalizeGroupDiscountRate } from '@/utils/groupDiscount';
 import styles from './ProductDetailPage.module.css';
 import { ProductCoverMedia } from '@/components/ProductCoverMedia';
+import { IconHintButton } from '@/components/IconHintButton';
 
 const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
@@ -136,6 +139,15 @@ export const ProductDetailPage: React.FC = () => {
   const [selectedSKU, setSelectedSKU] = useState<SKUWithSPU | null>(null);
   const [skuLoading, setSkuLoading] = useState(false);
   const [groupModalTick, setGroupModalTick] = useState(0);
+  const [detailTabKey, setDetailTabKey] = useState('detail');
+  const detailTabsRef = useRef<HTMLDivElement>(null);
+
+  const scrollToProductDetail = useCallback(() => {
+    setDetailTabKey('detail');
+    requestAnimationFrame(() => {
+      detailTabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -441,55 +453,18 @@ export const ProductDetailPage: React.FC = () => {
               </Tag>
             </Space>
 
-            <Collapse
-              bordered={false}
-              size="small"
-              style={{ background: 'transparent', marginBottom: 8 }}
-              items={[
-                {
-                  key: 'intro',
-                  label: '商品介绍',
-                  children: (
-                    <Text type="secondary">{product.description?.trim() || '暂无介绍'}</Text>
-                  ),
-                },
-                {
-                  key: 'spec',
-                  label: '规格参数',
-                  children: (
-                    <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                      {product.token_count ? (
-                        <Text>
-                          包含：
-                          <Text strong>{(product.token_count / 10000).toFixed(0)}万 Token</Text>
-                        </Text>
-                      ) : null}
-                      {product.models && product.models.length > 0 ? (
-                        <Text>
-                          模型：<Text strong>{product.models.join(', ')}</Text>
-                        </Text>
-                      ) : null}
-                      {product.validity_period ? (
-                        <Text>
-                          有效期：<Text strong>{product.validity_period}</Text>
-                        </Text>
-                      ) : null}
-                      {product.context_length ? (
-                        <Text>
-                          上下文：<Text strong>{product.context_length}</Text>
-                        </Text>
-                      ) : null}
-                      {!product.token_count &&
-                      !(product.models && product.models.length) &&
-                      !product.validity_period &&
-                      !product.context_length ? (
-                        <Text type="secondary">暂无结构化规格，可在下方详情查看。</Text>
-                      ) : null}
-                    </Space>
-                  ),
-                },
-              ]}
-            />
+            {selectedSKU ? (
+              <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+                当前套餐：{buildSkuSummary(selectedSKU)}
+              </Text>
+            ) : null}
+            <Button
+              type="link"
+              onClick={scrollToProductDetail}
+              style={{ padding: 0, height: 'auto' }}
+            >
+              查看完整规格、商品介绍与常见问题
+            </Button>
           </Col>
         </Row>
 
@@ -793,87 +768,172 @@ export const ProductDetailPage: React.FC = () => {
                 </Card>
                 <div className={styles.groupActionsRow}>
                   <div className={styles.groupActionCell}>
-                    <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
-                      <Button
-                        type="primary"
-                        size="large"
-                        block
-                        icon={<TeamOutlined />}
-                        onClick={() => {
-                          loadActiveGroups();
-                          setShowGroupsModal(true);
+                    <Tooltip
+                      title={
+                        product.stock === 0
+                          ? '暂无库存'
+                          : '查看并加入进行中的拼团（打开列表选择团）'
+                      }
+                    >
+                      <span
+                        style={{
+                          display: 'flex',
+                          width: '100%',
+                          minWidth: 0,
+                          cursor: product.stock === 0 ? 'not-allowed' : undefined,
                         }}
-                        disabled={product.stock === 0}
-                        style={{ background: '#52c41a', borderColor: '#52c41a' }}
                       >
-                        立即加入团
-                      </Button>
-                    </Badge>
+                        <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
+                          <Button
+                            type="primary"
+                            size="large"
+                            block
+                            icon={<UsergroupAddOutlined />}
+                            aria-label={
+                              product.stock === 0 ? '暂无库存' : '立即加入团，查看进行中的拼团'
+                            }
+                            onClick={() => {
+                              loadActiveGroups();
+                              setShowGroupsModal(true);
+                            }}
+                            disabled={product.stock === 0}
+                            style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                          >
+                            {screens.xs ? null : '立即加入团'}
+                          </Button>
+                        </Badge>
+                      </span>
+                    </Tooltip>
                   </div>
                   <div className={styles.groupActionCell}>
-                    <Button
-                      type="primary"
-                      size="large"
-                      block
-                      icon={<TeamOutlined />}
-                      onClick={handleGroupPurchase}
-                      disabled={product.stock === 0 || groupPrices.length === 0}
-                      style={{
-                        background: '#1890ff',
-                        borderColor: '#1890ff',
-                      }}
+                    <Tooltip
+                      title={
+                        product.stock === 0
+                          ? '暂无库存'
+                          : groupPrices.length === 0
+                            ? '当前规格不支持拼团'
+                            : '发起新拼团并前往支付'
+                      }
                     >
-                      {product.stock === 0
-                        ? '暂无库存'
-                        : groupPrices.length === 0
-                          ? '当前规格不可拼团'
-                          : '发起拼团并支付'}
-                    </Button>
+                      <span
+                        style={{
+                          display: 'flex',
+                          width: '100%',
+                          minWidth: 0,
+                          cursor:
+                            product.stock === 0 || groupPrices.length === 0
+                              ? 'not-allowed'
+                              : undefined,
+                        }}
+                      >
+                        <Button
+                          type="primary"
+                          size="large"
+                          block
+                          icon={<PlusCircleOutlined />}
+                          aria-label={
+                            product.stock === 0
+                              ? '暂无库存'
+                              : groupPrices.length === 0
+                                ? '当前规格不可拼团'
+                                : '发起拼团并支付'
+                          }
+                          onClick={handleGroupPurchase}
+                          disabled={product.stock === 0 || groupPrices.length === 0}
+                          style={{
+                            background: '#1890ff',
+                            borderColor: '#1890ff',
+                          }}
+                        >
+                          {screens.xs
+                            ? null
+                            : product.stock === 0
+                              ? '暂无库存'
+                              : groupPrices.length === 0
+                                ? '当前规格不可拼团'
+                                : '发起拼团并支付'}
+                        </Button>
+                      </span>
+                    </Tooltip>
                   </div>
                 </div>
               </Space>
             )}
 
             <div className={styles.secondaryRow}>
-              <Button
+              <IconHintButton
+                hint="复制商品分享链接"
+                type="default"
                 size="large"
                 icon={<ShareAltOutlined />}
                 onClick={handleShare}
-                style={{
-                  flex: screens.xs ? '1 1 calc(50% - 4px)' : '1 1 auto',
-                  minWidth: 0,
-                }}
-              >
-                分享
-              </Button>
-              <Button
+                className={styles.iconToolbarBtn}
+              />
+              <IconHintButton
+                hint="打开购物车"
+                type="default"
                 size="large"
+                icon={<ShoppingCartOutlined />}
                 onClick={() => navigate('/cart')}
-                style={{
-                  flex: screens.xs ? '1 1 calc(50% - 4px)' : '1 1 auto',
-                  minWidth: 0,
-                }}
-              >
-                {screens.xs ? '购物车' : '查看购物车'}
-              </Button>
+                className={styles.iconToolbarBtn}
+              />
             </div>
           </div>
         </Space>
       </Card>
 
-      <Card className={styles.tabsCard}>
-        <Tabs defaultActiveKey="detail">
+      <Card ref={detailTabsRef} className={styles.tabsCard}>
+        <Tabs activeKey={detailTabKey} onChange={setDetailTabKey}>
           <TabPane tab="商品详情" key="detail">
             <Space direction="vertical" style={{ width: '100%' }}>
               <Title level={5}>商品信息</Title>
               <ul style={{ paddingLeft: 20 }}>
                 <li>
-                  包含Token数量和类型：{(product.token_count || 1000000).toLocaleString()} Token
+                  包含 Token：
+                  {product.token_count != null && product.token_count > 0 ? (
+                    <Text strong>
+                      {(product.token_count / 10000).toFixed(0)}万（
+                      {product.token_count.toLocaleString()}）
+                    </Text>
+                  ) : (
+                    <Text type="secondary">—</Text>
+                  )}
                 </li>
-                <li>支持模型：{product.models?.join('、') || 'GLM-5, K2.5'}</li>
-                <li>有效期：{product.validity_period || '1年'}</li>
-                <li>上下文长度：{product.context_length || '128K'}</li>
+                <li>
+                  支持模型：
+                  {product.models && product.models.length > 0 ? (
+                    <Text strong>{product.models.join('、')}</Text>
+                  ) : (
+                    <Text type="secondary">—</Text>
+                  )}
+                </li>
+                <li>
+                  有效期：
+                  {product.validity_period ? (
+                    <Text strong>{product.validity_period}</Text>
+                  ) : (
+                    <Text type="secondary">—</Text>
+                  )}
+                </li>
+                <li>
+                  上下文长度：
+                  {product.context_length ? (
+                    <Text strong>{product.context_length}</Text>
+                  ) : (
+                    <Text type="secondary">—</Text>
+                  )}
+                </li>
               </ul>
+
+              {product.description?.trim() ? (
+                <>
+                  <Divider />
+                  <Title level={5}>商品介绍</Title>
+                  <Paragraph type="secondary" style={{ marginBottom: 0, whiteSpace: 'pre-wrap' }}>
+                    {product.description.trim()}
+                  </Paragraph>
+                </>
+              ) : null}
 
               <Divider />
 
@@ -889,7 +949,15 @@ export const ProductDetailPage: React.FC = () => {
                   支持 OpenAI 兼容路径：将 Base URL 设为平台提供的地址，请求体中填写
                   model（可用「厂商/模型」或兼容前缀匹配）
                 </li>
-                <li>流式（stream）是否开放以平台公告为准</li>
+                <li>
+                  流式输出（请求体 <Text code>stream: true</Text>
+                  ）平台已支持；客户端/SDK 接入示例见{' '}
+                  <Link to="/developer/quickstart">开发者中心 → 快速开始</Link>。
+                </li>
+                <li>
+                  更多接口说明、模型列表、用量与排错请前往{' '}
+                  <Link to="/developer/quickstart">开发者中心</Link>。
+                </li>
               </ol>
               {selectedSKU && (
                 <>
@@ -922,6 +990,9 @@ export const ProductDetailPage: React.FC = () => {
                 <>
                   <Divider />
                   <Title level={5}>同系列规格对比</Title>
+                  <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+                    请在上方「选择套餐」中切换规格；本表仅作对比参考，数据与套餐卡片一致。
+                  </Text>
                   <Table<SKUWithSPU>
                     size="small"
                     pagination={false}
@@ -978,16 +1049,6 @@ export const ProductDetailPage: React.FC = () => {
                           ) : (
                             <Text type="secondary">—</Text>
                           ),
-                      },
-                      {
-                        title: '操作',
-                        key: 'pick',
-                        width: 80,
-                        render: (_: unknown, r: SKUWithSPU) => (
-                          <Button type="link" size="small" onClick={() => setSelectedSKU(r)}>
-                            {selectedSKU?.id === r.id ? '当前' : '选择'}
-                          </Button>
-                        ),
                       },
                     ]}
                   />

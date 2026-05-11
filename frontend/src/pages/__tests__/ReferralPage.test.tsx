@@ -105,7 +105,7 @@ describe('ReferralPage Component', () => {
     expect(screen.getByText('邀请好友')).toBeInTheDocument();
     expect(screen.getByText('TESTCODE')).toBeInTheDocument();
     expect(screen.getByText('复制邀请码')).toBeInTheDocument();
-    expect(screen.getByText('分享链接')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /复制邀请链接/ })).toBeInTheDocument();
   });
 
   test('handles copy referral code', async () => {
@@ -211,8 +211,7 @@ describe('ReferralPage Component', () => {
       </MemoryRouter>
     );
 
-    // 点击分享链接按钮
-    const shareButton = screen.getByText('分享链接');
+    const shareButton = screen.getByRole('button', { name: /复制邀请链接/ });
     await act(async () => {
       fireEvent.click(shareButton);
     });

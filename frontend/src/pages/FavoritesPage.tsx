@@ -1,17 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Card,
-  List,
-  Button,
-  Empty,
-  Space,
-  Typography,
-  Popconfirm,
-  message,
-  Spin,
-  Tag,
-} from 'antd';
+import { Card, List, Button, Empty, Space, Typography, Popconfirm, message, Spin, Tag } from 'antd';
 import {
   HeartOutlined,
   HeartFilled,
@@ -24,6 +13,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { favoriteService, type FavoriteListItem, type FavoriteSKUItem } from '@/services/favorite';
 import { entitlementPackageService } from '@/services/entitlementPackage';
 import { ProductCoverMedia } from '@/components/ProductCoverMedia';
+import { IconHintButton } from '@/components/IconHintButton';
 import styles from './FavoritesPage.module.css';
 
 const { Title, Text } = Typography;
@@ -179,17 +169,16 @@ export default function FavoritesPage() {
                         />
                         <div className={styles.actions}>
                           <Space>
-                            <Button
+                            <IconHintButton
                               type="primary"
                               size="small"
+                              hint="加入购物车"
                               icon={<ShoppingCartOutlined />}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleAddToCart(item);
                               }}
-                            >
-                              加入购物车
-                            </Button>
+                            />
                             <Popconfirm
                               title="确定取消收藏？"
                               onConfirm={(e) => {

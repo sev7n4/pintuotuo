@@ -49,10 +49,15 @@ describe('GroupProgressPage', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     mockedListGroupMembers.mockResolvedValue({
-      data: { code: 0, message: 'ok', data: [{ user_id: 1, display_name: '团长用户', is_creator: true }] },
+      data: {
+        code: 0,
+        message: 'ok',
+        data: [{ user_id: 1, display_name: '团长用户', is_creator: true }],
+      },
     } as any);
-    mockUseAuthStore.mockImplementation((selector: (s: { user: { id: number } | null }) => unknown) =>
-      selector({ user: { id: 1 } as any })
+    mockUseAuthStore.mockImplementation(
+      (selector: (s: { user: { id: number } | null }) => unknown) =>
+        selector({ user: { id: 1 } as any })
     );
   });
 
@@ -160,7 +165,7 @@ describe('GroupProgressPage', () => {
         </BrowserRouter>
       );
 
-      const shareButton = screen.getByRole('button', { name: /分享邀请/ });
+      const shareButton = screen.getByRole('button', { name: /复制邀请链接，分享给好友参团/ });
       fireEvent.click(shareButton);
 
       await waitFor(() => {
