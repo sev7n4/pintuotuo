@@ -929,9 +929,9 @@ func ListGroups(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")
 	status := c.DefaultQuery("status", "active")
-	scope := strings.ToLower(strings.TrimSpace(c.DefaultQuery("scope", "all")))
-	if scope != "all" && scope != "mine_created" && scope != "mine_joined" && scope != "mine_involved" {
-		scope = "all"
+	scope := strings.ToLower(strings.TrimSpace(c.DefaultQuery("scope", adminSKUListScopeAll)))
+	if scope != adminSKUListScopeAll && scope != "mine_created" && scope != "mine_joined" && scope != "mine_involved" {
+		scope = adminSKUListScopeAll
 	}
 
 	pageNum, _ := strconv.Atoi(page)
@@ -953,7 +953,7 @@ func ListGroups(c *gin.Context) {
 	}
 
 	var uid int
-	if scope != "all" {
+	if scope != adminSKUListScopeAll {
 		userIDRaw, exists := c.Get("user_id")
 		if !exists {
 			middleware.RespondWithError(c, apperrors.ErrInvalidToken)
