@@ -167,6 +167,9 @@ type SKUWithSPU struct {
 	ModelTier          string   `json:"model_tier"`
 	SPUTotalSalesCount int64    `json:"spu_total_sales_count,omitempty"`
 	SPUAverageRating   *float64 `json:"spu_average_rating,omitempty"`
+	// 来自 spus：卖场参考成本（元/1K tokens），与 AdminSPUs 表单一致
+	ProviderInputRate  float64 `json:"provider_input_rate,omitempty"`
+	ProviderOutputRate float64 `json:"provider_output_rate,omitempty"`
 }
 
 type ComputePointAccount struct {

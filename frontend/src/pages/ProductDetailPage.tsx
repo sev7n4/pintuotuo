@@ -454,7 +454,8 @@ export const ProductDetailPage: React.FC = () => {
 
             {selectedSKU ? (
               <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-                当前套餐：{buildSkuSummary(selectedSKU)}
+                已选套餐：<Text strong>{selectedSKU.spu_name}</Text>
+                <Text type="secondary">（套餐用量与价格见下方卡片，商品级说明见「商品详情」）</Text>
               </Text>
             ) : null}
             <Button
@@ -894,6 +895,10 @@ export const ProductDetailPage: React.FC = () => {
           <TabPane tab="商品详情" key="detail">
             <Space direction="vertical" style={{ width: '100%' }}>
               <Title level={5}>商品信息</Title>
+              <Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 13 }}>
+                以下为商品（SPU）级字段，与目录/运营配置一致；套餐粒度的 Token 量、价与拼团等以
+                「选择套餐」卡片为准。
+              </Paragraph>
               <ul style={{ paddingLeft: 20 }}>
                 <li>
                   包含 Token：
@@ -970,6 +975,13 @@ export const ProductDetailPage: React.FC = () => {
                 <>
                   <Divider />
                   <Title level={5}>本商品规格参考（非最终权益）</Title>
+                  <Paragraph type="secondary" style={{ marginBottom: 8, fontSize: 13 }}>
+                    下列「参考输入/输出成本」优先取自<strong> baseline 定价版本</strong>在
+                    <Text code>pricing_version_spu_rates</Text>
+                    中的快照（与下单默认 <Text code>pricing_version_id</Text>
+                    、网关按版本计费一致）；若无快照再回落 SPU
+                    当前列。实际扣费仍以调用用量、账户权益与账单为准。
+                  </Paragraph>
                   <ul style={{ paddingLeft: 20 }}>
                     <li>
                       厂商代码（provider）：<Text code>{selectedSKU.model_provider}</Text>
@@ -989,6 +1001,27 @@ export const ProductDetailPage: React.FC = () => {
                         code
                       >{`${selectedSKU.model_provider}/${selectedSKU.provider_model_id?.trim() || selectedSKU.model_name}`}</Text>
                     </li>
+                    {(Number(selectedSKU.provider_input_rate) > 0 ||
+                      Number(selectedSKU.provider_output_rate) > 0) && (
+                      <>
+                        <li>
+                          参考输入成本（元/1K tokens）：
+                          <Text strong>
+                            {Number(selectedSKU.provider_input_rate) > 0
+                              ? `¥${Number(selectedSKU.provider_input_rate).toFixed(6)}`
+                              : '—'}
+                          </Text>
+                        </li>
+                        <li>
+                          参考输出成本（元/1K tokens）：
+                          <Text strong>
+                            {Number(selectedSKU.provider_output_rate) > 0
+                              ? `¥${Number(selectedSKU.provider_output_rate).toFixed(6)}`
+                              : '—'}
+                          </Text>
+                        </li>
+                      </>
+                    )}
                   </ul>
                 </>
               )}

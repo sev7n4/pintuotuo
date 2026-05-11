@@ -1999,15 +1999,22 @@ func ListPublicSKUs(c *gin.Context) {
 		orderClause = "s.retail_price DESC NULLS LAST, s.id DESC"
 	}
 
+	// 参考输入/输出单价：优先 baseline 定价版本快照（与下单 pricing_version_id、计费一致），无快照再回落 spus 当前列
 	selectCols := `SELECT s.id, s.spu_id, s.sku_code, s.sku_type, s.token_amount, s.compute_points, 
 		s.subscription_period, s.is_unlimited, s.valid_days, s.retail_price, s.original_price, 
 		s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
 		s.is_trial, s.trial_duration_days, s.is_promoted, s.sales_count,
 		sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier,
-		sp.total_sales_count, sp.average_rating`
+		sp.total_sales_count, sp.average_rating,
+		COALESCE(pvsr.provider_input_rate, sp.provider_input_rate, 0),
+		COALESCE(pvsr.provider_output_rate, sp.provider_output_rate, 0)`
 
 	query := fmt.Sprintf(`%s
-		FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE %s
+		FROM skus s
+		JOIN spus sp ON s.spu_id = sp.id
+		LEFT JOIN pricing_version_spu_rates pvsr ON pvsr.spu_id = sp.id
+			AND pvsr.pricing_version_id = (SELECT id FROM pricing_versions WHERE code = 'baseline' LIMIT 1)
+		WHERE %s
 		ORDER BY %s LIMIT $%d OFFSET $%d`,
 		selectCols, where, orderClause, argPos, argPos+1)
 	args = append(args, perPageNum, offset)
@@ -2036,7 +2043,7 @@ func ListPublicSKUs(c *gin.Context) {
 			&s.GroupEnabled, &s.MinGroupSize, &s.MaxGroupSize, &groupDiscountRate,
 			&s.IsTrial, &trialDurationDays, &s.IsPromoted, &s.SalesCount,
 			&s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier,
-			&spTotalSales, &spAvgRating)
+			&spTotalSales, &spAvgRating, &s.ProviderInputRate, &s.ProviderOutputRate)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -2112,8 +2119,13 @@ func GetPublicSKUByID(c *gin.Context) {
 		s.group_enabled, s.min_group_size, s.max_group_size, s.group_discount_rate,
 		s.is_trial, s.trial_duration_days, s.is_promoted, s.sales_count,
 		sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier,
-		sp.total_sales_count, sp.average_rating
-		FROM skus s JOIN spus sp ON s.spu_id = sp.id 
+		sp.total_sales_count, sp.average_rating,
+		COALESCE(pvsr.provider_input_rate, sp.provider_input_rate, 0),
+		COALESCE(pvsr.provider_output_rate, sp.provider_output_rate, 0)
+		FROM skus s
+		JOIN spus sp ON s.spu_id = sp.id
+		LEFT JOIN pricing_version_spu_rates pvsr ON pvsr.spu_id = sp.id
+			AND pvsr.pricing_version_id = (SELECT id FROM pricing_versions WHERE code = 'baseline' LIMIT 1)
 		WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
 		skuID,
 	).Scan(&s.ID, &s.SPUID, &s.SKUCode, &s.SKUType, &tokenAmount, &computePoints,
@@ -2121,7 +2133,7 @@ func GetPublicSKUByID(c *gin.Context) {
 		&s.GroupEnabled, &s.MinGroupSize, &s.MaxGroupSize, &groupDiscountRate,
 		&s.IsTrial, &trialDurationDays, &s.IsPromoted, &s.SalesCount,
 		&s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier,
-		&spTotalSales, &spAvgRating)
+		&spTotalSales, &spAvgRating, &s.ProviderInputRate, &s.ProviderOutputRate)
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrProductNotFound)
