@@ -29,16 +29,7 @@
 .imageWrapper {
   height: 180px;
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f5f5f5;
-}
-
-.image {
-  max-height: 100%;
-  max-width: 100%;
-  object-fit: cover;
+  position: relative;
 }
 
 .productName {

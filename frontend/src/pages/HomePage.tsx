@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Carousel,
@@ -29,7 +29,7 @@ import {
   pushRecentSearch,
   readRecentSearches,
 } from '@/utils/productDisplay';
-import { getProviderCardSurfaceStyle, getProviderLogoUrl } from '@/utils/providerBrand';
+import { ProductCoverMedia } from '@/components/ProductCoverMedia';
 import styles from './HomePage.module.css';
 
 const { Title, Text } = Typography;
@@ -75,10 +75,6 @@ const quickNavItems: QuickNav[] = [
   },
 ];
 
-function coverImageUrl(p: Product) {
-  return p.image_url || p.thumbnail_url;
-}
-
 function HomeProductCardCover({
   product,
   showGroupTag,
@@ -88,54 +84,16 @@ function HomeProductCardCover({
   showGroupTag: boolean;
   discount: number;
 }) {
-  const imgUrl = coverImageUrl(product);
-  const [coverBroken, setCoverBroken] = useState(false);
-  const [brandBroken, setBrandBroken] = useState(false);
-
-  useEffect(() => {
-    setCoverBroken(false);
-    setBrandBroken(false);
-  }, [product.id, imgUrl]);
-
-  const showCoverImg = Boolean(imgUrl) && !coverBroken;
-  const brandUrl =
-    !showCoverImg && product.model_provider ? getProviderLogoUrl(product.model_provider) : null;
-  const surface =
-    !showCoverImg && product.model_provider
-      ? getProviderCardSurfaceStyle(product.model_provider)
-      : undefined;
-
-  const onCoverError = useCallback(() => {
-    setCoverBroken(true);
-  }, []);
-
   return (
-    <div className={styles.productImage} style={surface ? { background: surface } : undefined}>
-      {showCoverImg ? (
-        <img
-          src={imgUrl!}
-          alt=""
-          className={styles.productCoverImg}
-          loading="lazy"
-          decoding="async"
-          onError={onCoverError}
-        />
-      ) : brandUrl && !brandBroken ? (
-        <div className={styles.productBrandBadge} aria-hidden>
-          <img
-            src={brandUrl}
-            alt=""
-            className={styles.productBrandLogo}
-            loading="lazy"
-            decoding="async"
-            onError={() => setBrandBroken(true)}
-          />
-        </div>
-      ) : (
-        <div className={styles.productPlaceholder}>
-          <Text type="secondary">{product.name.substring(0, 2)}</Text>
-        </div>
-      )}
+    <div className={styles.productImage}>
+      <ProductCoverMedia
+        variant="home"
+        imageUrl={product.image_url}
+        thumbnailUrl={product.thumbnail_url}
+        modelProvider={product.model_provider}
+        fallbackTitle={product.name}
+        resetKey={product.id}
+      />
       {discount > 0 && (
         <Tag className={styles.discountTag} bordered={false}>
           -{discount}%

@@ -45,6 +45,7 @@ import type { Product, GroupPrice, Group } from '@/types';
 import type { SKUWithSPU } from '@/types/sku';
 import { normalizeGroupDiscountRate } from '@/utils/groupDiscount';
 import styles from './ProductDetailPage.module.css';
+import { ProductCoverMedia } from '@/components/ProductCoverMedia';
 
 const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
@@ -404,18 +405,13 @@ export const ProductDetailPage: React.FC = () => {
                 height: screens.xs ? 220 : 300,
               }}
             >
-              {coverSrc ? (
-                <img
-                  src={coverSrc}
-                  alt=""
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  loading="lazy"
-                />
-              ) : (
-                <Text type="secondary" style={{ fontSize: 48 }}>
-                  📦
-                </Text>
-              )}
+              <ProductCoverMedia
+                variant="hero"
+                coverUrl={coverSrc}
+                modelProvider={selectedSKU?.model_provider ?? product.model_provider}
+                fallbackTitle={primaryTitle}
+                resetKey={selectedSKU?.id ?? product.id}
+              />
             </div>
           </Col>
 
