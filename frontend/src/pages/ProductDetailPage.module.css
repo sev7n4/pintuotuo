@@ -101,7 +101,7 @@
 .groupActionsRow {
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   align-items: stretch;
 }
@@ -116,22 +116,36 @@
   width: 100%;
 }
 
+/* 双按钮对称：等宽 + 文案不换行，避免一长一短造成「空白不均」 */
+.groupPairBtn {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
 .secondaryRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
   margin-top: 12px;
   width: 100%;
-  align-items: center;
+  box-sizing: border-box;
+  align-items: stretch;
+}
+
+/* 保证 Tooltip 包裹下按钮仍能拉满半行 */
+.secondaryCell {
+  min-width: 0;
+  width: 100%;
+  display: block;
+}
+
+.secondaryCell :global(.ant-btn) {
+  width: 100%;
 }
 
 .iconToolbarBtn {
-  min-width: 44px;
-  min-height: 40px;
-  padding-inline: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  min-height: 44px;
+  padding-inline: 10px;
 }
 
 .tabsCard {

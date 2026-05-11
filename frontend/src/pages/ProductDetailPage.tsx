@@ -18,7 +18,6 @@ import {
   Row,
   Col,
   Modal,
-  Badge,
   Alert,
   Progress,
   Collapse,
@@ -772,7 +771,7 @@ export const ProductDetailPage: React.FC = () => {
                       title={
                         product.stock === 0
                           ? '暂无库存'
-                          : '查看并加入进行中的拼团（打开列表选择团）'
+                          : '加入已有拼团：打开列表选择团并参团（当前可加入团数见上方）'
                       }
                     >
                       <span
@@ -783,25 +782,24 @@ export const ProductDetailPage: React.FC = () => {
                           cursor: product.stock === 0 ? 'not-allowed' : undefined,
                         }}
                       >
-                        <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
-                          <Button
-                            type="primary"
-                            size="large"
-                            block
-                            icon={<UsergroupAddOutlined />}
-                            aria-label={
-                              product.stock === 0 ? '暂无库存' : '立即加入团，查看进行中的拼团'
-                            }
-                            onClick={() => {
-                              loadActiveGroups();
-                              setShowGroupsModal(true);
-                            }}
-                            disabled={product.stock === 0}
-                            style={{ background: '#52c41a', borderColor: '#52c41a' }}
-                          >
-                            {screens.xs ? null : '立即加入团'}
-                          </Button>
-                        </Badge>
+                        <Button
+                          type="primary"
+                          size="large"
+                          block
+                          icon={<UsergroupAddOutlined />}
+                          aria-label={
+                            product.stock === 0 ? '暂无库存' : '加入拼团，打开可加入的团列表'
+                          }
+                          className={styles.groupPairBtn}
+                          onClick={() => {
+                            loadActiveGroups();
+                            setShowGroupsModal(true);
+                          }}
+                          disabled={product.stock === 0}
+                          style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                        >
+                          {product.stock === 0 ? '暂无库存' : '加入拼团'}
+                        </Button>
                       </span>
                     </Tooltip>
                   </div>
@@ -836,8 +834,9 @@ export const ProductDetailPage: React.FC = () => {
                               ? '暂无库存'
                               : groupPrices.length === 0
                                 ? '当前规格不可拼团'
-                                : '发起拼团并支付'
+                                : '发起拼团并前往支付'
                           }
+                          className={styles.groupPairBtn}
                           onClick={handleGroupPurchase}
                           disabled={product.stock === 0 || groupPrices.length === 0}
                           style={{
@@ -845,13 +844,11 @@ export const ProductDetailPage: React.FC = () => {
                             borderColor: '#1890ff',
                           }}
                         >
-                          {screens.xs
-                            ? null
-                            : product.stock === 0
-                              ? '暂无库存'
-                              : groupPrices.length === 0
-                                ? '当前规格不可拼团'
-                                : '发起拼团并支付'}
+                          {product.stock === 0
+                            ? '暂无库存'
+                            : groupPrices.length === 0
+                              ? '不可拼团'
+                              : '发起拼团'}
                         </Button>
                       </span>
                     </Tooltip>
@@ -861,22 +858,32 @@ export const ProductDetailPage: React.FC = () => {
             )}
 
             <div className={styles.secondaryRow}>
-              <IconHintButton
-                hint="复制商品分享链接"
-                type="default"
-                size="large"
-                icon={<ShareAltOutlined />}
-                onClick={handleShare}
-                className={styles.iconToolbarBtn}
-              />
-              <IconHintButton
-                hint="打开购物车"
-                type="default"
-                size="large"
-                icon={<ShoppingCartOutlined />}
-                onClick={() => navigate('/cart')}
-                className={styles.iconToolbarBtn}
-              />
+              <div className={styles.secondaryCell}>
+                <IconHintButton
+                  hint="复制商品分享链接"
+                  type="default"
+                  size="large"
+                  block
+                  icon={<ShareAltOutlined />}
+                  onClick={handleShare}
+                  className={styles.iconToolbarBtn}
+                >
+                  {screens.xs ? '分享' : null}
+                </IconHintButton>
+              </div>
+              <div className={styles.secondaryCell}>
+                <IconHintButton
+                  hint="打开购物车"
+                  type="default"
+                  size="large"
+                  block
+                  icon={<ShoppingCartOutlined />}
+                  onClick={() => navigate('/cart')}
+                  className={styles.iconToolbarBtn}
+                >
+                  {screens.xs ? '购物车' : null}
+                </IconHintButton>
+              </div>
             </div>
           </div>
         </Space>
