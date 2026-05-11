@@ -31,6 +31,7 @@ import {
   AppstoreOutlined,
   UnorderedListOutlined,
   FilterOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCartStore } from '@stores/cartStore';
@@ -740,7 +741,7 @@ export const ProductListPage: React.FC = () => {
 
   return (
     <div className={styles.wrap} style={{ padding: screens.xs ? 12 : 24 }}>
-      <Row gutter={16} style={{ marginBottom: 16 }}>
+      <Row gutter={16} style={{ marginBottom: 16 }} align="middle">
         <Col flex="auto">
           <Space>
             {pageIcon}
@@ -749,9 +750,16 @@ export const ProductListPage: React.FC = () => {
             </Title>
           </Space>
         </Col>
+        {groupCatalog && (
+          <Col>
+            <Button type="default" icon={<TeamOutlined />} onClick={() => navigate('/groups')}>
+              {screens.xs ? '参团' : '进行中的拼团'}
+            </Button>
+          </Col>
+        )}
       </Row>
 
-      <ScenarioFilter variant={sortParam === 'hot' ? 'rail' : 'panel'} />
+      <ScenarioFilter variant={sortParam === 'hot' || groupCatalog ? 'rail' : 'panel'} />
 
       {filterChips.length > 0 && (
         <div className={styles.chipRow}>

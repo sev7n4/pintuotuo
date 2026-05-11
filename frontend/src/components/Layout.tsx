@@ -34,14 +34,21 @@ import './Layout.css';
 const { Header, Content, Footer } = AntLayout;
 const { useBreakpoint } = Grid;
 
-function getMainNavSelectedKey(pathname: string): string[] {
+function getMainNavSelectedKey(pathname: string, search: string): string[] {
   if (pathname === '/') return ['home'];
-  if (pathname.startsWith('/catalog')) return ['catalog'];
+  if (pathname.startsWith('/catalog')) {
+    const q = new URLSearchParams(search);
+    if (q.get('group_enabled') === 'true' || q.get('group_enabled') === '1') {
+      return ['groups'];
+    }
+    return ['catalog'];
+  }
   if (pathname.startsWith('/packages')) return ['packages'];
   if (pathname.startsWith('/fuel-station')) return ['fuelStation'];
   if (pathname === '/cart' || pathname === '/checkout') return ['cart'];
   if (pathname.startsWith('/orders') || pathname.startsWith('/payment')) return ['orders'];
-  if (pathname.startsWith('/groups')) return ['groups'];
+  /* /groups 为「参团进度」独立页，主导航「拼团」已指向卖场拼团 SKU，此处不高亮主导航 */
+  if (pathname.startsWith('/groups')) return [];
   if (pathname.startsWith('/referral')) return ['referral'];
   if (pathname.startsWith('/help')) return ['help'];
   return [];
@@ -54,6 +61,11 @@ export default function Layout() {
   const screens = useBreakpoint();
   const isMobileNav = !screens.md;
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const mainNavSelectedKeys = useMemo(
+    () => getMainNavSelectedKey(location.pathname, location.search),
+    [location.pathname, location.search]
+  );
 
   useEffect(() => {
     if (isAuthenticated && !user) {
@@ -90,7 +102,7 @@ export default function Layout() {
       },
       {
         key: 'groups',
-        label: <Link to="/groups">拼团</Link>,
+        label: <Link to="/catalog?group_enabled=true">拼团</Link>,
         icon: <TeamOutlined />,
       },
       {
@@ -132,7 +144,7 @@ export default function Layout() {
     fuelStation: '/fuel-station',
     cart: '/cart',
     orders: '/orders',
-    groups: '/groups',
+    groups: '/catalog?group_enabled=true',
     referral: '/referral',
     help: '/help',
   };
@@ -246,7 +258,7 @@ export default function Layout() {
               >
                 <Menu
                   mode="inline"
-                  selectedKeys={getMainNavSelectedKey(location.pathname)}
+                  selectedKeys={mainNavSelectedKeys}
                   items={drawerMenuItems}
                   onClick={onDrawerMenuClick}
                 />
@@ -255,7 +267,7 @@ export default function Layout() {
           ) : (
             <Menu
               mode="horizontal"
-              selectedKeys={getMainNavSelectedKey(location.pathname)}
+              selectedKeys={mainNavSelectedKeys}
               items={tabItems}
               className="layout-menu"
             />

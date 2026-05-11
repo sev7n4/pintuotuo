@@ -154,7 +154,7 @@ describe('GroupListPage Component', () => {
 
     // 检查空状态（与 GroupListPage 文案一致）
     expect(screen.getByText('暂无进行中的拼团')).toBeInTheDocument();
-    expect(screen.getByText('浏览商品')).toBeInTheDocument();
+    expect(screen.getByText('浏览可拼团商品')).toBeInTheDocument();
   });
 
   test('renders groups list when groups exist', async () => {
@@ -270,11 +270,11 @@ describe('GroupListPage Component', () => {
       );
     });
 
-    const browseButton = screen.getByText('浏览商品');
+    const browseButton = screen.getByText('浏览可拼团商品');
     await act(async () => {
       fireEvent.click(browseButton);
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith('/catalog');
+    expect(mockNavigate).toHaveBeenCalledWith('/catalog?group_enabled=true');
   });
 });
