@@ -83,6 +83,51 @@ describe('groupService', () => {
     expect(result.data).toEqual(mockResponse);
   });
 
+  test('listGroups passes scope and status when opts provided (non-all scope)', async () => {
+    const mockResponse = {
+      success: true,
+      data: { items: [], total: 0, page: 1, per_page: 20 },
+      message: 'ok',
+    };
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
+
+    await groupService.listGroups(1, 40, { scope: 'mine_created', status: 'active' });
+
+    expect(mockApi.get).toHaveBeenCalledWith('/groups', {
+      params: { page: 1, per_page: 40, scope: 'mine_created', status: 'active' },
+    });
+  });
+
+  test('listGroups passes mine_involved scope', async () => {
+    const mockResponse = {
+      success: true,
+      data: { items: [], total: 0, page: 1, per_page: 20 },
+      message: 'ok',
+    };
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
+
+    await groupService.listGroups(1, 20, { scope: 'mine_involved', status: 'active' });
+
+    expect(mockApi.get).toHaveBeenCalledWith('/groups', {
+      params: { page: 1, per_page: 20, scope: 'mine_involved', status: 'active' },
+    });
+  });
+
+  test('listGroups omits scope when opts.scope is all', async () => {
+    const mockResponse = {
+      success: true,
+      data: { items: [], total: 0, page: 1, per_page: 20 },
+      message: 'ok',
+    };
+    mockApi.get.mockResolvedValue(createMockResponse(mockResponse));
+
+    await groupService.listGroups(1, 40, { scope: 'all', status: 'active' });
+
+    expect(mockApi.get).toHaveBeenCalledWith('/groups', {
+      params: { page: 1, per_page: 40, status: 'active' },
+    });
+  });
+
   test('listGroups calls api.get without parameters when page and per_page are not provided', async () => {
     const mockResponse = {
       success: true,

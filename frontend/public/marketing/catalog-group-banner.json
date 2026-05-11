@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "show_when": "always",
+  "tag": "限时开团",
+  "title": "拼团活动位（运营可改此 JSON）",
+  "subtitle": "更新本文件即可换文案与落地链，无需发版；设为 enabled:false 可关闭。",
+  "cta_label": "立即参团",
+  "cta_href": "/catalog?group_enabled=true",
+  "background": "linear-gradient(100deg, #fff7e6 0%, #ffe7ba 45%, #fff1f0 100%)"
+}

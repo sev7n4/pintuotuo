@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   List,
   Card,
@@ -11,11 +11,13 @@ import {
   Typography,
   Space,
   Grid,
+  Segmented,
 } from 'antd';
 import { UserAddOutlined, ShoppingOutlined, TagsOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useGroupStore } from '@stores/groupStore';
 import type { Group } from '@/types';
+import type { GroupListScope } from '@/services/group';
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -37,17 +39,20 @@ export const GroupListPage: React.FC = () => {
   const { isLoading, error, fetchGroups, joinGroup } = useGroupStore();
   const [groups, setGroups] = useState<GroupWithStore[]>([]);
   const [joiningId, setJoiningId] = useState<number | null>(null);
+  const [listScope, setListScope] = useState<GroupListScope>('all');
 
-  useEffect(() => {
-    loadGroups();
-  }, []);
-
-  const loadGroups = async () => {
-    const result = await fetchGroups();
+  const loadGroups = useCallback(async () => {
+    const result = await fetchGroups(1, 40, { scope: listScope, status: 'active' });
     if (result) {
       setGroups(result);
+    } else {
+      setGroups([]);
     }
-  };
+  }, [listScope, fetchGroups]);
+
+  useEffect(() => {
+    void loadGroups();
+  }, [loadGroups]);
 
   const handleJoinGroup = async (groupId: number) => {
     setJoiningId(groupId);
@@ -74,14 +79,45 @@ export const GroupListPage: React.FC = () => {
     return <Empty description={`错误: ${error}`} />;
   }
 
+  if (isLoading && groups.length === 0) {
+    return (
+      <div style={{ padding: screens.xs ? 12 : 24, textAlign: 'center', marginTop: 48 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
   if (groups.length === 0) {
+    let emptyPrimary = '暂无进行中的拼团';
+    let emptySecondary = '去商品页面发起拼团吧！';
+    if (listScope === 'mine_involved') {
+      emptyPrimary = '暂无你发起或参团的进行中拼团';
+      emptySecondary = '去卖场开团或到「全站热团」加入别人的团。';
+    } else if (listScope === 'mine_created') {
+      emptyPrimary = '暂无你发起的进行中拼团';
+      emptySecondary = '去卖场发起一个新团，或切换到「全站热团」看看。';
+    } else if (listScope === 'mine_joined') {
+      emptyPrimary = '暂无你跟团的记录';
+      emptySecondary = '切换到「全站热团」发现更多可参团的团。';
+    }
     return (
       <div style={{ padding: screens.xs ? 12 : 24, marginTop: 50, textAlign: 'center' }}>
+        <Segmented<GroupListScope>
+          value={listScope}
+          onChange={(v) => setListScope(v as GroupListScope)}
+          options={[
+            { label: '全站热团', value: 'all' },
+            { label: '我的拼团', value: 'mine_involved' },
+            { label: '我发起', value: 'mine_created' },
+            { label: '我跟团', value: 'mine_joined' },
+          ]}
+          style={{ display: 'block', maxWidth: 520, margin: '0 auto 24px' }}
+        />
         <Empty
           description={
             <Space direction="vertical">
-              <span>暂无进行中的拼团</span>
-              <span style={{ color: '#999', fontSize: 14 }}>去商品页面发起拼团吧！</span>
+              <span>{emptyPrimary}</span>
+              <span style={{ color: '#999', fontSize: 14 }}>{emptySecondary}</span>
             </Space>
           }
         />
@@ -118,6 +154,18 @@ export const GroupListPage: React.FC = () => {
           {screens.xs ? '' : '去拼团'}
         </Button>
       </div>
+
+      <Segmented<GroupListScope>
+        value={listScope}
+        onChange={(v) => setListScope(v as GroupListScope)}
+        options={[
+          { label: '全站热团', value: 'all' },
+          { label: '我的拼团', value: 'mine_involved' },
+          { label: '我发起', value: 'mine_created' },
+          { label: '我跟团', value: 'mine_joined' },
+        ]}
+        style={{ marginBottom: 16, maxWidth: 520 }}
+      />
 
       <Spin spinning={isLoading}>
         <List

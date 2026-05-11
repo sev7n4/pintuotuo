@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -919,11 +920,19 @@ func CreateGroup(c *gin.Context) {
 	})
 }
 
-// ListGroups lists all active groups
+// ListGroups lists groups. Query scope:
+//   - all (default): all groups with given status (参团广场 / 全站热团)
+//   - mine_created: current user as creator（我发起的）
+//   - mine_joined: user in group_members but not creator（我跟的团，不含自己发起的）
+//   - mine_involved: creator OR member in group_members（发起+参团一条时间线）
 func ListGroups(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")
 	status := c.DefaultQuery("status", "active")
+	scope := strings.ToLower(strings.TrimSpace(c.DefaultQuery("scope", adminSKUListScopeAll)))
+	if scope != adminSKUListScopeAll && scope != "mine_created" && scope != "mine_joined" && scope != "mine_involved" {
+		scope = adminSKUListScopeAll
+	}
 
 	pageNum, _ := strconv.Atoi(page)
 	perPageNum, _ := strconv.Atoi(perPage)
@@ -943,38 +952,142 @@ func ListGroups(c *gin.Context) {
 		return
 	}
 
-	rows, err := db.Query(
-		`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at 
-		 FROM groups WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-		status, perPageNum, offset,
-	)
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
-		return
+	var uid int
+	if scope != adminSKUListScopeAll {
+		userIDRaw, exists := c.Get("user_id")
+		if !exists {
+			middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+			return
+		}
+		var ok bool
+		uid, ok = userIDRaw.(int)
+		if !ok {
+			if f, ok2 := userIDRaw.(float64); ok2 {
+				uid = int(f)
+			} else {
+				middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+				return
+			}
+		}
 	}
-	defer rows.Close()
 
-	var groups []models.Group
-	for rows.Next() {
-		var g models.Group
-		var productID, skuID, spuID sql.NullInt64
-		err := rows.Scan(&g.ID, &productID, &skuID, &spuID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt)
+	appendGroup := func(rows *sql.Rows) ([]models.Group, error) {
+		var groups []models.Group
+		for rows.Next() {
+			var g models.Group
+			var productID, skuID, spuID sql.NullInt64
+			if err := rows.Scan(&g.ID, &productID, &skuID, &spuID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt); err != nil {
+				return nil, err
+			}
+			applyNullProductID(&g, productID)
+			if skuID.Valid {
+				g.SKUID = int(skuID.Int64)
+			}
+			if spuID.Valid {
+				g.SPUID = int(spuID.Int64)
+			}
+			groups = append(groups, g)
+		}
+		return groups, rows.Err()
+	}
+
+	var (
+		rows  *sql.Rows
+		err   error
+		total int
+	)
+
+	switch scope {
+	case "mine_created":
+		rows, err = db.Query(
+			`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at
+			 FROM groups WHERE status = $1 AND creator_id = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
+			status, uid, perPageNum, offset,
+		)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
-		applyNullProductID(&g, productID)
-		if skuID.Valid {
-			g.SKUID = int(skuID.Int64)
+		defer rows.Close()
+		if err = db.QueryRow(
+			`SELECT COUNT(*) FROM groups WHERE status = $1 AND creator_id = $2`,
+			status, uid,
+		).Scan(&total); err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
 		}
-		if spuID.Valid {
-			g.SPUID = int(spuID.Int64)
+	case "mine_joined":
+		rows, err = db.Query(
+			`SELECT g.id, g.product_id, g.sku_id, g.spu_id, g.creator_id, g.target_count, g.current_count, g.status, g.deadline, g.created_at, g.updated_at
+			 FROM groups g
+			 WHERE g.status = $1
+			   AND g.id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = $2)
+			   AND g.creator_id <> $2
+			 ORDER BY g.created_at DESC
+			 LIMIT $3 OFFSET $4`,
+			status, uid, perPageNum, offset,
+		)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
 		}
-		groups = append(groups, g)
+		defer rows.Close()
+		if err = db.QueryRow(
+			`SELECT COUNT(*) FROM groups g
+			 WHERE g.status = $1
+			   AND g.id IN (SELECT group_id FROM group_members WHERE user_id = $2)
+			   AND g.creator_id <> $2`,
+			status, uid,
+		).Scan(&total); err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+	case "mine_involved":
+		rows, err = db.Query(
+			`SELECT g.id, g.product_id, g.sku_id, g.spu_id, g.creator_id, g.target_count, g.current_count, g.status, g.deadline, g.created_at, g.updated_at
+			 FROM groups g
+			 WHERE g.status = $1
+			   AND (g.creator_id = $2 OR g.id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = $2))
+			 ORDER BY g.created_at DESC
+			 LIMIT $3 OFFSET $4`,
+			status, uid, perPageNum, offset,
+		)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		defer rows.Close()
+		if err = db.QueryRow(
+			`SELECT COUNT(*) FROM groups g
+			 WHERE g.status = $1
+			   AND (g.creator_id = $2 OR g.id IN (SELECT group_id FROM group_members WHERE user_id = $2))`,
+			status, uid,
+		).Scan(&total); err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+	default:
+		rows, err = db.Query(
+			`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at
+			 FROM groups WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+			status, perPageNum, offset,
+		)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		defer rows.Close()
+		if err = db.QueryRow("SELECT COUNT(*) FROM groups WHERE status = $1", status).Scan(&total); err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
 	}
 
-	var total int
-	db.QueryRow("SELECT COUNT(*) FROM groups WHERE status = $1", status).Scan(&total)
+	groups, err := appendGroup(rows)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"total":    total,

@@ -1,6 +1,12 @@
 import { create } from 'zustand';
-import { Group, APIResponse, PaginatedResponse } from '@/types';
-import { groupService, JoinGroupResponse, CreateGroupResponse } from '@/services/group';
+import { Group, APIResponse } from '@/types';
+import {
+  groupService,
+  JoinGroupResponse,
+  CreateGroupResponse,
+  type GroupListScope,
+} from '@/services/group';
+import { parseGroupsListPayload } from '@/utils/groupListPayload';
 
 interface GroupState {
   groups: Group[];
@@ -9,7 +15,11 @@ interface GroupState {
   isLoading: boolean;
   error: string | null;
 
-  fetchGroups: (page?: number, perPage?: number) => Promise<Group[] | null>;
+  fetchGroups: (
+    page?: number,
+    perPage?: number,
+    opts?: { scope?: GroupListScope; status?: string }
+  ) => Promise<Group[] | null>;
   fetchGroupByID: (id: number) => Promise<void>;
   createGroup: (skuId: number, targetCount: number, deadline: string) => Promise<number | null>;
   joinGroup: (id: number) => Promise<number | null>;
@@ -25,18 +35,18 @@ export const useGroupStore = create<GroupState>((set) => ({
   isLoading: false,
   error: null,
 
-  fetchGroups: async (page = 1, perPage = 20) => {
+  fetchGroups: async (page = 1, perPage = 20, opts) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await groupService.listGroups(page, perPage);
-      const apiResponse = response.data as APIResponse<PaginatedResponse<Group>>;
-      const data = apiResponse.data;
+      const response = await groupService.listGroups(page, perPage, opts);
+      const { list, total } = parseGroupsListPayload(response.data);
+
       set({
-        groups: data?.data || [],
-        total: data?.total || 0,
+        groups: list,
+        total,
         isLoading: false,
       });
-      return data?.data || [];
+      return list;
     } catch (error) {
       const message = error instanceof Error ? error.message : '获取分组列表失败';
       set({ error: message, isLoading: false });
