@@ -17,15 +17,27 @@ export interface JoinGroupResponse {
   order_id: number;
 }
 
+/** GET /groups?scope= 与后端 ListGroups 一致 */
+export type GroupListScope = 'all' | 'mine_involved' | 'mine_created' | 'mine_joined';
+
 export const groupService = {
   // Create group
   createGroup: (data: CreateGroupRequest) =>
     api.post<APIResponse<CreateGroupResponse>>('/groups', data),
 
-  // List groups
-  listGroups: (page?: number, per_page?: number) =>
+  // List groups（scope: all | mine_involved | mine_created | mine_joined）
+  listGroups: (
+    page?: number,
+    per_page?: number,
+    opts?: { scope?: GroupListScope; status?: string }
+  ) =>
     api.get<APIResponse<PaginatedResponse<Group>>>('/groups', {
-      params: { page, per_page },
+      params: {
+        page,
+        per_page,
+        ...(opts?.scope && opts.scope !== 'all' ? { scope: opts.scope } : {}),
+        ...(opts?.status ? { status: opts.status } : {}),
+      },
     }),
 
   // Get group by ID

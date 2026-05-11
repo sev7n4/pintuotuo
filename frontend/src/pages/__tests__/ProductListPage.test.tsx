@@ -20,6 +20,12 @@ jest.mock('@/services/product', () => ({
   },
 }));
 
+jest.mock('@/services/group', () => ({
+  groupService: {
+    listGroups: jest.fn().mockResolvedValue({ data: { data: [], total: 0 } }),
+  },
+}));
+
 jest.mock('@/components/CatalogFilterDrawer', () => ({
   CatalogFilterDrawer: jest.fn(() => null),
 }));
@@ -195,7 +201,7 @@ describe('ProductListPage (SKU catalog)', () => {
       );
     });
 
-    expect(screen.getByPlaceholderText(/搜索 SKU/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/搜索模型/)).toBeInTheDocument();
     await waitFor(() => {
       expect(mockGetPublicSKUs).toHaveBeenCalled();
     });

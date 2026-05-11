@@ -64,8 +64,9 @@ describe('GroupListPage Component', () => {
       );
     });
 
-    // 检查页面标题
-    expect(screen.getByText('拼团中心')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('拼团中心')).toBeInTheDocument();
+    });
   });
 
   test('shows loading state when fetching groups', async () => {
@@ -100,8 +101,9 @@ describe('GroupListPage Component', () => {
       );
     });
 
-    // 检查加载状态
-    expect(screen.getByText('拼团中心')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.querySelector('.ant-spin')).toBeInTheDocument();
+    });
   });
 
   test('shows error message when there is an error', async () => {
@@ -152,8 +154,9 @@ describe('GroupListPage Component', () => {
       );
     });
 
-    // 检查空状态（与 GroupListPage 文案一致）
-    expect(screen.getByText('暂无进行中的拼团')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('暂无进行中的拼团')).toBeInTheDocument();
+    });
     expect(screen.getByText('浏览可拼团商品')).toBeInTheDocument();
   });
 
@@ -196,8 +199,9 @@ describe('GroupListPage Component', () => {
       );
     });
 
-    // 检查分组列表
-    expect(screen.getByText('拼团中心')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('拼团中心')).toBeInTheDocument();
+    });
     expect(screen.getByText('拼团 #1')).toBeInTheDocument();
   });
 
@@ -236,8 +240,7 @@ describe('GroupListPage Component', () => {
       );
     });
 
-    // 点击加入拼团按钮
-    const joinButton = screen.getByText('加入拼团');
+    const joinButton = await screen.findByText('加入拼团');
     await act(async () => {
       fireEvent.click(joinButton);
     });
@@ -270,7 +273,7 @@ describe('GroupListPage Component', () => {
       );
     });
 
-    const browseButton = screen.getByText('浏览可拼团商品');
+    const browseButton = await screen.findByText('浏览可拼团商品');
     await act(async () => {
       fireEvent.click(browseButton);
     });

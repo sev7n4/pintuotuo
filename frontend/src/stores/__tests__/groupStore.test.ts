@@ -80,6 +80,46 @@ describe('GroupStore', () => {
       expect(newState.isLoading).toBe(false);
     });
 
+    it('should forward opts to listGroups', async () => {
+      const mockResponse = {
+        data: {
+          total: 0,
+          page: 1,
+          per_page: 40,
+          data: [],
+        },
+      };
+      mockedGroupService.listGroups.mockResolvedValueOnce(mockResponse as any);
+
+      const store = useGroupStore.getState();
+      await store.fetchGroups(1, 40, { scope: 'mine_joined', status: 'active' });
+
+      expect(mockedGroupService.listGroups).toHaveBeenCalledWith(1, 40, {
+        scope: 'mine_joined',
+        status: 'active',
+      });
+    });
+
+    it('should parse flat paginated body (Go ListGroups)', async () => {
+      const mockResponse = {
+        data: {
+          total: 1,
+          page: 1,
+          per_page: 20,
+          data: [mockGroup],
+        },
+      };
+
+      mockedGroupService.listGroups.mockResolvedValueOnce(mockResponse as any);
+
+      const store = useGroupStore.getState();
+      const result = await store.fetchGroups();
+
+      expect(result).toEqual([mockGroup]);
+      expect(useGroupStore.getState().groups).toEqual([mockGroup]);
+      expect(useGroupStore.getState().total).toBe(1);
+    });
+
     it('should handle fetch groups error', async () => {
       const errorMessage = 'Failed to fetch groups';
       mockedGroupService.listGroups.mockRejectedValueOnce(new Error(errorMessage));

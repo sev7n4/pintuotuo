@@ -1,0 +1,41 @@
+.bannerCard {
+  border-radius: 12px;
+}
+
+.bannerInner {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.bannerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.subtitle {
+  display: block;
+  max-width: 720px;
+}
+
+.bannerImgWrap {
+  flex-shrink: 0;
+  width: 120px;
+  display: none;
+}
+
+@media (min-width: 576px) {
+  .bannerImgWrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.bannerImg {
+  max-width: 120px;
+  max-height: 88px;
+  object-fit: contain;
+  border-radius: 8px;
+}
