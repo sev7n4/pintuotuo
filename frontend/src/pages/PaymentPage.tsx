@@ -180,8 +180,17 @@ const PaymentPage: React.FC = () => {
   const listItems = currentOrder.items && currentOrder.items.length > 0 ? currentOrder.items : null;
 
   return (
-    <div style={{ padding: '20px', maxWidth: 600, margin: '0 auto' }}>
-      <Card title="订单支付">
+    <div
+      style={{
+        padding: 12,
+        maxWidth: 'min(600px, calc(100vw - 24px))',
+        width: '100%',
+        margin: '0 auto',
+        boxSizing: 'border-box',
+        overflowX: 'hidden',
+      }}
+    >
+      <Card title="订单支付" style={{ maxWidth: '100%' }}>
         <Alert
           type="info"
           showIcon
@@ -240,7 +249,11 @@ const PaymentPage: React.FC = () => {
             value={currentOrder.total_price}
             precision={2}
             prefix="¥"
-            valueStyle={{ fontSize: '32px', color: '#f5222d' }}
+            valueStyle={{
+              fontSize: 'clamp(22px, 6vw, 32px)',
+              color: '#f5222d',
+              wordBreak: 'break-all',
+            }}
           />
         </div>
 
@@ -256,10 +269,12 @@ const PaymentPage: React.FC = () => {
               value="alipay"
               style={{
                 width: '100%',
+                maxWidth: '100%',
                 height: 60,
                 display: 'flex',
                 alignItems: 'center',
-                padding: '0 20px',
+                padding: '0 12px',
+                boxSizing: 'border-box',
               }}
             >
               <AlipayCircleOutlined style={{ fontSize: 28, color: '#1677ff', marginRight: 12 }} />
@@ -269,10 +284,12 @@ const PaymentPage: React.FC = () => {
               value="wechat"
               style={{
                 width: '100%',
+                maxWidth: '100%',
                 height: 60,
                 display: 'flex',
                 alignItems: 'center',
-                padding: '0 20px',
+                padding: '0 12px',
+                boxSizing: 'border-box',
               }}
             >
               <WechatOutlined style={{ fontSize: 28, color: '#52c41a', marginRight: 12 }} />

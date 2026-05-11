@@ -26,6 +26,88 @@ import (
 const orderStatusPending = "pending"
 const groupStatusActive = "active"
 
+// ListGroups: join SKU/SPU for card titles; keep in sync with scanGroupEnrichedRow.
+const (
+	listGroupBaseSelect      = `SELECT g.id, g.product_id, g.sku_id, g.spu_id, g.creator_id, g.target_count, g.current_count, g.status, g.deadline, g.created_at, g.updated_at`
+	listGroupSKUSelectSuffix = `,
+		CASE
+			WHEN NULLIF(TRIM(sp.model_name), '') IS NOT NULL THEN TRIM(sp.model_name)
+			WHEN NULLIF(TRIM(s.sku_code), '') IS NOT NULL THEN TRIM(s.sku_code)
+			WHEN g.sku_id IS NOT NULL THEN CONCAT('SKU #', g.sku_id::text)
+			ELSE ''
+		END,
+		COALESCE(s.sku_type, ''),
+		CASE WHEN s.valid_days IS NOT NULL THEN CONCAT(s.valid_days::text, ' 天有效') ELSE '' END,
+		s.group_discount_rate`
+	listGroupSKUJoin = `
+FROM groups g
+LEFT JOIN skus s ON s.id = g.sku_id
+LEFT JOIN spus sp ON sp.id = s.spu_id`
+)
+
+func intFromGinUserID(c *gin.Context) (int, bool) {
+	raw, exists := c.Get("user_id")
+	if !exists {
+		return 0, false
+	}
+	switch v := raw.(type) {
+	case int:
+		return v, true
+	case float64:
+		return int(v), true
+	default:
+		return 0, false
+	}
+}
+
+type sqlRowScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+func scanGroupEnrichedRow(rs sqlRowScanner, g *models.Group) error {
+	var productID, skuID, spuID sql.NullInt64
+	var skuName, skuType, skuSpecs sql.NullString
+	var disc sql.NullFloat64
+	if err := rs.Scan(
+		&g.ID, &productID, &skuID, &spuID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt,
+		&skuName, &skuType, &skuSpecs, &disc,
+	); err != nil {
+		return err
+	}
+	applyNullProductID(g, productID)
+	if skuID.Valid {
+		g.SKUID = int(skuID.Int64)
+	}
+	if spuID.Valid {
+		g.SPUID = int(spuID.Int64)
+	}
+	if skuName.Valid {
+		g.SkuName = strings.TrimSpace(skuName.String)
+	}
+	if skuType.Valid {
+		g.SkuType = skuType.String
+	}
+	if skuSpecs.Valid {
+		g.SkuSpecs = strings.TrimSpace(skuSpecs.String)
+	}
+	if r := utils.NormalizeGroupDiscountRateNull(disc); r > 0 {
+		g.GroupDiscountRate = &r
+	}
+	return nil
+}
+
+func appendGroupEnrichedRows(rows *sql.Rows) ([]models.Group, error) {
+	var groups []models.Group
+	for rows.Next() {
+		var g models.Group
+		if err := scanGroupEnrichedRow(rows, &g); err != nil {
+			return nil, err
+		}
+		groups = append(groups, g)
+	}
+	return groups, rows.Err()
+}
+
 type createOrderLineItem struct {
 	SKUID    int `json:"sku_id" binding:"required,gt=0"`
 	Quantity int `json:"quantity" binding:"required,gt=0"`
@@ -921,7 +1003,7 @@ func CreateGroup(c *gin.Context) {
 }
 
 // ListGroups lists groups. Query scope:
-//   - all (default): all groups with given status (参团广场 / 全站热团)
+//   - all (default): all groups with given status (参团广场 / 全站热团)；status=active 时排除已过 deadline 的团
 //   - mine_created: current user as creator（我发起的）
 //   - mine_joined: user in group_members but not creator（我跟的团，不含自己发起的）
 //   - mine_involved: creator OR member in group_members（发起+参团一条时间线）
@@ -954,41 +1036,17 @@ func ListGroups(c *gin.Context) {
 
 	var uid int
 	if scope != adminSKUListScopeAll {
-		userIDRaw, exists := c.Get("user_id")
-		if !exists {
+		var ok bool
+		uid, ok = intFromGinUserID(c)
+		if !ok {
 			middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 			return
 		}
-		var ok bool
-		uid, ok = userIDRaw.(int)
-		if !ok {
-			if f, ok2 := userIDRaw.(float64); ok2 {
-				uid = int(f)
-			} else {
-				middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-				return
-			}
-		}
 	}
 
-	appendGroup := func(rows *sql.Rows) ([]models.Group, error) {
-		var groups []models.Group
-		for rows.Next() {
-			var g models.Group
-			var productID, skuID, spuID sql.NullInt64
-			if err := rows.Scan(&g.ID, &productID, &skuID, &spuID, &g.CreatorID, &g.TargetCount, &g.CurrentCount, &g.Status, &g.Deadline, &g.CreatedAt, &g.UpdatedAt); err != nil {
-				return nil, err
-			}
-			applyNullProductID(&g, productID)
-			if skuID.Valid {
-				g.SKUID = int(skuID.Int64)
-			}
-			if spuID.Valid {
-				g.SPUID = int(spuID.Int64)
-			}
-			groups = append(groups, g)
-		}
-		return groups, rows.Err()
+	activePublicDeadline := ""
+	if scope == adminSKUListScopeAll && status == groupStatusActive {
+		activePublicDeadline = " AND g.deadline > NOW()"
 	}
 
 	var (
@@ -1000,8 +1058,9 @@ func ListGroups(c *gin.Context) {
 	switch scope {
 	case "mine_created":
 		rows, err = db.Query(
-			`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at
-			 FROM groups WHERE status = $1 AND creator_id = $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4`,
+			listGroupBaseSelect+listGroupSKUSelectSuffix+listGroupSKUJoin+`
+			 WHERE g.status = $1 AND g.creator_id = $2
+			 ORDER BY g.created_at DESC LIMIT $3 OFFSET $4`,
 			status, uid, perPageNum, offset,
 		)
 		if err != nil {
@@ -1010,7 +1069,7 @@ func ListGroups(c *gin.Context) {
 		}
 		defer rows.Close()
 		if err = db.QueryRow(
-			`SELECT COUNT(*) FROM groups WHERE status = $1 AND creator_id = $2`,
+			`SELECT COUNT(*) FROM groups g WHERE g.status = $1 AND g.creator_id = $2`,
 			status, uid,
 		).Scan(&total); err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -1018,8 +1077,7 @@ func ListGroups(c *gin.Context) {
 		}
 	case "mine_joined":
 		rows, err = db.Query(
-			`SELECT g.id, g.product_id, g.sku_id, g.spu_id, g.creator_id, g.target_count, g.current_count, g.status, g.deadline, g.created_at, g.updated_at
-			 FROM groups g
+			listGroupBaseSelect+listGroupSKUSelectSuffix+listGroupSKUJoin+`
 			 WHERE g.status = $1
 			   AND g.id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = $2)
 			   AND g.creator_id <> $2
@@ -1044,8 +1102,7 @@ func ListGroups(c *gin.Context) {
 		}
 	case "mine_involved":
 		rows, err = db.Query(
-			`SELECT g.id, g.product_id, g.sku_id, g.spu_id, g.creator_id, g.target_count, g.current_count, g.status, g.deadline, g.created_at, g.updated_at
-			 FROM groups g
+			listGroupBaseSelect+listGroupSKUSelectSuffix+listGroupSKUJoin+`
 			 WHERE g.status = $1
 			   AND (g.creator_id = $2 OR g.id IN (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = $2))
 			 ORDER BY g.created_at DESC
@@ -1068,8 +1125,9 @@ func ListGroups(c *gin.Context) {
 		}
 	default:
 		rows, err = db.Query(
-			`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at
-			 FROM groups WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+			listGroupBaseSelect+listGroupSKUSelectSuffix+listGroupSKUJoin+`
+			 WHERE g.status = $1`+activePublicDeadline+`
+			 ORDER BY g.created_at DESC LIMIT $2 OFFSET $3`,
 			status, perPageNum, offset,
 		)
 		if err != nil {
@@ -1077,13 +1135,16 @@ func ListGroups(c *gin.Context) {
 			return
 		}
 		defer rows.Close()
-		if err = db.QueryRow("SELECT COUNT(*) FROM groups WHERE status = $1", status).Scan(&total); err != nil {
+		if err = db.QueryRow(
+			`SELECT COUNT(*) FROM groups g WHERE g.status = $1`+activePublicDeadline,
+			status,
+		).Scan(&total); err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
 	}
 
-	groups, err := appendGroup(rows)
+	groups, err := appendGroupEnrichedRows(rows)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
@@ -1159,7 +1220,11 @@ func GetGroupByID(c *gin.Context) {
 	if cachedGroup, err := cache.Get(ctx, cacheKey); err == nil {
 		var group models.Group
 		if err := json.Unmarshal([]byte(cachedGroup), &group); err == nil {
-			c.JSON(http.StatusOK, group)
+			c.JSON(http.StatusOK, gin.H{
+				"code":    0,
+				"message": "success",
+				"data":    group,
+			})
 			return
 		}
 	}
@@ -1171,24 +1236,18 @@ func GetGroupByID(c *gin.Context) {
 	}
 
 	var group models.Group
-	var productID, skuID, spuID sql.NullInt64
-	err := db.QueryRow(
-		`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at 
-		 FROM groups WHERE id = $1`,
+	row := db.QueryRow(
+		listGroupBaseSelect+listGroupSKUSelectSuffix+listGroupSKUJoin+`
+		 WHERE g.id = $1`,
 		id,
-	).Scan(&group.ID, &productID, &skuID, &spuID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
-
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+	)
+	if err := scanGroupEnrichedRow(row, &group); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+			return
+		}
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
-	}
-
-	applyNullProductID(&group, productID)
-	if skuID.Valid {
-		group.SKUID = int(skuID.Int64)
-	}
-	if spuID.Valid {
-		group.SPUID = int(spuID.Int64)
 	}
 
 	if groupJSON, err := json.Marshal(group); err == nil {
@@ -1204,8 +1263,8 @@ func GetGroupByID(c *gin.Context) {
 
 // JoinGroup adds current user to a group
 func JoinGroup(c *gin.Context) {
-	userID, exists := c.Get("user_id")
-	if !exists {
+	uid, ok := intFromGinUserID(c)
+	if !ok {
 		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
 		return
 	}
@@ -1268,6 +1327,20 @@ func JoinGroup(c *gin.Context) {
 		))
 		return
 	}
+
+	var alreadyMember bool
+	if memberErr := db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2)`,
+		group.ID, uid,
+	).Scan(&alreadyMember); memberErr != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	if alreadyMember {
+		middleware.RespondWithError(c, apperrors.ErrAlreadyInGroup)
+		return
+	}
+
 	var retailPrice float64
 	var skuType string
 	var tokenAmount sql.NullInt64
@@ -1294,7 +1367,7 @@ func JoinGroup(c *gin.Context) {
 	}}); err != nil {
 		metrics.RecordFuelPackRestriction("join_group", "FUEL_PACK_PURCHASE_RESTRICTED")
 		logger.LogWarn(c.Request.Context(), "fuel_pack_policy", "Blocked token_pack-only join group", map[string]interface{}{
-			"user_id": userID,
+			"user_id": uid,
 			"source":  "join_group",
 			"code":    "FUEL_PACK_PURCHASE_RESTRICTED",
 			"sku_id":  group.SKUID,
@@ -1321,7 +1394,7 @@ func JoinGroup(c *gin.Context) {
 	err = db.QueryRow(
 		`INSERT INTO orders (user_id, product_id, sku_id, spu_id, group_id, quantity, unit_price, total_price, status, pricing_version_id) 
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-		userID, nilPID, nil, nil, group.ID, 1, 0, unitPrice, orderStatusPending, pvJoinArg,
+		uid, nilPID, nil, nil, group.ID, 1, 0, unitPrice, orderStatusPending, pvJoinArg,
 	).Scan(&orderID)
 
 	if err != nil {
@@ -1351,7 +1424,7 @@ func JoinGroup(c *gin.Context) {
 
 	_, err = db.Exec(
 		"INSERT INTO group_members (group_id, user_id, order_id) VALUES ($1, $2, $3)",
-		group.ID, userID, orderID,
+		group.ID, uid, orderID,
 	)
 
 	if err != nil {
@@ -1449,6 +1522,68 @@ func CancelGroup(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Group canceled successfully"})
 }
 
+// GetGroupMembers lists members with display names (requires auth).
+func GetGroupMembers(c *gin.Context) {
+	if _, ok := intFromGinUserID(c); !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	id := c.Param("id")
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var exists int
+	if err := db.QueryRow(`SELECT 1 FROM groups WHERE id = $1`, id).Scan(&exists); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+			return
+		}
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	rows, err := db.Query(
+		`SELECT gm.user_id,
+		        COALESCE(NULLIF(TRIM(u.name), ''), NULLIF(SPLIT_PART(u.email, '@', 1), ''), '用户') AS display_name,
+		        (g.creator_id = gm.user_id) AS is_creator
+		 FROM group_members gm
+		 INNER JOIN groups g ON g.id = gm.group_id
+		 INNER JOIN users u ON u.id = gm.user_id
+		 WHERE gm.group_id = $1
+		 ORDER BY gm.joined_at ASC NULLS LAST, gm.id ASC`,
+		id,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer rows.Close()
+
+	var members []models.GroupMemberPublic
+	for rows.Next() {
+		var m models.GroupMemberPublic
+		if err := rows.Scan(&m.UserID, &m.DisplayName, &m.IsCreator); err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		members = append(members, m)
+	}
+	if err := rows.Err(); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "success",
+		"data":    members,
+	})
+}
+
 // GetGroupProgress retrieves group progress
 func GetGroupProgress(c *gin.Context) {
 	id := c.Param("id")
@@ -1460,24 +1595,18 @@ func GetGroupProgress(c *gin.Context) {
 	}
 
 	var group models.Group
-	var productID, skuID, spuID sql.NullInt64
-	err := db.QueryRow(
-		`SELECT id, product_id, sku_id, spu_id, creator_id, target_count, current_count, status, deadline, created_at, updated_at 
-		 FROM groups WHERE id = $1`,
+	row := db.QueryRow(
+		listGroupBaseSelect+listGroupSKUSelectSuffix+listGroupSKUJoin+`
+		 WHERE g.id = $1`,
 		id,
-	).Scan(&group.ID, &productID, &skuID, &spuID, &group.CreatorID, &group.TargetCount, &group.CurrentCount, &group.Status, &group.Deadline, &group.CreatedAt, &group.UpdatedAt)
-
-	if err != nil {
-		middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+	)
+	if err := scanGroupEnrichedRow(row, &group); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			middleware.RespondWithError(c, apperrors.ErrGroupNotFound)
+			return
+		}
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
-	}
-
-	applyNullProductID(&group, productID)
-	if skuID.Valid {
-		group.SKUID = int(skuID.Int64)
-	}
-	if spuID.Valid {
-		group.SPUID = int(spuID.Int64)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

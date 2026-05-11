@@ -183,10 +183,11 @@ func RegisterGroupRoutes(router *gin.RouterGroup) {
 	{
 		groups.POST("", handlers.CreateGroup)
 		groups.GET("", handlers.ListGroups)
+		groups.GET("/:id/members", handlers.GetGroupMembers)
+		groups.GET("/:id/progress", handlers.GetGroupProgress)
 		groups.GET("/:id", handlers.GetGroupByID)
 		groups.POST("/:id/join", handlers.JoinGroup)
 		groups.DELETE("/:id", handlers.CancelGroup)
-		groups.GET("/:id/progress", handlers.GetGroupProgress)
 	}
 }
 
