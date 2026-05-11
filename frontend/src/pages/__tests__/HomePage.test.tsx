@@ -132,7 +132,7 @@ describe('HomePage', () => {
     expect(banner2Elements.length).toBeGreaterThan(0);
   });
 
-  test('显示分类与全部分类入口', () => {
+  test('显示分类与浏览场景与层级入口', () => {
     mockUseHomeStore.mockReturnValue({
       banners: [],
       hotProducts: [],
@@ -153,7 +153,7 @@ describe('HomePage', () => {
     expect(screen.getByText('分类1')).toBeInTheDocument();
     expect(screen.getByText('分类2')).toBeInTheDocument();
     expect(screen.getByText('分类3')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /全部分类/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /浏览场景与层级/ })).toBeInTheDocument();
   });
 
   test('显示精选推荐商品', () => {

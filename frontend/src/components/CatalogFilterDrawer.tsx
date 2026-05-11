@@ -9,6 +9,7 @@ export interface CatalogFilterValues {
   provider?: string;
   tier?: string;
   sku_type?: string;
+  endpoint_type?: string;
   group_enabled?: boolean;
   price_min?: number | null;
   price_max?: number | null;
@@ -113,6 +114,20 @@ export function CatalogFilterDrawer({
               { label: '订阅', value: 'subscription' },
               { label: '并发', value: 'concurrent' },
               { label: '试用', value: 'trial' },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item name="endpoint_type" label="端点类型">
+          <Select
+            allowClear
+            placeholder="默认不限"
+            options={[
+              { label: '对话补全', value: 'chat_completions' },
+              { label: 'Response API', value: 'responses' },
+              { label: '嵌入', value: 'embeddings' },
+              { label: '图像生成', value: 'images_generations' },
+              { label: '语音合成', value: 'audio_speech' },
+              { label: '内容审核', value: 'moderations' },
             ]}
           />
         </Form.Item>
