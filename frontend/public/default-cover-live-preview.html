@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>默认封面底 · 当前实现预览</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: system-ui, sans-serif;
+        background: #fff;
+      }
+      p {
+        margin: 0 0 16px;
+        color: #595959;
+        font-size: 14px;
+      }
+      .mock {
+        position: relative;
+        isolation: isolate;
+        width: min(100%, 360px);
+        height: 140px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #f0f0f0;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background-color: #eef4ff;
+        background-image: url('./images/default-product-cover.svg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+      .frost {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        /* 与 ProductCoverMedia grid + frostOverlayDefault 一致 */
+        background: rgba(255, 255, 255, 0.11);
+        -webkit-backdrop-filter: blur(12px) saturate(1.08);
+        backdrop-filter: blur(12px) saturate(1.08);
+      }
+      .ph {
+        position: relative;
+        z-index: 2;
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+        -webkit-backdrop-filter: blur(14px) saturate(1.15);
+        backdrop-filter: blur(14px) saturate(1.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: 600;
+        color: rgba(0, 0, 0, 0.55);
+      }
+    </style>
+  </head>
+  <body>
+    <p>
+      与线上 <code>ProductCoverMedia</code>（grid、无图、无厂商）一致：底图 + 全幅毛玻璃 + 中心毛玻璃占位。直接双击打开本文件即可。
+    </p>
+    <div class="mock">
+      <div class="bg" aria-hidden="true"></div>
+      <div class="frost" aria-hidden="true"></div>
+      <div class="ph">深度</div>
+    </div>
+  </body>
+</html>
