@@ -2,6 +2,8 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { GroupProgressPage } from '../GroupProgressPage';
 import { useGroupStore } from '@/stores/groupStore';
+import { useAuthStore } from '@/stores/authStore';
+import { groupService } from '@/services/group';
 import type { Group } from '@/types';
 
 const mockNavigate = jest.fn();
@@ -15,6 +17,21 @@ jest.mock('react-router-dom', () => ({
 jest.mock('@/stores/groupStore', () => ({
   useGroupStore: jest.fn(),
 }));
+
+jest.mock('@/services/group', () => ({
+  groupService: {
+    listGroupMembers: jest.fn(),
+  },
+}));
+
+jest.mock('@/stores/authStore', () => ({
+  useAuthStore: jest.fn(),
+}));
+
+const mockedListGroupMembers = groupService.listGroupMembers as jest.MockedFunction<
+  typeof groupService.listGroupMembers
+>;
+const mockUseAuthStore = useAuthStore as unknown as jest.Mock;
 
 const mockGroup: Group = {
   id: 1,
@@ -31,6 +48,12 @@ const mockGroup: Group = {
 describe('GroupProgressPage', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
+    mockedListGroupMembers.mockResolvedValue({
+      data: { code: 0, message: 'ok', data: [{ user_id: 1, display_name: '团长用户', is_creator: true }] },
+    } as any);
+    mockUseAuthStore.mockImplementation((selector: (s: { user: { id: number } | null }) => unknown) =>
+      selector({ user: { id: 1 } as any })
+    );
   });
 
   describe('UT-GP-001: renders group progress page with loading state', () => {
@@ -71,7 +94,7 @@ describe('GroupProgressPage', () => {
       );
 
       expect(screen.getByText(/拼团进度/)).toBeInTheDocument();
-      expect(screen.getByText(/订单号/)).toBeInTheDocument();
+      expect(screen.getByText(/拼团编号/)).toBeInTheDocument();
     });
   });
 
@@ -140,7 +163,9 @@ describe('GroupProgressPage', () => {
       const shareButton = screen.getByRole('button', { name: /分享邀请/ });
       fireEvent.click(shareButton);
 
-      expect(mockWriteText).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(mockWriteText).toHaveBeenCalled();
+      });
     });
   });
 

@@ -150,6 +150,12 @@ describe('groupService', () => {
     expect(result.data).toEqual(mockResponse);
   });
 
+  test('listGroupMembers calls api.get with correct path', async () => {
+    mockApi.get.mockResolvedValue(createMockResponse({ code: 0, data: [] }));
+    await groupService.listGroupMembers(9);
+    expect(mockApi.get).toHaveBeenCalledWith('/groups/9/members');
+  });
+
   test('getGroupByID calls api.get with correct parameters', async () => {
     const mockGroupId = 1;
     const mockResponse = {

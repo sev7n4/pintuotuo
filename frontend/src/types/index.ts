@@ -164,6 +164,13 @@ export interface Group {
   group_discount_rate?: number;
 }
 
+/** GET /groups/:id/members */
+export interface GroupMemberPublic {
+  user_id: number;
+  display_name: string;
+  is_creator: boolean;
+}
+
 // Token related types
 export interface Token {
   id: number;

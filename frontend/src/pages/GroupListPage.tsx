@@ -16,17 +16,20 @@ import {
 import { UserAddOutlined, ShoppingOutlined, TagsOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useGroupStore } from '@stores/groupStore';
+import { useAuthStore } from '@/stores/authStore';
 import type { Group } from '@/types';
 import type { GroupListScope } from '@/services/group';
+import { getApiErrorMessage } from '@/utils/apiError';
+import {
+  groupProductSubtitle,
+  groupProgressBarStatus,
+  groupStatusTagLabel,
+  isGroupJoinableByState,
+  isGroupPastDeadline,
+} from '@/utils/groupDisplay';
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
-
-const statusMap: Record<string, { color: string; label: string }> = {
-  active: { color: 'blue', label: '进行中' },
-  completed: { color: 'green', label: '已成团' },
-  failed: { color: 'red', label: '已失败' },
-};
 
 interface GroupWithStore extends Group {
   onJoin?: () => void;
@@ -36,6 +39,7 @@ interface GroupWithStore extends Group {
 export const GroupListPage: React.FC = () => {
   const navigate = useNavigate();
   const screens = useBreakpoint();
+  const user = useAuthStore((s) => s.user);
   const { isLoading, error, fetchGroups, joinGroup } = useGroupStore();
   const [groups, setGroups] = useState<GroupWithStore[]>([]);
   const [joiningId, setJoiningId] = useState<number | null>(null);
@@ -65,7 +69,7 @@ export const GroupListPage: React.FC = () => {
         await loadGroups();
       }
     } catch (err) {
-      message.error('加入失败，请稍后重试');
+      message.error(getApiErrorMessage(err, '加入失败，请稍后重试'));
     } finally {
       setJoiningId(null);
     }
@@ -174,8 +178,25 @@ export const GroupListPage: React.FC = () => {
           renderItem={(group) => {
             const progress = (group.current_count / group.target_count) * 100;
             const deadline = new Date(group.deadline);
-            const isExpired = deadline < new Date();
-            const s = statusMap[group.status] || { color: 'default', label: group.status };
+            const isExpired = isGroupPastDeadline(group.deadline);
+            const tagLabel = groupStatusTagLabel(group);
+            const tagColor =
+              group.status === 'completed'
+                ? 'green'
+                : group.status === 'failed' || tagLabel === '已截止'
+                  ? 'default'
+                  : 'blue';
+            const subtitle = groupProductSubtitle(group);
+            const imCreator = user?.id != null && group.creator_id === user.id;
+            const canJoin = isGroupJoinableByState(group) && !imCreator;
+            let joinLabel = '加入拼团';
+            if (canJoin) {
+              joinLabel = '加入拼团';
+            } else if (imCreator && group.status === 'active' && !isExpired) {
+              joinLabel = '我发起的';
+            } else {
+              joinLabel = tagLabel;
+            }
 
             return (
               <List.Item key={group.id}>
@@ -184,16 +205,16 @@ export const GroupListPage: React.FC = () => {
                   onClick={() => handleViewGroupDetail(group.id)}
                   actions={[
                     <Button
-                      type={group.status === 'active' ? 'primary' : 'default'}
+                      type={canJoin ? 'primary' : 'default'}
                       icon={<UserAddOutlined />}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleJoinGroup(group.id);
                       }}
                       loading={joiningId === group.id}
-                      disabled={group.status !== 'active' || isExpired}
+                      disabled={!canJoin}
                     >
-                      {group.status === 'active' ? '加入拼团' : '已' + s.label}
+                      {joinLabel}
                     </Button>,
                   ]}
                 >
@@ -201,11 +222,11 @@ export const GroupListPage: React.FC = () => {
                     title={
                       <Space direction="vertical" size={0}>
                         <span>拼团 #{group.id}</span>
-                        {group.sku_name && (
+                        {subtitle && (
                           <Space size={4}>
                             <TagsOutlined style={{ fontSize: 12, color: '#999' }} />
                             <Text type="secondary" style={{ fontSize: 12 }}>
-                              {group.sku_name}
+                              {subtitle}
                             </Text>
                           </Space>
                         )}
@@ -250,19 +271,23 @@ export const GroupListPage: React.FC = () => {
                         <p style={{ margin: '8px 0' }}>目标人数: {group.target_count}人</p>
                         <p style={{ margin: '8px 0' }}>
                           当前人数: {group.current_count}人
-                          <Tag color={s.color} style={{ marginLeft: 10 }}>
-                            {s.label}
+                          <Tag color={tagColor} style={{ marginLeft: 10 }}>
+                            {tagLabel}
                           </Tag>
                         </p>
                         <Progress
                           percent={Math.round(progress)}
-                          status={group.status === 'active' ? 'active' : 'success'}
+                          status={groupProgressBarStatus(group)}
                           size="small"
                         />
                         <p style={{ marginTop: 10, fontSize: 12, color: '#999' }}>
                           截止时间: {deadline.toLocaleString('zh-CN')}
                         </p>
-                        {isExpired && <Tag color="red">已过期</Tag>}
+                        {isExpired && group.status === 'active' && (
+                          <Tag color="warning" style={{ marginTop: 8 }}>
+                            已超过截止时间
+                          </Tag>
+                        )}
                       </div>
                     }
                   />

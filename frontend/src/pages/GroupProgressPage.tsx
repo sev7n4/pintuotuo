@@ -13,6 +13,7 @@ import {
   Typography,
   message,
   Modal,
+  Input,
 } from 'antd';
 import {
   ShareAltOutlined,
@@ -22,9 +23,16 @@ import {
   ClockCircleOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  CrownOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGroupStore } from '@/stores/groupStore';
+import { useAuthStore } from '@/stores/authStore';
+import { groupService } from '@/services/group';
+import type { APIResponse, GroupMemberPublic } from '@/types';
+import { getApiErrorMessage } from '@/utils/apiError';
+import { copyTextToClipboard } from '@/utils/clipboardCopy';
+import { groupProgressBarStatus, groupStatusTagLabel, isGroupPastDeadline } from '@/utils/groupDisplay';
 
 const { Title, Text } = Typography;
 
@@ -37,15 +45,37 @@ const statusConfig: Record<string, { color: string; label: string; icon: React.R
 export const GroupProgressPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
   const { currentGroup, isLoading, error, getGroupProgress, cancelGroup } = useGroupStore();
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [countdown, setCountdown] = useState('');
+  const [members, setMembers] = useState<GroupMemberPublic[]>([]);
 
   useEffect(() => {
     if (id) {
-      getGroupProgress(parseInt(id));
+      void getGroupProgress(parseInt(id, 10));
     }
   }, [id, getGroupProgress]);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await groupService.listGroupMembers(parseInt(id, 10));
+        const body = res.data as APIResponse<GroupMemberPublic[]>;
+        const next = Array.isArray(body?.data) ? body.data : [];
+        if (!cancelled) {
+          queueMicrotask(() => setMembers(next));
+        }
+      } catch {
+        if (!cancelled) queueMicrotask(() => setMembers([]));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!currentGroup || currentGroup.status !== 'active') return;
@@ -56,7 +86,7 @@ export const GroupProgressPage: React.FC = () => {
       const diff = deadline - now;
 
       if (diff <= 0) {
-        setCountdown('已过期');
+        setCountdown('已截止');
         return;
       }
 
@@ -73,15 +103,26 @@ export const GroupProgressPage: React.FC = () => {
     return () => clearInterval(timer);
   }, [currentGroup]);
 
-  const handleShare = () => {
-    if (!currentGroup) return;
-    const shareUrl = `${window.location.origin}/groups/${currentGroup.id}/join`;
-    navigator.clipboard.writeText(shareUrl);
-    message.success('分享链接已复制到剪贴板');
+  const shareJoinURL = () => {
+    if (!currentGroup) return '';
+    return `${window.location.origin}/groups/${currentGroup.id}/join`;
   };
 
-  const handleCopyLink = () => {
-    handleShare();
+  const handleShare = async () => {
+    const shareUrl = shareJoinURL();
+    if (!shareUrl) return;
+    const ok = await copyTextToClipboard(shareUrl);
+    if (ok) {
+      message.success('分享链接已复制到剪贴板');
+      return;
+    }
+    Modal.info({
+      title: '请手动复制链接',
+      width: 520,
+      content: (
+        <Input.TextArea readOnly autoSize={{ minRows: 2, maxRows: 4 }} value={shareUrl} style={{ marginTop: 8 }} />
+      ),
+    });
   };
 
   const handleCancel = async () => {
@@ -91,8 +132,8 @@ export const GroupProgressPage: React.FC = () => {
       message.success('拼团已取消');
       setCancelModalVisible(false);
       navigate('/groups');
-    } catch {
-      message.error('取消失败，请重试');
+    } catch (err) {
+      message.error(getApiErrorMessage(err, '取消失败，请稍后重试'));
     }
   };
 
@@ -116,7 +157,19 @@ export const GroupProgressPage: React.FC = () => {
 
   const statusInfo = statusConfig[currentGroup.status] || statusConfig.active;
   const progress = (currentGroup.current_count / currentGroup.target_count) * 100;
-  const remainingCount = currentGroup.target_count - currentGroup.current_count;
+  const remainingCount = Math.max(0, currentGroup.target_count - currentGroup.current_count);
+  const progressTagLabel = groupStatusTagLabel(currentGroup);
+  const tagColor =
+    currentGroup.status === 'completed'
+      ? 'success'
+      : currentGroup.status === 'failed'
+        ? 'error'
+        : progressTagLabel === '已截止'
+          ? 'warning'
+          : statusInfo.color;
+  const tagIcon =
+    progressTagLabel === '已截止' ? <ExclamationCircleOutlined /> : statusInfo.icon;
+  const isCreator = user?.id != null && currentGroup.creator_id === user.id;
 
   if (currentGroup.status === 'completed') {
     return (
@@ -125,7 +178,7 @@ export const GroupProgressPage: React.FC = () => {
           status="success"
           icon={<CheckCircleOutlined />}
           title="拼团成功！"
-          subTitle={`订单号: #${currentGroup.id}`}
+          subTitle={`拼团编号: #${currentGroup.id}`}
           extra={[
             <Button type="primary" key="pay" onClick={() => navigate('/orders')}>
               查看订单
@@ -161,19 +214,30 @@ export const GroupProgressPage: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '20px', maxWidth: 600, margin: '0 auto' }}>
-      <Card>
+    <div
+      style={{
+        padding: 12,
+        maxWidth: 'min(600px, calc(100vw - 24px))',
+        width: '100%',
+        margin: '0 auto',
+        boxSizing: 'border-box',
+        overflowX: 'hidden',
+      }}
+    >
+      <Card style={{ maxWidth: '100%' }}>
         <div style={{ marginBottom: 20 }}>
-          <Space align="center">
-            <Title level={3}>拼团进度</Title>
-            <Tag color={statusInfo.color} icon={statusInfo.icon}>
-              {statusInfo.label}
+          <Space align="center" wrap>
+            <Title level={3} style={{ margin: 0 }}>
+              拼团进度
+            </Title>
+            <Tag color={tagColor} icon={tagIcon}>
+              {progressTagLabel}
             </Tag>
           </Space>
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <Text type="secondary">订单号：#{currentGroup.id}</Text>
+          <Text type="secondary">拼团编号：#{currentGroup.id}</Text>
         </div>
 
         <Card style={{ marginBottom: 20, background: '#fafafa' }}>
@@ -186,7 +250,7 @@ export const GroupProgressPage: React.FC = () => {
 
           <Progress
             percent={progress}
-            status={currentGroup.status === 'active' ? 'active' : 'success'}
+            status={groupProgressBarStatus(currentGroup)}
             format={() => `还需${remainingCount}人`}
           />
 
@@ -198,46 +262,55 @@ export const GroupProgressPage: React.FC = () => {
 
         <Card title="成员列表" style={{ marginBottom: 20 }}>
           <List
-            dataSource={Array.from({ length: currentGroup.target_count }, (_, i) => ({
-              id: i,
-              joined: i < currentGroup.current_count,
-            }))}
-            renderItem={(item: { id: number; joined: boolean }) => (
+            dataSource={members}
+            locale={{ emptyText: '暂无成员数据' }}
+            renderItem={(m) => (
               <List.Item>
                 <List.Item.Meta
                   avatar={
                     <Avatar
-                      icon={item.joined ? <UserOutlined /> : <CloseOutlined />}
+                      icon={m.is_creator ? <CrownOutlined /> : <UserOutlined />}
                       style={{
-                        backgroundColor: item.joined ? '#1890ff' : '#f0f0f0',
-                        color: item.joined ? '#fff' : '#999',
+                        backgroundColor: m.is_creator ? '#faad14' : '#1890ff',
+                        color: '#fff',
                       }}
                     />
                   }
-                  title={item.joined ? `成员 ${(item.id as number) + 1}` : '等待加入...'}
-                  description={item.joined ? '已加入' : '等待中'}
+                  title={
+                    <Space size={8} wrap>
+                      <span>{m.display_name}</span>
+                      {m.is_creator && <Tag color="gold">团长</Tag>}
+                    </Space>
+                  }
+                  description="已参团"
                 />
               </List.Item>
             )}
           />
+          {remainingCount > 0 && (
+            <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+              还差 {remainingCount} 个名额，邀请好友参团吧
+            </Text>
+          )}
+          {isGroupPastDeadline(currentGroup.deadline) && currentGroup.status === 'active' && (
+            <Text type="warning" style={{ display: 'block', marginTop: 8 }}>
+              已超过截止时间，系统将按规则更新拼团状态；若仍显示进行中，请稍候刷新。
+            </Text>
+          )}
         </Card>
 
         <Space direction="vertical" style={{ width: '100%' }}>
-          <Button
-            type="primary"
-            icon={<ShareAltOutlined />}
-            onClick={handleShare}
-            block
-            size="large"
-          >
+          <Button type="primary" icon={<ShareAltOutlined />} onClick={() => void handleShare()} block size="large">
             分享邀请
           </Button>
-          <Button icon={<CopyOutlined />} onClick={handleCopyLink} block>
+          <Button icon={<CopyOutlined />} onClick={() => void handleShare()} block aria-label="复制链接">
             复制链接
           </Button>
-          <Button danger icon={<CloseOutlined />} onClick={() => setCancelModalVisible(true)} block>
-            取消拼团
-          </Button>
+          {isCreator && (
+            <Button danger icon={<CloseOutlined />} onClick={() => setCancelModalVisible(true)} block>
+              取消拼团
+            </Button>
+          )}
         </Space>
 
         <div style={{ marginTop: 16, textAlign: 'center' }}>
@@ -257,6 +330,7 @@ export const GroupProgressPage: React.FC = () => {
         okButtonProps={{ danger: true }}
       >
         <p>确定要取消这个拼团吗？取消后需要重新发起拼团。</p>
+        <p style={{ color: '#999', fontSize: 13 }}>仅发起人可以取消整团；其他成员如需退出，请在订单中取消未支付订单。</p>
       </Modal>
     </div>
   );

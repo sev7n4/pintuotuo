@@ -2,6 +2,11 @@ import { Button, Progress, Space, Tag, Typography, Alert, Grid, Spin, Segmented 
 import { TeamOutlined, RightOutlined, LoginOutlined } from '@ant-design/icons';
 import type { Group } from '@/types';
 import type { GroupListScope } from '@/services/group';
+import {
+  groupProductSubtitle,
+  groupProgressBarStatus,
+  groupStatusTagLabel,
+} from '@/utils/groupDisplay';
 import styles from './CatalogGroupsShowcase.module.css';
 
 const { Text, Title } = Typography;
@@ -14,12 +19,6 @@ export type CatalogGroupsLoadStatus =
   | 'empty'
   | 'unauthorized'
   | 'error';
-
-const statusMap: Record<string, { color: string; label: string }> = {
-  active: { color: 'blue', label: '进行中' },
-  completed: { color: 'green', label: '已成团' },
-  failed: { color: 'red', label: '已失败' },
-};
 
 interface CatalogGroupsShowcaseProps {
   layout: 'rail' | 'expanded';
@@ -77,9 +76,16 @@ function emptyHint(
 
 function GroupMiniCard({ group, onClick }: { group: Group; onClick: () => void }) {
   const progress = Math.min(100, Math.round((group.current_count / group.target_count) * 100));
-  const s = statusMap[group.status] || { color: 'default', label: group.status };
+  const tagLabel = groupStatusTagLabel(group);
+  const tagColor =
+    group.status === 'completed'
+      ? 'green'
+      : group.status === 'failed' || tagLabel === '已截止'
+        ? 'default'
+        : 'blue';
   const deadline = new Date(group.deadline);
-  const expired = deadline < new Date();
+  const expired = deadline.getTime() <= Date.now();
+  const subtitle = groupProductSubtitle(group);
 
   return (
     <div
@@ -97,17 +103,17 @@ function GroupMiniCard({ group, onClick }: { group: Group; onClick: () => void }
       <Space direction="vertical" size={6} style={{ width: '100%' }}>
         <Space style={{ width: '100%', justifyContent: 'space-between' }} align="start">
           <Text strong>拼团 #{group.id}</Text>
-          <Tag color={s.color}>{s.label}</Tag>
+          <Tag color={tagColor}>{tagLabel}</Tag>
         </Space>
-        {group.sku_name && (
+        {subtitle && (
           <Text type="secondary" ellipsis style={{ fontSize: 12 }}>
-            {group.sku_name}
+            {subtitle}
           </Text>
         )}
         <Progress
           percent={progress}
           size="small"
-          status={group.status === 'active' && !expired ? 'active' : 'normal'}
+          status={groupProgressBarStatus(group)}
         />
         <Text type="secondary" style={{ fontSize: 12 }}>
           {group.current_count}/{group.target_count} 人

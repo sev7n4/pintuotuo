@@ -1,4 +1,5 @@
 import api from './api';
+import type { GroupMemberPublic } from '@/types';
 import { Group, APIResponse, PaginatedResponse } from '@/types';
 
 export interface CreateGroupRequest {
@@ -42,6 +43,10 @@ export const groupService = {
 
   // Get group by ID
   getGroupByID: (id: number) => api.get<APIResponse<Group>>(`/groups/${id}`),
+
+  /** 拼团成员（展示名，需登录） */
+  listGroupMembers: (id: number) =>
+    api.get<APIResponse<GroupMemberPublic[]>>(`/groups/${id}/members`),
 
   // Join group
   joinGroup: (id: number) => api.post<APIResponse<JoinGroupResponse>>(`/groups/${id}/join`, {}),
