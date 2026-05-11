@@ -28,7 +28,7 @@ const groupStatusActive = "active"
 
 // ListGroups: join SKU/SPU for card titles; keep in sync with scanGroupEnrichedRow.
 const (
-	listGroupBaseSelect = `SELECT g.id, g.product_id, g.sku_id, g.spu_id, g.creator_id, g.target_count, g.current_count, g.status, g.deadline, g.created_at, g.updated_at`
+	listGroupBaseSelect      = `SELECT g.id, g.product_id, g.sku_id, g.spu_id, g.creator_id, g.target_count, g.current_count, g.status, g.deadline, g.created_at, g.updated_at`
 	listGroupSKUSelectSuffix = `,
 		CASE
 			WHEN NULLIF(TRIM(sp.model_name), '') IS NOT NULL THEN TRIM(sp.model_name)
@@ -1329,10 +1329,10 @@ func JoinGroup(c *gin.Context) {
 	}
 
 	var alreadyMember bool
-	if err := db.QueryRow(
+	if memberErr := db.QueryRow(
 		`SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2)`,
 		group.ID, uid,
-	).Scan(&alreadyMember); err != nil {
+	).Scan(&alreadyMember); memberErr != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 		return
 	}

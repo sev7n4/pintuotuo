@@ -94,10 +94,10 @@ type Group struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	// List/detail enrichment (LEFT JOIN skus/spus)
-	SkuName             string   `json:"sku_name,omitempty"`
-	SkuType             string   `json:"sku_type,omitempty"`
-	SkuSpecs            string   `json:"sku_specs,omitempty"`
-	GroupDiscountRate   *float64 `json:"group_discount_rate,omitempty"`
+	SkuName           string   `json:"sku_name,omitempty"`
+	SkuType           string   `json:"sku_type,omitempty"`
+	SkuSpecs          string   `json:"sku_specs,omitempty"`
+	GroupDiscountRate *float64 `json:"group_discount_rate,omitempty"`
 }
 
 // GroupMemberPublic is a safe member row for GET /groups/:id/members.
