@@ -31,7 +31,7 @@ function resolveCoverUrl(
 }
 
 /**
- * 卖场统一封面：主图（含 onError）→ Lobe 厂商徽标 → 灰底两字占位。
+ * 卖场统一封面：主图（含 onError）→ Lobe 厂商徽标 → 默认底图 + 全幅/中心毛玻璃 + 两字占位。
  * 用于首页、列表、详情、收藏、浏览历史等。
  */
 export function ProductCoverMedia({
@@ -99,6 +99,8 @@ export function ProductCoverMedia({
   const placeholderBoxClass = [
     styles.placeholder,
     variant === 'grid' && styles.placeholderCompact,
+    variant === 'wide' && styles.placeholderWide,
+    variant === 'home' && styles.placeholderHome,
     variant === 'hero' && styles.placeholderHero,
   ]
     .filter(Boolean)
@@ -107,8 +109,27 @@ export function ProductCoverMedia({
   const t = fallbackTitle.trim();
   const fallbackChars = t.length >= 2 ? t.slice(0, 2) : t || '—';
 
+  const bgLayerClass = [styles.bgLayer, !surface && styles.bgLayerDefault].filter(Boolean).join(' ');
+  const frostClass = [
+    styles.frostOverlay,
+    surface ? styles.frostOverlaySurface : styles.frostOverlayDefault,
+    variant === 'grid' && styles.frostOverlayGrid,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div className={rootClass} style={surface ? { background: surface } : undefined}>
+    <div className={rootClass}>
+      {!showCoverImg && (
+        <>
+          <div
+            className={bgLayerClass}
+            style={surface ? { background: surface } : undefined}
+            aria-hidden
+          />
+          <div className={frostClass} aria-hidden />
+        </>
+      )}
       {showCoverImg ? (
         <img
           src={resolved}

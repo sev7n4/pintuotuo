@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eef4ff"/>
+      <stop offset="45%" stop-color="#fff7f0"/>
+      <stop offset="100%" stop-color="#e8f2ff"/>
+    </linearGradient>
+    <radialGradient id="bloom" cx="18%" cy="12%" r="0.65">
+      <stop offset="0%" stop-color="#93c5fd" stop-opacity="0.45"/>
+      <stop offset="55%" stop-color="#93c5fd" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#93c5fd" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bloom2" cx="88%" cy="78%" r="0.55">
+      <stop offset="0%" stop-color="#fdba74" stop-opacity="0.35"/>
+      <stop offset="60%" stop-color="#fdba74" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#fdba74" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="arc" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#sky)"/>
+  <rect width="960" height="540" fill="url(#bloom)"/>
+  <rect width="960" height="540" fill="url(#bloom2)"/>
+  <path
+    d="M0 380 Q240 320 480 360 T960 340 L960 540 L0 540 Z"
+    fill="#c7d2fe"
+    fill-opacity="0.18"
+  />
+  <path
+    d="M0 420 Q320 400 640 440 T960 400 L960 540 L0 540 Z"
+    fill="#93c5fd"
+    fill-opacity="0.12"
+  />
+  <ellipse cx="480" cy="300" rx="420" ry="160" fill="url(#arc)"/>
+</svg>

@@ -70,7 +70,9 @@ describe('Layout Component', () => {
     expect(screen.getByText('首页')).toBeInTheDocument();
     expect(screen.getByText('卖场')).toBeInTheDocument();
     expect(screen.getByText('购物车')).toBeInTheDocument();
-    expect(screen.getByText('拼团')).toBeInTheDocument();
+    const groupNav = screen.getByRole('link', { name: '拼团' });
+    expect(groupNav).toBeInTheDocument();
+    expect(groupNav).toHaveAttribute('href', '/catalog?group_enabled=true');
     expect(screen.getByText('邀请')).toBeInTheDocument();
     expect(screen.getByText('帮助')).toBeInTheDocument();
     expect(screen.queryByText('我的订单')).not.toBeInTheDocument();
