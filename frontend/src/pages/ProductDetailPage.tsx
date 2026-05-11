@@ -34,8 +34,10 @@ import {
   UserOutlined,
   ClockCircleOutlined,
   TagsOutlined,
+  UsergroupAddOutlined,
+  PlusCircleOutlined,
 } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useProductStore } from '@stores/productStore';
 import { useCartStore } from '@stores/cartStore';
 import { useGroupStore } from '@stores/groupStore';
@@ -46,6 +48,7 @@ import type { SKUWithSPU } from '@/types/sku';
 import { normalizeGroupDiscountRate } from '@/utils/groupDiscount';
 import styles from './ProductDetailPage.module.css';
 import { ProductCoverMedia } from '@/components/ProductCoverMedia';
+import { IconHintButton } from '@/components/IconHintButton';
 
 const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
@@ -765,69 +768,115 @@ export const ProductDetailPage: React.FC = () => {
                 </Card>
                 <div className={styles.groupActionsRow}>
                   <div className={styles.groupActionCell}>
-                    <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
-                      <Button
-                        type="primary"
-                        size="large"
-                        block
-                        icon={<TeamOutlined />}
-                        onClick={() => {
-                          loadActiveGroups();
-                          setShowGroupsModal(true);
+                    <Tooltip
+                      title={
+                        product.stock === 0
+                          ? '暂无库存'
+                          : '查看并加入进行中的拼团（打开列表选择团）'
+                      }
+                    >
+                      <span
+                        style={{
+                          display: 'flex',
+                          width: '100%',
+                          minWidth: 0,
+                          cursor: product.stock === 0 ? 'not-allowed' : undefined,
                         }}
-                        disabled={product.stock === 0}
-                        style={{ background: '#52c41a', borderColor: '#52c41a' }}
                       >
-                        立即加入团
-                      </Button>
-                    </Badge>
+                        <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
+                          <Button
+                            type="primary"
+                            size="large"
+                            block
+                            icon={<UsergroupAddOutlined />}
+                            aria-label={
+                              product.stock === 0 ? '暂无库存' : '立即加入团，查看进行中的拼团'
+                            }
+                            onClick={() => {
+                              loadActiveGroups();
+                              setShowGroupsModal(true);
+                            }}
+                            disabled={product.stock === 0}
+                            style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                          >
+                            {screens.xs ? null : '立即加入团'}
+                          </Button>
+                        </Badge>
+                      </span>
+                    </Tooltip>
                   </div>
                   <div className={styles.groupActionCell}>
-                    <Button
-                      type="primary"
-                      size="large"
-                      block
-                      icon={<TeamOutlined />}
-                      onClick={handleGroupPurchase}
-                      disabled={product.stock === 0 || groupPrices.length === 0}
-                      style={{
-                        background: '#1890ff',
-                        borderColor: '#1890ff',
-                      }}
+                    <Tooltip
+                      title={
+                        product.stock === 0
+                          ? '暂无库存'
+                          : groupPrices.length === 0
+                            ? '当前规格不支持拼团'
+                            : '发起新拼团并前往支付'
+                      }
                     >
-                      {product.stock === 0
-                        ? '暂无库存'
-                        : groupPrices.length === 0
-                          ? '当前规格不可拼团'
-                          : '发起拼团并支付'}
-                    </Button>
+                      <span
+                        style={{
+                          display: 'flex',
+                          width: '100%',
+                          minWidth: 0,
+                          cursor:
+                            product.stock === 0 || groupPrices.length === 0
+                              ? 'not-allowed'
+                              : undefined,
+                        }}
+                      >
+                        <Button
+                          type="primary"
+                          size="large"
+                          block
+                          icon={<PlusCircleOutlined />}
+                          aria-label={
+                            product.stock === 0
+                              ? '暂无库存'
+                              : groupPrices.length === 0
+                                ? '当前规格不可拼团'
+                                : '发起拼团并支付'
+                          }
+                          onClick={handleGroupPurchase}
+                          disabled={product.stock === 0 || groupPrices.length === 0}
+                          style={{
+                            background: '#1890ff',
+                            borderColor: '#1890ff',
+                          }}
+                        >
+                          {screens.xs
+                            ? null
+                            : product.stock === 0
+                              ? '暂无库存'
+                              : groupPrices.length === 0
+                                ? '当前规格不可拼团'
+                                : '发起拼团并支付'}
+                        </Button>
+                      </span>
+                    </Tooltip>
                   </div>
                 </div>
               </Space>
             )}
 
             <div className={styles.secondaryRow}>
-              <Button
+              <IconHintButton
+                hint="复制商品分享链接"
+                type="default"
                 size="large"
                 icon={<ShareAltOutlined />}
                 onClick={handleShare}
-                style={{
-                  flex: screens.xs ? '1 1 calc(50% - 4px)' : '1 1 auto',
-                  minWidth: 0,
-                }}
-              >
-                分享
-              </Button>
-              <Button
+                className={styles.iconToolbarBtn}
+              />
+              <IconHintButton
+                hint="打开购物车"
+                type="default"
                 size="large"
+                icon={<ShoppingCartOutlined />}
                 onClick={() => navigate('/cart')}
-                style={{
-                  flex: screens.xs ? '1 1 calc(50% - 4px)' : '1 1 auto',
-                  minWidth: 0,
-                }}
-              >
-                {screens.xs ? '购物车' : '查看购物车'}
-              </Button>
+                className={styles.iconToolbarBtn}
+              />
             </div>
           </div>
         </Space>
@@ -900,7 +949,15 @@ export const ProductDetailPage: React.FC = () => {
                   支持 OpenAI 兼容路径：将 Base URL 设为平台提供的地址，请求体中填写
                   model（可用「厂商/模型」或兼容前缀匹配）
                 </li>
-                <li>流式（stream）是否开放以平台公告为准</li>
+                <li>
+                  流式输出（请求体 <Text code>stream: true</Text>
+                  ）平台已支持；客户端/SDK 接入示例见{' '}
+                  <Link to="/developer/quickstart">开发者中心 → 快速开始</Link>。
+                </li>
+                <li>
+                  更多接口说明、模型列表、用量与排错请前往{' '}
+                  <Link to="/developer/quickstart">开发者中心</Link>。
+                </li>
               </ol>
               {selectedSKU && (
                 <>

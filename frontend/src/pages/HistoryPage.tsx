@@ -23,6 +23,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { browseHistoryService, BrowseHistoryItem } from '@/services/favorite';
 import { ProductCoverMedia } from '@/components/ProductCoverMedia';
+import { IconHintButton } from '@/components/IconHintButton';
 import styles from './HistoryPage.module.css';
 
 const { Title, Text } = Typography;
@@ -45,7 +46,9 @@ export default function HistoryPage() {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const response = await browseHistoryService.getHistory(endpointTypeFilter ? { endpoint_type: endpointTypeFilter } : undefined);
+      const response = await browseHistoryService.getHistory(
+        endpointTypeFilter ? { endpoint_type: endpointTypeFilter } : undefined
+      );
       if (response.data?.data) {
         setHistory(response.data.data.items || []);
         setTotal(response.data.data.total || 0);
@@ -197,17 +200,16 @@ export default function HistoryPage() {
                     </div>
                     <div className={styles.actions}>
                       <Space>
-                        <Button
+                        <IconHintButton
                           type="primary"
                           size="small"
+                          hint="加入购物车"
                           icon={<ShoppingCartOutlined />}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleAddToCart(item);
                           }}
-                        >
-                          加入购物车
-                        </Button>
+                        />
                         <Popconfirm
                           title="确定删除该记录？"
                           onConfirm={(e) => {

@@ -26,6 +26,7 @@ import {
   WalletOutlined,
 } from '@ant-design/icons';
 import { useReferralStore } from '@/stores/referralStore';
+import { IconHintButton } from '@/components/IconHintButton';
 import { Referral, ReferralReward, ReferralWithdrawal } from '@/types';
 import type { ColumnsType } from 'antd/es/table';
 import styles from './ReferralPage.module.css';
@@ -214,9 +215,11 @@ const ReferralPage = () => {
                 <Button type="primary" icon={<CopyOutlined />} onClick={handleCopyCode}>
                   复制邀请码
                 </Button>
-                <Button icon={<ShareAltOutlined />} onClick={handleShare}>
-                  分享链接
-                </Button>
+                <IconHintButton
+                  icon={<ShareAltOutlined />}
+                  hint="复制邀请链接"
+                  onClick={handleShare}
+                />
               </Space>
             </div>
             <div className={styles.tips}>

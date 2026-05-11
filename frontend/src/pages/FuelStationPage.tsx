@@ -20,6 +20,7 @@ import { skuService } from '@/services/sku';
 import type { FuelStationConfig } from '@/types/fuelStation';
 import type { SKUWithSPU } from '@/types/sku';
 import { useCartStore } from '@/stores/cartStore';
+import { IconHintButton } from '@/components/IconHintButton';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -196,13 +197,12 @@ export default function FuelStationPage() {
                           })}
                         </Space>
                       </Radio.Group>
-                      <Button
+                      <IconHintButton
                         type="primary"
+                        hint="将当前所选档位加入购物车"
                         icon={<ShoppingCartOutlined />}
                         onClick={() => addSelectedTierToCart(section.code)}
-                      >
-                        选择档位并加入购物车
-                      </Button>
+                      />
                     </Space>
                   </Card>
                 </Col>
