@@ -18,7 +18,6 @@ import {
   Row,
   Col,
   Modal,
-  Badge,
   Alert,
   Progress,
   Collapse,
@@ -455,7 +454,8 @@ export const ProductDetailPage: React.FC = () => {
 
             {selectedSKU ? (
               <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-                当前套餐：{buildSkuSummary(selectedSKU)}
+                已选套餐：<Text strong>{selectedSKU.spu_name}</Text>
+                <Text type="secondary">（套餐用量与价格见下方卡片，商品级说明见「商品详情」）</Text>
               </Text>
             ) : null}
             <Button
@@ -772,7 +772,7 @@ export const ProductDetailPage: React.FC = () => {
                       title={
                         product.stock === 0
                           ? '暂无库存'
-                          : '查看并加入进行中的拼团（打开列表选择团）'
+                          : '加入已有拼团：打开列表选择团并参团（当前可加入团数见上方）'
                       }
                     >
                       <span
@@ -783,25 +783,24 @@ export const ProductDetailPage: React.FC = () => {
                           cursor: product.stock === 0 ? 'not-allowed' : undefined,
                         }}
                       >
-                        <Badge count={activeGroups.length} size="small" offset={[5, 0]}>
-                          <Button
-                            type="primary"
-                            size="large"
-                            block
-                            icon={<UsergroupAddOutlined />}
-                            aria-label={
-                              product.stock === 0 ? '暂无库存' : '立即加入团，查看进行中的拼团'
-                            }
-                            onClick={() => {
-                              loadActiveGroups();
-                              setShowGroupsModal(true);
-                            }}
-                            disabled={product.stock === 0}
-                            style={{ background: '#52c41a', borderColor: '#52c41a' }}
-                          >
-                            {screens.xs ? null : '立即加入团'}
-                          </Button>
-                        </Badge>
+                        <Button
+                          type="primary"
+                          size="large"
+                          block
+                          icon={<UsergroupAddOutlined />}
+                          aria-label={
+                            product.stock === 0 ? '暂无库存' : '加入拼团，打开可加入的团列表'
+                          }
+                          className={styles.groupPairBtn}
+                          onClick={() => {
+                            loadActiveGroups();
+                            setShowGroupsModal(true);
+                          }}
+                          disabled={product.stock === 0}
+                          style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                        >
+                          {product.stock === 0 ? '暂无库存' : '加入拼团'}
+                        </Button>
                       </span>
                     </Tooltip>
                   </div>
@@ -836,8 +835,9 @@ export const ProductDetailPage: React.FC = () => {
                               ? '暂无库存'
                               : groupPrices.length === 0
                                 ? '当前规格不可拼团'
-                                : '发起拼团并支付'
+                                : '发起拼团并前往支付'
                           }
+                          className={styles.groupPairBtn}
                           onClick={handleGroupPurchase}
                           disabled={product.stock === 0 || groupPrices.length === 0}
                           style={{
@@ -845,13 +845,11 @@ export const ProductDetailPage: React.FC = () => {
                             borderColor: '#1890ff',
                           }}
                         >
-                          {screens.xs
-                            ? null
-                            : product.stock === 0
-                              ? '暂无库存'
-                              : groupPrices.length === 0
-                                ? '当前规格不可拼团'
-                                : '发起拼团并支付'}
+                          {product.stock === 0
+                            ? '暂无库存'
+                            : groupPrices.length === 0
+                              ? '不可拼团'
+                              : '发起拼团'}
                         </Button>
                       </span>
                     </Tooltip>
@@ -861,22 +859,32 @@ export const ProductDetailPage: React.FC = () => {
             )}
 
             <div className={styles.secondaryRow}>
-              <IconHintButton
-                hint="复制商品分享链接"
-                type="default"
-                size="large"
-                icon={<ShareAltOutlined />}
-                onClick={handleShare}
-                className={styles.iconToolbarBtn}
-              />
-              <IconHintButton
-                hint="打开购物车"
-                type="default"
-                size="large"
-                icon={<ShoppingCartOutlined />}
-                onClick={() => navigate('/cart')}
-                className={styles.iconToolbarBtn}
-              />
+              <div className={styles.secondaryCell}>
+                <IconHintButton
+                  hint="复制商品分享链接"
+                  type="default"
+                  size="large"
+                  block
+                  icon={<ShareAltOutlined />}
+                  onClick={handleShare}
+                  className={styles.iconToolbarBtn}
+                >
+                  {screens.xs ? '分享' : null}
+                </IconHintButton>
+              </div>
+              <div className={styles.secondaryCell}>
+                <IconHintButton
+                  hint="打开购物车"
+                  type="default"
+                  size="large"
+                  block
+                  icon={<ShoppingCartOutlined />}
+                  onClick={() => navigate('/cart')}
+                  className={styles.iconToolbarBtn}
+                >
+                  {screens.xs ? '购物车' : null}
+                </IconHintButton>
+              </div>
             </div>
           </div>
         </Space>
@@ -887,6 +895,10 @@ export const ProductDetailPage: React.FC = () => {
           <TabPane tab="商品详情" key="detail">
             <Space direction="vertical" style={{ width: '100%' }}>
               <Title level={5}>商品信息</Title>
+              <Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 13 }}>
+                以下为商品（SPU）级字段，与目录/运营配置一致；套餐粒度的 Token 量、价与拼团等以
+                「选择套餐」卡片为准。
+              </Paragraph>
               <ul style={{ paddingLeft: 20 }}>
                 <li>
                   包含 Token：
@@ -963,6 +975,31 @@ export const ProductDetailPage: React.FC = () => {
                 <>
                   <Divider />
                   <Title level={5}>本商品规格参考（非最终权益）</Title>
+                  {selectedSKU.catalog_pricing_version_id != null ? (
+                    <Alert
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 8 }}
+                      message={
+                        <>
+                          以下「参考输入/输出成本」已按您<strong>最近已支付订单</strong>
+                          锁定的定价版本（
+                          <Text code>
+                            pricing_version_id = {selectedSKU.catalog_pricing_version_id}
+                          </Text>
+                          ）展示，便于与账户侧计费对齐；未登录用户仍为 baseline 版本。
+                        </>
+                      }
+                    />
+                  ) : (
+                    <Paragraph type="secondary" style={{ marginBottom: 8, fontSize: 13 }}>
+                      下列「参考输入/输出成本」优先取自<strong> baseline 定价版本</strong>在
+                      <Text code>pricing_version_spu_rates</Text>
+                      中的快照（与下单默认 <Text code>pricing_version_id</Text>
+                      、网关按版本计费一致）；若无快照再回落 SPU
+                      当前列。实际扣费仍以调用用量、账户权益与账单为准。
+                    </Paragraph>
+                  )}
                   <ul style={{ paddingLeft: 20 }}>
                     <li>
                       厂商代码（provider）：<Text code>{selectedSKU.model_provider}</Text>
@@ -982,6 +1019,27 @@ export const ProductDetailPage: React.FC = () => {
                         code
                       >{`${selectedSKU.model_provider}/${selectedSKU.provider_model_id?.trim() || selectedSKU.model_name}`}</Text>
                     </li>
+                    {(Number(selectedSKU.provider_input_rate) > 0 ||
+                      Number(selectedSKU.provider_output_rate) > 0) && (
+                      <>
+                        <li>
+                          参考输入成本（元/1K tokens）：
+                          <Text strong>
+                            {Number(selectedSKU.provider_input_rate) > 0
+                              ? `¥${Number(selectedSKU.provider_input_rate).toFixed(6)}`
+                              : '—'}
+                          </Text>
+                        </li>
+                        <li>
+                          参考输出成本（元/1K tokens）：
+                          <Text strong>
+                            {Number(selectedSKU.provider_output_rate) > 0
+                              ? `¥${Number(selectedSKU.provider_output_rate).toFixed(6)}`
+                              : '—'}
+                          </Text>
+                        </li>
+                      </>
+                    )}
                   </ul>
                 </>
               )}

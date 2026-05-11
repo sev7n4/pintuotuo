@@ -182,6 +182,14 @@ export interface SKUWithSPU extends SKU {
   model_provider: string;
   model_name: string;
   model_tier: string;
+  /**
+   * 参考输入/输出成本（元/1K tokens）。公开接口优先返回 baseline 定价版本快照
+   * （pricing_version_spu_rates），无快照时回落 spus 当前列，与下单默认 pricing_version 对齐。
+   */
+  provider_input_rate?: number;
+  provider_output_rate?: number;
+  /** 已登录且命中最近已支付订单的定价版本时，表示当前参考单价来自该 version */
+  catalog_pricing_version_id?: number;
 }
 
 export interface ComputePointAccount {

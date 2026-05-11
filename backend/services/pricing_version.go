@@ -2,6 +2,8 @@ package services
 
 import (
 	"database/sql"
+
+	"github.com/lib/pq"
 )
 
 const pricingVersionCodeBaseline = "baseline"
@@ -63,4 +65,39 @@ func CalculateCostFromPricingVersion(db *sql.DB, versionID int, provider, model 
 		return 0, false
 	}
 	return CostFromPer1KRates(inRate, outRate, inputTokens, outputTokens), true
+}
+
+// SPUPer1KSnapshot is per-SPU input/output rate (元/1K tokens) in a pricing_version snapshot row.
+type SPUPer1KSnapshot struct {
+	InputPer1K  float64
+	OutputPer1K float64
+}
+
+// LockedSPUPer1KSnapshots loads snapshot rates for many SPUs in one query; SPUs without a row are omitted.
+func LockedSPUPer1KSnapshots(db *sql.DB, pricingVersionID int64, spuIDs []int) (map[int]SPUPer1KSnapshot, error) {
+	if len(spuIDs) == 0 {
+		return map[int]SPUPer1KSnapshot{}, nil
+	}
+	rows, err := db.Query(`
+		SELECT spu_id, COALESCE(provider_input_rate, 0), COALESCE(provider_output_rate, 0)
+		FROM pricing_version_spu_rates
+		WHERE pricing_version_id = $1 AND spu_id = ANY($2::int[])
+	`, pricingVersionID, pq.Array(spuIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[int]SPUPer1KSnapshot)
+	for rows.Next() {
+		var sid int
+		var inR, outR float64
+		if err := rows.Scan(&sid, &inR, &outR); err != nil {
+			return nil, err
+		}
+		out[sid] = SPUPer1KSnapshot{InputPer1K: inR, OutputPer1K: outR}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

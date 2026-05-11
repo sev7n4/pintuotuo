@@ -409,7 +409,7 @@ describe('ProductDetailPage', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('暂无库存')).toBeInTheDocument();
+      expect(screen.getAllByText('暂无库存').length).toBeGreaterThanOrEqual(1);
     });
   });
 
