@@ -188,6 +188,8 @@ export interface SKUWithSPU extends SKU {
    */
   provider_input_rate?: number;
   provider_output_rate?: number;
+  /** 已登录且命中最近已支付订单的定价版本时，表示当前参考单价来自该 version */
+  catalog_pricing_version_id?: number;
 }
 
 export interface ComputePointAccount {

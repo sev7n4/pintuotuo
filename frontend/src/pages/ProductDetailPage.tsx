@@ -975,13 +975,31 @@ export const ProductDetailPage: React.FC = () => {
                 <>
                   <Divider />
                   <Title level={5}>本商品规格参考（非最终权益）</Title>
-                  <Paragraph type="secondary" style={{ marginBottom: 8, fontSize: 13 }}>
-                    下列「参考输入/输出成本」优先取自<strong> baseline 定价版本</strong>在
-                    <Text code>pricing_version_spu_rates</Text>
-                    中的快照（与下单默认 <Text code>pricing_version_id</Text>
-                    、网关按版本计费一致）；若无快照再回落 SPU
-                    当前列。实际扣费仍以调用用量、账户权益与账单为准。
-                  </Paragraph>
+                  {selectedSKU.catalog_pricing_version_id != null ? (
+                    <Alert
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 8 }}
+                      message={
+                        <>
+                          以下「参考输入/输出成本」已按您<strong>最近已支付订单</strong>
+                          锁定的定价版本（
+                          <Text code>
+                            pricing_version_id = {selectedSKU.catalog_pricing_version_id}
+                          </Text>
+                          ）展示，便于与账户侧计费对齐；未登录用户仍为 baseline 版本。
+                        </>
+                      }
+                    />
+                  ) : (
+                    <Paragraph type="secondary" style={{ marginBottom: 8, fontSize: 13 }}>
+                      下列「参考输入/输出成本」优先取自<strong> baseline 定价版本</strong>在
+                      <Text code>pricing_version_spu_rates</Text>
+                      中的快照（与下单默认 <Text code>pricing_version_id</Text>
+                      、网关按版本计费一致）；若无快照再回落 SPU
+                      当前列。实际扣费仍以调用用量、账户权益与账单为准。
+                    </Paragraph>
+                  )}
                   <ul style={{ paddingLeft: 20 }}>
                     <li>
                       厂商代码（provider）：<Text code>{selectedSKU.model_provider}</Text>

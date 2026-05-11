@@ -170,6 +170,8 @@ type SKUWithSPU struct {
 	// 来自 spus：卖场参考成本（元/1K tokens），与 AdminSPUs 表单一致
 	ProviderInputRate  float64 `json:"provider_input_rate,omitempty"`
 	ProviderOutputRate float64 `json:"provider_output_rate,omitempty"`
+	// 登录用户且命中「最近已支付订单」锁定的定价版本时，覆盖参考单价并回传该 version id
+	CatalogPricingVersionID *int64 `json:"catalog_pricing_version_id,omitempty"`
 }
 
 type ComputePointAccount struct {

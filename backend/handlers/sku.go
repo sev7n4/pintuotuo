@@ -1874,6 +1874,43 @@ func PatchModelProvider(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": p})
 }
 
+// applyUserLockedCatalogRatesToPublicSKUs：已登录且存在最近已支付订单的 pricing_version 时，
+// 用该版本在 pricing_version_spu_rates 中的快照覆盖 baseline 合并后的参考单价（仅当该 SPU 在版本中有行）。
+func applyUserLockedCatalogRatesToPublicSKUs(db *sql.DB, c *gin.Context, skus []models.SKUWithSPU) []models.SKUWithSPU {
+	if len(skus) == 0 {
+		return skus
+	}
+	uid, authed := middleware.OptionalJWTUserID(c)
+	if !authed {
+		return skus
+	}
+	uvid := services.LatestUserPricingVersionID(db, uid)
+	if !uvid.Valid {
+		return skus
+	}
+	spuSet := make(map[int]struct{}, len(skus))
+	for i := range skus {
+		spuSet[skus[i].SPUID] = struct{}{}
+	}
+	spuIDs := make([]int, 0, len(spuSet))
+	for id := range spuSet {
+		spuIDs = append(spuIDs, id)
+	}
+	m, err := services.LockedSPUPer1KSnapshots(db, uvid.Int64, spuIDs)
+	if err != nil || len(m) == 0 {
+		return skus
+	}
+	v := uvid.Int64
+	for i := range skus {
+		if snap, ok := m[skus[i].SPUID]; ok {
+			skus[i].ProviderInputRate = snap.InputPer1K
+			skus[i].ProviderOutputRate = snap.OutputPer1K
+			skus[i].CatalogPricingVersionID = &v
+		}
+	}
+	return skus
+}
+
 func ListPublicSKUs(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	perPage := c.DefaultQuery("per_page", "20")
@@ -2078,6 +2115,8 @@ func ListPublicSKUs(c *gin.Context) {
 		skus = append(skus, s)
 	}
 
+	skus = applyUserLockedCatalogRatesToPublicSKUs(db, c, skus)
+
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE %s", where)
 	var total int
 	if err := db.QueryRow(countQuery, args[:len(args)-2]...).Scan(&total); err != nil {
@@ -2165,6 +2204,10 @@ func GetPublicSKUByID(c *gin.Context) {
 		r := spAvgRating.Float64
 		s.SPUAverageRating = &r
 	}
+
+	skus := []models.SKUWithSPU{s}
+	skus = applyUserLockedCatalogRatesToPublicSKUs(db, c, skus)
+	s = skus[0]
 
 	c.JSON(http.StatusOK, gin.H{"data": s})
 }
