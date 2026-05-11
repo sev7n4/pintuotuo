@@ -121,7 +121,8 @@ export const ProductListPage: React.FC = () => {
   const skuPerPage = 20;
 
   const [searchInput, setSearchInput] = useState('');
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  /** 卖场 SKU 列表（含拼团入口、热销/新品等）默认卡片，便于浏览；桌面端可切换表格对比字段 */
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [catalogCategories, setCatalogCategories] = useState<Category[]>([]);
 
@@ -771,7 +772,11 @@ export const ProductListPage: React.FC = () => {
         <Badge count={cartItemCount} size="small">
           <FloatButton
             icon={<ShoppingCartOutlined />}
-            tooltip={<div>购物车</div>}
+            tooltip={
+              <div>
+                {cartItemCount > 0 ? `购物车（${cartItemCount} 件）` : '购物车'}
+              </div>
+            }
             onClick={() => navigate('/cart')}
             style={{ right: 24, bottom: 24 }}
           />
@@ -995,7 +1000,7 @@ export const ProductListPage: React.FC = () => {
                   ]}
                 />
                 {!screens.xs && (
-                  <Tooltip title="移动端默认使用卡片视图，便于浏览">
+                  <Tooltip title="默认卡片视图便于浏览；切换表格可横向对比多字段">
                     <Segmented
                       value={viewMode}
                       onChange={(v) => setViewMode(v as 'table' | 'grid')}
@@ -1108,7 +1113,11 @@ export const ProductListPage: React.FC = () => {
       <Badge count={cartItemCount} size="small">
         <FloatButton
           icon={<ShoppingCartOutlined />}
-          tooltip={<div>购物车</div>}
+          tooltip={
+            <div>
+              {cartItemCount > 0 ? `购物车（${cartItemCount} 件）` : '购物车'}
+            </div>
+          }
           onClick={() => navigate('/cart')}
           style={{ right: 24, bottom: 24 }}
         />
