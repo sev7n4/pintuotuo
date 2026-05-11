@@ -5,7 +5,6 @@ import {
   List,
   Button,
   Empty,
-  Image,
   Space,
   Typography,
   Popconfirm,
@@ -24,6 +23,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { favoriteService, type FavoriteListItem, type FavoriteSKUItem } from '@/services/favorite';
 import { entitlementPackageService } from '@/services/entitlementPackage';
+import { ProductCoverMedia } from '@/components/ProductCoverMedia';
 import styles from './FavoritesPage.module.css';
 
 const { Title, Text } = Typography;
@@ -152,12 +152,13 @@ export default function FavoritesPage() {
                         className={styles.productCard}
                         cover={
                           <div className={styles.imageWrapper}>
-                            <Image
-                              src="/placeholder.png"
-                              alt={item.product.name}
-                              className={styles.image}
-                              preview={false}
-                              fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                            <ProductCoverMedia
+                              variant="wide"
+                              imageUrl={item.product.image_url}
+                              thumbnailUrl={item.product.thumbnail_url}
+                              modelProvider={item.product.model_provider}
+                              fallbackTitle={item.product.name}
+                              resetKey={item.sku_id}
                             />
                           </div>
                         }

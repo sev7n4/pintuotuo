@@ -5,7 +5,6 @@ import {
   List,
   Button,
   Empty,
-  Image,
   Space,
   Typography,
   Popconfirm,
@@ -23,6 +22,7 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
 import { browseHistoryService, BrowseHistoryItem } from '@/services/favorite';
+import { ProductCoverMedia } from '@/components/ProductCoverMedia';
 import styles from './HistoryPage.module.css';
 
 const { Title, Text } = Typography;
@@ -167,12 +167,13 @@ export default function HistoryPage() {
                     className={styles.productCard}
                     cover={
                       <div className={styles.imageWrapper}>
-                        <Image
-                          src="/placeholder.png"
-                          alt={item.product.name}
-                          className={styles.image}
-                          preview={false}
-                          fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                        <ProductCoverMedia
+                          variant="wide"
+                          imageUrl={item.product.image_url}
+                          thumbnailUrl={item.product.thumbnail_url}
+                          modelProvider={item.product.model_provider}
+                          fallbackTitle={item.product.name}
+                          resetKey={item.sku_id}
                         />
                       </div>
                     }

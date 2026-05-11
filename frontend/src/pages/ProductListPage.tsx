@@ -40,6 +40,7 @@ import type { SKUWithSPU } from '@/types/sku';
 import { ENDPOINT_TYPE_LABELS, ENDPOINT_TYPE_COLORS } from '@/types/sku';
 import dayjs from 'dayjs';
 import { ScenarioFilter } from '@/components/ScenarioFilter';
+import { ProductCoverMedia } from '@/components/ProductCoverMedia';
 import { CatalogFilterDrawer, type CatalogFilterValues } from '@/components/CatalogFilterDrawer';
 import { productService } from '@/services/product';
 import type { Category } from '@/types';
@@ -908,20 +909,13 @@ export const ProductListPage: React.FC = () => {
                     hoverable
                     styles={{ body: { padding: 12 } }}
                     cover={
-                      <div className={styles.cardCover}>
-                        {record.thumbnail_url ? (
-                          <img
-                            className={styles.cardCoverImg}
-                            src={record.thumbnail_url}
-                            alt=""
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className={styles.cardCoverPlaceholder}>
-                            {record.spu_name?.slice(0, 2) || 'SKU'}
-                          </div>
-                        )}
-                      </div>
+                      <ProductCoverMedia
+                        variant="grid"
+                        thumbnailUrl={record.thumbnail_url}
+                        modelProvider={record.model_provider}
+                        fallbackTitle={record.spu_name || record.sku_code || 'SKU'}
+                        resetKey={record.id}
+                      />
                     }
                     onClick={() => navigate(`/catalog/${record.id}`)}
                   >
