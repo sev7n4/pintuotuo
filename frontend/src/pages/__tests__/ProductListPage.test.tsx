@@ -205,8 +205,9 @@ describe('ProductListPage (SKU catalog)', () => {
     await waitFor(() => {
       expect(mockGetPublicSKUs).toHaveBeenCalled();
     });
+    // 卖场默认卡片视图，商品名在卡片中展示（非表格 mock 的 sku-1）
     await waitFor(() => {
-      expect(screen.getByTestId('sku-1')).toBeInTheDocument();
+      expect(screen.getByText('测试套餐A')).toBeInTheDocument();
     });
   });
 
