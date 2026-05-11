@@ -245,14 +245,13 @@ export const OrderDetailPage: React.FC = () => {
                   loading={cartLoading}
                   onClick={() => void handleAddToCart()}
                 />
-                <Button
+                <IconHintButton
                   type="primary"
                   size="large"
+                  hint="同配置再下一单（生成新订单并去支付）"
                   icon={<ThunderboltOutlined />}
                   onClick={() => void handleQuickReorder()}
-                >
-                  同配置再下一单
-                </Button>
+                />
               </>
             )}
             {currentOrder.group_id && (
