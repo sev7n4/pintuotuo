@@ -127,4 +127,5 @@
 .tabsCard {
   margin-top: 16px;
   border-radius: 8px;
+  scroll-margin-top: 16px;
 }
