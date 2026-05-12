@@ -61,7 +61,12 @@ jobs:
           echo "${{ secrets.TENCENT_CLOUD_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
+          # ServerAlive*：长耗时步骤（如 capability-probe）期间保持 SSH 有双向保活，避免 NAT/防火墙空闲掐断。
+          ssh -o StrictHostKeyChecking=no \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=120 \
+            -o TCPKeepAlive=yes \
+            -i ~/.ssh/deploy_key ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << 'EOF'
           set -e
           cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}
           echo "Fetching latest code from GitHub..."
@@ -117,7 +122,11 @@ jobs:
           echo "Seed user password update completed"
           echo "=== Phase0: upstream capability-probe (BYOK from DB, non-fatal) ==="
           if docker exec pintuotuo-backend test -x /app/capability-probe 2>/dev/null; then
-            docker exec pintuotuo-backend /app/capability-probe -out /tmp/capability-probe-latest.csv -limit 50 2>&1 | tail -n 20 || true
+            # 将 docker exec 的 stdout/stderr 落到部署机文件，避免「exec | tail」读满行数后关管道触发 SIGPIPE，
+            # 同时 probe 主要写容器内 CSV，经 SSH 回传的字节流很少，仅靠保活即可稳住会话。
+            docker exec pintuotuo-backend /app/capability-probe -out /tmp/capability-probe-latest.csv -limit 50 \
+              > /tmp/capability-probe-exec.log 2>&1 || true
+            tail -n 40 /tmp/capability-probe-exec.log || true
             docker exec pintuotuo-backend tail -n 30 /tmp/capability-probe-latest.csv 2>/dev/null || true
           else
             echo "SKIP: /app/capability-probe not found in backend image"
