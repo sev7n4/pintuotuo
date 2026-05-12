@@ -251,7 +251,7 @@ type MerchantAPIKey struct {
 	Region        string `json:"region,omitempty"`
 	SecurityLevel string `json:"security_level,omitempty"`
 
-	// BYOK 路由配置
+	// BYOK 路由配置（与 route_mode / region / endpoint_url 列共同构成路由 SSOT；参见 ResolveBYOKRoutingEndpoint）
 	BYOKType            string                 `json:"byok_type,omitempty"`
 	RouteMode           string                 `json:"route_mode,omitempty"`
 	FallbackEndpointURL string                 `json:"fallback_endpoint_url,omitempty"`
@@ -312,6 +312,20 @@ func (k *MerchantAPIKey) GetEndpointForMode(mode string, region string) string {
 	}
 
 	return k.EndpointURL
+}
+
+// ResolveBYOKRoutingEndpoint returns the outbound HTTP base URL from **merchant_api_keys** only
+// (BYOK routing SSOT: route_mode is applied separately via services.ConfigureGatewayMode / HealthChecker).
+//
+// Resolution order matches [MerchantAPIKey.GetEndpointForMode]: for the given gatewayMode it consults
+// endpoint_url column (direct), route_config.endpoints.{direct|litellm|proxy}[region], then route_config.base_url.
+// It does **not** read model_providers — catalog defaults belong in the caller’s fallback path.
+func ResolveBYOKRoutingEndpoint(routeConfig map[string]interface{}, gatewayMode, merchantRegion, endpointURLColumn string) string {
+	k := &MerchantAPIKey{
+		RouteConfig: routeConfig,
+		EndpointURL: endpointURLColumn,
+	}
+	return k.GetEndpointForMode(gatewayMode, merchantRegion)
 }
 
 func (k *MerchantAPIKey) GetAuthTokenForMode(mode string) string {

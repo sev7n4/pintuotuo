@@ -13,6 +13,7 @@
 | [runbook-env-snapshot.md](./runbook-env-snapshot.md) | 0.3 | 脱敏导出 `model_providers` / 密钥元数据的步骤 |
 | [minimal-request-snippets.md](./minimal-request-snippets.md) | 0.5 | 各端点最小 `curl` / JSON 样例（便于复现探测） |
 | [phase0-scope.md](./phase0-scope.md) | 0.x | **用量与范围**：默认/计费探测次数、部署流水线行为 |
+| [byok-routing-ssot.md](./byok-routing-ssot.md) | — | **BYOK 路由 SSOT**：`merchant_api_keys` 与 `model_providers` 回退、api_proxy 与 ExecutionLayer |
 | [risk-register-template.md](./risk-register-template.md) | 0.6 | 风险登记占位（复制到 Wiki/Jira 亦可） |
 
 ## 上游探测命令（Go，从数据库读取 BYOK）

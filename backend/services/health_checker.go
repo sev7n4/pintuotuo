@@ -586,13 +586,13 @@ func (s *HealthChecker) resolveLitellmEndpoint(ctx context.Context, apiKey *mode
 					region = regionDomestic
 				}
 				if url, ok := litellmEndpoints[region].(string); ok && url != "" {
-					return url, nil
+					return NormalizeLegacyLitellmGatewayBaseURL(url), nil
 				}
 			}
 		}
 
 		if baseURL, ok := apiKey.RouteConfig["base_url"].(string); ok && baseURL != "" {
-			return baseURL, nil
+			return NormalizeLegacyLitellmGatewayBaseURL(baseURL), nil
 		}
 	}
 

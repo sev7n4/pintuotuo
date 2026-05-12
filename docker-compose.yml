@@ -23,6 +23,7 @@ services:
       - USE_EXECUTION_LAYER=${USE_EXECUTION_LAYER:-false}
       # LiteLLM Gateway Configuration
       - LLM_GATEWAY_LITELLM_URL=${LLM_GATEWAY_LITELLM_URL:-}
+      - LLM_GATEWAY_LITELLM_URL_OVERSEAS=${LLM_GATEWAY_LITELLM_URL_OVERSEAS:-}
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
       # OpenTelemetry → Grafana Tempo（OTLP gRPC）；未设置 endpoint 时后端为 noop；OTEL_SDK_DISABLED=true 关闭导出
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4317}

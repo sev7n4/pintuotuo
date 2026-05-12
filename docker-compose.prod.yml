@@ -67,6 +67,8 @@ services:
       # LiteLLM 网关配置（当 merchant_api_keys.route_mode = 'litellm' 时使用）
       - API_PROXY_LITELLM_MAX_RETRIES=${API_PROXY_LITELLM_MAX_RETRIES:-1}
       - LLM_GATEWAY_LITELLM_URL=${LLM_GATEWAY_LITELLM_URL:-http://litellm:4000}
+      # 海外独立 LiteLLM 节点时设置；未设置时占位 URL litellm-overseas 会回退到 LLM_GATEWAY_LITELLM_URL
+      - LLM_GATEWAY_LITELLM_URL_OVERSEAS=${LLM_GATEWAY_LITELLM_URL_OVERSEAS:-}
       # LiteLLM 鉴权：当 route_mode=litellm 时用作 Authorization Bearer
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-}
       - LANGFUSE_ENABLED=${LANGFUSE_ENABLED:-false}

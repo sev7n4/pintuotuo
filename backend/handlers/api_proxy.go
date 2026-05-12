@@ -1004,6 +1004,10 @@ func resolveRouteMode(apiKey *models.MerchantAPIKey) string {
 	}
 }
 
+// resolveEndpointURL 为 **OpenAI 兼容代理路径**（api_proxy）解析出站 host。
+// BYOK 意图仍以 merchant_api_keys 为准：direct/proxy 使用密钥列与 route_config；litellm 出站 host 使用
+// LLM_GATEWAY_LITELLM_URL（与 ExecutionLayer / 健康检查一致），上游 api_base 由 buildLitellmUserConfig 注入。
+// 与 ExecutionProviderConfig 的完整端点矩阵解析见 services.ResolveEndpointByType 与 documentation/capability/byok-routing-ssot.md。
 func resolveEndpointURL(routeMode string, apiKey *models.MerchantAPIKey, providerBaseURL string) string {
 	switch routeMode {
 	case routeModeDirect:

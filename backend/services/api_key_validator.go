@@ -1016,13 +1016,13 @@ func (v *APIKeyValidator) resolveLitellmEndpoint(ctx context.Context, routeConfi
 					region = regionDomestic
 				}
 				if url, ok := litellmEndpoints[region].(string); ok && url != "" {
-					return url, nil
+					return NormalizeLegacyLitellmGatewayBaseURL(url), nil
 				}
 			}
 		}
 
 		if baseURL, ok := routeConfig["base_url"].(string); ok && baseURL != "" {
-			return baseURL, nil
+			return NormalizeLegacyLitellmGatewayBaseURL(baseURL), nil
 		}
 	}
 

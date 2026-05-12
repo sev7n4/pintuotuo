@@ -255,6 +255,7 @@ func buildExecCfg(
 		BYOKRouteMode:   key.RouteMode,
 		BYOKRouteConfig: key.RouteConfig,
 		BYOKFallbackURL: strings.TrimSpace(key.FallbackEndpointURL),
+		BYOKRegion:      strings.TrimSpace(key.Region),
 	}
 	services.ConfigureGatewayMode(cfg)
 	return cfg, nil
