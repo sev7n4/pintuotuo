@@ -355,3 +355,27 @@ func TestMerchantAPIKey_GetEndpointByType(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveBYOKRoutingEndpointMatchesGetEndpointForMode(t *testing.T) {
+	rc := map[string]interface{}{
+		"endpoints": map[string]interface{}{
+			"litellm": map[string]interface{}{
+				"domestic": "http://gw-dom/v1",
+				"overseas": "http://gw-os/v1",
+			},
+		},
+	}
+	k := &MerchantAPIKey{RouteConfig: rc}
+	for _, tc := range []struct {
+		mode, region string
+	}{
+		{"litellm", "domestic"},
+		{"litellm", "overseas"},
+	} {
+		got := ResolveBYOKRoutingEndpoint(rc, tc.mode, tc.region, "")
+		want := k.GetEndpointForMode(tc.mode, tc.region)
+		if got != want {
+			t.Fatalf("mode=%s region=%s: ResolveBYOKRoutingEndpoint=%q GetEndpointForMode=%q", tc.mode, tc.region, got, want)
+		}
+	}
+}

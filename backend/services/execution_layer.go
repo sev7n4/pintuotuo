@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/pintuotuo/backend/models"
 )
 
 const (
@@ -69,19 +71,32 @@ func ResolveEndpointByType(cfg *ExecutionProviderConfig, endpointType string) st
 	return baseURL + suffix
 }
 
-// NormalizeLegacyLitellmGatewayBaseURL rewrites historical DB placeholder hosts
-// (litellm-domestic / litellm-overseas from migration seeds) to LLM_GATEWAY_LITELLM_URL + "/v1"
-// when the env var is set, e.g. http://litellm:4000 → http://litellm:4000/v1 for docker-compose DNS.
+// NormalizeLegacyLitellmGatewayBaseURL rewrites historical placeholder hosts in URLs
+// (litellm-domestic / litellm-overseas from older seeds) to process env:
+//   - litellm-domestic → LLM_GATEWAY_LITELLM_URL + "/v1" (国内网关)
+//   - litellm-overseas → LLM_GATEWAY_LITELLM_URL_OVERSEAS + "/v1", or if unset same as domestic URL
+//
+// Explicit URLs in merchant_api_keys.route_config or model_providers are left unchanged.
 func NormalizeLegacyLitellmGatewayBaseURL(resolved string) string {
 	u := strings.TrimSpace(resolved)
 	if u == "" {
 		return u
 	}
-	env := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL"))
-	if env == "" {
-		return u
+	if strings.Contains(u, "litellm-domestic:") {
+		env := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL"))
+		if env == "" {
+			return u
+		}
+		return strings.TrimRight(env, "/") + "/v1"
 	}
-	if strings.Contains(u, "litellm-domestic:") || strings.Contains(u, "litellm-overseas:") {
+	if strings.Contains(u, "litellm-overseas:") {
+		env := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL_OVERSEAS"))
+		if env == "" {
+			env = strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL"))
+		}
+		if env == "" {
+			return u
+		}
 		return strings.TrimRight(env, "/") + "/v1"
 	}
 	return u
@@ -158,6 +173,8 @@ type ExecutionLayerOutput struct {
 	DurationMs int              `json:"duration_ms"`
 }
 
+// ExecutionProviderConfig merges **merchant_api_keys BYOK fields** (BYOK*) with **model_providers** catalog
+// (Endpoints, APIBaseURL, ProviderRegion). Outbound URL resolution: BYOK SSOT first, then provider defaults — see resolveEndpoint.
 type ExecutionProviderConfig struct {
 	Code            string                 `json:"code"`
 	Name            string                 `json:"name"`
@@ -171,6 +188,8 @@ type ExecutionProviderConfig struct {
 	BYOKRouteMode   string                 `json:"byok_route_mode"`
 	BYOKRouteConfig map[string]interface{} `json:"byok_route_config"`
 	BYOKFallbackURL string                 `json:"byok_fallback_url"`
+	// BYOKRegion is merchant_api_keys.region (domestic|overseas); drives route_config.endpoints.*[region] selection with GetEndpointForMode.
+	BYOKRegion string `json:"byok_region,omitempty"`
 }
 
 func NewExecutionLayer(db *sql.DB, engine *ExecutionEngine) *ExecutionLayer {
@@ -353,32 +372,20 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 		return ""
 	}
 
-	if cfg.BYOKEndpointURL != "" {
-		return cfg.BYOKEndpointURL
-	}
-
-	if cfg.BYOKRouteConfig != nil {
-		if endpoints, ok := cfg.BYOKRouteConfig["endpoints"].(map[string]interface{}); ok {
-			region := cfg.ProviderRegion
-			if region == "" {
-				region = regionOverseas
-			}
-			if url, ok := endpoints[region].(string); ok && url != "" {
-				return url
-			}
-			if defaultURL, ok := endpoints["default"].(string); ok && defaultURL != "" {
-				return defaultURL
-			}
+	// 1) BYOK SSOT: merchant_api_keys (route_config + columns). Never use model_providers before this returns empty.
+	byokBase := models.ResolveBYOKRoutingEndpoint(cfg.BYOKRouteConfig, cfg.GatewayMode, cfg.BYOKRegion, cfg.BYOKEndpointURL)
+	if byokBase != "" {
+		if cfg.GatewayMode == GatewayModeLitellm {
+			return NormalizeLegacyLitellmGatewayBaseURL(byokBase)
 		}
-		if baseURL, ok := cfg.BYOKRouteConfig["base_url"].(string); ok && baseURL != "" {
-			return baseURL
-		}
+		return byokBase
 	}
 
 	if cfg.BYOKFallbackURL != "" {
 		return cfg.BYOKFallbackURL
 	}
 
+	// 2) Catalog defaults: model_providers.endpoints (bootstrap / provider-wide hints when key has no pin).
 	switch cfg.GatewayMode {
 	case GatewayModeLitellm:
 		if cfg.Endpoints != nil {

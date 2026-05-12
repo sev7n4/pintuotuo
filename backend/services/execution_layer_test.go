@@ -495,8 +495,14 @@ func TestNormalizeLegacyLitellmGatewayBaseURL(t *testing.T) {
 		t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000")
 		assert.Equal(t, "http://litellm:4000/v1", NormalizeLegacyLitellmGatewayBaseURL("http://litellm-domestic:4000/v1"))
 	})
-	t.Run("env rewrites litellm-overseas", func(t *testing.T) {
-		t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000/")
+	t.Run("env rewrites litellm-overseas with OVERSEAS when set", func(t *testing.T) {
+		t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000")
+		t.Setenv("LLM_GATEWAY_LITELLM_URL_OVERSEAS", "http://litellm-os:4000")
+		assert.Equal(t, "http://litellm-os:4000/v1", NormalizeLegacyLitellmGatewayBaseURL("http://litellm-overseas:4000/v1"))
+	})
+	t.Run("litellm-overseas falls back to domestic env when OVERSEAS unset", func(t *testing.T) {
+		t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000")
+		t.Setenv("LLM_GATEWAY_LITELLM_URL_OVERSEAS", "")
 		assert.Equal(t, "http://litellm:4000/v1", NormalizeLegacyLitellmGatewayBaseURL("http://litellm-overseas:4000/v1"))
 	})
 	t.Run("custom upstream unchanged", func(t *testing.T) {
@@ -513,6 +519,29 @@ func TestResolveEndpointByType_LitellmLegacyHostUsesEnv(t *testing.T) {
 		Endpoints: map[string]interface{}{
 			GatewayModeLitellm: map[string]interface{}{
 				"domestic": "http://litellm-domestic:4000/v1",
+			},
+		},
+	}
+	got := ResolveEndpointByType(cfg, EndpointTypeEmbeddings)
+	assert.Equal(t, "http://litellm:4000/v1/embeddings", got)
+}
+
+func TestResolveEndpoint_BYOKSsotOverridesModelProviderLitellm(t *testing.T) {
+	t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000")
+	cfg := &ExecutionProviderConfig{
+		GatewayMode:    GatewayModeLitellm,
+		ProviderRegion: regionDomestic,
+		BYOKRegion:     "domestic",
+		BYOKRouteConfig: map[string]interface{}{
+			"endpoints": map[string]interface{}{
+				"litellm": map[string]interface{}{
+					"domestic": "http://litellm-domestic:4000/v1",
+				},
+			},
+		},
+		Endpoints: map[string]interface{}{
+			GatewayModeLitellm: map[string]interface{}{
+				"domestic": "http://wrong-from-mp:4000/v1",
 			},
 		},
 	}
