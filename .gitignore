@@ -158,6 +158,9 @@ deploy/*
 # 仅忽略仓库根目录 docs/（勿用 docs/：会误伤 frontend/public/docs/）
 /docs/
 
+# Phase0 capability-probe 本地输出（可能含内网 URL 片段）
+documentation/capability/capability-probe-output*.csv
+
 # Backend temp docs
 backend/HANDLER_CACHING_GUIDE.md
 backend/IMPLEMENTATION_GUIDE.md

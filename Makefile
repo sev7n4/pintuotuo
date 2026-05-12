@@ -99,6 +99,12 @@ reconcile-check: ## Full-database usage ledger check (api_usage_logs vs token_tr
 	@echo "$(BLUE)Running usage reconciliation...$(NC)"
 	cd backend && go run ./cmd/reconcile
 
+capability-probe: ## Phase0: 用 DB 内 BYOK 密钥探测上游（GET /v1/models + 可选 POST embeddings）；需在部署机或能连库的环境执行，见 documentation/capability/README.md
+	cd backend && go run ./cmd/capability-probe $(CAPABILITY_PROBE_FLAGS)
+
+# 示例：make capability-probe CAPABILITY_PROBE_FLAGS='-out /tmp/cap.csv -provider openai -limit 5'
+CAPABILITY_PROBE_FLAGS ?=
+
 litellm-catalog-verify: ## 校验 litellm_proxy_config.yaml 覆盖库内 active SPU（需 DATABASE_URL；映射来自 model_providers）
 	@echo "$(BLUE)Verifying LiteLLM model_list vs catalog...$(NC)"
 	cd backend && go run ./cmd/litellm-catalog-sync -verify \

@@ -44,10 +44,10 @@ func normalizeOpenAICompatBase(endpoint string) string {
 	return strings.TrimRight(strings.TrimSpace(endpoint), "/")
 }
 
-// openAICompatModelsProbeURL returns the GET URL for OpenAI-compatible model listing.
+// OpenAICompatModelsProbeURL returns the GET URL for OpenAI-compatible model listing.
 // When the base is already a versioned OpenAI-compat root (…/v1, …/v4, 智谱 paas/v4, 阿里 compatible-mode/v1, etc.),
 // append "/models" only — matching api_key_validator (base + "/models") and avoiding paths like "…/v4/v1/models".
-func openAICompatModelsProbeURL(endpoint string) string {
+func OpenAICompatModelsProbeURL(endpoint string) string {
 	b := normalizeOpenAICompatBase(endpoint)
 	if hasOpenAICompatVersionedRootSuffix(b) {
 		return b + "/models"
@@ -233,7 +233,7 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 		}, nil
 	}
 
-	modelsEndpoint := openAICompatModelsProbeURL(endpoint)
+	modelsEndpoint := OpenAICompatModelsProbeURL(endpoint)
 	resolvedMode := s.resolvedRouteMode(ctx, apiKey)
 	authToken := s.getDecryptedAPIKey(apiKey)
 	if resolvedMode == GatewayModeLitellm {
@@ -955,4 +955,19 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 		EndpointUsed:      chatEndpoint,
 		CheckType:         "chat_test",
 	}, nil
+}
+
+// ResolveMerchantAPIKeyUpstreamBase returns the HTTP base URL used to reach the upstream or gateway for this BYOK row,
+// and the effective route mode (direct / litellm / proxy), matching HealthChecker probes.
+func ResolveMerchantAPIKeyUpstreamBase(ctx context.Context, apiKey *models.MerchantAPIKey) (baseURL string, routeMode string, err error) {
+	if apiKey == nil {
+		return "", "", fmt.Errorf("nil apiKey")
+	}
+	s := NewHealthChecker()
+	baseURL, err = s.resolveEndpoint(ctx, apiKey)
+	if err != nil {
+		return "", "", err
+	}
+	routeMode = s.resolvedRouteMode(ctx, apiKey)
+	return baseURL, routeMode, nil
 }
