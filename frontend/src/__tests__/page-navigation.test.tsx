@@ -196,6 +196,7 @@ describe('Page Navigation Integration Tests', () => {
       await act(async () => {
         fireEvent.change(emailInput, { target: { value: 'cuser@example.com' } });
         fireEvent.change(passwordInput, { target: { value: 'password123' } });
+        fireEvent.click(screen.getByRole('checkbox', { name: /用户协议/ }));
         fireEvent.click(submitButton);
       });
 

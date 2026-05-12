@@ -12,6 +12,7 @@ import {
   Space,
   Button,
   Skeleton,
+  Tooltip,
 } from 'antd';
 import {
   FireOutlined,
@@ -124,6 +125,15 @@ const HomePage = () => {
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>(() => readRecentSearches());
+  const [tierExpanded, setTierExpanded] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const sync = () => setTierExpanded(!mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
 
   useEffect(() => {
     fetchHomeData();
@@ -239,17 +249,21 @@ const HomePage = () => {
             className={styles.searchInput}
             style={{ flex: 1, minWidth: 0 }}
           />
-          <Button
-            size="large"
-            icon={<FilterOutlined />}
-            onClick={() => navigate('/catalog?filters=1')}
-          >
-            更多筛选
-          </Button>
+          <Tooltip title="前往卖场筛选（场景、层级、分项）">
+            <Button
+              type="default"
+              icon={<FilterOutlined />}
+              onClick={() => navigate('/catalog?filters=1')}
+              aria-label="更多筛选"
+            />
+          </Tooltip>
         </Space.Compact>
-        <Text type="secondary" style={{ fontSize: 12, marginTop: 6, display: 'block', maxWidth: 720 }}>
-          搜索为关键词直达卖场；下方场景 / 层级与「更多筛选」本质都是缩小列表，结果页 URL
-          可分享、可逐项清除。
+        <Text
+          type="secondary"
+          style={{ fontSize: 12, marginTop: 6, display: 'block', maxWidth: 720 }}
+        >
+          搜索为关键词直达卖场；下方「卖场 ·
+          按场景」与模型层级、以及筛选抽屉本质都是缩小列表，结果页 URL 可分享、可逐项清除。
         </Text>
         {recentSearches.length > 0 && (
           <div className={styles.recentSearch}>
@@ -319,13 +333,13 @@ const HomePage = () => {
               分类
             </Title>
             <Link to="/categories" className={styles.allCategoriesLink}>
-              浏览场景与层级 <RightOutlined />
+              全部场景与层级 <RightOutlined />
             </Link>
           </div>
           {scenarioCategories.length > 0 && (
             <>
               <Text type="secondary" className={styles.categoryGroupLabel}>
-                使用场景
+                卖场 · 按场景
               </Text>
               <div className={styles.categoryChips}>
                 {scenarioCategories.map((s) => (
@@ -344,22 +358,35 @@ const HomePage = () => {
           )}
           {categories.length > 0 && (
             <>
-              <Text type="secondary" className={styles.categoryGroupLabel}>
-                模型层级
-              </Text>
-              <div className={styles.categoryChips}>
-                {categories.map((category) => (
+              <div className={styles.tierHeaderRow}>
+                <Text type="secondary" className={styles.categoryGroupLabel}>
+                  模型层级
+                </Text>
+                {!tierExpanded && (
                   <button
                     type="button"
-                    key={category.name}
-                    className={`${styles.categoryChip} ${styles.categoryChipSubtle}`}
-                    onClick={() => handleTierNavigate(category.name)}
+                    className={styles.tierToggle}
+                    onClick={() => setTierExpanded(true)}
                   >
-                    <span className={styles.categoryChipName}>{category.name}</span>
-                    <span className={styles.categoryChipCount}>{category.count}</span>
+                    展开
                   </button>
-                ))}
+                )}
               </div>
+              {tierExpanded && (
+                <div className={styles.categoryChips}>
+                  {categories.map((category) => (
+                    <button
+                      type="button"
+                      key={category.name}
+                      className={`${styles.categoryChip} ${styles.categoryChipSubtle}`}
+                      onClick={() => handleTierNavigate(category.name)}
+                    >
+                      <span className={styles.categoryChipName}>{category.name}</span>
+                      <span className={styles.categoryChipCount}>{category.count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>

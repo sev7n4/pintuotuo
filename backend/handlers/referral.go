@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -206,11 +207,23 @@ func GetReferralStats(c *gin.Context) {
 	db.QueryRow("SELECT COALESCE(SUM(amount), 0) FROM referral_rewards WHERE referrer_id = $1 AND status = 'pending'", userIDInt).Scan(&pendingRewards)
 	db.QueryRow("SELECT COALESCE(SUM(amount), 0) FROM referral_rewards WHERE referrer_id = $1 AND status = 'paid'", userIDInt).Scan(&paidRewards)
 
+	var reservedWithdrawals float64
+	_ = db.QueryRow(
+		`SELECT COALESCE(SUM(amount), 0) FROM referral_withdrawals
+		 WHERE user_id = $1 AND status IN ('pending', 'processing', 'completed')`,
+		userIDInt,
+	).Scan(&reservedWithdrawals)
+	availableRewards := paidRewards - reservedWithdrawals
+	if availableRewards < 0 {
+		availableRewards = 0
+	}
+
 	stats := gin.H{
-		"total_referrals": totalReferrals,
-		"total_rewards":   totalRewards,
-		"pending_rewards": pendingRewards,
-		"paid_rewards":    paidRewards,
+		"total_referrals":   totalReferrals,
+		"total_rewards":     totalRewards,
+		"pending_rewards":   pendingRewards,
+		"paid_rewards":      paidRewards,
+		"available_rewards": availableRewards,
 	}
 
 	if statsJSON, err := json.Marshal(stats); err == nil {
@@ -513,6 +526,16 @@ func CalculateReferralReward(orderID int, refereeID int, orderAmount float64) er
 		return sql.ErrConnDone
 	}
 
+	if orderID > 0 {
+		var existing int
+		if err := db.QueryRow(
+			"SELECT COUNT(*) FROM referral_rewards WHERE order_id = $1",
+			orderID,
+		).Scan(&existing); err == nil && existing > 0 {
+			return nil
+		}
+	}
+
 	var referrerID int
 	err := db.QueryRow("SELECT referred_by FROM users WHERE id = $1", refereeID).Scan(&referrerID)
 	if err == sql.ErrNoRows || referrerID == 0 {
@@ -538,6 +561,216 @@ func CalculateReferralReward(orderID int, refereeID int, orderAmount float64) er
 	cache.Delete(ctx, cache.ReferralStatsKey(referrerID))
 
 	return nil
+}
+
+// ApplyReferralRewardForPaidOrder records referral reward after an order is paid (idempotent per order).
+func ApplyReferralRewardForPaidOrder(orderID int) {
+	if orderID <= 0 {
+		return
+	}
+	db := config.GetDB()
+	if db == nil {
+		return
+	}
+	var userID int
+	var total float64
+	if err := db.QueryRow(
+		"SELECT user_id, total_price FROM orders WHERE id = $1 AND status = 'paid'",
+		orderID,
+	).Scan(&userID, &total); err != nil {
+		return
+	}
+	if err := CalculateReferralReward(orderID, userID, total); err != nil {
+		log.Printf("referral: ApplyReferralRewardForPaidOrder order=%d: %v", orderID, err)
+	}
+}
+
+func GetReferralWithdrawals(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	page := c.DefaultQuery("page", "1")
+	perPage := c.DefaultQuery("per_page", "20")
+
+	pageNum, _ := strconv.Atoi(page)
+	perPageNum, _ := strconv.Atoi(perPage)
+
+	if pageNum < 1 {
+		pageNum = 1
+	}
+	if perPageNum < 1 || perPageNum > 100 {
+		perPageNum = 20
+	}
+
+	offset := (pageNum - 1) * perPageNum
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	rows, err := db.Query(
+		`SELECT id, user_id, amount, status, method, account_info, request_note, reject_reason,
+			created_at, processed_at, completed_at
+		 FROM referral_withdrawals WHERE user_id = $1
+		 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+		userIDInt, perPageNum, offset,
+	)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	defer rows.Close()
+
+	var list []gin.H
+	for rows.Next() {
+		var (
+			id           int
+			uid          int
+			amount       float64
+			status       string
+			method       string
+			accountInfo  string
+			requestNote  sql.NullString
+			rejectReason sql.NullString
+			createdAt    time.Time
+			processedAt  sql.NullTime
+			completedAt  sql.NullTime
+		)
+		if err := rows.Scan(
+			&id, &uid, &amount, &status, &method, &accountInfo,
+			&requestNote, &rejectReason, &createdAt, &processedAt, &completedAt,
+		); err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		row := gin.H{
+			"id":           id,
+			"user_id":      uid,
+			"amount":       amount,
+			"status":       status,
+			"method":       method,
+			"account_info": accountInfo,
+			"created_at":   createdAt,
+		}
+		if requestNote.Valid {
+			row["request_note"] = requestNote.String
+		}
+		if rejectReason.Valid {
+			row["reject_reason"] = rejectReason.String
+		}
+		if processedAt.Valid {
+			row["processed_at"] = processedAt.Time
+		}
+		if completedAt.Valid {
+			row["completed_at"] = completedAt.Time
+		}
+		list = append(list, row)
+	}
+
+	var total int
+	_ = db.QueryRow("SELECT COUNT(*) FROM referral_withdrawals WHERE user_id = $1", userIDInt).Scan(&total)
+
+	c.JSON(http.StatusOK, gin.H{
+		"total":    total,
+		"page":     pageNum,
+		"per_page": perPageNum,
+		"data":     list,
+	})
+}
+
+func RequestReferralWithdrawal(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	var req struct {
+		Amount      float64 `json:"amount" binding:"required,gt=0"`
+		Method      string  `json:"method" binding:"required,oneof=alipay wechat bank"`
+		AccountInfo string  `json:"account_info" binding:"required"`
+		RequestNote string  `json:"request_note"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var paidPool float64
+	var reserved float64
+	if err := db.QueryRow(
+		"SELECT COALESCE(SUM(amount), 0) FROM referral_rewards WHERE referrer_id = $1 AND status = 'paid'",
+		userIDInt,
+	).Scan(&paidPool); err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+	_ = db.QueryRow(
+		`SELECT COALESCE(SUM(amount), 0) FROM referral_withdrawals
+		 WHERE user_id = $1 AND status IN ('pending', 'processing', 'completed')`,
+		userIDInt,
+	).Scan(&reserved)
+
+	available := paidPool - reserved
+	if available < 0 {
+		available = 0
+	}
+	if req.Amount > available+1e-6 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Withdrawal amount exceeds available balance",
+		})
+		return
+	}
+
+	var newID int
+	err := db.QueryRow(
+		`INSERT INTO referral_withdrawals (user_id, amount, status, method, account_info, request_note)
+		 VALUES ($1, $2, 'pending', $3, $4, NULLIF(TRIM($5), '')) RETURNING id`,
+		userIDInt, req.Amount, req.Method, req.AccountInfo, req.RequestNote,
+	).Scan(&newID)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	ctx := context.Background()
+	cache.Delete(ctx, cache.ReferralStatsKey(userIDInt))
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Withdrawal request submitted",
+		"withdrawal": gin.H{
+			"id":           newID,
+			"user_id":      userIDInt,
+			"amount":       req.Amount,
+			"status":       "pending",
+			"method":       req.Method,
+			"account_info": req.AccountInfo,
+		},
+	})
 }
 
 func PayReferralRewards(c *gin.Context) {

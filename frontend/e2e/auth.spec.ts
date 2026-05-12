@@ -149,6 +149,7 @@ test.describe('Registration', () => {
 
     await page.getByPlaceholder('example@email.com').fill(uniqueEmail);
     await page.getByPlaceholder(/设置密码/).fill('short');
+    await page.getByRole('checkbox', { name: /用户协议/ }).check();
     await page.getByRole('button', { name: '注册并进入' }).click();
 
     await expect(page.getByText('密码至少 6 位')).toBeVisible({ timeout: 10000 });

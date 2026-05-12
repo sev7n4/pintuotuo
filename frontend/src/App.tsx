@@ -8,6 +8,8 @@ import AdminLayout from '@layouts/AdminLayout';
 // Pages
 import LoginPage from '@pages/LoginPage';
 import RegisterPage from '@pages/RegisterPage';
+import ForgotPasswordPage from '@pages/ForgotPasswordPage';
+import ResetPasswordPage from '@pages/ResetPasswordPage';
 import HomePage from '@pages/HomePage';
 import ProductListPage from '@pages/ProductListPage';
 import ProductDetailPage from '@pages/ProductDetailPage';
@@ -97,6 +99,8 @@ function App() {
           {/* Auth routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* C-end Developer Center（须在带 path="*" 的 Layout 之前，避免被 catch-all 吞掉） */}
           <Route path="/developer" element={<DeveloperLayout />}>

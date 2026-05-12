@@ -322,6 +322,26 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
                   <Input placeholder="已启用 MFA 的管理员请填写" autoComplete="one-time-code" />
                 </Form.Item>
               )}
+              {isRegisterRoute && (
+                <Form.Item
+                  name="acceptTerms"
+                  valuePropName="checked"
+                  rules={[
+                    {
+                      validator: (_: unknown, v: boolean) =>
+                        v
+                          ? Promise.resolve()
+                          : Promise.reject(new Error('请阅读并同意用户协议与隐私政策')),
+                    },
+                  ]}
+                >
+                  <Checkbox>
+                    我已阅读并同意 <Link to="/agreement">《用户协议》</Link>
+                    {' 与 '}
+                    <Link to="/privacy">《隐私政策》</Link>
+                  </Checkbox>
+                </Form.Item>
+              )}
               {isRegisterRoute &&
                 primaryLogin === 'email' &&
                 registerRole === 'merchant' &&
@@ -336,8 +356,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ defaultMode = 'login' }) => 
                   </Form.Item>
                 )}
               {!isRegisterRoute && (
-                <Form.Item name="rememberMe" valuePropName="checked">
-                  <Checkbox>记住我</Checkbox>
+                <Form.Item>
+                  <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
+                    <Form.Item name="rememberMe" valuePropName="checked" noStyle>
+                      <Checkbox>记住我</Checkbox>
+                    </Form.Item>
+                    <Link to="/forgot-password">忘记密码？</Link>
+                  </Space>
                 </Form.Item>
               )}
               <Form.Item style={{ marginBottom: 8 }}>

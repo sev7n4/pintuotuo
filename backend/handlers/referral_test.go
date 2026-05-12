@@ -70,6 +70,23 @@ func setupReferralTestDB() (*sql.DB, error) {
 		FOREIGN KEY (referee_id) REFERENCES users(id)
 	);
 
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_rewards_order_unique ON referral_rewards(order_id) WHERE order_id IS NOT NULL;
+
+	CREATE TABLE IF NOT EXISTS referral_withdrawals (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER,
+		amount REAL NOT NULL,
+		status TEXT NOT NULL DEFAULT 'pending',
+		method TEXT NOT NULL,
+		account_info TEXT NOT NULL,
+		request_note TEXT,
+		reject_reason TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		processed_at TIMESTAMP,
+		completed_at TIMESTAMP,
+		FOREIGN KEY (user_id) REFERENCES users(id)
+	);
+
 	CREATE TABLE IF NOT EXISTS orders (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_id INTEGER,
@@ -248,6 +265,7 @@ func TestGetReferralStats(t *testing.T) {
 	assert.Equal(t, 30.0, response["total_rewards"])
 	assert.Equal(t, 10.0, response["pending_rewards"])
 	assert.Equal(t, 20.0, response["paid_rewards"])
+	assert.Equal(t, 20.0, response["available_rewards"])
 }
 
 func TestGetReferralList(t *testing.T) {

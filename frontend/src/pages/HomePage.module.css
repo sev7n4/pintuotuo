@@ -382,6 +382,34 @@
   margin-top: 0;
 }
 
+.tierHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.tierHeaderRow .categoryGroupLabel {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.tierToggle {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #1677ff;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.tierToggle:hover {
+  background: rgba(22, 119, 255, 0.06);
+}
+
 .categoryChipSubtle {
   background: #fafafa;
   border-color: #f5f5f5;
@@ -438,6 +466,16 @@
 @media (max-width: 768px) {
   .container {
     padding: 12px;
+  }
+
+  .categorySection {
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+
+  .categoryChip {
+    padding: 6px 10px;
+    min-height: 36px;
   }
 
   .bannerItem {

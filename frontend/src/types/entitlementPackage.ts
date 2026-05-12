@@ -65,11 +65,9 @@ export interface EntitlementPackageStatRow {
   user_reviewed?: boolean;
 }
 
-/** 前台 /packages 分类筛选（不含 general，「通用」类套餐仅在「全部」下展示） */
+/** 前台 /packages 分类筛选（不含「全部」「加油包」；通用类并入「个人月包」视图） */
 export const ENTITLEMENT_PACKAGE_FILTER_OPTIONS: { value: string; label: string }[] = [
-  { value: 'all', label: '全部' },
   { value: 'personal', label: '个人月包' },
-  { value: 'boost', label: '加油包' },
   { value: 'team', label: '小团队' },
   { value: 'enterprise', label: '企业' },
 ];

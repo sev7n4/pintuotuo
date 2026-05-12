@@ -235,6 +235,10 @@ func HandleAlipayCallback(c *gin.Context) {
 			))
 			return
 		}
+		var orderID int
+		if err := db.QueryRow("SELECT order_id FROM payments WHERE id = $1", req.PaymentID).Scan(&orderID); err == nil {
+			ApplyReferralRewardForPaidOrder(orderID)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Callback processed"})
@@ -299,6 +303,10 @@ func HandleWechatCallback(c *gin.Context) {
 				err,
 			))
 			return
+		}
+		var orderID int
+		if err := db.QueryRow("SELECT order_id FROM payments WHERE id = $1", req.PaymentID).Scan(&orderID); err == nil {
+			ApplyReferralRewardForPaidOrder(orderID)
 		}
 	}
 
