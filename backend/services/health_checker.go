@@ -55,8 +55,8 @@ func OpenAICompatModelsProbeURL(endpoint string) string {
 	return b + "/v1/models"
 }
 
-// openAICompatChatCompletionsURL returns the POST URL for OpenAI-compatible chat completions.
-func openAICompatChatCompletionsURL(endpoint string) string {
+// OpenAICompatChatCompletionsURL returns the POST URL for OpenAI-compatible chat completions.
+func OpenAICompatChatCompletionsURL(endpoint string) string {
 	b := normalizeOpenAICompatBase(endpoint)
 	if hasOpenAICompatVersionedRootSuffix(b) {
 		return b + "/chat/completions"
@@ -876,7 +876,7 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 		}, nil
 	}
 
-	chatEndpoint := openAICompatChatCompletionsURL(endpoint)
+		chatEndpoint := OpenAICompatChatCompletionsURL(endpoint)
 
 	testReq := TestChatRequest{
 		Model: model,

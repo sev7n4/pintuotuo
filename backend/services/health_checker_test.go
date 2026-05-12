@@ -303,7 +303,7 @@ func TestOpenAICompatProbeURLs(t *testing.T) {
 			if g := OpenAICompatModelsProbeURL(tt.base); g != tt.wantM {
 				t.Errorf("models URL = %q, want %q", g, tt.wantM)
 			}
-			if g := openAICompatChatCompletionsURL(tt.base); g != tt.wantChat {
+			if g := OpenAICompatChatCompletionsURL(tt.base); g != tt.wantChat {
 				t.Errorf("chat URL = %q, want %q", g, tt.wantChat)
 			}
 		})

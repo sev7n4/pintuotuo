@@ -1,11 +1,11 @@
 // Command capability-probe runs Phase 0 upstream capability checks using BYOK keys stored in PostgreSQL
 // (merchant_api_keys.api_key_encrypted), decrypted with the same ENCRYPTION_KEY as the backend.
 //
-// Intended to run on the deployment host (or any host that can reach DATABASE_URL and upstreams), e.g.:
+// Intended to run inside the backend container on the deployment host:
 //
-//	cd /opt/pintuotuo/backend && ./bin/capability-probe -out /tmp/cap.csv
+//	docker exec pintuotuo-backend /app/capability-probe -out /tmp/cap.csv
 //
-// Do not pass vendor API keys on the command line; they are loaded from the DB only.
+// Vendor API keys are never read from operator-supplied OPENAI_* env vars; they come from the DB only.
 // For route_mode=litellm, Bearer may use LITELLM_MASTER_KEY from the process environment (same as health_checker).
 package main
 
@@ -33,9 +33,18 @@ func main() {
 	merchantID := flag.Int("merchant-id", 0, "only keys for this merchant_id (0 = all)")
 	apiKeyID := flag.Int("api-key-id", 0, "only this merchant_api_keys.id (0 = all)")
 	providerFilter := flag.String("provider", "", "only keys for this provider code (substring match)")
-	limit := flag.Int("limit", 80, "max rows to process")
-	skipEmbeddings := flag.Bool("skip-embeddings", false, "do not POST /v1/embeddings")
-	embeddingModel := flag.String("embedding-model", "text-embedding-3-small", "model id for embeddings probe (OpenAI-format providers only)")
+	limit := flag.Int("limit", 80, "max BYOK rows to process")
+	skipEmbeddings := flag.Bool("skip-embeddings", false, "skip POST embeddings")
+	billable := flag.Bool("billable", false, "enable probes that incur upstream usage (chat, images, speech, STT)")
+	httpTimeout := flag.Duration("http-timeout", 60*time.Second, "HTTP client timeout for most probes")
+	longTimeout := flag.Duration("long-http-timeout", 180*time.Second, "timeout for images/audio/chat")
+
+	embeddingModel := flag.String("embedding-model", "text-embedding-3-small", "embeddings model id")
+	moderationModel := flag.String("moderation-model", "omni-moderation-latest", "moderations model id")
+	chatModel := flag.String("chat-model", "gpt-4o-mini", "chat / responses model id")
+	imageModel := flag.String("image-model", "dall-e-3", "images generations/edits model id")
+	speechModel := flag.String("speech-model", "tts-1", "audio speech model id")
+	transcriptionModel := flag.String("transcription-model", "whisper-1", "audio transcription/translation model id")
 	flag.Parse()
 
 	if err := config.LoadConfig(); err != nil {
@@ -70,6 +79,19 @@ func main() {
 	db := config.GetDB()
 	ctx := context.Background()
 	hc := services.NewHealthChecker()
+	client := &http.Client{Timeout: *httpTimeout}
+	longClient := &http.Client{Timeout: *longTimeout}
+
+	pf := probeFlags{
+		skipEmbeddings:     *skipEmbeddings,
+		billable:           *billable,
+		embeddingModel:     strings.TrimSpace(*embeddingModel),
+		moderationModel:    strings.TrimSpace(*moderationModel),
+		chatModel:          strings.TrimSpace(*chatModel),
+		imageModel:         strings.TrimSpace(*imageModel),
+		speechModel:        strings.TrimSpace(*speechModel),
+		transcriptionModel: strings.TrimSpace(*transcriptionModel),
+	}
 
 	args := []interface{}{}
 	where := []string{
@@ -120,14 +142,13 @@ LIMIT %d
 	defer func() { _ = rows.Close() }()
 
 	ts := time.Now().UTC().Format(time.RFC3339)
-	client := &http.Client{Timeout: 45 * time.Second}
 
 	for rows.Next() {
 		var (
-			key                          models.MerchantAPIKey
-			routeConfigBytes             []byte
-			mpCode, apiFormat            string
-			mpAPIBase, mpProviderRegion  string
+			key                           models.MerchantAPIKey
+			routeConfigBytes              []byte
+			mpCode, apiFormat             string
+			mpAPIBase, mpProviderRegion   string
 			mpEndpoints, mpRouteStrategy []byte
 		)
 		if err := rows.Scan(
@@ -143,7 +164,6 @@ LIMIT %d
 			_ = json.Unmarshal(routeConfigBytes, &key.RouteConfig)
 		}
 
-		// --- GET models (same pipeline as health FullVerification) ---
 		routeMode := ""
 		if _, rm, e2 := services.ResolveMerchantAPIKeyUpstreamBase(ctx, &key); e2 == nil {
 			routeMode = rm
@@ -168,74 +188,36 @@ LIMIT %d
 				note = fmt.Sprintf("models_count=%d", len(full.ModelsFound))
 			}
 		}
-		_ = w.Write([]string{ts, itoa(key.ID), itoa(key.MerchantID), key.Provider, apiFormat, routeMode, "get_models", itoa(httpCode), ok, truncate(note, 500)})
-		w.Flush()
+		writeProbeRow(w, ts, &key, apiFormat, routeMode, "get_models", itoa(httpCode), ok, truncate(note, 500))
 
-		if *skipEmbeddings {
-			continue
-		}
 		if strings.ToLower(strings.TrimSpace(apiFormat)) != "openai" {
-			_ = w.Write([]string{ts, itoa(key.ID), itoa(key.MerchantID), key.Provider, apiFormat, routeMode, "post_embeddings", "0", "skipped", "api_format_not_openai"})
-			w.Flush()
+			writeNonOpenAISkips(w, ts, &key, apiFormat, routeMode)
 			continue
 		}
 
-		cfg, err := buildExecCfg(mpCode, mpAPIBase, apiFormat, mpProviderRegion, mpRouteStrategy, mpEndpoints, &key)
-		if err != nil {
-			_ = w.Write([]string{ts, itoa(key.ID), itoa(key.MerchantID), key.Provider, apiFormat, routeMode, "post_embeddings", "0", "false", "build_cfg:" + err.Error()})
-			w.Flush()
-			continue
-		}
-		embedURL := services.ResolveEndpointByType(cfg, services.EndpointTypeEmbeddings)
-		if embedURL == "" {
-			_ = w.Write([]string{ts, itoa(key.ID), itoa(key.MerchantID), key.Provider, apiFormat, routeMode, "post_embeddings", "0", "false", "empty_embed_url"})
-			w.Flush()
-			continue
-		}
-
-		decrypted, derr := utils.Decrypt(key.APIKeyEncrypted)
-		if derr != nil || decrypted == "" {
-			_ = w.Write([]string{ts, itoa(key.ID), itoa(key.MerchantID), key.Provider, apiFormat, routeMode, "post_embeddings", "0", "false", "decrypt_failed"})
-			w.Flush()
-			continue
-		}
-		authTok := decrypted
-		if cfg.GatewayMode == services.GatewayModeLitellm {
-			if mk := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY")); mk != "" {
-				authTok = mk
-			}
-		}
-
-		body := fmt.Sprintf(`{"model":%q,"input":"probe"}`, strings.TrimSpace(*embeddingModel))
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, embedURL, strings.NewReader(body))
-		if err != nil {
-			_ = w.Write([]string{ts, itoa(key.ID), itoa(key.MerchantID), key.Provider, apiFormat, routeMode, "post_embeddings", "0", "false", err.Error()})
-			w.Flush()
-			continue
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+authTok)
-
-		resp, err := client.Do(req)
-		if err != nil {
-			_ = w.Write([]string{ts, itoa(key.ID), itoa(key.MerchantID), key.Provider, apiFormat, routeMode, "post_embeddings", "0", "false", "http:" + err.Error()})
-			w.Flush()
-			continue
-		}
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-		_ = resp.Body.Close()
-		eok := "false"
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			eok = "true"
-		}
-		enote := resp.Status
-		_ = w.Write([]string{ts, itoa(key.ID), itoa(key.MerchantID), key.Provider, apiFormat, routeMode, "post_embeddings", itoa(resp.StatusCode), eok, truncate(enote, 200)})
-		w.Flush()
+		runOpenAIFormatProbes(ctx, w, ts, client, longClient, &key, apiFormat, routeMode, mpCode, mpAPIBase, mpProviderRegion, mpEndpoints, mpRouteStrategy, pf)
 	}
 	if err := rows.Err(); err != nil {
 		log.Fatalf("rows: %v", err)
 	}
 	w.Flush()
+}
+
+func writeNonOpenAISkips(w *csv.Writer, ts string, key *models.MerchantAPIKey, apiFormat, routeMode string) {
+	for _, probe := range []string{
+		"post_" + services.EndpointTypeChatCompletions,
+		"post_" + services.EndpointTypeEmbeddings,
+		"post_" + services.EndpointTypeImagesGenerations,
+		"post_" + services.EndpointTypeImagesVariations,
+		"post_" + services.EndpointTypeImagesEdits,
+		"post_" + services.EndpointTypeAudioTranscriptions,
+		"post_" + services.EndpointTypeAudioTranslations,
+		"post_" + services.EndpointTypeAudioSpeech,
+		"post_" + services.EndpointTypeModerations,
+		"post_" + services.EndpointTypeResponses,
+	} {
+		writeProbeRow(w, ts, key, apiFormat, routeMode, probe, "0", "skipped", "api_format_not_openai_use_anthropic_native_or_other_adapter")
+	}
 }
 
 func itoa(v int) string {
@@ -262,17 +244,17 @@ func buildExecCfg(
 		ep = map[string]interface{}{}
 	}
 	cfg := &services.ExecutionProviderConfig{
-		Code:             mpCode,
-		Name:             mpCode,
-		APIBaseURL:       mpAPIBase,
-		APIFormat:        apiFormat,
-		ProviderRegion:   mpProviderRegion,
-		RouteStrategy:    rs,
-		Endpoints:        ep,
-		BYOKEndpointURL:  strings.TrimSpace(key.EndpointURL),
-		BYOKRouteMode:    key.RouteMode,
-		BYOKRouteConfig:  key.RouteConfig,
-		BYOKFallbackURL:  strings.TrimSpace(key.FallbackEndpointURL),
+		Code:            mpCode,
+		Name:            mpCode,
+		APIBaseURL:      mpAPIBase,
+		APIFormat:       apiFormat,
+		ProviderRegion:  mpProviderRegion,
+		RouteStrategy:   rs,
+		Endpoints:       ep,
+		BYOKEndpointURL: strings.TrimSpace(key.EndpointURL),
+		BYOKRouteMode:   key.RouteMode,
+		BYOKRouteConfig: key.RouteConfig,
+		BYOKFallbackURL: strings.TrimSpace(key.FallbackEndpointURL),
 	}
 	services.ConfigureGatewayMode(cfg)
 	return cfg, nil

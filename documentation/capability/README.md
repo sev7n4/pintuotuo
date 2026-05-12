@@ -12,35 +12,34 @@
 | [matrix-template.md](./matrix-template.md) | 0.2 | 厂商 × 端点矩阵模板与状态枚举 |
 | [runbook-env-snapshot.md](./runbook-env-snapshot.md) | 0.3 | 脱敏导出 `model_providers` / 密钥元数据的步骤 |
 | [minimal-request-snippets.md](./minimal-request-snippets.md) | 0.5 | 各端点最小 `curl` / JSON 样例（便于复现探测） |
+| [phase0-scope.md](./phase0-scope.md) | 0.x | **用量与范围**：默认/计费探测次数、部署流水线行为 |
 | [risk-register-template.md](./risk-register-template.md) | 0.6 | 风险登记占位（复制到 Wiki/Jira 亦可） |
 
 ## 上游探测命令（Go，从数据库读取 BYOK）
 
-实现路径：[backend/cmd/capability-probe/main.go](../../backend/cmd/capability-probe/main.go)
+实现路径：[backend/cmd/capability-probe/](../../backend/cmd/capability-probe/)（`main.go` + `probes.go`）
 
-- **厂商 API Key 仅从表 `merchant_api_keys.api_key_encrypted` 解密得到**，不在命令行或操作员本机环境变量中配置 `OPENAI_API_KEY` 等上游密钥。
-- 与线上健康检查一致：对每条密钥执行 **`GET …/models`**（经 `HealthChecker.FullVerification`）；对 `model_providers.api_format = openai` 的密钥额外尝试 **`POST …/embeddings`**（极小请求体）。
-- **仍需**与后端相同的 **`DATABASE_URL`**、**`ENCRYPTION_KEY`**（由部署环境注入进程，与 `docker compose` / systemd 一致），否则无法连库与解密。
-- 若商户密钥 `route_mode=litellm`，访问网关时的 Bearer 与现有 [`health_checker`](../../backend/services/health_checker.go) 一致：优先使用进程环境变量 **`LITELLM_MASTER_KEY`**（属于部署侧基础设施，不是把 BYOK 明文放到本机 env）。
+- **生产镜像**：与 `server` 一并构建，路径 **`/app/capability-probe`**（见 [backend/Dockerfile](../../backend/Dockerfile)）。
+- **厂商 API Key** 仅从 **`merchant_api_keys.api_key_encrypted`** 解密；**不**使用操作员本机的 `OPENAI_API_KEY` 等。
+- **全量端点**：与 `services.EndpointType*` 对齐——`get_models` + 各 `post_*`（非 `openai` 的 `post_*` 仅写 `skipped` 行）。其中 **计费类**（chat、图像、语音、转写）默认 **跳过**，需显式传 **`-billable`** 才会真实调用上游（见 [phase0-scope.md](./phase0-scope.md)）。
+- **进程环境**：仍需 **`DATABASE_URL`**、**`ENCRYPTION_KEY`**（与 backend 容器一致）；`route_mode=litellm` 时与现网一致可使用 **`LITELLM_MASTER_KEY`**。
 
 ### 在部署机执行（示例）
 
 ```bash
 ssh -i ~/.ssh/tencent_cloud_deploy root@119.29.173.89
-cd /opt/pintuotuo/backend
-# 与线上 backend 容器相同环境变量（DATABASE_URL、ENCRYPTION_KEY 等）
-docker compose exec -T backend sh -lc 'cd /app && ./bin/capability-probe -out /tmp/capability-probe-output.csv'
+cd /opt/pintuotuo
+# 生产 compose 容器名为 pintuotuo-backend（见 docker-compose.prod.yml）
+docker exec pintuotuo-backend /app/capability-probe -out /tmp/capability-probe-latest.csv -limit 30
+# 可选：打开计费类探测（慎用，见 phase0-scope.md）
+# docker exec pintuotuo-backend /app/capability-probe -out /tmp/cap-billable.csv -limit 3 -billable -api-key-id 123
 ```
 
-若镜像内尚未编译该子命令，可在挂载源码的树中：
+本地：`make capability-probe`（`CAPABILITY_PROBE_FLAGS='-out /tmp/c.csv -provider openai -limit 5'`）。
 
-```bash
-docker compose exec -T backend sh -lc 'cd /app/backend && go run ./cmd/capability-probe -out /tmp/capability-probe-output.csv'
-```
+**GitHub Actions**：合并 `deploy-tencent.yml` 后，每次生产部署结束会**非致命**跑一次默认（无 `-billable`）探测，并在日志中 `tail` CSV 片段。
 
-本地 Makefile：`make capability-probe`（可选 `CAPABILITY_PROBE_FLAGS='-out /tmp/cap.csv -provider openai -limit 5'`）。
-
-探测输出 CSV 建议写到 `/tmp` 等受控目录；仓库已 `.gitignore`：`documentation/capability/capability-probe-output*.csv`。
+探测输出勿提交仓库；`.gitignore`：`documentation/capability/capability-probe-output*.csv`。
 
 ## 与代码的对照
 

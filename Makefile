@@ -99,7 +99,7 @@ reconcile-check: ## Full-database usage ledger check (api_usage_logs vs token_tr
 	@echo "$(BLUE)Running usage reconciliation...$(NC)"
 	cd backend && go run ./cmd/reconcile
 
-capability-probe: ## Phase0: 用 DB 内 BYOK 密钥探测上游（GET /v1/models + 可选 POST embeddings）；需在部署机或能连库的环境执行，见 documentation/capability/README.md
+capability-probe: ## Phase0: DB 内 BYOK 探测（GET /v1/models + 与 execution_layer 对齐的 POST；计费类需 -billable）；见 documentation/capability/README.md 与 phase0-scope.md
 	cd backend && go run ./cmd/capability-probe $(CAPABILITY_PROBE_FLAGS)
 
 # 示例：make capability-probe CAPABILITY_PROBE_FLAGS='-out /tmp/cap.csv -provider openai -limit 5'
