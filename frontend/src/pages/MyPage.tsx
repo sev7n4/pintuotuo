@@ -8,6 +8,7 @@ import {
   RightOutlined,
   TrophyOutlined,
   CodeOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import { referralService } from '@/services/referral';
@@ -168,12 +169,30 @@ const MyPage = () => {
         </Row>
       </Card>
 
+      <Card size="small" style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 16px' }}>
+        <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }} wrap>
+          <span style={{ color: 'rgba(0,0,0,0.65)' }}>邀请好友首单消费，你可获得奖励</span>
+          <Button
+            type="link"
+            icon={<GiftOutlined />}
+            onClick={() => navigate('/referral')}
+            style={{ padding: 0 }}
+          >
+            邀请得奖励
+          </Button>
+        </Space>
+      </Card>
+
       <div className={styles.servicesEntry}>
         <Space wrap>
           <Button type="primary" ghost onClick={() => navigate('/my/services')}>
             进入我的服务
           </Button>
-          <Button type="default" icon={<CodeOutlined />} onClick={() => navigate('/developer/quickstart')}>
+          <Button
+            type="default"
+            icon={<CodeOutlined />}
+            onClick={() => navigate('/developer/quickstart')}
+          >
             开发者中心
           </Button>
         </Space>

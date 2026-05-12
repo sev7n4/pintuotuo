@@ -160,8 +160,8 @@ const { Paragraph, Text } = Typography;
 type MainView = 'records' | 'charts';
 
 const Consumption: React.FC = () => {
-  const [mainView, setMainView] = useState<MainView>('records');
-  const [recordsLayout, setRecordsLayout] = useState<'table' | 'cards'>('table');
+  const [mainView, setMainView] = useState<MainView>('charts');
+  const [recordsLayout, setRecordsLayout] = useState<'table' | 'cards'>('cards');
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<ConsumptionRecord[]>([]);
   const [stats, setStats] = useState<ConsumptionStats | null>(null);
@@ -324,15 +324,27 @@ const Consumption: React.FC = () => {
         width: 100,
         render: (et: string) => {
           const labels: Record<string, string> = {
-            chat_completions: '对话', responses: 'Response', embeddings: '嵌入',
-            images_generations: '图像生成', images_variations: '图像变体', images_edits: '图像编辑',
-            audio_transcriptions: '语音转文字', audio_translations: '音频翻译', audio_speech: '语音合成',
+            chat_completions: '对话',
+            responses: 'Response',
+            embeddings: '嵌入',
+            images_generations: '图像生成',
+            images_variations: '图像变体',
+            images_edits: '图像编辑',
+            audio_transcriptions: '语音转文字',
+            audio_translations: '音频翻译',
+            audio_speech: '语音合成',
             moderations: '审核',
           };
           const colors: Record<string, string> = {
-            chat_completions: 'blue', responses: 'purple', embeddings: 'cyan',
-            images_generations: 'orange', images_variations: 'gold', images_edits: 'volcano',
-            audio_transcriptions: 'green', audio_translations: 'lime', audio_speech: 'magenta',
+            chat_completions: 'blue',
+            responses: 'purple',
+            embeddings: 'cyan',
+            images_generations: 'orange',
+            images_variations: 'gold',
+            images_edits: 'volcano',
+            audio_transcriptions: 'green',
+            audio_translations: 'lime',
+            audio_speech: 'magenta',
             moderations: 'red',
           };
           return <Tag color={colors[et] || 'default'}>{labels[et] || et || '对话'}</Tag>;
@@ -524,13 +536,12 @@ const Consumption: React.FC = () => {
           value={mainView}
           onChange={(v) => setMainView(v as MainView)}
           options={[
-            { label: '明细列表', value: 'records' },
             { label: '图表视图', value: 'charts' },
+            { label: '明细列表', value: 'records' },
           ]}
         />
-        <Paragraph type="secondary" style={{ margin: 0, flex: '1 1 200px' }}>
-          上方筛选项对列表与统计、图表共用。图表视图中含按日扣减、按 Provider
-          汇总，以及「模型对比」气泡图（延迟与单次扣减、用量节奏），便于在相同筛选条件下评估不同厂家与模型。
+        <Paragraph type="secondary" style={{ margin: 0, flex: '1 1 200px', fontSize: 12 }}>
+          筛选项对图表与明细共用；默认展示摘要图表与卡片式明细，完整表格在明细内切换。
         </Paragraph>
       </div>
       {mainView === 'records' && (
@@ -539,8 +550,8 @@ const Consumption: React.FC = () => {
             value={recordsLayout}
             onChange={(v) => setRecordsLayout(v as 'table' | 'cards')}
             options={[
-              { label: '表格', value: 'table' },
               { label: '卡片', value: 'cards' },
+              { label: '表格', value: 'table' },
             ]}
           />
         </div>
@@ -678,21 +689,27 @@ const Consumption: React.FC = () => {
       {mainView !== 'charts' && stats?.by_endpoint_type && stats.by_endpoint_type.length > 0 && (
         <Card className={styles.providerCard} title="按端点类型统计" style={{ marginTop: 16 }}>
           <Row gutter={[16, 16]}>
-            {stats.by_endpoint_type.map((ep: { endpoint_type: string; count: number; tokens: number }) => (
-              <Col xs={12} sm={12} md={6} key={ep.endpoint_type}>
-                <Card size="small">
-                  <Statistic
-                    title={<Tag color={ENDPOINT_TYPE_COLORS[ep.endpoint_type] || 'default'}>{ENDPOINT_TYPE_LABELS[ep.endpoint_type] || ep.endpoint_type}</Tag>}
-                    value={ep.count}
-                    suffix="次"
-                    valueStyle={{ fontSize: isMobile ? 14 : 16 }}
-                  />
-                  <div style={{ marginTop: 4, color: '#8c8c8c', fontSize: 12 }}>
-                    Token: {formatLedgerUnits(ep.tokens)}
-                  </div>
-                </Card>
-              </Col>
-            ))}
+            {stats.by_endpoint_type.map(
+              (ep: { endpoint_type: string; count: number; tokens: number }) => (
+                <Col xs={12} sm={12} md={6} key={ep.endpoint_type}>
+                  <Card size="small">
+                    <Statistic
+                      title={
+                        <Tag color={ENDPOINT_TYPE_COLORS[ep.endpoint_type] || 'default'}>
+                          {ENDPOINT_TYPE_LABELS[ep.endpoint_type] || ep.endpoint_type}
+                        </Tag>
+                      }
+                      value={ep.count}
+                      suffix="次"
+                      valueStyle={{ fontSize: isMobile ? 14 : 16 }}
+                    />
+                    <div style={{ marginTop: 4, color: '#8c8c8c', fontSize: 12 }}>
+                      Token: {formatLedgerUnits(ep.tokens)}
+                    </div>
+                  </Card>
+                </Col>
+              )
+            )}
           </Row>
         </Card>
       )}

@@ -110,11 +110,7 @@ function GroupMiniCard({ group, onClick }: { group: Group; onClick: () => void }
             {subtitle}
           </Text>
         )}
-        <Progress
-          percent={progress}
-          size="small"
-          status={groupProgressBarStatus(group)}
-        />
+        <Progress percent={progress} size="small" status={groupProgressBarStatus(group)} />
         <Text type="secondary" style={{ fontSize: 12 }}>
           {group.current_count}/{group.target_count} 人
           {expired && group.status === 'active' ? ' · 已截止' : ''}

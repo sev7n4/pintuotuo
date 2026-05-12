@@ -437,7 +437,7 @@ const AdminByokRouting = () => {
           setVerificationResult(latest);
 
           if (latest.models_found && latest.models_found.length > 0) {
-            setCachedModels(prev => {
+            setCachedModels((prev) => {
               const next = new Map(prev);
               next.set(id, latest.models_found!);
               return next;
@@ -970,7 +970,11 @@ const AdminByokRouting = () => {
             showSearch
             value={selectedProbeModel}
             onChange={(val) => setSelectedProbeModel(val)}
-            options={(cachedModels.get(probeModelTarget?.id || 0) || probeModelTarget?.models_supported || []).map(m => ({
+            options={(
+              cachedModels.get(probeModelTarget?.id || 0) ||
+              probeModelTarget?.models_supported ||
+              []
+            ).map((m) => ({
               label: m,
               value: m,
             }))}

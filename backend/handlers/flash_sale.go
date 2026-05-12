@@ -255,14 +255,15 @@ func CreateFlashSale(c *gin.Context) {
 
 	for _, p := range req.Skus {
 		var originalPrice float64
+		var skuStock int
 		var skuType, modelProvider, modelName, providerModelID string
 		err := tx.QueryRow(
-			`SELECT s.retail_price, s.sku_type, COALESCE(sp.model_provider, ''), COALESCE(sp.model_name, ''), COALESCE(sp.provider_model_id, '')
+			`SELECT s.retail_price, s.stock, s.sku_type, COALESCE(sp.model_provider, ''), COALESCE(sp.model_name, ''), COALESCE(sp.provider_model_id, '')
 			 FROM skus s
 			 JOIN spus sp ON s.spu_id = sp.id
 			 WHERE s.id = $1 AND s.status = 'active' AND sp.status = 'active'`,
 			p.SKUID,
-		).Scan(&originalPrice, &skuType, &modelProvider, &modelName, &providerModelID)
+		).Scan(&originalPrice, &skuStock, &skuType, &modelProvider, &modelName, &providerModelID)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrProductNotFound)
 			return
@@ -283,6 +284,44 @@ func CreateFlashSale(c *gin.Context) {
 			middleware.RespondWithError(c, apperrors.NewAppError(
 				"FUEL_PACK_PURCHASE_RESTRICTED",
 				"加油包不可单独购买，秒杀活动仅支持带模型商品",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+
+		if skuStock >= 0 && p.StockLimit > skuStock {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"FLASH_SALE_STOCK_EXCEEDS_SKU",
+				"秒杀库存不能超过 SKU 当前可售库存",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+
+		var overlapCount int
+		err = tx.QueryRow(`
+			SELECT COUNT(*) FROM flash_sale_products fsp
+			INNER JOIN flash_sales fs ON fs.id = fsp.flash_sale_id
+			WHERE fsp.sku_id = $1
+			  AND fs.status IN ('upcoming', 'active')
+			  AND fs.start_time < $3 AND fs.end_time > $2`,
+			p.SKUID, req.StartTime, req.EndTime,
+		).Scan(&overlapCount)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"FLASH_SALE_OVERLAP_CHECK_FAILED",
+				"检查场次冲突失败",
+				http.StatusInternalServerError,
+				err,
+			))
+			return
+		}
+		if overlapCount > 0 {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"FLASH_SALE_SKU_TIME_OVERLAP",
+				"该 SKU 在相同时间段内已有未结束或未取消的秒杀场次，请调整时间或 SKU",
 				http.StatusBadRequest,
 				nil,
 			))

@@ -56,9 +56,7 @@ export default function DeveloperModelsPage() {
         </Link>
       </Space>
 
-      {guide?.disclaimer ? (
-        <Alert type="info" showIcon message={guide.disclaimer} />
-      ) : null}
+      {guide?.disclaimer ? <Alert type="info" showIcon message={guide.disclaimer} /> : null}
 
       <Card title="可用模型（请求体 model）" loading={loading}>
         <Table<APIUsageGuideItem>

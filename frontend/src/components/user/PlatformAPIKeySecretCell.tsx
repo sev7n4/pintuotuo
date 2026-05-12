@@ -19,9 +19,7 @@ export function PlatformAPIKeySecretCell({ record }: Props) {
   const [loading, setLoading] = useState(false);
 
   const preview =
-    record.key_preview && record.key_preview.trim() !== ''
-      ? record.key_preview
-      : 'ptd_…（无预览）';
+    record.key_preview && record.key_preview.trim() !== '' ? record.key_preview : 'ptd_…（无预览）';
 
   const canReveal = record.can_reveal === true;
 

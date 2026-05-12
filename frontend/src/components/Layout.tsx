@@ -10,6 +10,7 @@ import {
   Drawer,
   Button,
   Grid,
+  FloatButton,
 } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -27,6 +28,7 @@ import {
   TeamOutlined,
   UserAddOutlined,
   QuestionCircleOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import './Layout.css';
@@ -61,6 +63,10 @@ export default function Layout() {
   const screens = useBreakpoint();
   const isMobileNav = !screens.md;
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [inviteFabHidden, setInviteFabHidden] = useState(
+    () =>
+      typeof window !== 'undefined' && window.localStorage.getItem('ptt_invite_fab_hide') === '1'
+  );
 
   const mainNavSelectedKeys = useMemo(
     () => getMainNavSelectedKey(location.pathname, location.search),
@@ -72,6 +78,14 @@ export default function Layout() {
       fetchUser();
     }
   }, [isAuthenticated, user, fetchUser]);
+
+  const showInviteFab =
+    isAuthenticated &&
+    !inviteFabHidden &&
+    !location.pathname.startsWith('/referral') &&
+    !location.pathname.startsWith('/login') &&
+    !location.pathname.startsWith('/register') &&
+    !location.pathname.startsWith('/admin');
 
   const tabItems = useMemo(
     () => [
@@ -295,6 +309,24 @@ export default function Layout() {
       <Content className="layout-content">
         <Outlet />
       </Content>
+      {showInviteFab && (
+        <FloatButton.Group shape="circle" style={{ right: 20, bottom: 88 }}>
+          <FloatButton
+            icon={<CloseOutlined />}
+            tooltip="隐藏邀请入口"
+            onClick={() => {
+              window.localStorage.setItem('ptt_invite_fab_hide', '1');
+              setInviteFabHidden(true);
+            }}
+          />
+          <FloatButton
+            type="primary"
+            icon={<UserAddOutlined />}
+            tooltip="邀请得奖励"
+            onClick={() => navigate('/referral')}
+          />
+        </FloatButton.Group>
+      )}
       <Footer className="layout-footer">
         <p>
           &copy; 2026 拼脱脱 - AI Token 二级市场

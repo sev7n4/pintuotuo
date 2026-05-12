@@ -13,8 +13,8 @@ export default function DeveloperUsagePage() {
           用量与账单
         </Title>
         <Paragraph type="secondary">
-          以下为账户维度的调用与 Token 扣减明细。也可在{' '}
-          <Link to="/consumption">独立页面</Link> 打开同一视图。
+          以下为账户维度的调用与 Token 扣减明细。也可在 <Link to="/consumption">独立页面</Link>{' '}
+          打开同一视图。
         </Paragraph>
       </div>
       <Consumption />

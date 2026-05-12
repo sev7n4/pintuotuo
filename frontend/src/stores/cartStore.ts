@@ -66,7 +66,9 @@ export const useCartStore = create<CartState>()(
 
       updateQuantity: (id, quantity) => {
         set((state) => {
-          const newItems = state.items.map((item) => (item.id === id ? { ...item, quantity } : item));
+          const newItems = state.items.map((item) =>
+            item.id === id ? { ...item, quantity } : item
+          );
           return {
             items: newItems,
             total: computeTotal(newItems),
@@ -76,7 +78,8 @@ export const useCartStore = create<CartState>()(
 
       clear: () => set({ items: [], total: 0 }),
 
-      getTotal: () => get().items.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+      getTotal: () =>
+        get().items.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
     }),
     {
       name: 'pintuotuo-cart',

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import FuelStationPage from '../FuelStationPage';
 
@@ -34,6 +34,7 @@ describe('FuelStationPage', () => {
     );
 
     expect(await screen.findByText('智燃加油站')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('购买规则'));
     expect(screen.getByText(/加油包不可单独购买/)).toBeInTheDocument();
   });
 });

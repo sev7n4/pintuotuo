@@ -18,6 +18,7 @@ import {
   Grid,
   List,
   Collapse,
+  Segmented,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { FundOutlined, ReloadOutlined, TeamOutlined, ShoppingOutlined } from '@ant-design/icons';
@@ -84,6 +85,7 @@ export const OrderListPage: React.FC = () => {
   const [cancelReasonText, setCancelReasonText] = useState<string>('');
   const [refundReason, setRefundReason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [desktopOrderView, setDesktopOrderView] = useState<'cards' | 'table'>('cards');
   const screens = useBreakpoint();
 
   const isMobile = screens.xs || (screens.sm && !screens.md);
@@ -399,7 +401,19 @@ export const OrderListPage: React.FC = () => {
           size={isMobile ? 'small' : 'middle'}
         />
         <Spin spinning={isLoading}>
-          {isMobile ? (
+          {!isMobile && (
+            <div style={{ marginBottom: 12 }}>
+              <Segmented
+                value={desktopOrderView}
+                onChange={(v) => setDesktopOrderView(v as 'cards' | 'table')}
+                options={[
+                  { label: '卡片', value: 'cards' },
+                  { label: '表格', value: 'table' },
+                ]}
+              />
+            </div>
+          )}
+          {isMobile || desktopOrderView === 'cards' ? (
             <List
               dataSource={filteredOrders}
               locale={{ emptyText: <Empty description="暂无订单" /> }}
@@ -462,6 +476,26 @@ export const OrderListPage: React.FC = () => {
                                 再下一单
                               </Button>
                             </>
+                          )}
+                          {order.status === 'paid' && (
+                            <Button
+                              type="link"
+                              size="small"
+                              icon={<FundOutlined />}
+                              onClick={() => openRefundModal(order)}
+                            >
+                              退款
+                            </Button>
+                          )}
+                          {order.group_id && (
+                            <Button
+                              type="link"
+                              size="small"
+                              icon={<TeamOutlined />}
+                              onClick={() => navigate(`/groups/${order.group_id}`)}
+                            >
+                              拼团详情
+                            </Button>
                           )}
                         </Space>
                       </Space>
