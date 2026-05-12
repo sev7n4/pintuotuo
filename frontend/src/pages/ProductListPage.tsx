@@ -130,6 +130,7 @@ export const ProductListPage: React.FC = () => {
   const { items } = useCartStore();
 
   const [flashSales, setFlashSales] = useState<FlashSale[]>([]);
+  const [upcomingFlashSales, setUpcomingFlashSales] = useState<FlashSale[]>([]);
   const [flashLoading, setFlashLoading] = useState(false);
   const [countdown, setCountdown] = useState<string>('');
 
@@ -429,11 +430,17 @@ export const ProductListPage: React.FC = () => {
   const loadFlashSales = async () => {
     setFlashLoading(true);
     try {
-      const response = await api.get('/flash-sales/active');
-      const data = (response.data as { data?: FlashSale[] })?.data || [];
-      setFlashSales(data);
+      const [activeRes, upRes] = await Promise.all([
+        api.get('/flash-sales/active'),
+        api.get('/flash-sales/upcoming'),
+      ]);
+      const activeData = (activeRes.data as { data?: FlashSale[] })?.data || [];
+      setFlashSales(activeData);
+      const upData = (upRes.data as { data?: FlashSale[] })?.data || [];
+      setUpcomingFlashSales(upData);
     } catch {
       setFlashSales([]);
+      setUpcomingFlashSales([]);
     } finally {
       setFlashLoading(false);
     }
@@ -732,6 +739,31 @@ export const ProductListPage: React.FC = () => {
             </Col>
           )}
         </Row>
+
+        {upcomingFlashSales.length > 0 && (
+          <Card size="small" title="即将开始" style={{ marginBottom: 16 }}>
+            {upcomingFlashSales.map((sale) => (
+              <div key={sale.id} style={{ marginBottom: 12 }}>
+                <Text strong>{sale.name}</Text>
+                <Text type="secondary" style={{ marginLeft: 8 }}>
+                  {dayjs(sale.start_time).format('MM-DD HH:mm')} 开抢 —{' '}
+                  {dayjs(sale.end_time).format('MM-DD HH:mm')} 结束
+                </Text>
+                <div style={{ marginTop: 8 }}>
+                  {sale.skus.map((p) => (
+                    <Tag
+                      key={p.id}
+                      style={{ cursor: 'pointer', marginBottom: 4 }}
+                      onClick={() => handleBuyFlashProduct(p)}
+                    >
+                      {p.product_name} · ¥{p.flash_price.toFixed(2)}
+                    </Tag>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </Card>
+        )}
 
         <Spin spinning={displayLoading}>
           {flashSales.length === 0 ? (

@@ -90,6 +90,10 @@ func main() {
 	responseCleanupScheduler.Start()
 	defer responseCleanupScheduler.Stop()
 
+	flashSaleStatusScheduler := scheduler.NewFlashSaleStatusScheduler(1 * time.Minute)
+	flashSaleStatusScheduler.Start()
+	defer flashSaleStatusScheduler.Stop()
+
 	services.GetHealthScheduler().Start()
 	defer services.GetHealthScheduler().Stop()
 

@@ -76,6 +76,7 @@ type OrderItem struct {
 	SKUCode          string     `json:"sku_code,omitempty"`
 	PricingVersionID *int       `json:"pricing_version_id,omitempty"`
 	FulfilledAt      *time.Time `json:"fulfilled_at,omitempty"`
+	FlashSaleID      *int       `json:"flash_sale_id,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at,omitempty"`
 }

@@ -5,6 +5,7 @@ interface CreateOrderRequest {
   items: Array<{
     sku_id: number;
     quantity: number;
+    flash_sale_id?: number;
   }>;
   /** 与 items 明细一致时写入订单，用于套餐销量统计 */
   entitlement_package_id?: number;

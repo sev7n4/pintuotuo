@@ -15,3 +15,15 @@ const SQLRestoreSKUStockFromOrderItems = `UPDATE skus s
      GROUP BY sku_id
   ) oi
  WHERE s.id = oi.sku_id`
+
+// SQLRestoreFlashSaleStockFromOrderItems rolls back flash_sale_products.stock_sold when a pending order is canceled.
+const SQLRestoreFlashSaleStockFromOrderItems = `UPDATE flash_sale_products fsp
+   SET stock_sold = GREATEST(0, fsp.stock_sold - oi.qty),
+       updated_at = CURRENT_TIMESTAMP
+  FROM (
+    SELECT flash_sale_id, sku_id, SUM(quantity)::bigint AS qty
+      FROM order_items
+     WHERE order_id = $1 AND flash_sale_id IS NOT NULL
+     GROUP BY flash_sale_id, sku_id
+  ) oi
+ WHERE fsp.flash_sale_id = oi.flash_sale_id AND fsp.sku_id = oi.sku_id`

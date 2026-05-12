@@ -72,6 +72,9 @@ const CheckoutPage: React.FC = () => {
         selectedCartItems.map((item) => ({
           sku_id: item.sku_id,
           quantity: item.quantity,
+          ...(item.flash_sale_id != null && item.flash_sale_id > 0
+            ? { flash_sale_id: item.flash_sale_id }
+            : {}),
         }))
       );
 

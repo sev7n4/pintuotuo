@@ -12,7 +12,7 @@ interface OrderState {
   fetchOrders: (page?: number, per_page?: number) => Promise<void>;
   fetchOrderByID: (id: number) => Promise<void>;
   createOrder: (
-    items: Array<{ sku_id: number; quantity: number }>,
+    items: Array<{ sku_id: number; quantity: number; flash_sale_id?: number }>,
     opts?: { entitlement_package_id?: number }
   ) => Promise<number | null>;
   cancelOrder: (id: number, reason?: string) => Promise<void>;
@@ -54,7 +54,13 @@ export const useOrderStore = create<OrderState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await orderService.createOrder({
-        items,
+        items: items.map((it) => ({
+          sku_id: it.sku_id,
+          quantity: it.quantity,
+          ...(it.flash_sale_id != null && it.flash_sale_id > 0
+            ? { flash_sale_id: it.flash_sale_id }
+            : {}),
+        })),
         ...(opts?.entitlement_package_id != null
           ? { entitlement_package_id: opts.entitlement_package_id }
           : {}),

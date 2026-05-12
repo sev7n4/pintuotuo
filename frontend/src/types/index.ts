@@ -557,6 +557,8 @@ export interface CartItem {
   product: Product;
   quantity: number;
   group_id?: number;
+  /** 来自秒杀卖场跳转时携带，下单会传给服务端校验 */
+  flash_sale_id?: number;
   sku_name?: string;
   sku_type?: string;
   sku_specs?: string;

@@ -6,7 +6,12 @@ interface CartState {
   items: CartItem[];
   total: number;
 
-  addItem: (product: Product, quantity: number, groupId?: number) => void;
+  addItem: (
+    product: Product,
+    quantity: number,
+    groupId?: number,
+    flashSaleId?: number
+  ) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clear: () => void;
@@ -23,10 +28,13 @@ export const useCartStore = create<CartState>()(
       items: [],
       total: 0,
 
-      addItem: (product, quantity, groupId) => {
+      addItem: (product, quantity, groupId, flashSaleId) => {
         set((state) => {
           const existingItem = state.items.find(
-            (item) => item.sku_id === product.id && item.group_id === groupId
+            (item) =>
+              item.sku_id === product.id &&
+              item.group_id === groupId &&
+              (item.flash_sale_id ?? 0) === (flashSaleId ?? 0)
           );
 
           let newItems: CartItem[];
@@ -38,11 +46,12 @@ export const useCartStore = create<CartState>()(
             newItems = [
               ...state.items,
               {
-                id: `${product.id}-${groupId || 0}-${Date.now()}`,
+                id: `${product.id}-${groupId || 0}-${flashSaleId || 0}-${Date.now()}`,
                 sku_id: product.id,
                 product,
                 quantity,
                 group_id: groupId,
+                flash_sale_id: flashSaleId,
               },
             ];
           }
