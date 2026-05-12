@@ -34,3 +34,17 @@ func TestSQLRestoreSKUStockFromOrderItems_Exec(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestSQLRestoreFlashSaleStockFromOrderItems_Exec(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectExec(
+		`(?s)UPDATE flash_sale_products fsp.+WHERE order_id = \$1`,
+	).WithArgs(42).WillReturnResult(sqlmock.NewResult(0, 1))
+
+	_, err = db.Exec(SQLRestoreFlashSaleStockFromOrderItems, 42)
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}

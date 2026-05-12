@@ -9,6 +9,7 @@ import (
 
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
+	"github.com/pintuotuo/backend/services"
 )
 
 type OrderScheduler struct {
@@ -124,6 +125,10 @@ func (s *OrderScheduler) cancelExpiredOrders() {
 			if err != nil {
 				log.Printf("Scheduler: failed to restore stock for order %d: %v", o.id, err)
 			}
+		}
+
+		if _, err := tx.ExecContext(ctx, services.SQLRestoreFlashSaleStockFromOrderItems, o.id); err != nil {
+			log.Printf("Scheduler: failed to restore flash sale stock for order %d: %v", o.id, err)
 		}
 	}
 

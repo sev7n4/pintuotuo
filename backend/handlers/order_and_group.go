@@ -122,8 +122,9 @@ func appendGroupEnrichedRows(rows *sql.Rows) ([]models.Group, error) {
 }
 
 type createOrderLineItem struct {
-	SKUID    int `json:"sku_id" binding:"required,gt=0"`
-	Quantity int `json:"quantity" binding:"required,gt=0"`
+	SKUID       int  `json:"sku_id" binding:"required,gt=0"`
+	Quantity    int  `json:"quantity" binding:"required,gt=0"`
+	FlashSaleID *int `json:"flash_sale_id,omitempty"`
 }
 
 func validateEntitlementPackageOrderLines(tx *sql.Tx, packageID int, reqItems []createOrderLineItem) *apperrors.AppError {
@@ -212,6 +213,16 @@ func CreateOrder(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
+	if _, perr := services.PromoteFlashSaleStatuses(tx, time.Now()); perr != nil {
+		logger.LogWarn(c.Request.Context(), "flash_sale", "promote in create order tx failed", map[string]interface{}{"error": perr.Error()})
+	}
+
+	buyerID, okBuyer := intFromGinUserID(c)
+	if !okBuyer {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
 	if req.EntitlementPackageID != nil {
 		if ae := validateEntitlementPackageOrderLines(tx, *req.EntitlementPackageID, req.Items); ae != nil {
 			middleware.RespondWithError(c, ae)
@@ -223,6 +234,7 @@ func CreateOrder(c *gin.Context) {
 		item        models.OrderItem
 		tokenAmount sql.NullInt64
 		cpAmount    sql.NullFloat64
+		flashSaleID sql.NullInt64
 	}
 	items := make([]pendingItem, 0, len(req.Items))
 	policyLines := make([]services.OrderLinePolicyInput, 0, len(req.Items))
@@ -328,6 +340,18 @@ func CreateOrder(c *gin.Context) {
 		}
 		lineTotal := unitPrice * float64(in.Quantity)
 
+		var flashSaleIDArg sql.NullInt64
+		if in.FlashSaleID != nil && *in.FlashSaleID > 0 {
+			fp, appErr := services.ReserveFlashSaleLine(tx, buyerID, *in.FlashSaleID, skuID, in.Quantity, time.Now())
+			if appErr != nil {
+				middleware.RespondWithError(c, appErr)
+				return
+			}
+			unitPrice = fp
+			lineTotal = unitPrice * float64(in.Quantity)
+			flashSaleIDArg = sql.NullInt64{Int64: int64(*in.FlashSaleID), Valid: true}
+		}
+
 		item := models.OrderItem{
 			SKUID:      skuID,
 			SPUID:      spuID,
@@ -348,7 +372,11 @@ func CreateOrder(c *gin.Context) {
 			pvInt := int(pv.Int64)
 			item.PricingVersionID = &pvInt
 		}
-		items = append(items, pendingItem{item: item, tokenAmount: tokenAmount, cpAmount: computePoints})
+		if flashSaleIDArg.Valid {
+			fs := int(flashSaleIDArg.Int64)
+			item.FlashSaleID = &fs
+		}
+		items = append(items, pendingItem{item: item, tokenAmount: tokenAmount, cpAmount: computePoints, flashSaleID: flashSaleIDArg})
 		policyLines = append(policyLines, services.OrderLinePolicyInput{
 			SKUType:         skuType,
 			ModelProvider:   modelProvider.String,
@@ -417,10 +445,10 @@ func CreateOrder(c *gin.Context) {
 		var createdAt, updatedAt time.Time
 		var fulfilledAt sql.NullTime
 		err = tx.QueryRow(
-			`INSERT INTO order_items (order_id, sku_id, spu_id, quantity, unit_price, total_price, pricing_version_id, sku_type, token_amount, compute_points)
-			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+			`INSERT INTO order_items (order_id, sku_id, spu_id, quantity, unit_price, total_price, pricing_version_id, sku_type, token_amount, compute_points, flash_sale_id)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 			 RETURNING id, pricing_version_id, fulfilled_at, created_at, updated_at`,
-			order.ID, item.SKUID, item.SPUID, item.Quantity, item.UnitPrice, item.TotalPrice, pvArg, item.SKUType, pi.tokenAmount, pi.cpAmount,
+			order.ID, item.SKUID, item.SPUID, item.Quantity, item.UnitPrice, item.TotalPrice, pvArg, item.SKUType, pi.tokenAmount, pi.cpAmount, pi.flashSaleID,
 		).Scan(&itemID, &itemPV, &fulfilledAt, &createdAt, &updatedAt)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.NewAppError(
@@ -467,7 +495,7 @@ func loadOrderItems(db *sql.DB, orderID int) ([]models.OrderItem, error) {
 	rows, err := db.Query(
 		`SELECT oi.id, oi.order_id, oi.sku_id, oi.spu_id, oi.quantity, oi.unit_price, oi.total_price,
 		        oi.sku_type, COALESCE(sp.name, ''), COALESCE(s.sku_code, ''),
-		        oi.token_amount, oi.compute_points, oi.fulfilled_at, oi.pricing_version_id, oi.created_at, oi.updated_at
+		        oi.token_amount, oi.compute_points, oi.fulfilled_at, oi.pricing_version_id, oi.flash_sale_id, oi.created_at, oi.updated_at
 		   FROM order_items oi
 		   LEFT JOIN spus sp ON oi.spu_id = sp.id
 		   LEFT JOIN skus s ON oi.sku_id = s.id
@@ -487,10 +515,11 @@ func loadOrderItems(db *sql.DB, orderID int) ([]models.OrderItem, error) {
 		var computePoints sql.NullFloat64
 		var fulfilledAt sql.NullTime
 		var pricingVID sql.NullInt64
+		var flashSaleID sql.NullInt64
 		if scanErr := rows.Scan(
 			&item.ID, &item.OrderID, &item.SKUID, &item.SPUID, &item.Quantity, &item.UnitPrice, &item.TotalPrice,
 			&item.SKUType, &item.SPUName, &item.SKUCode,
-			&tokenAmount, &computePoints, &fulfilledAt, &pricingVID, &item.CreatedAt, &item.UpdatedAt,
+			&tokenAmount, &computePoints, &fulfilledAt, &pricingVID, &flashSaleID, &item.CreatedAt, &item.UpdatedAt,
 		); scanErr != nil {
 			return nil, scanErr
 		}
@@ -509,6 +538,10 @@ func loadOrderItems(db *sql.DB, orderID int) ([]models.OrderItem, error) {
 		if pricingVID.Valid {
 			v := int(pricingVID.Int64)
 			item.PricingVersionID = &v
+		}
+		if flashSaleID.Valid {
+			v := int(flashSaleID.Int64)
+			item.FlashSaleID = &v
 		}
 		items = append(items, item)
 	}
@@ -802,6 +835,16 @@ func CancelOrder(c *gin.Context) {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"STOCK_RESTORE_FAILED",
 			"Failed to restore stock",
+			http.StatusInternalServerError,
+			err,
+		))
+		return
+	}
+
+	if _, err = tx.Exec(services.SQLRestoreFlashSaleStockFromOrderItems, order.ID); err != nil {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FLASH_STOCK_RESTORE_FAILED",
+			"Failed to restore flash sale stock",
 			http.StatusInternalServerError,
 			err,
 		))

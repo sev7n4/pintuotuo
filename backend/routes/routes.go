@@ -379,6 +379,10 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.PUT("/entitlement-packages/:id", handlers.UpdateAdminEntitlementPackage)
 		admin.DELETE("/entitlement-packages/:id", handlers.DeleteAdminEntitlementPackage)
 
+		admin.GET("/flash-sales", handlers.AdminListFlashSales)
+		admin.GET("/flash-sales/:id", handlers.AdminGetFlashSaleDetail)
+		admin.PUT("/flash-sales/:id", handlers.AdminPatchFlashSale)
+
 		admin.GET("/endpoint-pricing", handlers.AdminListEndpointPricing)
 		admin.POST("/endpoint-pricing", handlers.AdminCreateEndpointPricing)
 		admin.PUT("/endpoint-pricing/:id", handlers.AdminUpdateEndpointPricing)
@@ -394,6 +398,7 @@ func RegisterFlashSaleRoutes(router *gin.RouterGroup) {
 	flashSales := router.Group("/flash-sales")
 	{
 		flashSales.GET("/active", handlers.GetActiveFlashSales)
+		flashSales.GET("/upcoming", handlers.GetUpcomingFlashSales)
 		flashSales.GET("/:id/skus", handlers.GetFlashSaleProducts)
 	}
 

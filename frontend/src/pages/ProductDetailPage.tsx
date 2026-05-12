@@ -37,11 +37,12 @@ import {
   UsergroupAddOutlined,
   PlusCircleOutlined,
 } from '@ant-design/icons';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useProductStore } from '@stores/productStore';
 import { useCartStore } from '@stores/cartStore';
 import { useGroupStore } from '@stores/groupStore';
 import { productService } from '@services/product';
+import api from '@/services/api';
 import { skuService } from '@services/sku';
 import type { Product, GroupPrice, Group } from '@/types';
 import type { SKUWithSPU } from '@/types/sku';
@@ -143,6 +144,48 @@ export const ProductDetailPage: React.FC = () => {
   const [groupModalTick, setGroupModalTick] = useState(0);
   const [detailTabKey, setDetailTabKey] = useState('detail');
   const detailTabsRef = useRef<HTMLDivElement>(null);
+
+  const [searchParams] = useSearchParams();
+  const flashSaleIdQuery = useMemo(() => {
+    const raw = searchParams.get('flash_sale_id');
+    if (!raw) return undefined;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }, [searchParams]);
+
+  type FlashSkuLine = {
+    flash_price: number;
+    sku_id: number;
+    stock_limit: number;
+    stock_sold: number;
+  };
+  const [flashSkuLine, setFlashSkuLine] = useState<FlashSkuLine | null>(null);
+
+  useEffect(() => {
+    if (!flashSaleIdQuery || !selectedSKU?.id) {
+      setFlashSkuLine(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await api.get(`/flash-sales/${flashSaleIdQuery}/skus`);
+        const body = res.data as { data?: FlashSkuLine[] };
+        const rows = body?.data || [];
+        const hit = rows.find((r) => r.sku_id === selectedSKU.id);
+        if (!cancelled) {
+          setFlashSkuLine(hit ?? null);
+        }
+      } catch {
+        if (!cancelled) {
+          setFlashSkuLine(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [flashSaleIdQuery, selectedSKU?.id]);
 
   const scrollToProductDetail = useCallback(() => {
     setDetailTabKey('detail');
@@ -276,7 +319,14 @@ export const ProductDetailPage: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!product) return;
-    addItem(product, quantity);
+    const retail = selectedSKU?.retail_price ?? product.price ?? 0;
+    const cartPrice = flashSkuLine ? flashSkuLine.flash_price : retail;
+    const cap =
+      flashSkuLine != null
+        ? Math.max(0, flashSkuLine.stock_limit - flashSkuLine.stock_sold)
+        : product.stock;
+    const cartProduct = { ...product, price: cartPrice, stock: Math.min(product.stock, cap) };
+    addItem(cartProduct, quantity, undefined, flashSaleIdQuery);
     message.success(`已添加 ${quantity} 件到购物车`);
     setTimeout(() => navigate('/cart'), 1000);
   };
@@ -394,17 +444,24 @@ export const ProductDetailPage: React.FC = () => {
   const groupPrices = resolveGroupPrices(selectedSKU, product);
   const effectiveGroupTier = selectedGroupPrice ?? groupPrices[0] ?? null;
 
+  const baseRetail = selectedSKU?.retail_price ?? product.price ?? 0;
+  const displayRetail = flashSkuLine ? flashSkuLine.flash_price : baseRetail;
+  const flashQtyCap =
+    flashSkuLine != null
+      ? Math.max(0, flashSkuLine.stock_limit - flashSkuLine.stock_sold)
+      : undefined;
+  const maxBuyQty =
+    flashQtyCap != null ? Math.min(product.stock, flashQtyCap) : product.stock;
+
   const estimatedFinalPrice = () => {
-    const skuPrice = selectedSKU?.retail_price || product.price || 0;
-    if (!skuPrice) return 0;
     if (purchaseMode === 'group') {
-      return effectiveGroupTier?.price_per_person ?? skuPrice;
+      return effectiveGroupTier?.price_per_person ?? baseRetail;
     }
-    return skuPrice;
+    return displayRetail;
   };
 
   const calculateDiscount = () => {
-    const basePrice = selectedSKU?.retail_price || product.price;
+    const basePrice = baseRetail;
     if (!basePrice || !effectiveGroupTier) return 0;
     return Math.max(0, Math.round((1 - effectiveGroupTier.price_per_person / basePrice) * 100));
   };
@@ -459,6 +516,15 @@ export const ProductDetailPage: React.FC = () => {
               <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
                 {subtitle}
               </Text>
+            ) : null}
+            {flashSkuLine && flashSaleIdQuery ? (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message="限时秒杀价"
+                description={`当前以秒杀价 ¥${displayRetail.toFixed(2)} 加入购物车；结算时将校验场次与库存。`}
+              />
             ) : null}
             {selectedSKU?.sku_code ? (
               <Tag style={{ marginBottom: 12 }}>{selectedSKU.sku_code}</Tag>
@@ -600,7 +666,7 @@ export const ProductDetailPage: React.FC = () => {
                 <Space direction="vertical" style={{ width: '100%' }} size={4}>
                   <Text type="secondary">单独购买</Text>
                   <Statistic
-                    value={selectedSKU?.retail_price || product.price}
+                    value={displayRetail}
                     prefix="¥"
                     valueStyle={{ color: '#333', fontSize: 22 }}
                   />
@@ -662,7 +728,7 @@ export const ProductDetailPage: React.FC = () => {
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <Text type="secondary">单独购买</Text>
                     <Statistic
-                      value={selectedSKU?.retail_price || product.price}
+                      value={displayRetail}
                       prefix="¥"
                       valueStyle={{ color: '#333', fontSize: 24 }}
                     />
@@ -775,7 +841,7 @@ export const ProductDetailPage: React.FC = () => {
             <span>购买数量: </span>
             <InputNumber
               min={1}
-              max={product.stock}
+              max={Math.max(1, maxBuyQty)}
               value={quantity}
               onChange={(val) => setQuantity(val || 1)}
               style={{ marginLeft: '10px', width: 100 }}
