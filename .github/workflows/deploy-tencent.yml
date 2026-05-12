@@ -115,6 +115,13 @@ jobs:
           echo "Seeding database..."
           docker exec pintuotuo-postgres psql -U pintuotuo -d pintuotuo_db -c "INSERT INTO users (email, name, password_hash, role, status) VALUES ('admin@example.com', 'Admin', 'd5ab7a93ed8183930bbac413b2b46c159788e64b789a6da2b63cc56a7c6d1e05', 'admin', 'active') ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;"
           echo "Seed user password update completed"
+          echo "=== Phase0: upstream capability-probe (BYOK from DB, non-fatal) ==="
+          if docker exec pintuotuo-backend test -x /app/capability-probe 2>/dev/null; then
+            docker exec pintuotuo-backend /app/capability-probe -out /tmp/capability-probe-latest.csv -limit 50 2>&1 | tail -n 20 || true
+            docker exec pintuotuo-backend tail -n 30 /tmp/capability-probe-latest.csv 2>/dev/null || true
+          else
+            echo "SKIP: /app/capability-probe not found in backend image"
+          fi
           echo 'Deployment completed successfully'
           EOF
 

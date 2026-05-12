@@ -77,6 +77,15 @@ func ResolveEndpoint(cfg *ExecutionProviderConfig) string {
 	return layer.resolveEndpoint(cfg)
 }
 
+// ConfigureGatewayMode sets cfg.GatewayMode using the same policy as ExecutionLayer.Execute (BYOK route mode override, then auto).
+func ConfigureGatewayMode(cfg *ExecutionProviderConfig) {
+	if cfg == nil {
+		return
+	}
+	var layer ExecutionLayer
+	cfg.GatewayMode = layer.determineGatewayMode(cfg)
+}
+
 func ResolveRouteModeWithProvider(routeMode, providerRegion string) string {
 	if routeMode != "" && routeMode != RouteModeAuto {
 		validModes := map[string]bool{

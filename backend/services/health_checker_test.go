@@ -300,10 +300,10 @@ func TestOpenAICompatProbeURLs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if g := openAICompatModelsProbeURL(tt.base); g != tt.wantM {
+			if g := OpenAICompatModelsProbeURL(tt.base); g != tt.wantM {
 				t.Errorf("models URL = %q, want %q", g, tt.wantM)
 			}
-			if g := openAICompatChatCompletionsURL(tt.base); g != tt.wantChat {
+			if g := OpenAICompatChatCompletionsURL(tt.base); g != tt.wantChat {
 				t.Errorf("chat URL = %q, want %q", g, tt.wantChat)
 			}
 		})
