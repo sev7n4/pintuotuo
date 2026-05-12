@@ -876,7 +876,7 @@ func (s *HealthChecker) TestChatCompletion(ctx context.Context, apiKey *models.M
 		}, nil
 	}
 
-		chatEndpoint := OpenAICompatChatCompletionsURL(endpoint)
+	chatEndpoint := OpenAICompatChatCompletionsURL(endpoint)
 
 	testReq := TestChatRequest{
 		Model: model,

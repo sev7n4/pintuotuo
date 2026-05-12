@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -43,7 +44,10 @@ func writeProbeRow(w *csv.Writer, ts string, key *models.MerchantAPIKey, apiForm
 	w.Flush()
 }
 
-func pcmWavMono16LE(sampleRate, durationMs int) []byte {
+// pcmWavProbeMono16LE 生成极短静音 WAV（固定 16kHz / 200ms），供音频类 POST 探测；避免可变整型转换以通过 gosec G115。
+func pcmWavProbeMono16LE() []byte {
+	const sampleRate = 16000
+	const durationMs = 200
 	numSamples := sampleRate * durationMs / 1000
 	if numSamples < 1 {
 		numSamples = 1
@@ -51,31 +55,19 @@ func pcmWavMono16LE(sampleRate, durationMs int) []byte {
 	dataSize := numSamples * 2
 	buf := make([]byte, 44+dataSize)
 	copy(buf[0:4], []byte("RIFF"))
-	lePutUint32(buf[4:8], uint32(36+dataSize))
+	binary.LittleEndian.PutUint32(buf[4:8], uint32(36+dataSize))
 	copy(buf[8:12], []byte("WAVEfmt "))
-	lePutUint32(buf[12:16], 16)
-	lePutUint16(buf[16:18], 1)
-	lePutUint16(buf[18:20], 1)
-	lePutUint32(buf[20:24], uint32(sampleRate))
-	lePutUint32(buf[24:28], uint32(sampleRate*2))
-	lePutUint16(buf[28:30], 2)
-	lePutUint16(buf[30:32], 16)
+	binary.LittleEndian.PutUint32(buf[12:16], 16)
+	binary.LittleEndian.PutUint16(buf[16:18], 1)
+	binary.LittleEndian.PutUint16(buf[18:20], 1)
+	binary.LittleEndian.PutUint32(buf[20:24], sampleRate)
+	binary.LittleEndian.PutUint32(buf[24:28], sampleRate*2)
+	binary.LittleEndian.PutUint16(buf[28:30], 2)
+	binary.LittleEndian.PutUint16(buf[30:32], 16)
 	copy(buf[32:36], []byte("data"))
-	lePutUint32(buf[36:40], uint32(dataSize))
+	binary.LittleEndian.PutUint32(buf[36:40], uint32(dataSize))
 	// PCM silence already zero
 	return buf
-}
-
-func lePutUint32(b []byte, v uint32) {
-	b[0] = byte(v)
-	b[1] = byte(v >> 8)
-	b[2] = byte(v >> 16)
-	b[3] = byte(v >> 24)
-}
-
-func lePutUint16(b []byte, v uint16) {
-	b[0] = byte(v)
-	b[1] = byte(v >> 8)
 }
 
 func postJSONProbe(ctx context.Context, client *http.Client, url, bearer, body string) (code int, ok bool, note string) {
@@ -226,7 +218,7 @@ func runOpenAIFormatProbes(
 		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeImagesEdits, itoa(code), boolStr(ok), note)
 	}
 
-	wav := pcmWavMono16LE(16000, 200)
+	wav := pcmWavProbeMono16LE()
 
 	// --- audio transcriptions ---
 	if !p.billable {
@@ -289,13 +281,13 @@ func runOpenAIFormatProbes(
 }
 
 type probeFlags struct {
-	skipEmbeddings   bool
-	billable         bool
-	embeddingModel   string
-	moderationModel  string
-	chatModel        string
-	imageModel       string
-	speechModel      string
+	skipEmbeddings     bool
+	billable           bool
+	embeddingModel     string
+	moderationModel    string
+	chatModel          string
+	imageModel         string
+	speechModel        string
 	transcriptionModel string
 }
 

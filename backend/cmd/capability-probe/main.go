@@ -145,10 +145,10 @@ LIMIT %d
 
 	for rows.Next() {
 		var (
-			key                           models.MerchantAPIKey
-			routeConfigBytes              []byte
-			mpCode, apiFormat             string
-			mpAPIBase, mpProviderRegion   string
+			key                          models.MerchantAPIKey
+			routeConfigBytes             []byte
+			mpCode, apiFormat            string
+			mpAPIBase, mpProviderRegion  string
 			mpEndpoints, mpRouteStrategy []byte
 		)
 		if err := rows.Scan(
