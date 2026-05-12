@@ -113,7 +113,12 @@ export default function DeveloperLayout() {
                 : ['/developer/quickstart']
             }
             items={menuItems}
-            onClick={({ key }) => navigate(key)}
+            onClick={({ key }) => {
+              navigate(key);
+              if (typeof window !== 'undefined' && window.matchMedia('(max-width: 991px)').matches) {
+                setSiderCollapsed(true);
+              }
+            }}
             style={{ borderRight: 0 }}
           />
         </Sider>

@@ -17,7 +17,6 @@ import {
   Card,
   Grid,
   List,
-  Alert,
   Collapse,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -399,14 +398,6 @@ export const OrderListPage: React.FC = () => {
           items={tabItems}
           size={isMobile ? 'small' : 'middle'}
         />
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12, borderRadius: 10 }}
-          message="多明细订单与复购"
-          description="列表「商品摘要」展示主商品名称；展开详情可查看每条规格、数量与金额。支持「加入购物车」或「同配置下单」快速复购。"
-        />
-
         <Spin spinning={isLoading}>
           {isMobile ? (
             <List
