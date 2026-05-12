@@ -485,3 +485,37 @@ func TestResolveEndpointByType(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeLegacyLitellmGatewayBaseURL(t *testing.T) {
+	t.Run("no env leaves legacy host unchanged", func(t *testing.T) {
+		t.Setenv("LLM_GATEWAY_LITELLM_URL", "")
+		assert.Equal(t, "http://litellm-domestic:4000/v1", NormalizeLegacyLitellmGatewayBaseURL("http://litellm-domestic:4000/v1"))
+	})
+	t.Run("env rewrites litellm-domestic", func(t *testing.T) {
+		t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000")
+		assert.Equal(t, "http://litellm:4000/v1", NormalizeLegacyLitellmGatewayBaseURL("http://litellm-domestic:4000/v1"))
+	})
+	t.Run("env rewrites litellm-overseas", func(t *testing.T) {
+		t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000/")
+		assert.Equal(t, "http://litellm:4000/v1", NormalizeLegacyLitellmGatewayBaseURL("http://litellm-overseas:4000/v1"))
+	})
+	t.Run("custom upstream unchanged", func(t *testing.T) {
+		t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000")
+		assert.Equal(t, "https://gw.example.com/v1", NormalizeLegacyLitellmGatewayBaseURL("https://gw.example.com/v1"))
+	})
+}
+
+func TestResolveEndpointByType_LitellmLegacyHostUsesEnv(t *testing.T) {
+	t.Setenv("LLM_GATEWAY_LITELLM_URL", "http://litellm:4000")
+	cfg := &ExecutionProviderConfig{
+		GatewayMode:    GatewayModeLitellm,
+		ProviderRegion: regionDomestic,
+		Endpoints: map[string]interface{}{
+			GatewayModeLitellm: map[string]interface{}{
+				"domestic": "http://litellm-domestic:4000/v1",
+			},
+		},
+	}
+	got := ResolveEndpointByType(cfg, EndpointTypeEmbeddings)
+	assert.Equal(t, "http://litellm:4000/v1/embeddings", got)
+}

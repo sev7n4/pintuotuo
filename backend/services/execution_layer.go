@@ -69,6 +69,24 @@ func ResolveEndpointByType(cfg *ExecutionProviderConfig, endpointType string) st
 	return baseURL + suffix
 }
 
+// NormalizeLegacyLitellmGatewayBaseURL rewrites historical DB placeholder hosts
+// (litellm-domestic / litellm-overseas from migration seeds) to LLM_GATEWAY_LITELLM_URL + "/v1"
+// when the env var is set, e.g. http://litellm:4000 → http://litellm:4000/v1 for docker-compose DNS.
+func NormalizeLegacyLitellmGatewayBaseURL(resolved string) string {
+	u := strings.TrimSpace(resolved)
+	if u == "" {
+		return u
+	}
+	env := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL"))
+	if env == "" {
+		return u
+	}
+	if strings.Contains(u, "litellm-domestic:") || strings.Contains(u, "litellm-overseas:") {
+		return strings.TrimRight(env, "/") + "/v1"
+	}
+	return u
+}
+
 func ResolveEndpoint(cfg *ExecutionProviderConfig) string {
 	if cfg == nil {
 		return ""
@@ -370,7 +388,7 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 					region = "domestic"
 				}
 				if url, ok := litellmEndpoints[region].(string); ok && url != "" {
-					return url
+					return NormalizeLegacyLitellmGatewayBaseURL(url)
 				}
 			}
 		}
@@ -378,7 +396,7 @@ func (l *ExecutionLayer) resolveEndpoint(cfg *ExecutionProviderConfig) string {
 		if litellmURL != "" {
 			return litellmURL + "/v1"
 		}
-		return cfg.APIBaseURL
+		return NormalizeLegacyLitellmGatewayBaseURL(cfg.APIBaseURL)
 
 	case GatewayModeProxy:
 		if cfg.APIBaseURL != "" {
