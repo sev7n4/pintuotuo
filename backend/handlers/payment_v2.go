@@ -350,6 +350,7 @@ func processBalancePayment(db *sql.DB, paymentID, orderID, userID int, amount fl
 	cache.Delete(ctx, cache.TokenBalanceKey(userID))
 	cache.Delete(ctx, cache.ComputePointBalanceKey(userID))
 	invalidateOrderCachesAfterPayment(db, orderID)
+	ApplyReferralRewardForPaidOrder(orderID)
 	return nil
 }
 
@@ -452,6 +453,7 @@ func AlipayNotify(c *gin.Context) {
 	cache.Delete(ctx, cache.TokenBalanceKey(userID))
 	cache.Delete(ctx, cache.ComputePointBalanceKey(userID))
 	invalidateOrderCachesAfterPayment(db, orderID)
+	ApplyReferralRewardForPaidOrder(orderID)
 
 	log.Printf("[AlipayNotify] Payment completed successfully: order_id=%d", orderID)
 	c.String(http.StatusOK, "success")
@@ -534,6 +536,7 @@ func WechatNotify(c *gin.Context) {
 	cache.Delete(ctx, cache.TokenBalanceKey(payUserID))
 	cache.Delete(ctx, cache.ComputePointBalanceKey(payUserID))
 	invalidateOrderCachesAfterPayment(db, orderID)
+	ApplyReferralRewardForPaidOrder(orderID)
 
 	c.String(http.StatusOK, "<xml><return_code><![CDATA[SUCCESS]]></return_code></xml>")
 }

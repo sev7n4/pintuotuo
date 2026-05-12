@@ -8,6 +8,8 @@ import {
   BugOutlined,
   AppstoreOutlined,
   HomeOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
@@ -29,6 +31,17 @@ export default function DeveloperLayout() {
   const location = useLocation();
   const { isAuthenticated, fetchUser, user } = useAuthStore();
   const [ready, setReady] = useState(false);
+  const [siderCollapsed, setSiderCollapsed] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 991px)').matches : false
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 991px)');
+    const sync = () => setSiderCollapsed(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +74,13 @@ export default function DeveloperLayout() {
     <Layout className={styles.root}>
       <Header className={styles.header}>
         <div className={styles.brand}>
+          <Button
+            type="text"
+            className={styles.siderToggle}
+            aria-label={siderCollapsed ? '展开侧栏' : '收起侧栏'}
+            icon={siderCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={() => setSiderCollapsed((v) => !v)}
+          />
           <Link to="/">
             <Button type="link" icon={<HomeOutlined />}>
               返回卖场
@@ -72,11 +92,15 @@ export default function DeveloperLayout() {
           <Button type="default">我的 Token</Button>
         </Link>
       </Header>
-      <Layout>
+      <Layout className={styles.innerLayout}>
         <Sider
           width={220}
           breakpoint="lg"
           collapsedWidth={0}
+          collapsible
+          collapsed={siderCollapsed}
+          onCollapse={setSiderCollapsed}
+          trigger={null}
           className={styles.sider}
           theme="light"
         >

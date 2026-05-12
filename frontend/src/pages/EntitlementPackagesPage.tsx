@@ -20,7 +20,7 @@ export default function EntitlementPackagesPage() {
   const [submittingID, setSubmittingID] = useState<string>('');
   const [packages, setPackages] = useState<EntitlementPackage[]>([]);
   const [socialById, setSocialById] = useState<Record<number, PackageSocialStats>>({});
-  const [category, setCategory] = useState<string>('all');
+  const [category, setCategory] = useState<string>('personal');
 
   useEffect(() => {
     let cancelled = false;
@@ -86,8 +86,13 @@ export default function EntitlementPackagesPage() {
   );
 
   const filtered = useMemo(() => {
-    if (category === 'all') return packageView;
-    return packageView.filter((p) => (p.category_code || 'general') === category);
+    return packageView.filter((p) => {
+      const code = p.category_code || 'general';
+      if (category === 'personal') {
+        return code === 'personal' || code === 'general';
+      }
+      return code === category;
+    });
   }, [packageView, category]);
 
   useEffect(() => {

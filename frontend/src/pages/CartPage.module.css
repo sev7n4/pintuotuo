@@ -1,0 +1,66 @@
+.wrap {
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: 22px;
+}
+
+.table {
+  margin-bottom: 20px;
+}
+
+.mobileList {
+  width: 100%;
+}
+
+.mobileCard {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mobileRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mobileMain {
+  min-width: 0;
+  flex: 1;
+}
+
+.mobileSub {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.mobileMeta {
+  margin-top: 8px;
+}
+
+.mobileQtyRow {
+  margin-top: 12px;
+}
+
+.mobileSubtotal {
+  margin-top: 8px;
+  text-align: right;
+  font-size: 14px;
+}
+
+.summaryCard {
+  margin-top: 8px;
+}
+
+@media (min-width: 769px) {
+  .wrap {
+    padding: 20px;
+  }
+}

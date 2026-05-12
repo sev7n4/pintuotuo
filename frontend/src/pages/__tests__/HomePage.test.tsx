@@ -153,7 +153,7 @@ describe('HomePage', () => {
     expect(screen.getByText('分类1')).toBeInTheDocument();
     expect(screen.getByText('分类2')).toBeInTheDocument();
     expect(screen.getByText('分类3')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /浏览场景与层级/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /全部场景与层级/ })).toBeInTheDocument();
   });
 
   test('显示精选推荐商品', () => {

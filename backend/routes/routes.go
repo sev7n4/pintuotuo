@@ -247,6 +247,8 @@ func RegisterReferralRoutes(router *gin.RouterGroup) {
 		referrals.GET("/list", handlers.GetReferralList)
 		referrals.GET("/rewards", handlers.GetReferralRewards)
 		referrals.POST("/rewards/pay", handlers.PayReferralRewards)
+		referrals.GET("/withdrawals", handlers.GetReferralWithdrawals)
+		referrals.POST("/withdrawals", handlers.RequestReferralWithdrawal)
 	}
 }
 

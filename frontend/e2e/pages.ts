@@ -42,6 +42,7 @@ export class RegisterPage {
     }
     await this.page.getByPlaceholder('example@email.com').fill(email);
     await this.page.getByPlaceholder(/设置密码/).fill(password);
+    await this.page.getByRole('checkbox', { name: /用户协议/ }).check();
     await this.page.getByRole('button', { name: '注册并进入' }).click();
   }
 }
