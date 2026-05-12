@@ -252,6 +252,7 @@ const HomePage = () => {
           <Tooltip title="前往卖场筛选（场景、层级、分项）">
             <Button
               type="default"
+              size="large"
               icon={<FilterOutlined />}
               onClick={() => navigate('/catalog?filters=1')}
               aria-label="更多筛选"
@@ -315,7 +316,7 @@ const HomePage = () => {
       </Card>
 
       {banners.length > 0 && (
-        <Carousel autoplay className={styles.bannerCarousel}>
+        <Carousel autoplay autoplaySpeed={9000} dots className={styles.bannerCarousel}>
           {banners.map((banner) => (
             <div key={banner.id} className={styles.bannerItem}>
               <div className={styles.bannerContent} onClick={() => navigate(banner.link)}>
@@ -332,8 +333,8 @@ const HomePage = () => {
             <Title level={5} className={styles.categoryTitle}>
               分类
             </Title>
-            <Link to="/categories" className={styles.allCategoriesLink}>
-              全部场景与层级 <RightOutlined />
+            <Link to="/catalog" className={styles.allCategoriesLink}>
+              全部分类 <RightOutlined />
             </Link>
           </div>
           {scenarioCategories.length > 0 && (

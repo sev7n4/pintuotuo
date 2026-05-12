@@ -397,7 +397,12 @@ const MyToken = () => {
         description={
           <span>
             接入引导、试调用、错误说明已集中到{' '}
-            <Button type="link" size="small" style={{ padding: 0 }} onClick={() => navigate('/developer/quickstart')}>
+            <Button
+              type="link"
+              size="small"
+              style={{ padding: 0 }}
+              onClick={() => navigate('/developer/quickstart')}
+            >
               开发者中心
             </Button>
             。

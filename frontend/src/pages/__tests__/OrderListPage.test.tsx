@@ -1,93 +1,114 @@
+import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import OrderListPage from '../OrderListPage';
-import { useOrderStore } from '@/stores/orderStore';
-import { useCartStore } from '@/stores/cartStore';
-import { useProductStore } from '@/stores/productStore';
+import { useOrderStore } from '@stores/orderStore';
+import { useCartStore } from '@stores/cartStore';
+import { useProductStore } from '@stores/productStore';
 
-jest.mock('@/stores/orderStore');
-jest.mock('@/stores/cartStore');
-jest.mock('@/stores/productStore');
+jest.mock('@stores/orderStore');
+jest.mock('@stores/cartStore');
+jest.mock('@stores/productStore');
 
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: jest.fn(),
 }));
 
-jest.mock('antd', () => ({
-  ...jest.requireActual('antd'),
-  Table: jest.fn(({ columns, dataSource, rowKey, locale }) => (
+jest.mock('antd', () => {
+  const antd = jest.requireActual('antd');
+  const ListMock: any = jest.fn(({ dataSource, renderItem, locale }) => (
     <div data-testid="order-table">
-      {dataSource.length > 0 ? (
+      {dataSource?.length > 0 ? (
         dataSource.map((item: any) => (
-          <div key={item[rowKey]} data-testid={`order-${item.id}`}>
-            {columns.map((col: any) => (
-              <div key={col.key}>
-                {col.render ? col.render(item[col.dataIndex], item) : item[col.dataIndex]}
-              </div>
-            ))}
+          <div key={item.id} data-testid={`order-${item.id}`}>
+            {renderItem(item)}
           </div>
         ))
       ) : (
         <div data-testid="empty-text">{locale?.emptyText || '暂无订单'}</div>
       )}
     </div>
-  )),
-  Button: jest.fn(({ type, children, onClick, disabled }) => (
-    <button
-      data-testid="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={type === 'link' ? 'link' : ''}
-    >
-      {children}
-    </button>
-  )),
-  Space: jest.fn(({ children }) => <div data-testid="space">{children}</div>),
-  Tag: jest.fn(({ color, children }) => (
-    <span data-testid="tag" style={{ color }}>
-      {children}
-    </span>
-  )),
-  Empty: jest.fn(({ description }) => <div data-testid="empty">{description}</div>),
-  Spin: jest.fn(({ spinning, children }) => (
-    <div data-testid="spin" data-spinning={spinning}>
-      {children}
-    </div>
-  )),
-  Modal: jest.fn(({ title, open, onCancel }) =>
-    open ? (
-      <div
-        data-testid="modal"
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          background: 'rgba(0,0,0,0.5)',
-        }}
-      >
-        <div style={{ background: 'white', margin: '50px auto', padding: '20px', width: '500px' }}>
-          <h2>{title}</h2>
-          <div data-testid="descriptions">
-            <div data-testid="description-item">订单号: 1</div>
-            <div data-testid="description-item">产品ID: 101</div>
-            <div data-testid="description-item">数量: 2</div>
-            <div data-testid="description-item">单价: ¥100.00</div>
-            <div data-testid="description-item">总价: ¥200.00</div>
-            <div data-testid="description-item">状态: 待支付</div>
-            <div data-testid="description-item">创建时间: 2026-03-19 08:00:00</div>
-            <div data-testid="description-item">分组ID: -</div>
-          </div>
-          <button onClick={onCancel} data-testid="modal-cancel">
-            关闭
-          </button>
-        </div>
+  ));
+  ListMock.Item = jest.fn(({ children }: { children: React.ReactNode }) => <div>{children}</div>);
+  return {
+    ...antd,
+    Table: jest.fn(({ columns, dataSource, rowKey, locale }) => (
+      <div data-testid="order-table">
+        {dataSource.length > 0 ? (
+          dataSource.map((item: any) => (
+            <div key={item[rowKey]} data-testid={`order-${item.id}`}>
+              {columns.map((col: any) => (
+                <div key={col.key}>
+                  {col.render ? col.render(item[col.dataIndex], item) : item[col.dataIndex]}
+                </div>
+              ))}
+            </div>
+          ))
+        ) : (
+          <div data-testid="empty-text">{locale?.emptyText || '暂无订单'}</div>
+        )}
       </div>
-    ) : null
-  ),
-}));
+    )),
+    List: ListMock,
+    Button: jest.fn(({ type, children, onClick, disabled }) => (
+      <button
+        data-testid="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={type === 'link' ? 'link' : ''}
+      >
+        {children}
+      </button>
+    )),
+    Space: jest.fn(({ children }) => <div data-testid="space">{children}</div>),
+    Tag: jest.fn(({ color, children }) => (
+      <span data-testid="tag" style={{ color }}>
+        {children}
+      </span>
+    )),
+    Empty: jest.fn(({ description }) => <div data-testid="empty">{description}</div>),
+    Spin: jest.fn(({ spinning, children }) => (
+      <div data-testid="spin" data-spinning={spinning}>
+        {children}
+      </div>
+    )),
+    Modal: jest.fn(({ title, open, onCancel }) =>
+      open ? (
+        <div
+          data-testid="modal"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0,0,0,0.5)',
+          }}
+        >
+          <div
+            style={{ background: 'white', margin: '50px auto', padding: '20px', width: '500px' }}
+          >
+            <h2>{title}</h2>
+            <div data-testid="descriptions">
+              <div data-testid="description-item">订单号: 1</div>
+              <div data-testid="description-item">产品ID: 101</div>
+              <div data-testid="description-item">数量: 2</div>
+              <div data-testid="description-item">单价: ¥100.00</div>
+              <div data-testid="description-item">总价: ¥200.00</div>
+              <div data-testid="description-item">状态: 待支付</div>
+              <div data-testid="description-item">创建时间: 2026-03-19 08:00:00</div>
+              <div data-testid="description-item">分组ID: -</div>
+            </div>
+            <button onClick={onCancel} data-testid="modal-cancel">
+              关闭
+            </button>
+          </div>
+        </div>
+      ) : null
+    ),
+  };
+});
 
 const mockUseOrderStore = useOrderStore as jest.MockedFunction<typeof useOrderStore>;
 const mockUseCartStore = useCartStore as jest.MockedFunction<typeof useCartStore>;

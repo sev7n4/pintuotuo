@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { RegisterPage } from '../pages/RegisterPage';
 import ProductListPage from '../pages/ProductListPage';
@@ -11,14 +11,16 @@ import PaymentPage from '../pages/PaymentPage';
 import Layout from '../components/Layout';
 import { useAuthStore } from '@/stores/authStore';
 import { useProductStore } from '@/stores/productStore';
-import { useOrderStore } from '@/stores/orderStore';
+import { useOrderStore } from '@stores/orderStore';
 import { useCartStore } from '@/stores/cartStore';
 import { useMerchantStore } from '@/stores/merchantStore';
 import { AUTH_PRIMARY_LOGIN_KEY } from '@/lib/authLoginPreference';
 
 jest.mock('@/stores/authStore');
 jest.mock('@/stores/productStore');
-jest.mock('@/stores/orderStore');
+jest.mock('@stores/orderStore', () => ({
+  useOrderStore: jest.fn(),
+}));
 jest.mock('@/stores/cartStore');
 jest.mock('@/stores/merchantStore');
 
@@ -107,12 +109,29 @@ function mockSkuRow(spuName: string, id = 1) {
   };
 }
 
+function defaultOrderStoreState() {
+  return {
+    orders: [] as Array<Record<string, unknown>>,
+    currentOrder: null,
+    isLoading: false,
+    error: null,
+    fetchOrders: jest.fn(),
+    fetchOrderByID: jest.fn(),
+    createOrder: jest.fn(),
+    cancelOrder: jest.fn(),
+    requestRefund: jest.fn(),
+    clearError: jest.fn(),
+  };
+}
+
 describe('Page Navigation Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetPublicSKUs.mockReset();
     mockGetPublicSKUs.mockResolvedValue({
       data: { data: [], total: 0, page: 1, per_page: 20 },
     });
+    mockUseOrderStore.mockReturnValue(defaultOrderStoreState() as ReturnType<typeof useOrderStore>);
     mockUseCartStore.mockReturnValue({
       items: [],
       total: 0,
@@ -587,8 +606,14 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('支付')).toBeInTheDocument();
+        expect(screen.getByText('我的订单')).toBeInTheDocument();
       });
+      const listRoot = document.querySelector('.ant-list');
+      expect(listRoot).toBeTruthy();
+      const payButton = within(listRoot as HTMLElement)
+        .getAllByRole('button')
+        .find((b) => (b.textContent || '').replace(/\s/g, '') === '支付');
+      expect(payButton).toBeTruthy();
     });
 
     test('should show order details in modal', async () => {
@@ -639,12 +664,16 @@ describe('Page Navigation Integration Tests', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('详情')).toBeInTheDocument();
+        expect(screen.getByText('我的订单')).toBeInTheDocument();
       });
-
-      const detailButton = screen.getByText('详情');
+      const listRootForDetail = document.querySelector('.ant-list');
+      expect(listRootForDetail).toBeTruthy();
+      const detailButton = within(listRootForDetail as HTMLElement)
+        .getAllByRole('button')
+        .find((b) => (b.textContent || '').replace(/\s/g, '') === '详情');
+      expect(detailButton).toBeTruthy();
       await act(async () => {
-        fireEvent.click(detailButton);
+        fireEvent.click(detailButton!);
       });
 
       await waitFor(() => {
@@ -1053,8 +1082,13 @@ describe('Page Navigation Integration Tests', () => {
 
       await waitFor(() => {
         expect(screen.getByText('我的订单')).toBeInTheDocument();
-        expect(screen.getByText('支付')).toBeInTheDocument();
       });
+      const listRoot = document.querySelector('.ant-list');
+      expect(listRoot).toBeTruthy();
+      const payButton = within(listRoot as HTMLElement)
+        .getAllByRole('button')
+        .find((b) => (b.textContent || '').replace(/\s/g, '') === '支付');
+      expect(payButton).toBeTruthy();
     });
 
     test('should handle complete user journey from registration to order', async () => {

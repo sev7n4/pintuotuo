@@ -51,11 +51,18 @@ func TestProbeProviderModels_ErrorMapping(t *testing.T) {
 	})
 
 	t.Run("network timeout maps category", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		// 使用本机 httptest + 短生命周期 context，避免依赖「黑洞 IP」等环境相关行为（部分环境会偶发连上或快速返回非错误路径）。
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			<-r.Context().Done()
+		}))
+		defer srv.Close()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
 		defer cancel()
-		res, err := ProbeProviderModels(ctx, &http.Client{Timeout: 50 * time.Millisecond}, "http://10.255.255.1/models", "k", "openai")
+
+		res, err := ProbeProviderModels(ctx, &http.Client{Timeout: 5 * time.Second}, srv.URL, "k", "openai")
 		if err == nil {
-			t.Fatal("expected timeout/network error")
+			t.Fatal("expected timeout/context error")
 		}
 		if res == nil {
 			t.Fatal("expected non-nil result")

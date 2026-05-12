@@ -41,7 +41,9 @@ const AdminSPUs = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSPU, setEditingSPU] = useState<SPU | null>(null);
   const [form] = Form.useForm();
-  const [providerModelOptions, setProviderModelOptions] = useState<{ value: string; label: string }[]>([]);
+  const [providerModelOptions, setProviderModelOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
   const [syncingModels, setSyncingModels] = useState(false);
   const [listScope, setListScope] = useState<'active' | 'all'>('active');
   const [filters, setFilters] = useState({
@@ -108,9 +110,7 @@ const AdminSPUs = () => {
     try {
       const response = await skuService.getProviderModels(providerCode);
       const models = response.data.models || [];
-      setProviderModelOptions(
-        models.map((m) => ({ value: m.model_id, label: m.model_id }))
-      );
+      setProviderModelOptions(models.map((m) => ({ value: m.model_id, label: m.model_id })));
     } catch {
       setProviderModelOptions([]);
     }
@@ -688,7 +688,9 @@ const AdminSPUs = () => {
             <Col span={16}>
               <Form.Item
                 noStyle
-                shouldUpdate={(prev, cur) => prev.sync_baseline_pricing !== cur.sync_baseline_pricing}
+                shouldUpdate={(prev, cur) =>
+                  prev.sync_baseline_pricing !== cur.sync_baseline_pricing
+                }
               >
                 {() => (
                   <Form.Item
@@ -713,7 +715,9 @@ const AdminSPUs = () => {
               <Form.Item name="endpoint_type" label="端点类型">
                 <Select placeholder="请选择" allowClear>
                   {Object.entries(ENDPOINT_TYPE_LABELS).map(([value, label]) => (
-                    <Select.Option key={value} value={value}>{label}</Select.Option>
+                    <Select.Option key={value} value={value}>
+                      {label}
+                    </Select.Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -722,7 +726,9 @@ const AdminSPUs = () => {
               <Form.Item name="billing_unit" label="计费单位">
                 <Select placeholder="请选择" allowClear>
                   {Object.entries(BILLING_UNIT_LABELS).map(([value, label]) => (
-                    <Select.Option key={value} value={value}>{label}</Select.Option>
+                    <Select.Option key={value} value={value}>
+                      {label}
+                    </Select.Option>
                   ))}
                 </Select>
               </Form.Item>

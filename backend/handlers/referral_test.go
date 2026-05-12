@@ -532,6 +532,15 @@ func TestCalculateReferralReward(t *testing.T) {
 	err = db.QueryRow("SELECT total_rewards FROM users WHERE id = ?", 1).Scan(&totalRewards)
 	assert.NoError(t, err)
 	assert.Equal(t, 5.0, totalRewards)
+
+	// 第二笔已支付订单不应再产生返利（首单之后不再计）
+	_, err = db.Exec("INSERT INTO orders (id, user_id, product_id, quantity, total_price, status) VALUES (?, ?, ?, ?, ?, ?)", 2, 2, 1, 1, 50.0, "paid")
+	assert.NoError(t, err)
+	err = CalculateReferralReward(2, 2, 50.0)
+	assert.NoError(t, err)
+	err = db.QueryRow("SELECT COUNT(*) FROM referral_rewards WHERE referee_id = ?", 2).Scan(&count)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
 }
 
 func TestPayReferralRewards(t *testing.T) {

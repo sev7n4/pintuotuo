@@ -51,7 +51,11 @@ export const skuService = {
     api.put<{ message: string }>(`/admin/spus/${id}/scenarios`, data),
 
   getProviderModels: (provider: string) =>
-    api.get<{ provider_code: string; models: { model_id: string; display_name?: string; is_active: boolean }[]; count: number }>('/admin/provider-models', {
+    api.get<{
+      provider_code: string;
+      models: { model_id: string; display_name?: string; is_active: boolean }[];
+      count: number;
+    }>('/admin/provider-models', {
       params: { provider, active_only: true },
     }),
 

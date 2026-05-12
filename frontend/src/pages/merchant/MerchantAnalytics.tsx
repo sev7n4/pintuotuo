@@ -364,12 +364,10 @@ export const MerchantAnalytics: React.FC = () => {
                 ].map((ep) => (
                   <Col xs={12} sm={8} md={4} key={ep.type}>
                     <Card size="small" style={{ textAlign: 'center' }}>
-                      <Tag color={ep.color} style={{ marginBottom: 8 }}>{ep.label}</Tag>
-                      <Statistic
-                        value={0}
-                        suffix="次"
-                        valueStyle={{ fontSize: 16 }}
-                      />
+                      <Tag color={ep.color} style={{ marginBottom: 8 }}>
+                        {ep.label}
+                      </Tag>
+                      <Statistic value={0} suffix="次" valueStyle={{ fontSize: 16 }} />
                     </Card>
                   </Col>
                 ))}

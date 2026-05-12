@@ -12,6 +12,7 @@ import {
   Tag,
   Typography,
   message,
+  Collapse,
 } from 'antd';
 import { RocketOutlined, ThunderboltOutlined, ShoppingCartOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -137,14 +138,21 @@ export default function FuelStationPage() {
           />
         )}
 
-        <Alert
-          type="info"
-          showIcon
-          message="购买规则"
-          description={
-            config?.rule_text ||
-            '加油包不可单独购买，需与至少一个在售模型商品或套餐包组合下单；仅持有余额不代表自动开通新模型权限。'
-          }
+        <Collapse
+          bordered={false}
+          style={{ background: 'transparent' }}
+          items={[
+            {
+              key: 'fuel-rules',
+              label: '购买规则',
+              children: (
+                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                  {config?.rule_text ||
+                    '加油包不可单独购买，需与至少一个在售模型商品或套餐包组合下单；仅持有余额不代表自动开通新模型权限。'}
+                </Paragraph>
+              ),
+            },
+          ]}
         />
 
         <Spin spinning={loading}>

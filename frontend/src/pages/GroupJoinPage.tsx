@@ -49,7 +49,9 @@ export default function GroupJoinPage() {
   }, [groupId, isAuthenticated, joinGroup, navigate]);
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 320 }}>
+    <div
+      style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 320 }}
+    >
       <Spin size="large" tip="正在处理参团…" />
     </div>
   );

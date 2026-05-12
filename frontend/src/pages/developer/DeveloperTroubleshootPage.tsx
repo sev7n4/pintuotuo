@@ -51,9 +51,7 @@ export default function DeveloperTroubleshootPage() {
         <a href="/developer/ide-clients">IDE 与 CLI 接入</a>。
       </Paragraph>
 
-      {err && (
-        <Alert type="error" message={err} style={{ marginBottom: 16 }} />
-      )}
+      {err && <Alert type="error" message={err} style={{ marginBottom: 16 }} />}
 
       {loading ? (
         <Spin />

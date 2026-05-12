@@ -70,17 +70,67 @@ const routeTypes = [
   { value: 'direct', label: '直连', icon: <ApiOutlined />, color: 'orange' },
 ];
 
-const endpointTypeOptions: { value: EndpointType; label: string; defaultUrl: string; defaultBillingUnit: BillingUnit }[] = [
-  { value: 'chat_completions', label: '对话补全', defaultUrl: '/v1/chat/completions', defaultBillingUnit: 'token' },
-  { value: 'responses', label: 'Response API', defaultUrl: '/v1/responses', defaultBillingUnit: 'token' },
+const endpointTypeOptions: {
+  value: EndpointType;
+  label: string;
+  defaultUrl: string;
+  defaultBillingUnit: BillingUnit;
+}[] = [
+  {
+    value: 'chat_completions',
+    label: '对话补全',
+    defaultUrl: '/v1/chat/completions',
+    defaultBillingUnit: 'token',
+  },
+  {
+    value: 'responses',
+    label: 'Response API',
+    defaultUrl: '/v1/responses',
+    defaultBillingUnit: 'token',
+  },
   { value: 'embeddings', label: '嵌入', defaultUrl: '/v1/embeddings', defaultBillingUnit: 'token' },
-  { value: 'images_generations', label: '图像生成', defaultUrl: '/v1/images/generations', defaultBillingUnit: 'image' },
-  { value: 'images_variations', label: '图像变体', defaultUrl: '/v1/images/variations', defaultBillingUnit: 'image' },
-  { value: 'images_edits', label: '图像编辑', defaultUrl: '/v1/images/edits', defaultBillingUnit: 'image' },
-  { value: 'audio_transcriptions', label: '语音转文字', defaultUrl: '/v1/audio/transcriptions', defaultBillingUnit: 'second' },
-  { value: 'audio_translations', label: '音频翻译', defaultUrl: '/v1/audio/translations', defaultBillingUnit: 'second' },
-  { value: 'audio_speech', label: '语音合成', defaultUrl: '/v1/audio/speech', defaultBillingUnit: 'character' },
-  { value: 'moderations', label: '内容审核', defaultUrl: '/v1/moderations', defaultBillingUnit: 'request' },
+  {
+    value: 'images_generations',
+    label: '图像生成',
+    defaultUrl: '/v1/images/generations',
+    defaultBillingUnit: 'image',
+  },
+  {
+    value: 'images_variations',
+    label: '图像变体',
+    defaultUrl: '/v1/images/variations',
+    defaultBillingUnit: 'image',
+  },
+  {
+    value: 'images_edits',
+    label: '图像编辑',
+    defaultUrl: '/v1/images/edits',
+    defaultBillingUnit: 'image',
+  },
+  {
+    value: 'audio_transcriptions',
+    label: '语音转文字',
+    defaultUrl: '/v1/audio/transcriptions',
+    defaultBillingUnit: 'second',
+  },
+  {
+    value: 'audio_translations',
+    label: '音频翻译',
+    defaultUrl: '/v1/audio/translations',
+    defaultBillingUnit: 'second',
+  },
+  {
+    value: 'audio_speech',
+    label: '语音合成',
+    defaultUrl: '/v1/audio/speech',
+    defaultBillingUnit: 'character',
+  },
+  {
+    value: 'moderations',
+    label: '内容审核',
+    defaultUrl: '/v1/moderations',
+    defaultBillingUnit: 'request',
+  },
 ];
 
 const billingUnitOptions = Object.entries(BILLING_UNIT_LABELS).map(([value, label]) => ({
@@ -126,7 +176,9 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
       return;
     }
     if (value[selectedRouteType]) {
-      message.warning(`${routeTypes.find((t) => t.value === selectedRouteType)?.label || selectedRouteType}端点已存在`);
+      message.warning(
+        `${routeTypes.find((t) => t.value === selectedRouteType)?.label || selectedRouteType}端点已存在`
+      );
       return;
     }
     const newEndpoints = {
@@ -174,7 +226,11 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
     onEndpointTypesChange?.(newEndpointTypes);
   };
 
-  const handleEndpointTypeConfigChange = (et: string, field: 'url_template' | 'billing_unit', val: string) => {
+  const handleEndpointTypeConfigChange = (
+    et: string,
+    field: 'url_template' | 'billing_unit',
+    val: string
+  ) => {
     const newEndpointTypes = {
       ...endpointTypes,
       [et]: {
@@ -283,7 +339,9 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
                           size="small"
                           placeholder="/v1/..."
                           value={config?.url_template || ''}
-                          onChange={(e) => handleEndpointTypeConfigChange(et, 'url_template', e.target.value)}
+                          onChange={(e) =>
+                            handleEndpointTypeConfigChange(et, 'url_template', e.target.value)
+                          }
                         />
                       </Form.Item>
                       <Form.Item label="计费单位" style={{ marginBottom: 0 }}>
@@ -452,7 +510,10 @@ const EndpointsConfig: React.FC<EndpointsConfigProps> = ({
       <Modal
         title="添加端点配置"
         open={addModalVisible}
-        onCancel={() => { setAddModalVisible(false); setSelectedRouteType(''); }}
+        onCancel={() => {
+          setAddModalVisible(false);
+          setSelectedRouteType('');
+        }}
         onOk={handleConfirmAdd}
         okText="添加"
         cancelText="取消"

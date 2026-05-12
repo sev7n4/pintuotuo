@@ -24,6 +24,7 @@ import {
   Tooltip,
   Table,
   Grid,
+  Drawer,
 } from 'antd';
 import {
   ShoppingCartOutlined,
@@ -135,6 +136,7 @@ export const ProductDetailPage: React.FC = () => {
   const [showGroupsModal, setShowGroupsModal] = useState(false);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null);
+  const [detailDrawer, setDetailDrawer] = useState<'group' | null>(null);
   const [skus, setSKUs] = useState<SKUWithSPU[]>([]);
   const [selectedSKU, setSelectedSKU] = useState<SKUWithSPU | null>(null);
   const [skuLoading, setSkuLoading] = useState(false);
@@ -538,7 +540,12 @@ export const ProductDetailPage: React.FC = () => {
                           </Tag>
                           <Tag color="geekblue">{sku.sku_code}</Tag>
                         </div>
-                        <Text strong className={styles.skuPickName} ellipsis style={{ display: 'block' }}>
+                        <Text
+                          strong
+                          className={styles.skuPickName}
+                          ellipsis
+                          style={{ display: 'block' }}
+                        >
                           {getSkuCardSubtitle(sku) || sku.spu_name}
                         </Text>
                         <Tooltip title={sku.spu_name}>
@@ -710,13 +717,17 @@ export const ProductDetailPage: React.FC = () => {
         {purchaseMode === 'group' && (
           <div style={{ marginBottom: 24 }}>
             {groupPrices.length === 0 && (
-              <Alert
-                type="info"
-                showIcon
-                message="当前规格不支持拼团"
-                description="请选择支持拼团的 SKU 规格，或使用单独购买。"
-                style={{ marginBottom: 16 }}
-              />
+              <div style={{ marginBottom: 16 }}>
+                <Text type="secondary">当前规格不可发起拼团。</Text>{' '}
+                <Button
+                  type="link"
+                  size="small"
+                  style={{ padding: 0 }}
+                  onClick={() => setDetailDrawer('group')}
+                >
+                  说明
+                </Button>
+              </div>
             )}
             {groupPrices.length > 0 && <Title level={5}>选择拼团规则</Title>}
             <Space direction="vertical" style={{ width: '100%' }}>
@@ -804,91 +815,73 @@ export const ProductDetailPage: React.FC = () => {
                 </Card>
                 <div className={styles.groupActionsRow}>
                   <div className={styles.groupActionCell}>
-                    <Tooltip
-                      title={
-                        product.stock === 0
-                          ? '暂无库存'
-                          : '加入已有拼团：打开列表选择团并参团（当前可加入团数见上方）'
-                      }
+                    <span
+                      style={{
+                        display: 'flex',
+                        width: '100%',
+                        minWidth: 0,
+                        cursor: product.stock === 0 ? 'not-allowed' : undefined,
+                      }}
                     >
-                      <span
-                        style={{
-                          display: 'flex',
-                          width: '100%',
-                          minWidth: 0,
-                          cursor: product.stock === 0 ? 'not-allowed' : undefined,
+                      <Button
+                        type="primary"
+                        size="large"
+                        block
+                        icon={<UsergroupAddOutlined />}
+                        aria-label={
+                          product.stock === 0 ? '暂无库存' : '加入拼团，打开可加入的团列表'
+                        }
+                        className={styles.groupPairBtn}
+                        onClick={() => {
+                          loadActiveGroups();
+                          setShowGroupsModal(true);
                         }}
+                        disabled={product.stock === 0}
+                        style={{ background: '#52c41a', borderColor: '#52c41a' }}
                       >
-                        <Button
-                          type="primary"
-                          size="large"
-                          block
-                          icon={<UsergroupAddOutlined />}
-                          aria-label={
-                            product.stock === 0 ? '暂无库存' : '加入拼团，打开可加入的团列表'
-                          }
-                          className={styles.groupPairBtn}
-                          onClick={() => {
-                            loadActiveGroups();
-                            setShowGroupsModal(true);
-                          }}
-                          disabled={product.stock === 0}
-                          style={{ background: '#52c41a', borderColor: '#52c41a' }}
-                        >
-                          {product.stock === 0 ? '暂无库存' : '加入拼团'}
-                        </Button>
-                      </span>
-                    </Tooltip>
+                        {product.stock === 0 ? '暂无库存' : '加入拼团'}
+                      </Button>
+                    </span>
                   </div>
                   <div className={styles.groupActionCell}>
-                    <Tooltip
-                      title={
-                        product.stock === 0
-                          ? '暂无库存'
-                          : groupPrices.length === 0
-                            ? '当前规格不支持拼团'
-                            : '发起新拼团并前往支付'
-                      }
+                    <span
+                      style={{
+                        display: 'flex',
+                        width: '100%',
+                        minWidth: 0,
+                        cursor:
+                          product.stock === 0 || groupPrices.length === 0
+                            ? 'not-allowed'
+                            : undefined,
+                      }}
                     >
-                      <span
-                        style={{
-                          display: 'flex',
-                          width: '100%',
-                          minWidth: 0,
-                          cursor:
-                            product.stock === 0 || groupPrices.length === 0
-                              ? 'not-allowed'
-                              : undefined,
-                        }}
-                      >
-                        <Button
-                          type="primary"
-                          size="large"
-                          block
-                          icon={<PlusCircleOutlined />}
-                          aria-label={
-                            product.stock === 0
-                              ? '暂无库存'
-                              : groupPrices.length === 0
-                                ? '当前规格不可拼团'
-                                : '发起拼团并前往支付'
-                          }
-                          className={styles.groupPairBtn}
-                          onClick={handleGroupPurchase}
-                          disabled={product.stock === 0 || groupPrices.length === 0}
-                          style={{
-                            background: '#1890ff',
-                            borderColor: '#1890ff',
-                          }}
-                        >
-                          {product.stock === 0
+                      <Button
+                        type="primary"
+                        size="large"
+                        block
+                        icon={<PlusCircleOutlined />}
+                        aria-label={
+                          product.stock === 0
                             ? '暂无库存'
                             : groupPrices.length === 0
-                              ? '不可拼团'
-                              : '发起拼团'}
-                        </Button>
-                      </span>
-                    </Tooltip>
+                              ? '当前规格不可拼团'
+                              : '发起拼团并前往支付'
+                        }
+                        className={styles.groupPairBtn}
+                        onClick={handleGroupPurchase}
+                        disabled={product.stock === 0 || groupPrices.length === 0}
+                        style={{
+                          background: '#1890ff',
+                          borderColor: '#1890ff',
+                        }}
+                      >
+                        {product.stock === 0
+                          ? '暂无库存'
+                          : groupPrices.length === 0
+                            ? '不可拼团'
+                            : '发起拼团'}
+                      </Button>
+                    </span>
                   </div>
                 </div>
               </Space>
@@ -930,10 +923,9 @@ export const ProductDetailPage: React.FC = () => {
         <Tabs activeKey={detailTabKey} onChange={setDetailTabKey}>
           <TabPane tab="商品详情" key="detail">
             <Space direction="vertical" style={{ width: '100%' }}>
-              <Title level={5}>商品信息</Title>
+              <Title level={5}>商品说明</Title>
               <Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 13 }}>
-                以下为商品（SPU）级字段，与目录/运营配置一致；套餐粒度的 Token 量、价与拼团等以
-                「选择套餐」卡片为准。无 SPU 数据时不展示占位的「—」行。
+                以下为与目录同步的概览信息；具体 Token 量、价格与拼团规则以「选择套餐」卡片为准。
               </Paragraph>
               {spuProductInfoRows.length > 0 ? (
                 <ul style={{ paddingLeft: 20 }}>
@@ -947,13 +939,13 @@ export const ProductDetailPage: React.FC = () => {
                 <Alert
                   type="info"
                   showIcon
-                  message="暂无 SPU 级商品概要"
+                  message="暂无商品级概要"
                   description={
                     selectedSKU ? (
                       <>
                         当前所选套餐摘要：
                         <Text strong> {getSkuCardSubtitle(selectedSKU)}</Text>
-                        。未配置 SPU 级 token/模型/上下文等时，以套餐卡与订单为准。
+                        。未配置商品级 token/模型/上下文等时，以套餐卡与订单为准。
                       </>
                     ) : (
                       '请先在上方「选择套餐」；关键用量与价格以所选 SKU 为准。'
@@ -999,73 +991,91 @@ export const ProductDetailPage: React.FC = () => {
               {selectedSKU && (
                 <>
                   <Divider />
-                  <Title level={5}>本商品规格参考（非最终权益）</Title>
-                  {selectedSKU.catalog_pricing_version_id != null ? (
-                    <Alert
-                      type="info"
-                      showIcon
-                      style={{ marginBottom: 8 }}
-                      message={
-                        <>
-                          以下「参考输入/输出成本」已按您<strong>最近已支付订单</strong>
-                          锁定的定价版本（
-                          <Text code>
-                            pricing_version_id = {selectedSKU.catalog_pricing_version_id}
-                          </Text>
-                          ）展示，便于与账户侧计费对齐；未登录用户仍为 baseline 版本。
-                        </>
-                      }
-                    />
-                  ) : (
-                    <Paragraph type="secondary" style={{ marginBottom: 8, fontSize: 13 }}>
-                      下列「参考输入/输出成本」优先取自<strong> baseline 定价版本</strong>在
-                      <Text code>pricing_version_spu_rates</Text>
-                      中的快照（与下单默认 <Text code>pricing_version_id</Text>
-                      、网关按版本计费一致）；若无快照再回落 SPU
-                      当前列。实际扣费仍以调用用量、账户权益与账单为准。
-                    </Paragraph>
-                  )}
-                  <ul style={{ paddingLeft: 20 }}>
-                    <li>
-                      厂商代码（provider）：<Text code>{selectedSKU.model_provider}</Text>
-                    </li>
-                    <li>
-                      模型名参考：{' '}
-                      <Text code>
-                        {selectedSKU.provider_model_id?.trim() || selectedSKU.model_name}
-                      </Text>
-                      {selectedSKU.provider_model_id?.trim() ? (
-                        <Text type="secondary">（SPU 配置的 provider_model_id）</Text>
-                      ) : null}
-                    </li>
-                    <li>
-                      OpenAI 兼容示例：
-                      <Text
-                        code
-                      >{`${selectedSKU.model_provider}/${selectedSKU.provider_model_id?.trim() || selectedSKU.model_name}`}</Text>
-                    </li>
-                    {(Number(selectedSKU.provider_input_rate) > 0 ||
-                      Number(selectedSKU.provider_output_rate) > 0) && (
-                      <>
-                        <li>
-                          参考输入成本（元/1K tokens）：
-                          <Text strong>
-                            {Number(selectedSKU.provider_input_rate) > 0
-                              ? `¥${Number(selectedSKU.provider_input_rate).toFixed(6)}`
-                              : '—'}
-                          </Text>
-                        </li>
-                        <li>
-                          参考输出成本（元/1K tokens）：
-                          <Text strong>
-                            {Number(selectedSKU.provider_output_rate) > 0
-                              ? `¥${Number(selectedSKU.provider_output_rate).toFixed(6)}`
-                              : '—'}
-                          </Text>
-                        </li>
-                      </>
-                    )}
-                  </ul>
+                  <Title level={5}>规格与计费参考</Title>
+                  <Text
+                    type="secondary"
+                    style={{ display: 'block', marginBottom: 8, fontSize: 13 }}
+                  >
+                    以下为便于核对的参数摘要；实际扣费以调用用量与账单为准。
+                  </Text>
+                  <Collapse
+                    bordered={false}
+                    defaultActiveKey={[]}
+                    items={[
+                      {
+                        key: 'billing',
+                        label: '计费说明（技术细节，默认收起）',
+                        children: (
+                          <>
+                            {selectedSKU.catalog_pricing_version_id != null ? (
+                              <Alert
+                                type="info"
+                                showIcon
+                                style={{ marginBottom: 8 }}
+                                message={
+                                  <>
+                                    「参考输入/输出成本」按您<strong>最近已支付订单</strong>
+                                    锁定的定价版本（
+                                    <Text code>
+                                      pricing_version_id = {selectedSKU.catalog_pricing_version_id}
+                                    </Text>
+                                    ）展示；未登录用户为 baseline 版本。
+                                  </>
+                                }
+                              />
+                            ) : (
+                              <Paragraph type="secondary" style={{ marginBottom: 8, fontSize: 13 }}>
+                                「参考输入/输出成本」优先取自 baseline 定价版本在{' '}
+                                <Text code>pricing_version_spu_rates</Text>{' '}
+                                的快照；若无快照再回落目录当前列。
+                              </Paragraph>
+                            )}
+                            <ul style={{ paddingLeft: 20 }}>
+                              <li>
+                                厂商代码（provider）：<Text code>{selectedSKU.model_provider}</Text>
+                              </li>
+                              <li>
+                                模型名参考：{' '}
+                                <Text code>
+                                  {selectedSKU.provider_model_id?.trim() || selectedSKU.model_name}
+                                </Text>
+                                {selectedSKU.provider_model_id?.trim() ? (
+                                  <Text type="secondary">（目录配置的 provider_model_id）</Text>
+                                ) : null}
+                              </li>
+                              <li>
+                                OpenAI 兼容示例：
+                                <Text
+                                  code
+                                >{`${selectedSKU.model_provider}/${selectedSKU.provider_model_id?.trim() || selectedSKU.model_name}`}</Text>
+                              </li>
+                              {(Number(selectedSKU.provider_input_rate) > 0 ||
+                                Number(selectedSKU.provider_output_rate) > 0) && (
+                                <>
+                                  <li>
+                                    参考输入成本（元/1K tokens）：
+                                    <Text strong>
+                                      {Number(selectedSKU.provider_input_rate) > 0
+                                        ? `¥${Number(selectedSKU.provider_input_rate).toFixed(6)}`
+                                        : '—'}
+                                    </Text>
+                                  </li>
+                                  <li>
+                                    参考输出成本（元/1K tokens）：
+                                    <Text strong>
+                                      {Number(selectedSKU.provider_output_rate) > 0
+                                        ? `¥${Number(selectedSKU.provider_output_rate).toFixed(6)}`
+                                        : '—'}
+                                    </Text>
+                                  </li>
+                                </>
+                              )}
+                            </ul>
+                          </>
+                        ),
+                      },
+                    ]}
+                  />
                 </>
               )}
 
@@ -1093,7 +1103,11 @@ export const ProductDetailPage: React.FC = () => {
                               <Text strong ellipsis style={{ maxWidth: 260 }}>
                                 {getSkuCardSubtitle(r) || r.spu_name}
                               </Text>
-                              <Text type="secondary" ellipsis style={{ maxWidth: 260, fontSize: 12 }}>
+                              <Text
+                                type="secondary"
+                                ellipsis
+                                style={{ maxWidth: 260, fontSize: 12 }}
+                              >
                                 {r.sku_code}
                               </Text>
                             </Space>
@@ -1155,6 +1169,7 @@ export const ProductDetailPage: React.FC = () => {
               <Title level={5}>常见问题</Title>
               <Collapse
                 bordered={false}
+                defaultActiveKey={[]}
                 items={[
                   {
                     key: '1',
@@ -1204,7 +1219,7 @@ export const ProductDetailPage: React.FC = () => {
                   <Rate disabled value={rating} allowHalf />
                 </Space>
               ) : (
-                <Text type="secondary">暂无综合评分数据（以商品与 SPU 汇总为准）。</Text>
+                <Text type="secondary">暂无综合评分数据（以商品与目录汇总为准）。</Text>
               )}
 
               <Divider />
@@ -1302,6 +1317,17 @@ export const ProductDetailPage: React.FC = () => {
             )}
           </Spin>
         </Modal>
+        <Drawer
+          title="拼团说明"
+          placement="right"
+          width={400}
+          onClose={() => setDetailDrawer(null)}
+          open={detailDrawer === 'group'}
+        >
+          <Paragraph>
+            当前所选套餐规格未开启拼团或未配置成团档位时，无法发起或加入拼团。请在上方「选择套餐」中切换到支持拼团的规格，或改用单独购买。
+          </Paragraph>
+        </Drawer>
       </Card>
     </div>
   );

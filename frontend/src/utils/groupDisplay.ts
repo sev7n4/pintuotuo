@@ -24,7 +24,10 @@ export function groupProgressBarStatus(
   group: Pick<Group, 'status' | 'deadline'>
 ): 'active' | 'success' | 'normal' | 'exception' {
   if (group.status === 'completed') return 'success';
-  if (group.status === 'failed' || (group.status === 'active' && isGroupPastDeadline(group.deadline))) {
+  if (
+    group.status === 'failed' ||
+    (group.status === 'active' && isGroupPastDeadline(group.deadline))
+  ) {
     return 'normal';
   }
   if (group.status === 'active') return 'active';

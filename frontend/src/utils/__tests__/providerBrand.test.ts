@@ -17,7 +17,7 @@ describe('providerBrand', () => {
 
   it('returns logo URL for mapped providers (Lobe Icons CDN)', () => {
     expect(getProviderLogoUrl('openai')).toMatch(
-      /@lobehub\/icons-static-svg@\d+\.\d+\.\d+\/icons\/openai\.svg$/,
+      /@lobehub\/icons-static-svg@\d+\.\d+\.\d+\/icons\/openai\.svg$/
     );
     expect(getProviderLogoUrl('deepseek')).toMatch(/\/icons\/deepseek\.svg$/);
     expect(getProviderLogoUrl('zhipu')).toMatch(/\/icons\/zhipu\.svg$/);

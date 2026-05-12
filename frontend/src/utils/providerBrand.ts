@@ -69,8 +69,7 @@ const PROVIDER_SURFACE: Record<string, string> = {
     'radial-gradient(120% 80% at 18% 12%, rgba(66, 133, 244, 0.08) 0%, transparent 55%), linear-gradient(165deg, #fafafa 0%, #f0f0f0 100%)',
   deepseek:
     'radial-gradient(120% 80% at 18% 12%, rgba(77, 107, 254, 0.08) 0%, transparent 55%), linear-gradient(165deg, #fafafa 0%, #f0f0f0 100%)',
-  meta:
-    'radial-gradient(120% 80% at 18% 12%, rgba(8, 102, 255, 0.07) 0%, transparent 55%), linear-gradient(165deg, #fafafa 0%, #f0f0f0 100%)',
+  meta: 'radial-gradient(120% 80% at 18% 12%, rgba(8, 102, 255, 0.07) 0%, transparent 55%), linear-gradient(165deg, #fafafa 0%, #f0f0f0 100%)',
   mistral:
     'radial-gradient(120% 80% at 18% 12%, rgba(250, 70, 22, 0.07) 0%, transparent 55%), linear-gradient(165deg, #fafafa 0%, #f0f0f0 100%)',
   cohere:
@@ -83,8 +82,7 @@ const PROVIDER_SURFACE: Record<string, string> = {
     'radial-gradient(120% 80% at 18% 12%, rgba(99, 102, 241, 0.08) 0%, transparent 55%), linear-gradient(165deg, #fafafa 0%, #f0f0f0 100%)',
   moonshotai:
     'radial-gradient(120% 80% at 18% 12%, rgba(99, 102, 241, 0.08) 0%, transparent 55%), linear-gradient(165deg, #fafafa 0%, #f0f0f0 100%)',
-  xai:
-    'radial-gradient(120% 80% at 18% 12%, rgba(0, 0, 0, 0.04) 0%, transparent 55%), linear-gradient(165deg, #fafafa 0%, #f0f0f0 100%)',
+  xai: 'radial-gradient(120% 80% at 18% 12%, rgba(0, 0, 0, 0.04) 0%, transparent 55%), linear-gradient(165deg, #fafafa 0%, #f0f0f0 100%)',
   stepfun:
     'radial-gradient(120% 80% at 18% 12%, rgba(59, 130, 246, 0.06) 0%, transparent 55%), linear-gradient(165deg, #fafafa 0%, #f0f0f0 100%)',
   openrouter:
@@ -102,11 +100,7 @@ const PROVIDER_SURFACE: Record<string, string> = {
 };
 
 function normalizeProviderCode(code: string): string {
-  return code
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '')
-    .replace(/_/g, '');
+  return code.trim().toLowerCase().replace(/\s+/g, '').replace(/_/g, '');
 }
 
 /** 返回 Lobe Icons 的图标文件名（不含扩展名），供 URL 与测试使用 */

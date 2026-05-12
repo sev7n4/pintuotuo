@@ -10,7 +10,6 @@ import {
   Space,
   Typography,
   List,
-  Alert,
   Collapse,
   message,
 } from 'antd';
@@ -182,16 +181,6 @@ export const OrderDetailPage: React.FC = () => {
           </Descriptions.Item>
         </Descriptions>
 
-        {(currentOrder.items?.length ?? 0) > 1 && (
-          <Alert
-            type="info"
-            showIcon
-            style={{ marginTop: 16 }}
-            message="多明细订单"
-            description="支付成功后，系统按每条明细分别履约（如订阅、Token 等）。对账与售后以明细为准。"
-          />
-        )}
-
         <Card
           size="small"
           title="订单明细"
@@ -203,7 +192,7 @@ export const OrderDetailPage: React.FC = () => {
             items={[
               {
                 key: 'lines',
-                label: `共 ${currentOrder.items?.length || 0} 条（展开查看名称、类型、数量与金额）`,
+                label: `${currentOrder.items?.length || 0} 条明细`,
                 children: (
                   <List
                     size="small"

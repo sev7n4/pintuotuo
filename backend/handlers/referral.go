@@ -542,6 +542,18 @@ func CalculateReferralReward(orderID int, refereeID int, orderAmount float64) er
 		return nil
 	}
 
+	// 产品规则：仅被邀请用户「首笔」已支付/已完成订单计返利（与「首单 5%」文案一致）。
+	var paidOrderCount int
+	if err = db.QueryRow(
+		"SELECT COUNT(*) FROM orders WHERE user_id = $1 AND status IN ('paid','completed')",
+		refereeID,
+	).Scan(&paidOrderCount); err != nil {
+		return err
+	}
+	if paidOrderCount != 1 {
+		return nil
+	}
+
 	rewardAmount := orderAmount * referralRewardRate
 
 	_, err = db.Exec(

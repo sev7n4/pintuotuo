@@ -280,7 +280,11 @@ const MerchantAPIKeys = () => {
   const handleAdd = () => {
     setEditingKey(null);
     form.resetFields();
-    form.setFieldsValue({ unlimited_quota: true, health_check_level: 'medium', byok_type: 'official' });
+    form.setFieldsValue({
+      unlimited_quota: true,
+      health_check_level: 'medium',
+      byok_type: 'official',
+    });
     setModalVisible(true);
   };
 
@@ -386,7 +390,11 @@ const MerchantAPIKeys = () => {
     }
   };
 
-  const handleVerify = async (id: number, mode: 'light' | 'deep' = 'light', probeModel?: string) => {
+  const handleVerify = async (
+    id: number,
+    mode: 'light' | 'deep' = 'light',
+    probeModel?: string
+  ) => {
     setVerificationModalVisible(true);
     setVerificationLoading(true);
     setVerificationResult(null);
@@ -477,7 +485,7 @@ const MerchantAPIKeys = () => {
         setVerificationResult(result);
 
         if (result.models_found && result.models_found.length > 0) {
-          setCachedModels(prev => {
+          setCachedModels((prev) => {
             const next = new Map(prev);
             next.set(id, result.models_found!);
             return next;
@@ -1125,13 +1133,16 @@ const MerchantAPIKeys = () => {
             />
           </Form.Item>
 
-          <Form.Item noStyle shouldUpdate={(prev, cur) => {
-            const prevHas = (prev.allowed_endpoint_types || []).includes('responses');
-            const curHas = (cur.allowed_endpoint_types || []).includes('responses');
-            return prevHas !== curHas;
-          }}>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, cur) => {
+              const prevHas = (prev.allowed_endpoint_types || []).includes('responses');
+              const curHas = (cur.allowed_endpoint_types || []).includes('responses');
+              return prevHas !== curHas;
+            }}
+          >
             {() => {
-              const types = form.getFieldValue('allowed_endpoint_types') as string[] || [];
+              const types = (form.getFieldValue('allowed_endpoint_types') as string[]) || [];
               return types.includes('responses') ? (
                 <Form.Item name="allowed_tools" label="Response API 工具权限">
                   <Checkbox.Group
@@ -1213,7 +1224,7 @@ const MerchantAPIKeys = () => {
             showSearch
             value={selectedProbeModel}
             onChange={(val) => setSelectedProbeModel(val)}
-            options={(cachedModels.get(probeModelTargetId || 0) || []).map(m => ({
+            options={(cachedModels.get(probeModelTargetId || 0) || []).map((m) => ({
               label: m,
               value: m,
             }))}

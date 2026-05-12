@@ -1,13 +1,33 @@
 import { useEffect, useState } from 'react';
-import { Card, Table, Button, Tag, Space, Modal, Form, Select, InputNumber, message, Popconfirm, Row, Col } from 'antd';
+import {
+  Card,
+  Table,
+  Button,
+  Tag,
+  Space,
+  Modal,
+  Form,
+  Select,
+  InputNumber,
+  message,
+  Popconfirm,
+  Row,
+  Col,
+} from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { endpointPricingService } from '@/services/endpointPricing';
 import type { EndpointPricing, EndpointPricingCreateRequest } from '@/types/sku';
 import { ENDPOINT_TYPE_LABELS, ENDPOINT_TYPE_COLORS, BILLING_UNIT_LABELS } from '@/types/sku';
 import { getApiErrorMessage } from '@/utils/apiError';
 
-const endpointTypeOptions = Object.entries(ENDPOINT_TYPE_LABELS).map(([value, label]) => ({ value, label }));
-const billingUnitOptions = Object.entries(BILLING_UNIT_LABELS).map(([value, label]) => ({ value, label }));
+const endpointTypeOptions = Object.entries(ENDPOINT_TYPE_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+const billingUnitOptions = Object.entries(BILLING_UNIT_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
 
 const AdminEndpointPricing = () => {
   const [items, setItems] = useState<EndpointPricing[]>([]);
@@ -111,17 +131,27 @@ const AdminEndpointPricing = () => {
       title: '更新时间',
       dataIndex: 'updated_at',
       key: 'updated_at',
-      render: (v: string) => v ? new Date(v).toLocaleString() : '-',
+      render: (v: string) => (v ? new Date(v).toLocaleString() : '-'),
     },
     {
       title: '操作',
       key: 'action',
       render: (_: unknown, record: EndpointPricing) => (
         <Space size="small">
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          >
             编辑
           </Button>
-          <Popconfirm title="确定删除？" onConfirm={() => handleDelete(record.id)} okText="确定" cancelText="取消">
+          <Popconfirm
+            title="确定删除？"
+            onConfirm={() => handleDelete(record.id)}
+            okText="确定"
+            cancelText="取消"
+          >
             <Button type="link" size="small" danger icon={<DeleteOutlined />}>
               删除
             </Button>
@@ -184,12 +214,24 @@ const AdminEndpointPricing = () => {
         <Form form={form} layout="vertical">
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="endpoint_type" label="端点类型" rules={[{ required: true, message: '请选择端点类型' }]}>
-                <Select options={endpointTypeOptions} placeholder="选择端点类型" disabled={!!editingItem} />
+              <Form.Item
+                name="endpoint_type"
+                label="端点类型"
+                rules={[{ required: true, message: '请选择端点类型' }]}
+              >
+                <Select
+                  options={endpointTypeOptions}
+                  placeholder="选择端点类型"
+                  disabled={!!editingItem}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="provider_code" label="厂商代码" rules={[{ required: true, message: '请输入厂商代码' }]}>
+              <Form.Item
+                name="provider_code"
+                label="厂商代码"
+                rules={[{ required: true, message: '请输入厂商代码' }]}
+              >
                 <Select
                   placeholder="选择厂商"
                   disabled={!!editingItem}
@@ -204,12 +246,20 @@ const AdminEndpointPricing = () => {
           </Row>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="unit_type" label="计费单位" rules={[{ required: true, message: '请选择计费单位' }]}>
+              <Form.Item
+                name="unit_type"
+                label="计费单位"
+                rules={[{ required: true, message: '请选择计费单位' }]}
+              >
                 <Select options={billingUnitOptions} placeholder="选择计费单位" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="unit_price" label="单价（元）" rules={[{ required: true, message: '请输入单价' }]}>
+              <Form.Item
+                name="unit_price"
+                label="单价（元）"
+                rules={[{ required: true, message: '请输入单价' }]}
+              >
                 <InputNumber style={{ width: '100%' }} min={0} precision={6} step={0.000001} />
               </Form.Item>
             </Col>

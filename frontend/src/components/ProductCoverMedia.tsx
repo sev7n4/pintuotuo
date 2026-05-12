@@ -58,8 +58,7 @@ export function ProductCoverMedia({
   }, [resetKey, resolved]);
 
   const showCoverImg = Boolean(resolved) && !coverBroken;
-  const brandUrl =
-    !showCoverImg && modelProvider ? getProviderLogoUrl(modelProvider) : null;
+  const brandUrl = !showCoverImg && modelProvider ? getProviderLogoUrl(modelProvider) : null;
   const surface =
     !showCoverImg && modelProvider ? getProviderCardSurfaceStyle(modelProvider) : undefined;
 
@@ -82,6 +81,7 @@ export function ProductCoverMedia({
     styles.productBrandBadge,
     variant === 'grid' && styles.badgeGrid,
     variant === 'wide' && styles.badgeWide,
+    variant === 'home' && styles.badgeHome,
     variant === 'hero' && styles.badgeHero,
   ]
     .filter(Boolean)
@@ -101,6 +101,7 @@ export function ProductCoverMedia({
     variant === 'grid' && styles.placeholderCompact,
     variant === 'wide' && styles.placeholderWide,
     variant === 'home' && styles.placeholderHome,
+    variant === 'home' && styles.placeholderHomePerf,
     variant === 'hero' && styles.placeholderHero,
   ]
     .filter(Boolean)
@@ -109,11 +110,14 @@ export function ProductCoverMedia({
   const t = fallbackTitle.trim();
   const fallbackChars = t.length >= 2 ? t.slice(0, 2) : t || '—';
 
-  const bgLayerClass = [styles.bgLayer, !surface && styles.bgLayerDefault].filter(Boolean).join(' ');
+  const bgLayerClass = [styles.bgLayer, !surface && styles.bgLayerDefault]
+    .filter(Boolean)
+    .join(' ');
   const frostClass = [
     styles.frostOverlay,
     surface ? styles.frostOverlaySurface : styles.frostOverlayDefault,
     variant === 'grid' && styles.frostOverlayGrid,
+    variant === 'home' && styles.frostOverlayHome,
   ]
     .filter(Boolean)
     .join(' ');

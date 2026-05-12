@@ -136,7 +136,12 @@ export default function MyEntitlementsPage() {
             message="部分数据加载失败"
             description="可能是网络波动或未登录会话过期。请点击重试；若仍失败请稍后再试或联系客服。"
             action={
-              <Button size="small" type="primary" loading={loadingMain || loadingExtras} onClick={handleRetryLoad}>
+              <Button
+                size="small"
+                type="primary"
+                loading={loadingMain || loadingExtras}
+                onClick={handleRetryLoad}
+              >
                 重试
               </Button>
             }
@@ -246,9 +251,12 @@ export default function MyEntitlementsPage() {
                     message="Claude Code（Anthropic 协议）"
                     description={
                       <Space direction="vertical" size={8}>
-                        <Paragraph style={{ marginBottom: 0 }}>{usageGuide.claude_code_hint}</Paragraph>
+                        <Paragraph style={{ marginBottom: 0 }}>
+                          {usageGuide.claude_code_hint}
+                        </Paragraph>
                         <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
-                          若 API 网关域名与本页不同（例如独立服务器），请将下列 URL 的域名替换为实际 API 地址。
+                          若 API 网关域名与本页不同（例如独立服务器），请将下列 URL 的域名替换为实际
+                          API 地址。
                         </Paragraph>
                         <Paragraph copyable style={{ marginBottom: 0 }}>
                           <Text type="secondary">Anthropic Base URL：</Text>

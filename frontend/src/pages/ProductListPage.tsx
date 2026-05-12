@@ -21,6 +21,7 @@ import {
   Segmented,
   Tooltip,
   Alert,
+  Collapse,
 } from 'antd';
 import {
   SearchOutlined,
@@ -835,11 +836,7 @@ export const ProductListPage: React.FC = () => {
         <Badge count={cartItemCount} size="small">
           <FloatButton
             icon={<ShoppingCartOutlined />}
-            tooltip={
-              <div>
-                {cartItemCount > 0 ? `购物车（${cartItemCount} 件）` : '购物车'}
-              </div>
-            }
+            tooltip={<div>{cartItemCount > 0 ? `购物车（${cartItemCount} 件）` : '购物车'}</div>}
             onClick={() => navigate('/cart')}
             style={{ right: 24, bottom: 24 }}
           />
@@ -895,20 +892,34 @@ export const ProductListPage: React.FC = () => {
       )}
 
       {!isFlashSale && catalogView === 'skus' && (
-        <CatalogGroupsShowcase
-          layout="rail"
-          groups={catalogGroupsBlock.list}
-          total={catalogGroupsBlock.total}
-          status={catalogGroupsBlock.status}
-          groupScope={groupListScope}
-          onGroupScopeChange={setGroupListScope}
-          onOpenGroup={(id) => navigate(`/groups/${id}`)}
-          onOpenAll={() => navigate('/groups')}
-          onLogin={() =>
-            navigate(
-              `/login?redirect=${encodeURIComponent(`${location.pathname}${location.search}`)}`
-            )
-          }
+        <Collapse
+          ghost
+          bordered={false}
+          style={{ marginBottom: 12 }}
+          defaultActiveKey={[]}
+          items={[
+            {
+              key: 'catalog-groups-rail',
+              label: '进行中的拼团',
+              children: (
+                <CatalogGroupsShowcase
+                  layout="rail"
+                  groups={catalogGroupsBlock.list}
+                  total={catalogGroupsBlock.total}
+                  status={catalogGroupsBlock.status}
+                  groupScope={groupListScope}
+                  onGroupScopeChange={setGroupListScope}
+                  onOpenGroup={(id) => navigate(`/groups/${id}`)}
+                  onOpenAll={() => navigate('/groups')}
+                  onLogin={() =>
+                    navigate(
+                      `/login?redirect=${encodeURIComponent(`${location.pathname}${location.search}`)}`
+                    )
+                  }
+                />
+              ),
+            },
+          ]}
         />
       )}
 
@@ -999,7 +1010,10 @@ export const ProductListPage: React.FC = () => {
             </Col>
             <Col xs={24} lg={14}>
               <Space wrap size="middle" style={{ width: '100%', justifyContent: 'flex-end' }}>
-                <Text type="secondary" style={{ maxWidth: screens.xs ? '100%' : 200, fontSize: 12 }}>
+                <Text
+                  type="secondary"
+                  style={{ maxWidth: screens.xs ? '100%' : 200, fontSize: 12 }}
+                >
                   类型、厂商、层级、端点、价格与有效期在「筛选」抽屉
                 </Text>
                 <Select
@@ -1134,11 +1148,7 @@ export const ProductListPage: React.FC = () => {
       <Badge count={cartItemCount} size="small">
         <FloatButton
           icon={<ShoppingCartOutlined />}
-          tooltip={
-            <div>
-              {cartItemCount > 0 ? `购物车（${cartItemCount} 件）` : '购物车'}
-            </div>
-          }
+          tooltip={<div>{cartItemCount > 0 ? `购物车（${cartItemCount} 件）` : '购物车'}</div>}
           onClick={() => navigate('/cart')}
           style={{ right: 24, bottom: 24 }}
         />

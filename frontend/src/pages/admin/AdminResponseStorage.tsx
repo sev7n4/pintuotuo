@@ -107,22 +107,29 @@ const AdminResponseStorage = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 170,
-      render: (v: string) => v ? new Date(v).toLocaleString() : '-',
+      render: (v: string) => (v ? new Date(v).toLocaleString() : '-'),
     },
     {
       title: '过期时间',
       dataIndex: 'expires_at',
       key: 'expires_at',
       width: 170,
-      render: (v: string) => v ? new Date(v).toLocaleString() : '-',
+      render: (v: string) => (v ? new Date(v).toLocaleString() : '-'),
     },
     {
       title: '操作',
       key: 'action',
       width: 80,
       render: (_: unknown, record: ResponseStorageItem) => (
-        <Popconfirm title="确定删除？" onConfirm={() => handleDelete(record.id)} okText="确定" cancelText="取消">
-          <Button type="link" size="small" danger icon={<DeleteOutlined />}>删除</Button>
+        <Popconfirm
+          title="确定删除？"
+          onConfirm={() => handleDelete(record.id)}
+          okText="确定"
+          cancelText="取消"
+        >
+          <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+            删除
+          </Button>
         </Popconfirm>
       ),
     },
@@ -148,7 +155,12 @@ const AdminResponseStorage = () => {
           <Col span={18} style={{ textAlign: 'right' }}>
             <Space>
               <Button onClick={fetchItems}>刷新</Button>
-              <Popconfirm title="确定清理所有过期响应？" onConfirm={handleCleanExpired} okText="确定" cancelText="取消">
+              <Popconfirm
+                title="确定清理所有过期响应？"
+                onConfirm={handleCleanExpired}
+                okText="确定"
+                cancelText="取消"
+              >
                 <Button icon={<ClearOutlined />}>清理过期</Button>
               </Popconfirm>
             </Space>

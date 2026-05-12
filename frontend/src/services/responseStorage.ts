@@ -15,10 +15,12 @@ export interface ResponseStorageItem {
 
 export const responseStorageService = {
   getList: (params?: { page?: number; per_page?: number; status?: string; user_id?: string }) =>
-    api.get<{ total: number; page: number; per_page: number; data: ResponseStorageItem[] }>('/admin/response-storage', { params }),
+    api.get<{ total: number; page: number; per_page: number; data: ResponseStorageItem[] }>(
+      '/admin/response-storage',
+      { params }
+    ),
 
-  delete: (id: number) =>
-    api.delete(`/admin/response-storage/${id}`),
+  delete: (id: number) => api.delete(`/admin/response-storage/${id}`),
 
   cleanExpired: () =>
     api.post<{ message: string; deleted_count: number }>('/admin/response-storage/clean-expired'),

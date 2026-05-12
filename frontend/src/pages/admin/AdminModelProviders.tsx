@@ -190,7 +190,7 @@ const AdminModelProviders = () => {
     setSelectedAPIKeyID(undefined);
     setSyncModalVisible(true);
     setApiKeyListLoading(true);
-    
+
     try {
       const response = await adminByokRoutingService.getByokRoutingList({
         provider: record.code,
@@ -210,22 +210,15 @@ const AdminModelProviders = () => {
 
   const handleSyncModels = async () => {
     if (!syncingProvider) return;
-    
+
     setSyncing(true);
     try {
-      const response = await skuService.syncProviderModels(
-        syncingProvider.code,
-        selectedAPIKeyID
-      );
-      message.success(
-        `同步成功，共同步 ${response.data.synced_count} 个模型`
-      );
+      const response = await skuService.syncProviderModels(syncingProvider.code, selectedAPIKeyID);
+      message.success(`同步成功，共同步 ${response.data.synced_count} 个模型`);
       setSyncModalVisible(false);
       setSyncingProvider(null);
     } catch (error) {
-      message.error(
-        error instanceof Error ? error.message : '同步失败'
-      );
+      message.error(error instanceof Error ? error.message : '同步失败');
     } finally {
       setSyncing(false);
     }
@@ -318,7 +311,12 @@ const AdminModelProviders = () => {
       fixed: 'right' as const,
       render: (_: unknown, record: ModelProvider) => (
         <Space size="small">
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
+          <Button
+            type="link"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          >
             编辑
           </Button>
           {record.code !== fallbackCode && (
@@ -482,7 +480,10 @@ const AdminModelProviders = () => {
         message="端点配置（默认模板）"
         description={
           <div>
-            <p>此配置为<strong>厂商级默认模板</strong>，用于生成 LiteLLM YAML 配置和作为商户 API Key 的回退端点。</p>
+            <p>
+              此配置为<strong>厂商级默认模板</strong>，用于生成 LiteLLM YAML 配置和作为商户 API Key
+              的回退端点。
+            </p>
             <p style={{ marginTop: 8 }}>
               <InfoCircleOutlined style={{ marginRight: 4 }} />
               商户上传的 API Key 可通过 BYOK 路由管理页面配置独立端点，优先级高于此默认模板。
@@ -518,7 +519,10 @@ const AdminModelProviders = () => {
           message="LiteLLM 网关配置"
           description={
             <div>
-              <p>配置厂商在 LiteLLM 网关中的模型名称映射。只需填写 LiteLLM Provider 前缀，系统会自动生成模板和环境变量名。</p>
+              <p>
+                配置厂商在 LiteLLM 网关中的模型名称映射。只需填写 LiteLLM Provider
+                前缀，系统会自动生成模板和环境变量名。
+              </p>
               <p style={{ marginTop: 8 }}>
                 <InfoCircleOutlined style={{ marginRight: 4 }} />
                 此配置为 BYOK 深度验证和 LiteLLM 路由模式的核心数据源（SSOT）。
@@ -563,9 +567,24 @@ const AdminModelProviders = () => {
             message="自动推导预览"
             description={
               <div style={{ fontSize: 13 }}>
-                <div>模型模板：<code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3 }}>{derived.template}</code></div>
-                <div style={{ marginTop: 4 }}>环境变量：<code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3 }}>{derived.envVar}</code></div>
-                <div style={{ marginTop: 4 }}>示例：<code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3 }}>glm-4.5 → {derived.template.replace('{model_id}', 'glm-4.5')}</code></div>
+                <div>
+                  模型模板：
+                  <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3 }}>
+                    {derived.template}
+                  </code>
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  环境变量：
+                  <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3 }}>
+                    {derived.envVar}
+                  </code>
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  示例：
+                  <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3 }}>
+                    glm-4.5 → {derived.template.replace('{model_id}', 'glm-4.5')}
+                  </code>
+                </div>
               </div>
             }
           />
@@ -610,7 +629,10 @@ const AdminModelProviders = () => {
             </Space>
           }
         >
-          <Input placeholder="仅 OpenAI 兼容厂商需要，如 https://api.stepfun.com/v1" disabled={isFallbackEditing} />
+          <Input
+            placeholder="仅 OpenAI 兼容厂商需要，如 https://api.stepfun.com/v1"
+            disabled={isFallbackEditing}
+          />
         </Form.Item>
       </>
     );
@@ -725,7 +747,8 @@ const AdminModelProviders = () => {
               <p>从厂商的 /v1/models 接口获取最新的模型列表，并更新到系统数据库中。</p>
               <p style={{ marginTop: 8 }}>
                 <InfoCircleOutlined style={{ marginRight: 4 }} />
-                需要选择一个有效的 API Key 用于认证，如果该厂商没有可用的 API Key，请先在 BYOK 路由管理中添加。
+                需要选择一个有效的 API Key 用于认证，如果该厂商没有可用的 API Key，请先在 BYOK
+                路由管理中添加。
               </p>
             </div>
           }

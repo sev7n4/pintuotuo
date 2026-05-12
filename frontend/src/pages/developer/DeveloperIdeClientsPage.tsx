@@ -75,7 +75,12 @@ export default function DeveloperIdeClientsPage() {
       a: ({ href, children, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement>) => {
         const ext = href?.startsWith('http');
         return (
-          <a href={href} {...rest} target={ext ? '_blank' : undefined} rel={ext ? 'noreferrer' : undefined}>
+          <a
+            href={href}
+            {...rest}
+            target={ext ? '_blank' : undefined}
+            rel={ext ? 'noreferrer' : undefined}
+          >
             {children}
           </a>
         );
@@ -91,12 +96,19 @@ export default function DeveloperIdeClientsPage() {
       </Title>
       <Paragraph type="secondary">
         按工具分册；正文为 <Text code>react-markdown</Text> 渲染（标题、表格、<Text code>```</Text>{' '}
-        代码高亮），并经 <Text code>rehype-sanitize</Text> 按 GitHub 风格白名单清洗以降低 XSS 风险。源文件位于{' '}
-        <Text code>public/docs/developer/ide-*.md</Text>。
+        代码高亮），并经 <Text code>rehype-sanitize</Text> 按 GitHub 风格白名单清洗以降低 XSS
+        风险。源文件位于 <Text code>public/docs/developer/ide-*.md</Text>。
       </Paragraph>
 
       {error && (
-        <Alert type="error" message={error} style={{ marginBottom: 16 }} showIcon closable onClose={() => setError(null)} />
+        <Alert
+          type="error"
+          message={error}
+          style={{ marginBottom: 16 }}
+          showIcon
+          closable
+          onClose={() => setError(null)}
+        />
       )}
 
       <Tabs

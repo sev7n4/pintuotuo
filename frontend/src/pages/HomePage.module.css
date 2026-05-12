@@ -221,6 +221,11 @@
   overflow: hidden;
 }
 
+/* 首页精选区：减轻卡片悬停阴影，降低滚轮滚动时合成层开销 */
+.container :global(.ant-card.ant-card-hoverable:hover) {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
 .productImage {
   position: relative;
   height: 160px;

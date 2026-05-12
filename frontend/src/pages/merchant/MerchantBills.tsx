@@ -276,7 +276,7 @@ const MerchantBills = () => {
       dataIndex: 'endpoint_type',
       key: 'endpoint_type',
       width: 100,
-      render: (v: string) => v ? <Tag color="blue">{v}</Tag> : '-',
+      render: (v: string) => (v ? <Tag color="blue">{v}</Tag> : '-'),
     },
     {
       title: '计费单位',

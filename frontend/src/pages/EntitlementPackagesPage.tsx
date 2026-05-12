@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { List, Space, Spin, Typography, message, Segmented } from 'antd';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useOrderStore } from '@/stores/orderStore';
 import { entitlementPackageService } from '@/services/entitlementPackage';
 import type { EntitlementPackage } from '@/types/entitlementPackage';
@@ -166,6 +166,10 @@ export default function EntitlementPackagesPage() {
         </div>
         <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
           套餐包为组合一口价下单；若需单品拼团，请在支持拼团的商品详情页发起。
+        </Paragraph>
+        <Paragraph type="secondary" style={{ marginBottom: 0, fontSize: 12 }}>
+          <Link to="/referral">邀请得奖励</Link>
+          ：分享你的专属链接，好友首单消费后你可获得返利。
         </Paragraph>
         <Spin spinning={loading}>
           <List

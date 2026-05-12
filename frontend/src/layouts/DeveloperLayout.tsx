@@ -26,13 +26,19 @@ const menuItems = [
   { key: '/developer/models', icon: <AppstoreOutlined />, label: '模型与权益' },
 ];
 
+/** 与 antd Grid `lg`（≥992）对齐：小于 992 视为窄屏，侧栏应收起以免挡住正文 */
+function isBelowLgBreakpoint(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth < 992;
+}
+
 export default function DeveloperLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, fetchUser, user } = useAuthStore();
   const [ready, setReady] = useState(false);
   const [siderCollapsed, setSiderCollapsed] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(max-width: 991px)').matches : false
+    typeof window !== 'undefined' ? isBelowLgBreakpoint() : false
   );
 
   useEffect(() => {
@@ -42,6 +48,15 @@ export default function DeveloperLayout() {
     mq.addEventListener('change', sync);
     return () => mq.removeEventListener('change', sync);
   }, []);
+
+  /** 路由切换后再次收起侧栏，避免仅依赖 Menu onClick 与 Sider 内部 responsive 竞态导致正文仍被挡住 */
+  useEffect(() => {
+    if (!isBelowLgBreakpoint()) return;
+    const id = window.requestAnimationFrame(() => {
+      setSiderCollapsed(true);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [location.pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,7 +110,6 @@ export default function DeveloperLayout() {
       <Layout className={styles.innerLayout}>
         <Sider
           width={220}
-          breakpoint="lg"
           collapsedWidth={0}
           collapsible
           collapsed={siderCollapsed}
@@ -113,7 +127,12 @@ export default function DeveloperLayout() {
                 : ['/developer/quickstart']
             }
             items={menuItems}
-            onClick={({ key }) => navigate(key)}
+            onClick={({ key }) => {
+              navigate(key);
+              if (isBelowLgBreakpoint()) {
+                window.requestAnimationFrame(() => setSiderCollapsed(true));
+              }
+            }}
             style={{ borderRight: 0 }}
           />
         </Sider>

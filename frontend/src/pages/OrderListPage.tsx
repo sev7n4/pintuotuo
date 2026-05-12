@@ -17,8 +17,8 @@ import {
   Card,
   Grid,
   List,
-  Alert,
   Collapse,
+  Segmented,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { FundOutlined, ReloadOutlined, TeamOutlined, ShoppingOutlined } from '@ant-design/icons';
@@ -85,6 +85,7 @@ export const OrderListPage: React.FC = () => {
   const [cancelReasonText, setCancelReasonText] = useState<string>('');
   const [refundReason, setRefundReason] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [desktopOrderView, setDesktopOrderView] = useState<'cards' | 'table'>('cards');
   const screens = useBreakpoint();
 
   const isMobile = screens.xs || (screens.sm && !screens.md);
@@ -399,16 +400,20 @@ export const OrderListPage: React.FC = () => {
           items={tabItems}
           size={isMobile ? 'small' : 'middle'}
         />
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12, borderRadius: 10 }}
-          message="多明细订单与复购"
-          description="列表「商品摘要」展示主商品名称；展开详情可查看每条规格、数量与金额。支持「加入购物车」或「同配置下单」快速复购。"
-        />
-
         <Spin spinning={isLoading}>
-          {isMobile ? (
+          {!isMobile && (
+            <div style={{ marginBottom: 12 }}>
+              <Segmented
+                value={desktopOrderView}
+                onChange={(v) => setDesktopOrderView(v as 'cards' | 'table')}
+                options={[
+                  { label: '卡片', value: 'cards' },
+                  { label: '表格', value: 'table' },
+                ]}
+              />
+            </div>
+          )}
+          {isMobile || desktopOrderView === 'cards' ? (
             <List
               dataSource={filteredOrders}
               locale={{ emptyText: <Empty description="暂无订单" /> }}
@@ -471,6 +476,26 @@ export const OrderListPage: React.FC = () => {
                                 再下一单
                               </Button>
                             </>
+                          )}
+                          {order.status === 'paid' && (
+                            <Button
+                              type="link"
+                              size="small"
+                              icon={<FundOutlined />}
+                              onClick={() => openRefundModal(order)}
+                            >
+                              退款
+                            </Button>
+                          )}
+                          {order.group_id && (
+                            <Button
+                              type="link"
+                              size="small"
+                              icon={<TeamOutlined />}
+                              onClick={() => navigate(`/groups/${order.group_id}`)}
+                            >
+                              拼团详情
+                            </Button>
                           )}
                         </Space>
                       </Space>
