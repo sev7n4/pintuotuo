@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -80,7 +79,7 @@ func AnthropicMessages(c *gin.Context) {
 	}
 
 	stream := false
-	if s, ok := raw["stream"].(bool); ok {
+	if s, streamOk := raw["stream"].(bool); streamOk {
 		stream = s
 	}
 
@@ -193,86 +192,6 @@ func anthropicJSONNumberToInt(v interface{}) (int, bool) {
 	default:
 		return 0, false
 	}
-}
-
-func anthropicToChatMessages(system json.RawMessage, messagesJSON json.RawMessage) ([]ChatMessage, error) {
-	var out []ChatMessage
-	if len(system) > 0 {
-		s, err := anthropicContentToString(system)
-		if err != nil {
-			return nil, fmt.Errorf("invalid system: %w", err)
-		}
-		if strings.TrimSpace(s) != "" {
-			out = append(out, ChatMessage{Role: "system", Content: s})
-		}
-	}
-	var rawMsgs []json.RawMessage
-	if err := json.Unmarshal(messagesJSON, &rawMsgs); err != nil {
-		return nil, fmt.Errorf("messages must be an array")
-	}
-	for _, rm := range rawMsgs {
-		var wrap map[string]json.RawMessage
-		if err := json.Unmarshal(rm, &wrap); err != nil {
-			return nil, fmt.Errorf("invalid message object")
-		}
-		roleBytes, ok := wrap["role"]
-		if !ok {
-			return nil, fmt.Errorf("each message must have role")
-		}
-		var role string
-		if err := json.Unmarshal(roleBytes, &role); err != nil {
-			return nil, fmt.Errorf("invalid message role")
-		}
-		role = strings.TrimSpace(strings.ToLower(role))
-		if role != "user" && role != "assistant" {
-			return nil, fmt.Errorf("unsupported message role %q (only user, assistant)", role)
-		}
-		contentRaw, ok := wrap["content"]
-		if !ok {
-			return nil, fmt.Errorf("each message must have content")
-		}
-		text, err := anthropicContentToString(contentRaw)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, ChatMessage{Role: role, Content: text})
-	}
-	return out, nil
-}
-
-func anthropicContentToString(raw json.RawMessage) (string, error) {
-	raw = bytesTrimSpaceJSON(raw)
-	if len(raw) == 0 {
-		return "", nil
-	}
-	if raw[0] == '"' {
-		var s string
-		if err := json.Unmarshal(raw, &s); err != nil {
-			return "", fmt.Errorf("invalid string content")
-		}
-		return s, nil
-	}
-	if raw[0] == '[' {
-		var blocks []map[string]interface{}
-		if err := json.Unmarshal(raw, &blocks); err != nil {
-			return "", fmt.Errorf("invalid content blocks")
-		}
-		var b strings.Builder
-		for _, blk := range blocks {
-			t, _ := blk["type"].(string)
-			if t == "text" {
-				if tx, ok := blk["text"].(string); ok {
-					b.WriteString(tx)
-				}
-			}
-		}
-		return b.String(), nil
-	}
-	return "", fmt.Errorf("unsupported content shape")
-}
-
-func bytesTrimSpaceJSON(b []byte) []byte {
-	return []byte(strings.TrimSpace(string(b)))
 }
 
 func openAICompletionToAnthropicMessage(body []byte, clientModel string) (map[string]interface{}, error) {
