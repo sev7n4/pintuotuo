@@ -38,7 +38,7 @@ docker exec pintuotuo-backend /app/capability-probe -out /tmp/capability-probe-l
 
 本地：`make capability-probe`（`CAPABILITY_PROBE_FLAGS='-out /tmp/c.csv -provider openai -limit 5'`）。
 
-**GitHub Actions**：合并 `deploy-tencent.yml` 后，每次生产部署结束会**非致命**跑一次默认（无 `-billable`）探测，并在日志中 `tail` CSV 片段。
+**GitHub Actions**：默认 **不再** 在 `deploy-tencent.yml` 末尾跑重 probe（避免阻塞部署）。需要全量/重探测时，在 Actions 中手动运行 **Capability probe (Tencent production)**（`.github/workflows/capability-probe-tencent.yml`，`workflow_dispatch`，可选 `-limit` / `-skip-embeddings`），或在部署机 `docker exec`（见上文示例）。
 
 探测输出勿提交仓库；`.gitignore`：`documentation/capability/capability-probe-output*.csv`。
 

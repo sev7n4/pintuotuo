@@ -1,0 +1,57 @@
+# 生产环境 Phase0 全量/重 capability-probe：已从默认 deploy 中移出，按需手动触发，避免阻塞每次合并部署。
+name: Capability probe (Tencent production)
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: Max BYOK rows (-limit), digits only
+        required: false
+        default: '50'
+      skip_embeddings:
+        description: Pass -skip-embeddings (fewer upstream POSTs)
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Run capability-probe on Tencent
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: SSH and run /app/capability-probe
+        run: |
+          set -euo pipefail
+          LIMIT='${{ inputs.limit }}'
+          case "$LIMIT" in ''|*[!0-9]*) LIMIT=50 ;; esac
+          SKIP_FLAG=""
+          if [ "${{ inputs.skip_embeddings }}" = "true" ]; then
+            SKIP_FLAG="-skip-embeddings"
+          fi
+          mkdir -p ~/.ssh
+          echo "${{ secrets.TENCENT_CLOUD_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=120 \
+            -o TCPKeepAlive=yes \
+            -i ~/.ssh/deploy_key ${{ secrets.TENCENT_CLOUD_USER }}@${{ secrets.TENCENT_CLOUD_IP }} << EOF
+          set -e
+          cd ${{ secrets.TENCENT_CLOUD_PROJECT_DIR }}
+          if ! docker exec pintuotuo-backend test -x /app/capability-probe 2>/dev/null; then
+            echo "ERROR: /app/capability-probe not found in pintuotuo-backend" >&2
+            exit 1
+          fi
+          echo "Running capability-probe with -limit ${LIMIT} ${SKIP_FLAG}"
+          docker exec pintuotuo-backend /app/capability-probe -out /tmp/capability-probe-latest.csv -limit ${LIMIT} ${SKIP_FLAG} \
+            > /tmp/capability-probe-exec.log 2>&1 || true
+          tail -n 80 /tmp/capability-probe-exec.log || true
+          docker exec pintuotuo-backend tail -n 40 /tmp/capability-probe-latest.csv 2>/dev/null || true
+          echo "capability-probe finished (non-fatal if probe exited non-zero)"
+          EOF
+          rm -f ~/.ssh/deploy_key
