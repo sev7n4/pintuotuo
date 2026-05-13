@@ -63,6 +63,14 @@ function buildCapabilityProbeCLI(keyID: number): string {
   ].join('\n');
 }
 
+/** Admin 各处理模型列表时的统一说明（与后端 probe-models / FullVerification 一致） */
+const BYOK_PROBE_MODELS_DESCRIPTION =
+  '与轻量验证、能力探测、深度验证模型选择同源：GET /admin/byok-routing/:id/probe-models（OpenAI 兼容模型目录），不合并 models_supported 或验证记录内快照。';
+
+/** 验证结果里「使用端点」与模型目录 probe 路径的区别说明 */
+const BYOK_ENDPOINT_USED_NOTE =
+  '为本次验证连接/配额阶段记录的实际请求端点；与上栏「发现的模型」所用 probe-models 解析路径可能不同（例如 LiteLLM 流量走网关、模型目录走已配置的直连 upstream）。';
+
 const byokTypeTag = (byokType: string) => {
   const colorMap: Record<string, string> = {
     official: 'blue',
@@ -210,11 +218,18 @@ const AdminByokRouting = () => {
   const [verificationModalVisible, setVerificationModalVisible] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verificationContextKeyId, setVerificationContextKeyId] = useState<number | null>(null);
+  const [verificationProbeModels, setVerificationProbeModels] = useState<string[] | null>(null);
+  const [verificationProbeModelsLoading, setVerificationProbeModelsLoading] = useState(false);
+  const [verificationProbeModelsError, setVerificationProbeModelsError] = useState<string | undefined>(
+    undefined
+  );
 
   const [probeModelModalVisible, setProbeModelModalVisible] = useState(false);
   const [probeModelTarget, setProbeModelTarget] = useState<BYOKRoutingItem | null>(null);
   const [selectedProbeModel, setSelectedProbeModel] = useState<string | undefined>(undefined);
-  const [cachedModels, setCachedModels] = useState<Map<number, string[]>>(new Map());
+  const [probeModalModels, setProbeModalModels] = useState<string[]>([]);
+  const [probeModalModelsLoading, setProbeModalModelsLoading] = useState(false);
 
   const [capabilityModalVisible, setCapabilityModalVisible] = useState(false);
   const [capabilityTarget, setCapabilityTarget] = useState<BYOKRoutingItem | null>(null);
@@ -271,13 +286,14 @@ const AdminByokRouting = () => {
     fetchData();
   }, [fetchData]);
 
+  /** 与后端 GET .../probe-models（同轻量验证模型目录请求）一致，不合并列表缓存或 models_supported */
   const capabilityModelOptions = useMemo(() => {
     if (!capabilityTarget) return [];
-    const fromCache = cachedModels.get(capabilityTarget.id) || [];
-    const fromRow = capabilityTarget.models_supported || [];
-    const merged = [...new Set([...capabilityFetchedModels, ...fromCache, ...fromRow])];
-    return merged.map((m) => ({ label: m, value: m }));
-  }, [capabilityFetchedModels, capabilityTarget, cachedModels]);
+    const uniq = [...new Set(capabilityFetchedModels.filter((m) => Boolean(m && String(m).trim())))].sort(
+      (a, b) => a.localeCompare(b)
+    );
+    return uniq.map((m) => ({ label: m, value: m }));
+  }, [capabilityFetchedModels, capabilityTarget]);
 
   useEffect(() => {
     if (!capabilityModalVisible || !capabilityTarget) {
@@ -308,6 +324,49 @@ const AdminByokRouting = () => {
       cancelled = true;
     };
   }, [capabilityModalVisible, capabilityTarget]);
+
+  useEffect(() => {
+    if (!verificationModalVisible || verificationContextKeyId == null || !verificationResult) {
+      return;
+    }
+    if (verificationResult.status === 'pending' || verificationResult.status === 'in_progress') {
+      setVerificationProbeModels(null);
+      setVerificationProbeModelsError(undefined);
+      setVerificationProbeModelsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setVerificationProbeModelsLoading(true);
+      setVerificationProbeModelsError(undefined);
+      try {
+        const res = await adminByokRoutingService.getProbeModels(verificationContextKeyId);
+        if (cancelled) return;
+        const raw = res.data.models || [];
+        const list = [...new Set(raw.filter((m) => Boolean(m && String(m).trim())))].sort((a, b) =>
+          a.localeCompare(b)
+        );
+        setVerificationProbeModels(list);
+        if (!res.data.success && (res.data.hint || res.data.error_message)) {
+          message.warning((res.data.hint || res.data.error_message) as string);
+        }
+      } catch {
+        if (!cancelled) {
+          setVerificationProbeModels([]);
+          setVerificationProbeModelsError(
+            '拉取 probe-models 失败，无法展示与能力探测一致的模型列表'
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setVerificationProbeModelsLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [verificationModalVisible, verificationContextKeyId, verificationResult]);
 
   const providerOptions = useMemo(() => {
     const providers = new Set(data.map((item) => item.provider));
@@ -451,6 +510,9 @@ const AdminByokRouting = () => {
   };
 
   const handleLightVerify = async (record: BYOKRoutingItem) => {
+    setVerificationContextKeyId(record.id);
+    setVerificationProbeModels(null);
+    setVerificationProbeModelsError(undefined);
     setVerificationModalVisible(true);
     setVerificationLoading(true);
     setVerificationResult(null);
@@ -466,6 +528,9 @@ const AdminByokRouting = () => {
   };
 
   const handleDeepVerify = async (record: BYOKRoutingItem, probeModel?: string) => {
+    setVerificationContextKeyId(record.id);
+    setVerificationProbeModels(null);
+    setVerificationProbeModelsError(undefined);
     setVerificationModalVisible(true);
     setVerificationLoading(true);
     setVerificationResult(null);
@@ -480,11 +545,31 @@ const AdminByokRouting = () => {
     }
   };
 
+  const fetchProbeModelsForModal = async (record: BYOKRoutingItem) => {
+    setProbeModalModelsLoading(true);
+    try {
+      const res = await adminByokRoutingService.getProbeModels(record.id);
+      const list = res.data.models || [];
+      setProbeModalModels(list);
+      setSelectedProbeModel(list.length > 0 ? list[0] : undefined);
+      if (!res.data.success && (res.data.hint || res.data.error_message)) {
+        message.warning((res.data.hint || res.data.error_message) as string);
+      }
+    } catch {
+      message.error('拉取模型列表失败');
+      setProbeModalModels([]);
+      setSelectedProbeModel(undefined);
+    } finally {
+      setProbeModalModelsLoading(false);
+    }
+  };
+
   const openProbeModelSelector = (record: BYOKRoutingItem) => {
     setProbeModelTarget(record);
-    const existing = cachedModels.get(record.id) || record.models_supported || [];
-    setSelectedProbeModel(existing.length > 0 ? existing[0] : undefined);
+    setProbeModalModels([]);
+    setSelectedProbeModel(undefined);
     setProbeModelModalVisible(true);
+    void fetchProbeModelsForModal(record);
   };
 
   const confirmProbeModel = () => {
@@ -585,14 +670,6 @@ const AdminByokRouting = () => {
 
         if (latest) {
           setVerificationResult(latest);
-
-          if (latest.models_found && latest.models_found.length > 0) {
-            setCachedModels((prev) => {
-              const next = new Map(prev);
-              next.set(id, latest.models_found!);
-              return next;
-            });
-          }
 
           if (latest.status === 'pending' || latest.status === 'in_progress') {
             attempts++;
@@ -1285,8 +1362,14 @@ const AdminByokRouting = () => {
               )}
             </Space>
             <Divider orientation="left" plain style={{ margin: '8px 0 12px' }}>
-              各端点模型（可选；选项来自 /v1/models 与已缓存列表）
+              各端点模型
             </Divider>
+            <Text
+              type="secondary"
+              style={{ display: 'block', marginBottom: 12, fontSize: 12, lineHeight: 1.6 }}
+            >
+              {BYOK_PROBE_MODELS_DESCRIPTION}
+            </Text>
             <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }} size="middle">
               <div>
                 <div style={{ marginBottom: 4, fontSize: 12, color: 'rgba(0,0,0,0.55)' }}>
@@ -1302,7 +1385,7 @@ const AdminByokRouting = () => {
                   options={capabilityModelOptions}
                   disabled={capabilityLoading}
                   notFoundContent={
-                    capabilityProbeModelsLoading ? '加载中…' : '暂无列表，可完成深度验证后重试'
+                    capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
                   }
                 />
               </div>
@@ -1319,7 +1402,9 @@ const AdminByokRouting = () => {
                   onChange={(v) => setCapabilityModerationModel(v)}
                   options={capabilityModelOptions}
                   disabled={capabilityLoading}
-                  notFoundContent={capabilityProbeModelsLoading ? '加载中…' : '暂无列表'}
+                  notFoundContent={
+                    capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
+                  }
                 />
               </div>
               <div>
@@ -1335,7 +1420,9 @@ const AdminByokRouting = () => {
                   onChange={(v) => setCapabilityResponsesModel(v)}
                   options={capabilityModelOptions}
                   disabled={capabilityLoading}
-                  notFoundContent={capabilityProbeModelsLoading ? '加载中…' : '暂无列表'}
+                  notFoundContent={
+                    capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
+                  }
                 />
               </div>
               {capabilityBillable && (
@@ -1352,7 +1439,9 @@ const AdminByokRouting = () => {
                     onChange={(v) => setCapabilityChatModel(v)}
                     options={capabilityModelOptions}
                     disabled={capabilityLoading}
-                    notFoundContent={capabilityProbeModelsLoading ? '加载中…' : '暂无列表'}
+                    notFoundContent={
+                      capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
+                    }
                   />
                 </div>
               )}
@@ -1385,7 +1474,12 @@ const AdminByokRouting = () => {
       <Modal
         title="深度验证 - 探测模型选择"
         open={probeModelModalVisible}
-        onCancel={() => setProbeModelModalVisible(false)}
+        onCancel={() => {
+          setProbeModelModalVisible(false);
+          setProbeModelTarget(null);
+          setProbeModalModels([]);
+          setSelectedProbeModel(undefined);
+        }}
         onOk={confirmProbeModel}
         width={480}
         okText="开始深度验证"
@@ -1399,26 +1493,37 @@ const AdminByokRouting = () => {
         ]}
       >
         <div style={{ marginBottom: 16 }}>
-          <p style={{ marginBottom: 8, color: 'rgba(0,0,0,0.65)' }}>
-            选择用于配额探测的模型，不选择将使用默认模型。
-          </p>
-          <Select
-            style={{ width: '100%' }}
-            placeholder="选择探测模型（可选）"
-            allowClear
-            showSearch
-            value={selectedProbeModel}
-            onChange={(val) => setSelectedProbeModel(val)}
-            options={(
-              cachedModels.get(probeModelTarget?.id || 0) ||
-              probeModelTarget?.models_supported ||
-              []
-            ).map((m) => ({
-              label: m,
-              value: m,
-            }))}
-            notFoundContent="暂无模型列表，将使用默认模型"
-          />
+          <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12, lineHeight: 1.6 }}>
+            {BYOK_PROBE_MODELS_DESCRIPTION}
+          </Text>
+          <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
+            <Select
+              style={{ width: '100%' }}
+              placeholder={probeModalModelsLoading ? '正在拉取模型列表…' : '选择探测模型（可选）'}
+              allowClear
+              showSearch
+              loading={probeModalModelsLoading}
+              value={selectedProbeModel}
+              onChange={(val) => setSelectedProbeModel(val)}
+              options={probeModalModels.map((m) => ({ label: m, value: m }))}
+              notFoundContent={
+                probeModalModelsLoading ? '加载中…' : '暂无，可点击右侧刷新或检查上游'
+              }
+            />
+            <Button
+              type="default"
+              icon={<SyncOutlined spin={probeModalModelsLoading} />}
+              disabled={!probeModelTarget || probeModalModelsLoading}
+              onClick={() => {
+                if (probeModelTarget) void fetchProbeModelsForModal(probeModelTarget);
+              }}
+            >
+              刷新
+            </Button>
+          </Space.Compact>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            不选择将使用默认模型发起深度验证。
+          </Text>
         </div>
       </Modal>
 
@@ -1428,6 +1533,10 @@ const AdminByokRouting = () => {
         onCancel={() => {
           setVerificationModalVisible(false);
           setVerificationResult(null);
+          setVerificationContextKeyId(null);
+          setVerificationProbeModels(null);
+          setVerificationProbeModelsError(undefined);
+          setVerificationProbeModelsLoading(false);
         }}
         footer={null}
         width={600}
@@ -1475,21 +1584,49 @@ const AdminByokRouting = () => {
 
             {verificationResult.endpoint_used && (
               <Descriptions.Item label="使用端点">
+                <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}>
+                  {BYOK_ENDPOINT_USED_NOTE}
+                </Text>
                 <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>
                   {verificationResult.endpoint_used}
                 </span>
               </Descriptions.Item>
             )}
 
-            {verificationResult.models_found && verificationResult.models_found.length > 0 && (
-              <Descriptions.Item label="支持的模型">
-                <Space wrap>
-                  {verificationResult.models_found.map((model) => (
-                    <Tag key={model}>{model}</Tag>
-                  ))}
-                </Space>
-              </Descriptions.Item>
-            )}
+            <Descriptions.Item label="发现的模型">
+              <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}>
+                {BYOK_PROBE_MODELS_DESCRIPTION}
+                {verificationResult.status === 'pending' || verificationResult.status === 'in_progress'
+                  ? ' 验证结束后将自动拉取并展示。'
+                  : ''}
+              </Text>
+              {verificationProbeModelsLoading && (
+                <div style={{ padding: '8px 0' }}>
+                  <Spin size="small" /> <Text type="secondary">正在拉取 probe-models…</Text>
+                </div>
+              )}
+              {verificationProbeModelsError && (
+                <Text type="danger" style={{ display: 'block', marginBottom: 8 }}>
+                  {verificationProbeModelsError}
+                </Text>
+              )}
+              {!verificationProbeModelsLoading &&
+                verificationProbeModels !== null &&
+                verificationResult.status !== 'pending' &&
+                verificationResult.status !== 'in_progress' && (
+                  <>
+                    {verificationProbeModels.length > 0 ? (
+                      <Space wrap>
+                        {verificationProbeModels.map((model) => (
+                          <Tag key={model}>{model}</Tag>
+                        ))}
+                      </Space>
+                    ) : (
+                      <Text type="secondary">未从上游返回模型 ID（可关闭后使用能力探测「刷新 /v1/models」重试）</Text>
+                    )}
+                  </>
+                )}
+            </Descriptions.Item>
 
             <Descriptions.Item label="定价验证">
               {verificationResult.pricing_verified ? (

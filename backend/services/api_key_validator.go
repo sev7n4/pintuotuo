@@ -18,6 +18,7 @@ import (
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/logger"
 	"github.com/pintuotuo/backend/metrics"
+	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/utils"
 	"github.com/redis/go-redis/v9"
 )
@@ -793,23 +794,33 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 
 	authToken := v.resolveAuthToken(routeMode, decryptedKey)
 
-	modelsEndpoint := endpoint
-	if routeMode == GatewayModeLitellm {
-		upstreamEndpoint, upstreamErr := v.resolveDirectEndpoint(ctx, provider, routeConfig, region)
-		if upstreamErr == nil && upstreamEndpoint != "" {
-			modelsEndpoint = upstreamEndpoint
-		}
+	var endpointURLCol, fallbackEndpointURLCol string
+	if db := v.ensureDB(); db != nil {
+		_ = db.QueryRowContext(ctx, `
+			SELECT COALESCE(NULLIF(TRIM(endpoint_url), ''), ''),
+			       COALESCE(NULLIF(TRIM(fallback_endpoint_url), ''), '')
+			FROM merchant_api_keys WHERE id = $1`,
+			apiKeyID,
+		).Scan(&endpointURLCol, &fallbackEndpointURLCol)
+	}
+	synthKey := &models.MerchantAPIKey{
+		ID:                  apiKeyID,
+		Provider:            provider,
+		APIKeyEncrypted:     encryptedKey,
+		RouteMode:           routeMode,
+		RouteConfig:         routeConfig,
+		Region:              region,
+		EndpointURL:         endpointURLCol,
+		FallbackEndpointURL: fallbackEndpointURLCol,
+	}
+	hc := NewHealthChecker()
+	modelsURL, modelsAuthToken, probeRouteMode, modelsResolveErr := hc.ResolveOpenAICompatModelsListProbe(ctx, synthKey)
+	if modelsResolveErr != nil {
+		v.handleVerificationError(ctx, verificationID, apiKeyID, "ENDPOINT_RESOLVE_FAILED", modelsResolveErr.Error(), startTime)
+		return
 	}
 
-	baseURL := strings.TrimRight(modelsEndpoint, "/")
-	modelsURL := baseURL + "/models"
-
-	modelsAuthToken := decryptedKey
-	if routeMode == GatewayModeLitellm {
-		modelsAuthToken = decryptedKey
-	}
-
-	probeClient := newProxyAwareHTTPClient(10*time.Second, routeMode)
+	probeClient := newProxyAwareHTTPClient(10*time.Second, probeRouteMode)
 
 	var probe *ProbeModelsResult
 	var probeErr error
