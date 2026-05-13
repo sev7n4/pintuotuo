@@ -137,7 +137,31 @@ export interface CapabilityProbeRow {
   note: string;
 }
 
-const runCapabilityProbe = async (id: number, body?: { skip_embeddings?: boolean }) => {
+export interface ProbeModelsResponse {
+  models: string[];
+  api_format: string;
+  success: boolean;
+  hint?: string;
+  error_message?: string;
+  endpoint_used?: string;
+}
+
+const getProbeModels = async (id: number) => {
+  return api.get<ProbeModelsResponse>(`/admin/byok-routing/${id}/probe-models`, {
+    timeout: 120000,
+  });
+};
+
+export interface CapabilityProbeRequest {
+  skip_embeddings?: boolean;
+  probes?: string[];
+  embedding_model?: string;
+  moderation_model?: string;
+  responses_model?: string;
+  chat_model?: string;
+}
+
+const runCapabilityProbe = async (id: number, body?: CapabilityProbeRequest) => {
   return api.post<{ rows: CapabilityProbeRow[] }>(
     `/admin/byok-routing/${id}/capability-probe`,
     body ?? {},
@@ -152,5 +176,6 @@ export const adminByokRoutingService = {
   triggerLightVerify,
   triggerDeepVerify,
   getVerificationDetails,
+  getProbeModels,
   runCapabilityProbe,
 };

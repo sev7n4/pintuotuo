@@ -14,6 +14,8 @@ import {
   Tooltip,
   Spin,
   Switch,
+  Checkbox,
+  Radio,
   Descriptions,
   Result,
   Divider,
@@ -36,6 +38,7 @@ import {
   UpdateRouteConfigRequest,
   VerificationResult,
   CapabilityProbeRow,
+  CapabilityProbeRequest,
 } from '@/services/adminByokRouting';
 import {
   getRouteModeLabel,
@@ -45,7 +48,7 @@ import {
 } from '@/utils/byokRouteMode';
 import styles from './AdminByokRouting.module.css';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 const byokTypeTag = (byokType: string) => {
   const colorMap: Record<string, string> = {
@@ -205,6 +208,20 @@ const AdminByokRouting = () => {
   const [capabilityRows, setCapabilityRows] = useState<CapabilityProbeRow[]>([]);
   const [capabilityLoading, setCapabilityLoading] = useState(false);
   const [capabilitySkipEmbeddings, setCapabilitySkipEmbeddings] = useState(false);
+  const [capabilityEndpointPickMode, setCapabilityEndpointPickMode] = useState<
+    'single' | 'multiple'
+  >('multiple');
+  const [capabilitySingleProbeId, setCapabilitySingleProbeId] = useState<string>('embeddings');
+  const [capabilityProbeIds, setCapabilityProbeIds] = useState<string[]>([
+    'embeddings',
+    'moderations',
+    'responses',
+  ]);
+  const [capabilityEmbeddingModel, setCapabilityEmbeddingModel] = useState<string | undefined>();
+  const [capabilityModerationModel, setCapabilityModerationModel] = useState<string | undefined>();
+  const [capabilityResponsesModel, setCapabilityResponsesModel] = useState<string | undefined>();
+  const [capabilityFetchedModels, setCapabilityFetchedModels] = useState<string[]>([]);
+  const [capabilityProbeModelsLoading, setCapabilityProbeModelsLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -238,6 +255,44 @@ const AdminByokRouting = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const capabilityModelOptions = useMemo(() => {
+    if (!capabilityTarget) return [];
+    const fromCache = cachedModels.get(capabilityTarget.id) || [];
+    const fromRow = capabilityTarget.models_supported || [];
+    const merged = [...new Set([...capabilityFetchedModels, ...fromCache, ...fromRow])];
+    return merged.map((m) => ({ label: m, value: m }));
+  }, [capabilityFetchedModels, capabilityTarget, cachedModels]);
+
+  useEffect(() => {
+    if (!capabilityModalVisible || !capabilityTarget) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setCapabilityProbeModelsLoading(true);
+      try {
+        const res = await adminByokRoutingService.getProbeModels(capabilityTarget.id);
+        if (cancelled) return;
+        setCapabilityFetchedModels(res.data.models || []);
+        if (!res.data.success && (res.data.hint || res.data.error_message)) {
+          message.warning((res.data.hint || res.data.error_message) as string);
+        }
+      } catch {
+        if (!cancelled) {
+          message.error('拉取 /v1/models 模型列表失败');
+          setCapabilityFetchedModels([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setCapabilityProbeModelsLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [capabilityModalVisible, capabilityTarget]);
 
   const providerOptions = useMemo(() => {
     const providers = new Set(data.map((item) => item.provider));
@@ -433,18 +488,44 @@ const AdminByokRouting = () => {
 
   const openCapabilityModal = (record: BYOKRoutingItem) => {
     setCapabilityTarget(record);
+    setCapabilityEndpointPickMode('multiple');
+    setCapabilitySingleProbeId('embeddings');
     setCapabilitySkipEmbeddings(false);
+    setCapabilityProbeIds(['embeddings', 'moderations', 'responses']);
+    setCapabilityEmbeddingModel(undefined);
+    setCapabilityModerationModel(undefined);
+    setCapabilityResponsesModel(undefined);
+    setCapabilityFetchedModels([]);
     setCapabilityRows([]);
     setCapabilityModalVisible(true);
   };
 
   const runCapabilityFromModal = async () => {
     if (!capabilityTarget) return;
+    const probesForRequest =
+      capabilityEndpointPickMode === 'single' ? [capabilitySingleProbeId] : capabilityProbeIds;
+    if (probesForRequest.length === 0) {
+      message.warning('请至少选择一个非 chat 端点');
+      return;
+    }
+    if (
+      capabilityEndpointPickMode === 'single' &&
+      capabilitySkipEmbeddings &&
+      capabilitySingleProbeId === 'embeddings'
+    ) {
+      message.warning('已开启「跳过 embeddings」，请改选 moderations 或 responses');
+      return;
+    }
     setCapabilityLoading(true);
     try {
-      const res = await adminByokRoutingService.runCapabilityProbe(capabilityTarget.id, {
+      const body: CapabilityProbeRequest = {
         skip_embeddings: capabilitySkipEmbeddings,
-      });
+        probes: probesForRequest,
+      };
+      if (capabilityEmbeddingModel) body.embedding_model = capabilityEmbeddingModel;
+      if (capabilityModerationModel) body.moderation_model = capabilityModerationModel;
+      if (capabilityResponsesModel) body.responses_model = capabilityResponsesModel;
+      const res = await adminByokRoutingService.runCapabilityProbe(capabilityTarget.id, body);
       setCapabilityRows(res.data.rows || []);
       message.success('能力探测完成（非 chat 矩阵）');
     } catch {
@@ -992,6 +1073,7 @@ const AdminByokRouting = () => {
           setCapabilityModalVisible(false);
           setCapabilityTarget(null);
           setCapabilityRows([]);
+          setCapabilityFetchedModels([]);
         }}
         footer={null}
         width={920}
@@ -1003,18 +1085,132 @@ const AdminByokRouting = () => {
               商户：{capabilityTarget.company_name} · Key：{capabilityTarget.name}（
               {capabilityTarget.provider.toUpperCase()}）
             </p>
+            <Divider orientation="left" plain style={{ margin: '8px 0 12px' }}>
+              探测端点
+            </Divider>
+            <Text
+              type="secondary"
+              style={{ display: 'block', marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}
+            >
+              严格来说「非
+              chat」还包含图生（images_*）、语音（audio_*）等；本后台探测固定为不计费模式，只会对下面三项发起真实
+              POST。图/音在结果表里会始终为 skipped（billable_disabled）。完整含计费矩阵请用仓库内
+              capability-probe CLI 的 -billable。每次探测仍会先跑 get_models（列表里第一行）。
+            </Text>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
+              完整对照表（Admin / CLI / 图音等）：{' '}
+              <a
+                href="https://github.com/sev7n4/pintuotuo/blob/main/documentation/capability/endpoint-coverage-matrix.md"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                endpoint-coverage-matrix.md
+              </a>
+            </Text>
+            <Space direction="vertical" size="middle" style={{ marginBottom: 12 }}>
+              <div>
+                <span style={{ marginRight: 12, color: 'rgba(0,0,0,0.65)' }}>选择方式</span>
+                <Radio.Group
+                  optionType="button"
+                  buttonStyle="solid"
+                  value={capabilityEndpointPickMode}
+                  onChange={(e) => {
+                    const mode = e.target.value as 'single' | 'multiple';
+                    setCapabilityEndpointPickMode(mode);
+                    if (mode === 'single') {
+                      const valid = capabilityProbeIds.filter(
+                        (p) => !(capabilitySkipEmbeddings && p === 'embeddings')
+                      );
+                      const next = valid[0] || 'moderations';
+                      setCapabilitySingleProbeId(next);
+                    } else {
+                      const cur = capabilitySingleProbeId;
+                      const all = ['embeddings', 'moderations', 'responses'].filter(
+                        (p) => !(capabilitySkipEmbeddings && p === 'embeddings')
+                      );
+                      setCapabilityProbeIds((prev) => {
+                        const merged = new Set<string>(prev.length > 0 ? prev : all);
+                        merged.add(cur);
+                        return Array.from(merged).filter(
+                          (p) => !(capabilitySkipEmbeddings && p === 'embeddings')
+                        );
+                      });
+                    }
+                  }}
+                  disabled={capabilityLoading}
+                >
+                  <Radio.Button value="single">单选</Radio.Button>
+                  <Radio.Button value="multiple">多选</Radio.Button>
+                </Radio.Group>
+              </div>
+              {capabilityEndpointPickMode === 'single' ? (
+                <Radio.Group
+                  value={capabilitySingleProbeId}
+                  onChange={(e) => setCapabilitySingleProbeId(e.target.value)}
+                  disabled={capabilityLoading}
+                >
+                  <Radio value="embeddings" disabled={capabilitySkipEmbeddings}>
+                    embeddings
+                  </Radio>
+                  <Radio value="moderations">moderations</Radio>
+                  <Radio value="responses">responses</Radio>
+                </Radio.Group>
+              ) : (
+                <Checkbox.Group
+                  value={capabilityProbeIds}
+                  onChange={(v) => setCapabilityProbeIds(v as string[])}
+                  disabled={capabilityLoading}
+                  options={[
+                    {
+                      label: 'embeddings',
+                      value: 'embeddings',
+                      disabled: capabilitySkipEmbeddings,
+                    },
+                    { label: 'moderations', value: 'moderations' },
+                    { label: 'responses', value: 'responses' },
+                  ]}
+                />
+              )}
+            </Space>
             <Space wrap style={{ marginBottom: 16 }}>
               <span>跳过 embeddings POST</span>
               <Switch
                 checked={capabilitySkipEmbeddings}
-                onChange={setCapabilitySkipEmbeddings}
+                onChange={(checked) => {
+                  setCapabilitySkipEmbeddings(checked);
+                  if (checked) {
+                    setCapabilityProbeIds((prev) => prev.filter((p) => p !== 'embeddings'));
+                    setCapabilitySingleProbeId((cur) =>
+                      cur === 'embeddings' ? 'moderations' : cur
+                    );
+                  }
+                }}
                 disabled={capabilityLoading}
               />
               <Button
-                type="primary"
-                onClick={runCapabilityFromModal}
-                loading={capabilityLoading}
+                type="default"
+                onClick={() => {
+                  if (!capabilityTarget) return;
+                  setCapabilityProbeModelsLoading(true);
+                  adminByokRoutingService
+                    .getProbeModels(capabilityTarget.id)
+                    .then((res) => {
+                      setCapabilityFetchedModels(res.data.models || []);
+                      if (!res.data.success && (res.data.hint || res.data.error_message)) {
+                        message.warning((res.data.hint || res.data.error_message) as string);
+                      } else {
+                        message.success('已刷新模型列表');
+                      }
+                    })
+                    .catch(() => message.error('刷新失败'))
+                    .finally(() => setCapabilityProbeModelsLoading(false));
+                }}
+                loading={capabilityProbeModelsLoading}
+                disabled={capabilityLoading}
               >
+                刷新 /v1/models
+              </Button>
+              <Button type="primary" onClick={runCapabilityFromModal} loading={capabilityLoading}>
                 开始探测
               </Button>
               {capabilityRows.length > 0 && (
@@ -1027,6 +1223,61 @@ const AdminByokRouting = () => {
                   清空结果
                 </Button>
               )}
+            </Space>
+            <Divider orientation="left" plain style={{ margin: '8px 0 12px' }}>
+              各端点模型（可选，不选则使用服务端默认；选项来自 /v1/models 与已缓存列表）
+            </Divider>
+            <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }} size="middle">
+              <div>
+                <div style={{ marginBottom: 4, fontSize: 12, color: 'rgba(0,0,0,0.55)' }}>
+                  Embeddings
+                </div>
+                <Select
+                  style={{ width: '100%', maxWidth: 480 }}
+                  placeholder="默认 text-embedding-3-small"
+                  allowClear
+                  showSearch
+                  value={capabilityEmbeddingModel}
+                  onChange={(v) => setCapabilityEmbeddingModel(v)}
+                  options={capabilityModelOptions}
+                  disabled={capabilityLoading}
+                  notFoundContent={
+                    capabilityProbeModelsLoading ? '加载中…' : '暂无列表，可完成深度验证后重试'
+                  }
+                />
+              </div>
+              <div>
+                <div style={{ marginBottom: 4, fontSize: 12, color: 'rgba(0,0,0,0.55)' }}>
+                  Moderations
+                </div>
+                <Select
+                  style={{ width: '100%', maxWidth: 480 }}
+                  placeholder="默认 omni-moderation-latest"
+                  allowClear
+                  showSearch
+                  value={capabilityModerationModel}
+                  onChange={(v) => setCapabilityModerationModel(v)}
+                  options={capabilityModelOptions}
+                  disabled={capabilityLoading}
+                  notFoundContent={capabilityProbeModelsLoading ? '加载中…' : '暂无列表'}
+                />
+              </div>
+              <div>
+                <div style={{ marginBottom: 4, fontSize: 12, color: 'rgba(0,0,0,0.55)' }}>
+                  Responses
+                </div>
+                <Select
+                  style={{ width: '100%', maxWidth: 480 }}
+                  placeholder="默认与 chat 探测一致（gpt-4o-mini）"
+                  allowClear
+                  showSearch
+                  value={capabilityResponsesModel}
+                  onChange={(v) => setCapabilityResponsesModel(v)}
+                  options={capabilityModelOptions}
+                  disabled={capabilityLoading}
+                  notFoundContent={capabilityProbeModelsLoading ? '加载中…' : '暂无列表'}
+                />
+              </div>
             </Space>
             {capabilityLoading && (
               <div style={{ textAlign: 'center', padding: 24 }}>

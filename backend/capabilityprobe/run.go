@@ -86,6 +86,22 @@ type AdminRunOptions struct {
 	SkipEmbeddings bool
 	HTTPTimeout    time.Duration
 	LongTimeout    time.Duration
+	// NonChatProbeIDs limits non-billable POST probes (embeddings / moderations / responses). Nil = all three (embeddings still obeys SkipEmbeddings).
+	NonChatProbeIDs []string
+	EmbeddingModel  string
+	ModerationModel string
+	ResponsesModel  string
+	ChatModel       string // used when ResponsesModel is empty for /v1/responses body.model
+}
+
+// AdminProbeKeyRow is one BYOK key row plus model_provider fields needed for capabilityprobe.
+type AdminProbeKeyRow struct {
+	Key                          *models.MerchantAPIKey
+	MPCode                       string
+	APIFormat                    string
+	MPAPIBase                    string
+	MPProviderRegion             string
+	MPEndpoints, MPRouteStrategy []byte
 }
 
 const adminCapabilityProbeQuery = `
@@ -111,15 +127,8 @@ WHERE mak.id = $1
   AND COALESCE(m.lifecycle_status, 'active') <> 'suspended'
 `
 
-// RunForAdminAPIKeyID loads one active key (no verified_at gate) and returns Phase0-style probe rows.
-func RunForAdminAPIKeyID(ctx context.Context, db *sql.DB, keyID int, opts AdminRunOptions) ([]Row, error) {
-	if opts.HTTPTimeout <= 0 {
-		opts.HTTPTimeout = 45 * time.Second
-	}
-	if opts.LongTimeout <= 0 {
-		opts.LongTimeout = 90 * time.Second
-	}
-
+// LoadAdminProbeKeyRow loads one active key (same eligibility as capability-probe admin path).
+func LoadAdminProbeKeyRow(ctx context.Context, db *sql.DB, keyID int) (*AdminProbeKeyRow, error) {
 	var (
 		key                          models.MerchantAPIKey
 		routeConfigBytes             []byte
@@ -134,29 +143,67 @@ func RunForAdminAPIKeyID(ctx context.Context, db *sql.DB, keyID int, opts AdminR
 		&mpCode, &apiFormat, &mpAPIBase, &mpProviderRegion,
 		&mpEndpoints, &mpRouteStrategy,
 	)
-	if err == sql.ErrNoRows {
-		return nil, sql.ErrNoRows
-	}
 	if err != nil {
 		return nil, err
 	}
 	if len(routeConfigBytes) > 0 {
 		_ = json.Unmarshal(routeConfigBytes, &key.RouteConfig)
 	}
+	return &AdminProbeKeyRow{
+		Key:              &key,
+		MPCode:           mpCode,
+		APIFormat:        apiFormat,
+		MPAPIBase:        mpAPIBase,
+		MPProviderRegion: mpProviderRegion,
+		MPEndpoints:      mpEndpoints,
+		MPRouteStrategy:  mpRouteStrategy,
+	}, nil
+}
+
+// RunForAdminAPIKeyID loads one active key (no verified_at gate) and returns Phase0-style probe rows.
+func RunForAdminAPIKeyID(ctx context.Context, db *sql.DB, keyID int, opts AdminRunOptions) ([]Row, error) {
+	if opts.HTTPTimeout <= 0 {
+		opts.HTTPTimeout = 45 * time.Second
+	}
+	if opts.LongTimeout <= 0 {
+		opts.LongTimeout = 90 * time.Second
+	}
+
+	row, err := LoadAdminProbeKeyRow(ctx, db, keyID)
+	if err != nil {
+		return nil, err
+	}
 
 	hc := services.NewHealthChecker()
 	client := &http.Client{Timeout: opts.HTTPTimeout}
 	longClient := &http.Client{Timeout: opts.LongTimeout}
 	ts := time.Now().UTC().Format(time.RFC3339)
+
+	emb := strings.TrimSpace(opts.EmbeddingModel)
+	if emb == "" {
+		emb = "text-embedding-3-small"
+	}
+	mod := strings.TrimSpace(opts.ModerationModel)
+	if mod == "" {
+		mod = "omni-moderation-latest"
+	}
+	chat := strings.TrimSpace(opts.ChatModel)
+	if chat == "" {
+		chat = "gpt-4o-mini"
+	}
+	resp := strings.TrimSpace(opts.ResponsesModel)
+
 	pf := ProbeFlags{
 		SkipEmbeddings:     opts.SkipEmbeddings,
 		Billable:           false,
-		EmbeddingModel:     "text-embedding-3-small",
-		ModerationModel:    "omni-moderation-latest",
-		ChatModel:          "gpt-4o-mini",
+		NonChatProbeIDs:    opts.NonChatProbeIDs,
+		EmbeddingModel:     emb,
+		ModerationModel:    mod,
+		ChatModel:          chat,
+		ResponsesModel:     resp,
 		ImageModel:         "dall-e-3",
 		SpeechModel:        "tts-1",
 		TranscriptionModel: "whisper-1",
 	}
-	return ProbeScannedKey(ctx, hc, client, longClient, ts, &key, apiFormat, mpCode, mpAPIBase, mpProviderRegion, mpEndpoints, mpRouteStrategy, pf), nil
+	return ProbeScannedKey(ctx, hc, client, longClient, ts, row.Key, row.APIFormat, row.MPCode, row.MPAPIBase, row.MPProviderRegion, row.MPEndpoints, row.MPRouteStrategy, pf), nil
 }

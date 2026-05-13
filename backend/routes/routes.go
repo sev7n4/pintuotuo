@@ -322,6 +322,7 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 		admin.POST("/byok-routing/:id/probe", handlers.TriggerBYOKProbe)
 		admin.POST("/byok-routing/:id/light-verify", handlers.LightVerifyBYOK)
 		admin.POST("/byok-routing/:id/deep-verify", handlers.DeepVerifyBYOK)
+		admin.GET("/byok-routing/:id/probe-models", handlers.GetAdminBYOKProbeModels)
 		admin.POST("/byok-routing/:id/capability-probe", handlers.RunBYOKCapabilityProbe)
 		admin.GET("/byok-routing/:id/verification", handlers.GetBYOKVerificationDetails)
 		admin.GET("/merchants", handlers.GetAdminMerchants)

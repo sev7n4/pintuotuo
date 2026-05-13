@@ -547,6 +547,83 @@ func DeepVerifyBYOK(c *gin.Context) {
 	})
 }
 
+// GetAdminBYOKProbeModels lists model IDs from the same upstream /v1/models path as FullVerification (for admin UI model pickers).
+func GetAdminBYOKProbeModels(c *gin.Context) {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != roleAdmin {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Admin access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return
+	}
+
+	keyIDStr := c.Param("id")
+	keyID, err := strconv.Atoi(keyIDStr)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	row, err := capabilityprobe.LoadAdminProbeKeyRow(c.Request.Context(), db, keyID)
+	if errors.Is(err, sql.ErrNoRows) {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"API key not found or not eligible for probe models",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	af := strings.ToLower(strings.TrimSpace(row.APIFormat))
+	if af != "openai" {
+		c.JSON(http.StatusOK, gin.H{
+			"models":     []string{},
+			"api_format": row.APIFormat,
+			"success":    false,
+			"hint":       "当前提供商的 api_format 非 openai，不进行 /v1/models 拉取；模型下拉可使用列表中的 models_supported 或手动输入。",
+		})
+		return
+	}
+
+	hc := services.NewHealthChecker()
+	full, ferr := hc.FullVerification(c.Request.Context(), row.Key)
+	out := gin.H{
+		"models":     []string{},
+		"api_format": row.APIFormat,
+		"success":    false,
+	}
+	if full != nil {
+		out["success"] = full.Success
+		if len(full.ModelsFound) > 0 {
+			out["models"] = full.ModelsFound
+		}
+		if strings.TrimSpace(full.ErrorMessage) != "" {
+			out["error_message"] = full.ErrorMessage
+		}
+		if strings.TrimSpace(full.EndpointUsed) != "" {
+			out["endpoint_used"] = full.EndpointUsed
+		}
+	}
+	if ferr != nil {
+		out["error_message"] = ferr.Error()
+	}
+	c.JSON(http.StatusOK, out)
+}
+
 // RunBYOKCapabilityProbe runs Phase0-style non-chat upstream probes for one key (sync; may take up to ~2–3 minutes).
 func RunBYOKCapabilityProbe(c *gin.Context) {
 	userRole, exists := c.Get("user_role")
@@ -574,12 +651,46 @@ func RunBYOKCapabilityProbe(c *gin.Context) {
 	}
 
 	var body struct {
-		SkipEmbeddings bool `json:"skip_embeddings"`
+		SkipEmbeddings  bool      `json:"skip_embeddings"`
+		Probes          *[]string `json:"probes"`
+		EmbeddingModel  string    `json:"embedding_model"`
+		ModerationModel string    `json:"moderation_model"`
+		ResponsesModel  string    `json:"responses_model"`
+		ChatModel       string    `json:"chat_model"`
 	}
 	_ = c.ShouldBindJSON(&body)
 
+	var nonChatIDs []string
+	if body.Probes != nil {
+		if len(*body.Probes) == 0 {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_REQUEST",
+				"probes 不能为空；省略 probes 字段表示探测全部非 chat 端点（embeddings / moderations / responses）",
+				http.StatusBadRequest,
+				nil,
+			))
+			return
+		}
+		var nerr error
+		nonChatIDs, nerr = capabilityprobe.NormalizeAdminNonChatProbes(*body.Probes, body.SkipEmbeddings)
+		if nerr != nil {
+			middleware.RespondWithError(c, apperrors.NewAppError(
+				"INVALID_REQUEST",
+				nerr.Error(),
+				http.StatusBadRequest,
+				nerr,
+			))
+			return
+		}
+	}
+
 	rows, err := capabilityprobe.RunForAdminAPIKeyID(c.Request.Context(), db, keyID, capabilityprobe.AdminRunOptions{
-		SkipEmbeddings: body.SkipEmbeddings,
+		SkipEmbeddings:  body.SkipEmbeddings,
+		NonChatProbeIDs: nonChatIDs,
+		EmbeddingModel:  body.EmbeddingModel,
+		ModerationModel: body.ModerationModel,
+		ResponsesModel:  body.ResponsesModel,
+		ChatModel:       body.ChatModel,
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		middleware.RespondWithError(c, apperrors.NewAppError(
