@@ -500,14 +500,13 @@ docker exec pintuotuo-backend wget -q -O - \
   "https://api.openai.com/v1/models" 2>&1 | head -5
 # 预期: 返回 401 JSON 或模型列表
 
-# 3. 通过 Backend API 测试（需要有效的海外 Provider API Key）
+# 3. 通过 Backend API 测试（需要有效的平台 API Key 或 JWT，且模型 id 与目录一致）
 # 先在管理后台配置 OpenAI Provider 和 BYOK Key，然后：
-curl -X POST http://127.0.0.1:8080/api/v1/proxy/chat \
+curl -X POST http://127.0.0.1:8080/api/v1/openai/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_USER_TOKEN" \
+  -H "Authorization: Bearer YOUR_PTD_KEY_OR_JWT" \
   -d '{
-    "provider": "openai",
-    "model": "gpt-4o",
+    "model": "openai/gpt-4o",
     "messages": [{"role": "user", "content": "Hello"}]
   }'
 ```

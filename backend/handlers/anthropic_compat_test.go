@@ -5,15 +5,15 @@ import (
 	"testing"
 )
 
-func TestAnthropicToChatMessages_StringContent(t *testing.T) {
-	sys := json.RawMessage(`"你是助手"`)
-	msgs := json.RawMessage(`[{"role":"user","content":"hi"}]`)
-	out, err := anthropicToChatMessages(sys, msgs)
-	if err != nil {
-		t.Fatal(err)
+func TestAnthropicJSONNumberToInt(t *testing.T) {
+	if n, ok := anthropicJSONNumberToInt(json.Number("42")); !ok || n != 42 {
+		t.Fatalf("json.Number: ok=%v n=%d", ok, n)
 	}
-	if len(out) != 2 || out[0].Role != "system" || out[1].Role != "user" {
-		t.Fatalf("got %+v", out)
+	if n, ok := anthropicJSONNumberToInt(float64(7)); !ok || n != 7 {
+		t.Fatalf("float64: ok=%v n=%d", ok, n)
+	}
+	if _, ok := anthropicJSONNumberToInt("x"); ok {
+		t.Fatal("expected false for string")
 	}
 }
 

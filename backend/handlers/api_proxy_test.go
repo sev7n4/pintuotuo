@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -571,6 +572,44 @@ func TestBuildLitellmUserConfig(t *testing.T) {
 		params := ml[0]["litellm_params"].(map[string]interface{})
 		assert.Equal(t, "some-model", params["model"])
 	})
+}
+
+func TestBuildOpenAICompatUpstreamJSON(t *testing.T) {
+	base := []byte(`{"model":"client/slash","messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}],"tools":[{"type":"function","function":{"name":"fn"}}],"stream":false,"user_config":{"evil":true}}`)
+	out, err := buildOpenAICompatUpstreamJSON(base, "resolved-model", false, nil, nil)
+	require.NoError(t, err)
+	var m map[string]interface{}
+	require.NoError(t, json.Unmarshal(out, &m))
+	assert.Equal(t, "resolved-model", m["model"])
+	assert.Equal(t, false, m["stream"])
+	_, hasUC := m["user_config"]
+	assert.False(t, hasUC)
+	tools, ok := m["tools"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, tools, 1)
+
+	streamTrue := true
+	uc := map[string]interface{}{"model_list": []interface{}{map[string]interface{}{"x": 1}}}
+	out2, err := buildOpenAICompatUpstreamJSON(base, "m2", true, uc, &streamTrue)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(out2, &m))
+	assert.Equal(t, true, m["stream"])
+	ucOut, ok := m["user_config"].(map[string]interface{})
+	require.True(t, ok)
+	_, ok = ucOut["model_list"]
+	assert.True(t, ok)
+}
+
+func TestBuildAnthropicNativeUpstreamJSON(t *testing.T) {
+	base := []byte(`{"model":"client/model","max_tokens":1024,"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}],"stream":false,"user_config":{"x":1}}`)
+	out, err := buildAnthropicNativeUpstreamJSON(base, "claude-3-opus-20240229", false, nil, nil)
+	require.NoError(t, err)
+	var m map[string]interface{}
+	require.NoError(t, json.Unmarshal(out, &m))
+	assert.Equal(t, "claude-3-opus-20240229", m["model"])
+	assert.Equal(t, float64(1024), m["max_tokens"])
+	_, hasUC := m["user_config"]
+	assert.False(t, hasUC)
 }
 
 func TestMapLLMProxyHTTPStatusForClient(t *testing.T) {

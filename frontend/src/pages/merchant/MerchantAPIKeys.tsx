@@ -739,7 +739,7 @@ const MerchantAPIKeys = () => {
               轻量验证
             </Button>
           </Tooltip>
-          <Tooltip title="深度验证（api_format=openai 的厂商会探测 /chat/completions 是否可用，含上游余额类错误）">
+          <Tooltip title="深度验证：api_format=openai 探测 /chat/completions；api_format=anthropic 探测 /messages（含上游余额类错误）">
             <Button type="link" size="small" onClick={() => openProbeModelSelector(record.id)}>
               深度验证
             </Button>

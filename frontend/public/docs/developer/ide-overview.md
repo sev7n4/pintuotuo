@@ -19,6 +19,8 @@
 | OpenAI 兼容 | `https://YOUR_ORIGIN/api/v1/openai/v1` | `POST …/chat/completions` |
 | Anthropic 兼容 | `https://YOUR_ORIGIN/api/v1/anthropic/v1` | `POST …/messages` |
 
+两条路径在 **IDE 场景**下均为「除 `model`（及 LiteLLM 的 `user_config`）外 **请求体原样出站**」；Anthropic 路由要求目录中该模型的 **`api_format` 为 anthropic**，否则会在 fallback 中跳过直至失败。
+
 本地开发时 `YOUR_ORIGIN` 常为 `http://localhost:5173`（经 Vite 代理，与 `VITE_API_BASE_URL` 一致）。
 
 4. **余额**  

@@ -104,30 +104,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/proxy/chat": {
-            "post": {
-                "security": [{"ApiKeyAuth": []}],
-                "description": "Proxy chat request to AI providers",
-                "consumes": ["application/json"],
-                "produces": ["application/json"],
-                "tags": ["api-proxy"],
-                "summary": "Proxy chat request",
-                "parameters": [
-                    {
-                        "description": "Chat request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {"$ref": "#/definitions/APIProxyRequest"}
-                    }
-                ],
-                "responses": {
-                    "200": {"description": "OK"},
-                    "401": {"description": "Unauthorized"},
-                    "402": {"description": "Insufficient balance"}
-                }
-            }
-        },
         "/health": {
             "get": {
                 "description": "Get system health status",

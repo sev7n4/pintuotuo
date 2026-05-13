@@ -36,7 +36,7 @@ import {
 import { useTokenStore } from '@/stores/tokenStore';
 import { tokenService } from '@/services/token';
 import { UserAPIKey, RechargeOrder, APIUsageGuideResponse, TokenLot } from '@/types';
-import { getOpenAICompatBaseURL } from '@/utils/openaiCompat';
+import { getAnthropicCompatBaseURL, getOpenAICompatBaseURL } from '@/utils/openaiCompat';
 import { copyToClipboard } from '@/utils/clipboard';
 import { PlatformAPIKeySecretCell } from '@/components/user/PlatformAPIKeySecretCell';
 import styles from './MyToken.module.css';
@@ -48,6 +48,7 @@ const MyToken = () => {
   const navigate = useNavigate();
   const allowMockRecharge = import.meta.env.VITE_ALLOW_MOCK_RECHARGE === 'true';
   const openAICompatBase = useMemo(() => getOpenAICompatBaseURL(), []);
+  const anthropicCompatBase = useMemo(() => getAnthropicCompatBaseURL(), []);
 
   const {
     balance,
@@ -714,6 +715,19 @@ const MyToken = () => {
               <Text code>zhipu/glm-4-flash</Text>
               ）或无前缀模型名（将按平台配置的兼容前缀推断厂商）。OpenAI 兼容路径支持{' '}
               <Text code>stream: true</Text>（SSE）；详见开发者中心文档。
+            </Paragraph>
+            <Paragraph type="secondary" className={styles.hintParagraph}>
+              <strong>Anthropic 兼容（Claude Code 等）：</strong>若客户端支持自定义 Anthropic Base
+              URL，可设为{' '}
+              <Text code>
+                {usageGuide?.anthropic_compat_path
+                  ? `${window.location.origin}${usageGuide.anthropic_compat_path}`
+                  : anthropicCompatBase}
+              </Text>
+              ，API Key 仍填本平台密钥；请求 <Text code>POST /v1/messages</Text>（相对 Base
+              URL，即完整路径为 <Text code>…/anthropic/v1/messages</Text>
+              ）。须包含 <Text code>max_tokens</Text> 与非空 <Text code>messages</Text>
+              ；详见开发者中心文档。
             </Paragraph>
             <div className={styles.tabHeader}>
               <Button
