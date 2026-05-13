@@ -109,7 +109,7 @@ func executeProxyChatCompletionStreamFromUpstream(
 	recordHealthCheckerProxyOutcome(c, winningKey.ID, true, startTime)
 	traceSpan.SetStatusCode(http.StatusOK)
 
-	inputTokens := estimateInputTokens(req.Messages)
+	inputTokens := estimateInputTokensForProxy(req)
 	outputTokens := streamedBytes / 4
 	if outputTokens < 1 {
 		outputTokens = 1
@@ -165,6 +165,185 @@ func executeProxyChatCompletionStreamFromUpstream(
 			} else {
 				tx.Commit()
 				logger.LogInfo(context.Background(), "api_proxy", "stream request completed", map[string]interface{}{
+					"user_id": userIDInt, "provider": billProv, "model": billModel,
+					"input_tokens": inputTokens, "output_tokens": outputTokens, "cost": cost,
+					"latency_ms": latency, "request_id": requestID, "usage_from_stream": lastUsage != nil,
+				})
+				metrics.RecordOrderCreation("completed", int64(cost*100), "USD")
+			}
+		}
+		ctx := context.Background()
+		cache.Delete(ctx, cache.TokenBalanceKey(userIDInt))
+		cache.Delete(ctx, cache.ComputePointBalanceKey(userIDInt))
+	}
+
+	decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
+	_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, winningKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCountTotal)
+}
+
+func extractUsageFromAnthropicStreamJSON(payload []byte) *APIUsage {
+	var w map[string]interface{}
+	if json.Unmarshal(payload, &w) != nil {
+		return nil
+	}
+	if u, ok := w["usage"].(map[string]interface{}); ok {
+		pt := intFromJSONNumber(u["input_tokens"])
+		ct := intFromJSONNumber(u["output_tokens"])
+		tt := pt + ct
+		if tt > 0 {
+			return &APIUsage{PromptTokens: pt, CompletionTokens: ct, TotalTokens: tt}
+		}
+	}
+	if msg, ok := w["message"].(map[string]interface{}); ok {
+		if u, ok := msg["usage"].(map[string]interface{}); ok {
+			pt := intFromJSONNumber(u["input_tokens"])
+			ct := intFromJSONNumber(u["output_tokens"])
+			tt := pt + ct
+			if tt > 0 {
+				return &APIUsage{PromptTokens: pt, CompletionTokens: ct, TotalTokens: tt}
+			}
+		}
+	}
+	return nil
+}
+
+// executeAnthropicNativeStreamPassthrough 在已拿到上游 Anthropic Messages SSE（HTTP 200）时，将事件原样透传给客户端并结算。
+func executeAnthropicNativeStreamPassthrough(
+	c *gin.Context,
+	upstream *http.Response,
+	requestID string,
+	userIDInt int,
+	req APIProxyRequest,
+	billProv string,
+	billModel string,
+	requestPath string,
+	startTime time.Time,
+	db *sql.DB,
+	billingEngine *billing.BillingEngine,
+	winningKey models.MerchantAPIKey,
+	merchantID int,
+	strictPricingVID *int,
+	selectedStrategy string,
+	smartCandidatesJSON []byte,
+	effectivePolicySource string,
+	decisionStart time.Time,
+	traceSpan *services.LLMTraceSpan,
+	strategySnapshot strategyRuntimeSnapshot,
+	retryCountTotal int,
+) {
+	defer upstream.Body.Close()
+
+	if ct := upstream.Header.Get("Content-Type"); ct != "" {
+		c.Writer.Header().Set("Content-Type", ct)
+	} else {
+		c.Writer.Header().Set("Content-Type", "text/event-stream")
+	}
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+
+	c.Writer.WriteHeader(http.StatusOK)
+	flusher, okFlush := c.Writer.(http.Flusher)
+
+	br := bufio.NewReader(upstream.Body)
+	var streamedBytes int
+	var lastUsage *APIUsage
+
+	for {
+		line, err := br.ReadBytes('\n')
+		if len(line) > 0 {
+			streamedBytes += len(line)
+			trim := bytes.TrimSpace(line)
+			if bytes.HasPrefix(trim, []byte("data: ")) {
+				payload := bytes.TrimSpace(trim[6:])
+				if len(payload) > 0 && !bytes.Equal(payload, []byte("[DONE]")) {
+					if u := extractUsageFromAnthropicStreamJSON(payload); u != nil && u.TotalTokens > 0 {
+						lastUsage = u
+					}
+				}
+			}
+			if _, werr := c.Writer.Write(line); werr != nil {
+				logger.LogWarn(c.Request.Context(), "api_proxy", "anthropic native stream write interrupted", map[string]interface{}{
+					"request_id": requestID, "error": werr.Error(),
+				})
+				break
+			}
+			if okFlush {
+				flusher.Flush()
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			logger.LogWarn(c.Request.Context(), "api_proxy", "anthropic native stream read error", map[string]interface{}{
+				"request_id": requestID, "error": err.Error(),
+			})
+			break
+		}
+	}
+
+	latency := int(time.Since(startTime).Milliseconds())
+	services.GetSmartRouter().RecordRequestResult(winningKey.ID, true)
+	recordHealthCheckerProxyOutcome(c, winningKey.ID, true, startTime)
+	traceSpan.SetStatusCode(http.StatusOK)
+
+	inputTokens := estimateInputTokensForProxy(req)
+	outputTokens := streamedBytes / 4
+	if outputTokens < 1 {
+		outputTokens = 1
+	}
+	if lastUsage != nil && lastUsage.TotalTokens > 0 {
+		inputTokens = lastUsage.PromptTokens
+		outputTokens = lastUsage.CompletionTokens
+	}
+
+	tokenUsage := billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
+	cost, cerr := calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
+	if cerr != nil {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
+		logger.LogError(context.Background(), "api_proxy", "anthropic native stream token cost resolution failed", cerr, map[string]interface{}{
+			"user_id": userIDInt, "provider": billProv, "model": billModel, "request_id": requestID,
+		})
+		return
+	}
+
+	if tokenUsage > 0 {
+		if settleErr := billingEngine.SettlePreDeduct(userIDInt, requestID, tokenUsage); settleErr != nil {
+			logger.LogError(context.Background(), "api_proxy", "anthropic native stream settle pre-deduct failed", settleErr, map[string]interface{}{
+				"user_id": userIDInt, "token_usage": tokenUsage, "request_id": requestID,
+			})
+		}
+	} else {
+		billingEngine.CancelPreDeduct(userIDInt, requestID)
+	}
+
+	if cost > 0 {
+		billReq := req
+		billReq.Provider = billProv
+		billReq.Model = billModel
+		logMerchantSKUID, logProcurementCNY := resolveMerchantSKUProcurementForLog(db, billReq, winningKey.ID, merchantID, inputTokens, outputTokens)
+		tx, err := db.Begin()
+		if err == nil {
+			_, updateErr := tx.Exec(
+				"UPDATE merchant_api_keys SET quota_used = quota_used + $1, last_used_at = $2 WHERE id = $3",
+				cost, time.Now(), winningKey.ID,
+			)
+			err = updateErr
+			if err == nil {
+				_, err = tx.Exec(
+					"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, token_usage, merchant_sku_id, procurement_cost_cny) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+					userIDInt, winningKey.ID, requestID, billProv, billModel, "POST", requestPath, http.StatusOK, latency, inputTokens, outputTokens, cost, tokenUsage, nullInt64Arg(logMerchantSKUID), nullFloat64Arg(logProcurementCNY),
+				)
+			}
+			if err != nil {
+				tx.Rollback()
+				logger.LogError(context.Background(), "api_proxy", "anthropic native stream transaction rollback", err, map[string]interface{}{
+					"user_id": userIDInt, "request_id": requestID,
+				})
+			} else {
+				tx.Commit()
+				logger.LogInfo(context.Background(), "api_proxy", "anthropic native stream request completed", map[string]interface{}{
 					"user_id": userIDInt, "provider": billProv, "model": billModel,
 					"input_tokens": inputTokens, "output_tokens": outputTokens, "cost": cost,
 					"latency_ms": latency, "request_id": requestID, "usage_from_stream": lastUsage != nil,
@@ -364,7 +543,7 @@ func executeProxyAnthropicStreamFromUpstream(
 	recordHealthCheckerProxyOutcome(c, winningKey.ID, true, startTime)
 	traceSpan.SetStatusCode(http.StatusOK)
 
-	inputTokens := estimateInputTokens(req.Messages)
+	inputTokens := estimateInputTokensForProxy(req)
 	outputTokens := streamedBytes / 4
 	if outputTokens < 1 {
 		outputTokens = 1

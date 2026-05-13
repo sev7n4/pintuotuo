@@ -39,7 +39,7 @@ const client = new OpenAI({
 
 - Anthropic 兼容路径见 `GET /tokens/api-usage-guide` 返回的 `anthropic_compat_path`（若配置）
 - **Claude Code、Cursor、Codex 等 IDE/CLI**：见同目录分册（如 [`ide-overview.md`](./ide-overview.md)）或开发者中心 **「IDE 与 CLI 接入」**（多 Tab）
-- 多轮对话、工具调用等能力以后端与权益白名单为准；未在文档列出的参数可能不被支持
+- 多轮对话、**tools / 多模态 messages** 等：请求体会**原样转发**至上游 OpenAI 兼容接口（平台会解析并重写 `model`；走 LiteLLM 时注入 `user_config` 并覆盖客户端同名键）。计费与权益仍以平台规则为准。
 
 ## 路线图（可选）
 

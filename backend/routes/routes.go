@@ -70,13 +70,12 @@ func RegisterUserRoutes(router *gin.RouterGroup) {
 	}
 }
 
+// RegisterAPIRoutes 注册 /proxy 下的运维类只读接口。LLM 对话请使用 RegisterOpenAICompatRoutes 与 RegisterAnthropicCompatRoutes。
 func RegisterAPIRoutes(router *gin.RouterGroup) {
 	api := router.Group("/proxy")
 	api.Use(middleware.AuthMiddleware())
 	api.Use(middleware.RateLimitMiddleware())
 	{
-		api.POST("/chat", handlers.ProxyAPIRequest)
-		api.POST("/completions", handlers.ProxyAPIRequest)
 		api.GET("/providers", handlers.GetAPIProviders)
 		api.GET("/usage", handlers.GetAPIUsageStats)
 		api.GET("/trace/:request_id", handlers.GetAPIRequestTrace)

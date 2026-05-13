@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
@@ -87,13 +86,20 @@ func legacyProviderList() []map[string]interface{} {
 }
 
 type APIProxyRequest struct {
-	Provider      string          `json:"provider" binding:"required"`
-	Model         string          `json:"model" binding:"required"`
-	Messages      []ChatMessage   `json:"messages" binding:"required"`
+	Provider string `json:"provider" binding:"required"`
+	Model    string `json:"model" binding:"required"`
+	// Messages 与 Options 供 Anthropic 兼容入口等内部结构化调用；OpenAI 兼容 chat 使用 RawOpenAIChatBody 时可为空。
+	Messages      []ChatMessage   `json:"messages"`
 	Stream        bool            `json:"stream"`
 	Options       json.RawMessage `json:"options,omitempty"`
 	APIKeyID      *int            `json:"api_key_id,omitempty"`
 	MerchantSKUID *int            `json:"merchant_sku_id,omitempty"`
+	// RawOpenAIChatBody 为完整 OpenAI Chat Completions JSON（由 POST …/openai/v1/chat/completions 写入）。
+	// 非空时上游请求体由其经平台改写 model（及 LiteLLM user_config）后序列化，保留 tools、多模态 messages 等字段。
+	RawOpenAIChatBody json.RawMessage `json:"-"`
+	// RawAnthropicMessagesBody 为完整 Anthropic Messages API JSON（由 POST …/anthropic/v1/messages 写入）。
+	// 非空且上游 api_format=anthropic 时 POST 原生 /v1/messages，保留 tool_use、多模态 content 等字段。
+	RawAnthropicMessagesBody json.RawMessage `json:"-"`
 }
 
 type ChatMessage struct {
@@ -107,6 +113,141 @@ func estimateInputTokens(messages []ChatMessage) int {
 		totalChars += len(msg.Role) + len(msg.Content)
 	}
 	return totalChars / 4
+}
+
+func openAIProxyUsesRawChatBody(req APIProxyRequest) bool {
+	return len(req.RawOpenAIChatBody) > 0
+}
+
+// estimateInputTokensFromOpenAIRawBody 用整包 JSON 大小做预扣费上界估计（不做 schema 深解析）。
+func estimateInputTokensFromOpenAIRawBody(raw []byte) int {
+	n := len(raw) / 4
+	if n < 1 {
+		return 1
+	}
+	const capEst = 200000
+	if n > capEst {
+		return capEst
+	}
+	return n
+}
+
+func estimateInputTokensForProxy(req APIProxyRequest) int {
+	if openAIProxyUsesRawChatBody(req) {
+		return estimateInputTokensFromOpenAIRawBody(req.RawOpenAIChatBody)
+	}
+	if anthropicProxyUsesRawBody(req) {
+		return estimateInputTokensFromOpenAIRawBody(req.RawAnthropicMessagesBody)
+	}
+	return estimateInputTokens(req.Messages)
+}
+
+func anthropicProxyUsesRawBody(req APIProxyRequest) bool {
+	return len(req.RawAnthropicMessagesBody) > 0
+}
+
+// buildOpenAICompatUpstreamJSON 基于客户端原始 JSON 生成出站 body：覆盖 model；剔除客户端 user_config 后按需注入 LiteLLM；可选强制 stream。
+func buildOpenAICompatUpstreamJSON(
+	base []byte,
+	upstreamModel string,
+	litellm bool,
+	litellmUser map[string]interface{},
+	forceStream *bool,
+) ([]byte, error) {
+	var m map[string]interface{}
+	if err := json.Unmarshal(base, &m); err != nil {
+		return nil, err
+	}
+	delete(m, "user_config")
+	m["model"] = upstreamModel
+	if litellm && litellmUser != nil {
+		m["user_config"] = litellmUser
+	}
+	if forceStream != nil {
+		m["stream"] = *forceStream
+	}
+	return json.Marshal(m)
+}
+
+// buildAnthropicNativeUpstreamJSON 基于客户端原始 Anthropic Messages JSON 生成出站 body：覆盖 model；剔除客户端 user_config 后按需注入 LiteLLM。
+func buildAnthropicNativeUpstreamJSON(
+	base []byte,
+	upstreamModel string,
+	litellm bool,
+	litellmUser map[string]interface{},
+	forceStream *bool,
+) ([]byte, error) {
+	var m map[string]interface{}
+	if err := json.Unmarshal(base, &m); err != nil {
+		return nil, err
+	}
+	delete(m, "user_config")
+	m["model"] = upstreamModel
+	if litellm && litellmUser != nil {
+		m["user_config"] = litellmUser
+	}
+	if forceStream != nil {
+		m["stream"] = *forceStream
+	}
+	return json.Marshal(m)
+}
+
+func anthropicNativeMessageHTTPIndicatesSuccess(statusCode int, body []byte) bool {
+	if statusCode != http.StatusOK {
+		return false
+	}
+	var root map[string]interface{}
+	if json.Unmarshal(body, &root) != nil {
+		return false
+	}
+	if _, has := root["error"]; has {
+		return false
+	}
+	typ, _ := root["type"].(string)
+	return typ == "message"
+}
+
+func usageTokensFromAnthropicMessageBody(body []byte) (input int, output int, ok bool) {
+	var root map[string]interface{}
+	if json.Unmarshal(body, &root) != nil {
+		return 0, 0, false
+	}
+	u, ok2 := root["usage"].(map[string]interface{})
+	if !ok2 {
+		return 0, 0, false
+	}
+	in := intFromJSONNumber(u["input_tokens"])
+	out := intFromJSONNumber(u["output_tokens"])
+	if in+out == 0 {
+		return 0, 0, false
+	}
+	return in, out, true
+}
+
+func smartRouterRequestBodyFromProxy(req APIProxyRequest) map[string]interface{} {
+	if anthropicProxyUsesRawBody(req) {
+		var root map[string]interface{}
+		if json.Unmarshal(req.RawAnthropicMessagesBody, &root) != nil {
+			return map[string]interface{}{"messages": []interface{}{}}
+		}
+		msgs, ok := root["messages"]
+		if !ok {
+			return map[string]interface{}{"messages": []interface{}{}}
+		}
+		return map[string]interface{}{"messages": msgs}
+	}
+	if openAIProxyUsesRawChatBody(req) {
+		var root map[string]interface{}
+		if json.Unmarshal(req.RawOpenAIChatBody, &root) != nil {
+			return map[string]interface{}{"messages": []interface{}{}}
+		}
+		msgs, ok := root["messages"]
+		if !ok {
+			return map[string]interface{}{"messages": []interface{}{}}
+		}
+		return map[string]interface{}{"messages": msgs}
+	}
+	return map[string]interface{}{"messages": req.Messages}
 }
 
 type APIProxyResponse struct {
@@ -136,30 +277,6 @@ type APIError struct {
 	Message string `json:"message"`
 	Type    string `json:"type"`
 	Code    string `json:"code"`
-}
-
-func ProxyAPIRequest(c *gin.Context) {
-	startTime := time.Now()
-	requestID := uuid.New().String()
-
-	userID, exists := c.Get("user_id")
-	if !exists {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-	userIDInt, ok := userID.(int)
-	if !ok {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-
-	var req APIProxyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
-		return
-	}
-
-	proxyAPIRequestCore(c, userIDInt, requestID, startTime, req, c.Request.URL.Path)
 }
 
 func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startTime time.Time, req APIProxyRequest, requestPath string) {
@@ -206,7 +323,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		return
 	}
 
-	inputTokensEstimate := estimateInputTokens(req.Messages)
+	inputTokensEstimate := estimateInputTokensForProxy(req)
 	billingEngine := billing.GetBillingEngine()
 	preDeductConfig := billingEngine.GetPreDeductConfig(0, 0, req.Provider)
 	estimatedUsage := billingEngine.EstimateTokenUsage(inputTokensEstimate, preDeductConfig)
@@ -398,11 +515,12 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	applyCircuitBreakerConfig(apiKey.ID, strategySnapshot)
 
 	if req.Stream {
-		if providerCfg.APIFormat != apiFormatOpenAI {
+		_, isAnthropicHTTPClient := anthropicCompatFromContext(c)
+		if !(anthropicProxyUsesRawBody(req) && isAnthropicHTTPClient) && providerCfg.APIFormat != apiFormatOpenAI {
 			billingEngine.CancelPreDeduct(userIDInt, requestID)
 			middleware.RespondWithError(c, apperrors.NewAppError(
 				"STREAMING_NOT_SUPPORTED",
-				"Streaming is only supported for OpenAI-compatible providers",
+				"Streaming is only supported for OpenAI-compatible providers, or raw Anthropic Messages against native Anthropic upstream",
 				http.StatusBadRequest,
 				nil,
 			))
@@ -438,7 +556,24 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				continue
 			}
 
-			if pcfg.APIFormat != apiFormatOpenAI {
+			ac, isAnthClient := anthropicCompatFromContext(c)
+			anthropicRaw := anthropicProxyUsesRawBody(req)
+
+			if anthropicRaw && isAnthClient {
+				if pcfg.APIFormat != providerAnthropic {
+					if attemptIdx < len(streamAttempts)-1 {
+						continue
+					}
+					billingEngine.CancelPreDeduct(userIDInt, requestID)
+					middleware.RespondWithError(c, apperrors.NewAppError(
+						"STREAMING_NOT_SUPPORTED",
+						"Anthropic Messages raw body requires native Anthropic upstream (api_format=anthropic) for streaming",
+						http.StatusBadRequest,
+						nil,
+					))
+					return
+				}
+			} else if pcfg.APIFormat != apiFormatOpenAI {
 				if attemptIdx < len(streamAttempts)-1 {
 					continue
 				}
@@ -467,25 +602,49 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				return
 			}
 
-			ep := fmt.Sprintf("%s/chat/completions", base)
-			rb := map[string]interface{}{
-				"model":    att.model,
-				"messages": req.Messages,
-				"stream":   true,
-			}
-			if resolveRouteMode(&pk) == routeModeLitellm {
-				upstreamBase := services.ResolveLitellmUpstreamBaseURL(att.provider)
-				rb["user_config"] = buildLitellmUserConfig(att.provider, att.model, dk, upstreamBase)
-			}
-			if req.Options != nil {
-				var options map[string]interface{}
-				if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
-					for k, v := range options {
-						rb[k] = v
+			var ep string
+			var jb []byte
+			var mErr error
+			if anthropicRaw && isAnthClient {
+				ep = fmt.Sprintf("%s/messages", base)
+				streamTrue := true
+				var uc map[string]interface{}
+				if resolveRouteMode(&pk) == routeModeLitellm {
+					upstreamBase := services.ResolveLitellmUpstreamBaseURL(att.provider)
+					uc = buildLitellmUserConfig(att.provider, att.model, dk, upstreamBase)
+				}
+				jb, mErr = buildAnthropicNativeUpstreamJSON(req.RawAnthropicMessagesBody, att.model, resolveRouteMode(&pk) == routeModeLitellm, uc, &streamTrue)
+			} else {
+				ep = fmt.Sprintf("%s/chat/completions", base)
+				if openAIProxyUsesRawChatBody(req) {
+					streamTrue := true
+					var uc map[string]interface{}
+					if resolveRouteMode(&pk) == routeModeLitellm {
+						upstreamBase := services.ResolveLitellmUpstreamBaseURL(att.provider)
+						uc = buildLitellmUserConfig(att.provider, att.model, dk, upstreamBase)
 					}
+					jb, mErr = buildOpenAICompatUpstreamJSON(req.RawOpenAIChatBody, att.model, resolveRouteMode(&pk) == routeModeLitellm, uc, &streamTrue)
+				} else {
+					rb := map[string]interface{}{
+						"model":    att.model,
+						"messages": req.Messages,
+						"stream":   true,
+					}
+					if resolveRouteMode(&pk) == routeModeLitellm {
+						upstreamBase := services.ResolveLitellmUpstreamBaseURL(att.provider)
+						rb["user_config"] = buildLitellmUserConfig(att.provider, att.model, dk, upstreamBase)
+					}
+					if req.Options != nil {
+						var options map[string]interface{}
+						if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
+							for k, v := range options {
+								rb[k] = v
+							}
+						}
+					}
+					jb, mErr = json.Marshal(rb)
 				}
 			}
-			jb, mErr := json.Marshal(rb)
 			if mErr != nil {
 				billingEngine.CancelPreDeduct(userIDInt, requestID)
 				middleware.RespondWithError(c, apperrors.NewAppError(
@@ -511,8 +670,13 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				return io.NopCloser(bytes.NewReader(jb)), nil
 			}
 			hreq.Header.Set("Content-Type", "application/json")
-			authToken := resolveAuthTokenFromRouteMode(resolveRouteMode(&pk), dk)
-			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+			if anthropicRaw && isAnthClient {
+				hreq.Header.Set("x-api-key", dk)
+				hreq.Header.Set("anthropic-version", "2023-06-01")
+			} else {
+				authToken := resolveAuthTokenFromRouteMode(resolveRouteMode(&pk), dk)
+				hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
+			}
 			hreq.Header.Set("Accept", "text/event-stream")
 			applyProxyUpstreamHeaders(c, hreq, requestID)
 
@@ -560,7 +724,11 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 				return
 			}
 
-			if ac, anthOK := anthropicCompatFromContext(c); anthOK {
+			if anthropicRaw && isAnthClient {
+				executeAnthropicNativeStreamPassthrough(c, r, requestID, userIDInt, req, att.provider, att.model, requestPath, startTime, db,
+					billingEngine, pk, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
+					decisionStart, traceSpan, strategySnapshot, retryCountStream)
+			} else if isAnthClient {
 				executeProxyAnthropicStreamFromUpstream(c, r, requestID, userIDInt, req, att.provider, att.model, ac.ClientModel, requestPath, startTime, db,
 					billingEngine, pk, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
 					decisionStart, traceSpan, strategySnapshot, retryCountStream)
@@ -623,6 +791,13 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			continue
 		}
 
+		if openAIProxyUsesRawChatBody(req) && pcfg.APIFormat != apiFormatOpenAI {
+			continue
+		}
+		if anthropicProxyUsesRawBody(req) && pcfg.APIFormat != providerAnthropic {
+			continue
+		}
+
 		base := strings.TrimRight(pcfg.APIBaseURL, "/")
 		if base == "" {
 			if attemptIdx < len(attempts)-1 {
@@ -639,28 +814,48 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		}
 
 		ep := fmt.Sprintf("%s/chat/completions", base)
-		if pcfg.APIFormat == providerAnthropic {
+		if anthropicProxyUsesRawBody(req) {
+			ep = fmt.Sprintf("%s/messages", base)
+		} else if pcfg.APIFormat == providerAnthropic {
 			ep = fmt.Sprintf("%s/messages", base)
 		}
 
-		rb := map[string]interface{}{
-			"model":    att.model,
-			"messages": req.Messages,
-			"stream":   req.Stream,
-		}
-		if resolveRouteMode(&pk) == routeModeLitellm {
-			upstreamBase := services.ResolveLitellmUpstreamBaseURL(att.provider)
-			rb["user_config"] = buildLitellmUserConfig(att.provider, att.model, dk, upstreamBase)
-		}
-		if req.Options != nil {
-			var options map[string]interface{}
-			if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
-				for k, v := range options {
-					rb[k] = v
+		var jb []byte
+		var mErr error
+		if anthropicProxyUsesRawBody(req) {
+			var uc map[string]interface{}
+			if resolveRouteMode(&pk) == routeModeLitellm {
+				upstreamBase := services.ResolveLitellmUpstreamBaseURL(att.provider)
+				uc = buildLitellmUserConfig(att.provider, att.model, dk, upstreamBase)
+			}
+			jb, mErr = buildAnthropicNativeUpstreamJSON(req.RawAnthropicMessagesBody, att.model, resolveRouteMode(&pk) == routeModeLitellm, uc, nil)
+		} else if openAIProxyUsesRawChatBody(req) {
+			var uc map[string]interface{}
+			if resolveRouteMode(&pk) == routeModeLitellm {
+				upstreamBase := services.ResolveLitellmUpstreamBaseURL(att.provider)
+				uc = buildLitellmUserConfig(att.provider, att.model, dk, upstreamBase)
+			}
+			jb, mErr = buildOpenAICompatUpstreamJSON(req.RawOpenAIChatBody, att.model, resolveRouteMode(&pk) == routeModeLitellm, uc, nil)
+		} else {
+			rb := map[string]interface{}{
+				"model":    att.model,
+				"messages": req.Messages,
+				"stream":   req.Stream,
+			}
+			if resolveRouteMode(&pk) == routeModeLitellm {
+				upstreamBase := services.ResolveLitellmUpstreamBaseURL(att.provider)
+				rb["user_config"] = buildLitellmUserConfig(att.provider, att.model, dk, upstreamBase)
+			}
+			if req.Options != nil {
+				var options map[string]interface{}
+				if unmarshalErr := json.Unmarshal(req.Options, &options); unmarshalErr == nil {
+					for k, v := range options {
+						rb[k] = v
+					}
 				}
 			}
+			jb, mErr = json.Marshal(rb)
 		}
-		jb, mErr := json.Marshal(rb)
 		if mErr != nil {
 			billingEngine.CancelPreDeduct(userIDInt, requestID)
 			middleware.RespondWithError(c, apperrors.NewAppError(
@@ -736,7 +931,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			return
 		}
 
-		if chatCompletionJSONIndicatesProxySuccess(r.StatusCode, bRead) {
+		if chatCompletionJSONIndicatesProxySuccess(r.StatusCode, bRead) ||
+			(anthropicProxyUsesRawBody(req) && anthropicNativeMessageHTTPIndicatesSuccess(r.StatusCode, bRead)) {
 			resp = r
 			body = bRead
 			billProv = att.provider
@@ -775,6 +971,101 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			http.StatusBadGateway,
 			nil,
 		))
+		return
+	}
+
+	if anthropicProxyUsesRawBody(req) {
+		retryCount := retryCountTotal
+		latency := int(time.Since(startTime).Milliseconds())
+
+		var inputTokens, outputTokens int
+		var tokenUsage int64
+		var cost float64
+
+		if in, out, ok := usageTokensFromAnthropicMessageBody(body); ok {
+			inputTokens, outputTokens = in, out
+			tokenUsage = billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
+			var cerr error
+			cost, cerr = calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
+			if cerr != nil {
+				billingEngine.CancelPreDeduct(userIDInt, requestID)
+				logger.LogError(context.Background(), "api_proxy", "Anthropic native token cost resolution failed", cerr, map[string]interface{}{
+					"user_id": userIDInt, "provider": billProv, "model": billModel, "request_id": requestID,
+				})
+				middleware.RespondWithError(c, apperrors.ErrPricingSnapshotMiss)
+				return
+			}
+		} else {
+			inputTokens = estimateInputTokensForProxy(req)
+			outputTokens = len(body) / 4
+			if outputTokens < 1 {
+				outputTokens = 1
+			}
+			tokenUsage = billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
+			var cerr error
+			cost, cerr = calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
+			if cerr != nil {
+				billingEngine.CancelPreDeduct(userIDInt, requestID)
+				middleware.RespondWithError(c, apperrors.ErrPricingSnapshotMiss)
+				return
+			}
+		}
+
+		if tokenUsage > 0 {
+			if settleErr := billingEngine.SettlePreDeduct(userIDInt, requestID, tokenUsage); settleErr != nil {
+				logger.LogError(context.Background(), "api_proxy", "Anthropic native Settle pre-deduct failed", settleErr, map[string]interface{}{
+					"user_id": userIDInt, "token_usage": tokenUsage, "request_id": requestID,
+				})
+			}
+		} else {
+			billingEngine.CancelPreDeduct(userIDInt, requestID)
+		}
+
+		if cost > 0 {
+			metrics.RecordAPIKeyRequest(billProv, "success")
+			billReq := req
+			billReq.Provider = billProv
+			billReq.Model = billModel
+			logMerchantSKUID, logProcurementCNY := resolveMerchantSKUProcurementForLog(db, billReq, winningKey.ID, merchantID, inputTokens, outputTokens)
+			tx, err := db.Begin()
+			if err == nil {
+				_, updateErr := tx.Exec(
+					"UPDATE merchant_api_keys SET quota_used = quota_used + $1, last_used_at = $2 WHERE id = $3",
+					cost, time.Now(), winningKey.ID,
+				)
+				err = updateErr
+				if err == nil {
+					_, err = tx.Exec(
+						"INSERT INTO api_usage_logs (user_id, key_id, request_id, provider, model, method, path, status_code, latency_ms, input_tokens, output_tokens, cost, token_usage, merchant_sku_id, procurement_cost_cny) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+						userIDInt, winningKey.ID, requestID, billProv, billModel, "POST", requestPath, resp.StatusCode, latency, inputTokens, outputTokens, cost, tokenUsage, nullInt64Arg(logMerchantSKUID), nullFloat64Arg(logProcurementCNY),
+					)
+				}
+				if err != nil {
+					tx.Rollback()
+					logger.LogError(context.Background(), "api_proxy", "Anthropic native transaction rollback", err, map[string]interface{}{
+						"user_id": userIDInt, "request_id": requestID,
+					})
+				} else {
+					tx.Commit()
+					logger.LogInfo(context.Background(), "api_proxy", "Anthropic native API request completed", map[string]interface{}{
+						"user_id": userIDInt, "provider": billProv, "model": billModel,
+						"input_tokens": inputTokens, "output_tokens": outputTokens, "cost": cost,
+						"latency_ms": latency, "request_id": requestID,
+					})
+					metrics.RecordOrderCreation("completed", int64(cost*100), "USD")
+				}
+			}
+			ctx := context.Background()
+			cache.Delete(ctx, cache.TokenBalanceKey(userIDInt))
+			cache.Delete(ctx, cache.ComputePointBalanceKey(userIDInt))
+		}
+
+		decisionPayload := buildRoutingDecisionPayload(smartCandidatesJSON, strategySnapshot, effectivePolicySource)
+		_ = insertRoutingDecision(db, requestID, userIDInt, req, selectedStrategy, decisionPayload, winningKey.ID, int(time.Since(decisionStart).Milliseconds()), retryCount)
+
+		stOK := mapLLMProxyHTTPStatusForClient(resp.StatusCode, resolveRouteMode(&winningKey))
+		traceSpan.SetStatusCode(stOK)
+		c.Data(stOK, "application/json", body)
 		return
 	}
 
@@ -885,7 +1176,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		cache.Delete(ctx, cache.ComputePointBalanceKey(userIDInt))
 	}
 
-	if currentRoutingDecision != nil {
+	if currentRoutingDecision != nil && !anthropicProxyUsesRawBody(req) {
 		pipeline := services.NewThreeLayerRoutingPipeline()
 
 		gatewayMode := resolveRouteMode(&apiKey)
@@ -936,7 +1227,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 	stOK := mapLLMProxyHTTPStatusForClient(resp.StatusCode, resolveRouteMode(&winningKey))
 	traceSpan.SetStatusCode(stOK)
-	if ac, anthOK := anthropicCompatFromContext(c); anthOK {
+	if ac, anthOK := anthropicCompatFromContext(c); anthOK && !anthropicProxyUsesRawBody(req) {
 		if anthBody, convErr := openAICompletionToAnthropicMessage(body, ac.ClientModel); convErr == nil {
 			c.JSON(stOK, anthBody)
 			return
@@ -1465,7 +1756,7 @@ func trySelectAPIKeyWithSmartRouter(req APIProxyRequest, strategyCode string, ke
 		Model:         req.Model,
 		Provider:      req.Provider,
 		AllowedKeyIDs: keyFilter,
-		RequestBody:   map[string]interface{}{"messages": req.Messages},
+		RequestBody:   smartRouterRequestBodyFromProxy(req),
 	}
 
 	decision, err := pipeline.Execute(context.Background(), routingReq)

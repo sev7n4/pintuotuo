@@ -26,9 +26,11 @@ func respondOpenAIError(c *gin.Context, status int, message string) {
 }
 
 // OpenAIChatCompletions accepts an OpenAI-compatible JSON body and reuses the platform proxy pipeline.
+// 请求体除 model 由平台解析并重写为上游模型 id 外，整体原样转发至 OpenAI 兼容上游（含 tools、多模态 messages、stream 等）。
+// LiteLLM 路由下由平台注入 user_config，客户端同名字段会被剥离后覆盖。
 // Supports stream:true (SSE) for OpenAI-compatible providers; see deploy/litellm/README.md.
 // Clients should set base URL to {API_ORIGIN}/api/v1/openai/v1 (OpenAI SDK: baseURL + "/chat/completions").
-// Authentication: Bearer platform API key (ptd_* / ptt_*) or existing JWT (same as /proxy/chat).
+// Authentication: Bearer platform API key (ptd_* / ptt_*) or JWT（与 /openai/v1 其它路由一致）。
 func OpenAIChatCompletions(c *gin.Context) {
 	bodyBytes, readErr := io.ReadAll(c.Request.Body)
 	if readErr != nil {
@@ -47,18 +49,13 @@ func OpenAIChatCompletions(c *gin.Context) {
 		respondOpenAIError(c, http.StatusBadRequest, "model is required")
 		return
 	}
-	msgsRaw, ok := raw["messages"]
+	msgs, ok := raw["messages"]
 	if !ok {
 		respondOpenAIError(c, http.StatusBadRequest, "messages is required")
 		return
 	}
-	messagesJSON, marshalErr := json.Marshal(msgsRaw)
-	if marshalErr != nil {
-		respondOpenAIError(c, http.StatusBadRequest, "messages is invalid")
-		return
-	}
-	var messages []ChatMessage
-	if msgErr := json.Unmarshal(messagesJSON, &messages); msgErr != nil || len(messages) == 0 {
+	arr, ok := msgs.([]interface{})
+	if !ok || len(arr) == 0 {
 		respondOpenAIError(c, http.StatusBadRequest, "messages must be a non-empty array")
 		return
 	}
@@ -66,18 +63,6 @@ func OpenAIChatCompletions(c *gin.Context) {
 	stream := false
 	if streamVal, streamOk := raw["stream"].(bool); streamOk {
 		stream = streamVal
-	}
-	delete(raw, "model")
-	delete(raw, "messages")
-	delete(raw, "stream")
-	var options json.RawMessage
-	if len(raw) > 0 {
-		optBytes, optErr := json.Marshal(raw)
-		if optErr != nil {
-			respondOpenAIError(c, http.StatusBadRequest, "Invalid optional parameters")
-			return
-		}
-		options = optBytes
 	}
 
 	db := config.GetDB()
@@ -87,12 +72,14 @@ func OpenAIChatCompletions(c *gin.Context) {
 		return
 	}
 
+	rawBody := json.RawMessage(append(json.RawMessage(nil), bodyBytes...))
 	req := APIProxyRequest{
-		Provider: provider,
-		Model:    modelName,
-		Messages: messages,
-		Stream:   stream,
-		Options:  options,
+		Provider:          provider,
+		Model:             modelName,
+		Messages:          nil,
+		Stream:            stream,
+		Options:           nil,
+		RawOpenAIChatBody: rawBody,
 	}
 
 	userID, exists := c.Get("user_id")

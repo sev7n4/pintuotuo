@@ -1,13 +1,13 @@
 # HTTP 状态与鉴权（C 端代理）
 
-本文档描述**拼脱脱 OpenAI 兼容代理**（路径含 `/openai/`、`/proxy/`）与**平台登录 JWT**并存时的语义，便于区分「登录过期」与「上游/BYOK 失败」。
+本文档描述**拼脱脱 OpenAI / Anthropic 兼容代理**（路径含 `/openai/`、`/anthropic/`）与**平台登录 JWT**并存时的语义，便于区分「登录过期」与「上游/BYOK 失败」。
 
 ## 前端 axios 行为（`frontend/src/services/api.ts`）
 
 | 条件 | 行为 |
 |------|------|
-| 响应 **401** 且 URL **不含** `/openai/`、`/proxy/`，且不是登录接口 | 清除本地 token，跳转登录页 |
-| 响应 **401** 且 URL **含** `/openai/` 或 `/proxy/` | **不清除** JWT（避免把上游鉴权失败当成平台登出） |
+| 响应 **401** 且 URL **不含** `/openai/`、`/anthropic/`，且不是登录接口 | 清除本地 token，跳转登录页 |
+| 响应 **401** 且 URL **含** `/openai/` 或 `/anthropic/` | **不清除** JWT（避免把上游鉴权失败当成平台登出） |
 
 ## 后端映射（`route_mode = litellm`）
 

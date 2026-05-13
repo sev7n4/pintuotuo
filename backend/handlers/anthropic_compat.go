@@ -22,7 +22,7 @@ const (
 	anthropicStopMaxTokens = "max_tokens"
 )
 
-// ctxKeyAnthropicCompat 标记本请求需将上游 OpenAI 兼容结果转为 Anthropic Messages API 形态。
+// ctxKeyAnthropicCompat 标记请求来自 Anthropic Messages HTTP 客户端（用于流式分支与响应形态；原生上游时仍透传 SSE/JSON）。
 const ctxKeyAnthropicCompat = "ptd_anthropic_compat"
 
 type anthropicCompatCtx struct {
@@ -38,19 +38,84 @@ func anthropicCompatFromContext(c *gin.Context) (anthropicCompatCtx, bool) {
 	return ac, ok
 }
 
-// --- Anthropic POST /v1/messages 请求体（子集，满足 Claude Code / SDK 常见字段） ---
+// AnthropicMessages 接受 Anthropic Messages API 原始 JSON，在 api_format=anthropic 的上游原样转发（仅改写 model；LiteLLM 注入 user_config）。
+// 若上游为 OpenAI 兼容而客户端走本路由，请改用 POST …/openai/v1/chat/completions。
+// Base URL：{API_ORIGIN}/api/v1/anthropic/v1；鉴权：Authorization: Bearer ptd_* 或 x-api-key: ptd_*。
+func AnthropicMessages(c *gin.Context) {
+	bodyBytes, readErr := io.ReadAll(c.Request.Body)
+	if readErr != nil {
+		respondAnthropicInvalidRequest(c, "Failed to read request body")
+		return
+	}
+	var raw map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		respondAnthropicInvalidRequest(c, "Invalid JSON body")
+		return
+	}
+	modelVal, ok := raw["model"].(string)
+	if !ok || strings.TrimSpace(modelVal) == "" {
+		respondAnthropicInvalidRequest(c, "model is required")
+		return
+	}
+	maxTok, ok := raw["max_tokens"]
+	if !ok {
+		respondAnthropicInvalidRequest(c, "max_tokens is required and must be positive")
+		return
+	}
+	maxN, ok := anthropicJSONNumberToInt(maxTok)
+	if !ok || maxN <= 0 {
+		respondAnthropicInvalidRequest(c, "max_tokens is required and must be positive")
+		return
+	}
+	_ = maxN // 校验存在即可，完整负载在 RawAnthropicMessagesBody 中透传
+	msgs, ok := raw["messages"]
+	if !ok {
+		respondAnthropicInvalidRequest(c, "messages is required")
+		return
+	}
+	arr, ok := msgs.([]interface{})
+	if !ok || len(arr) == 0 {
+		respondAnthropicInvalidRequest(c, "messages must be a non-empty array")
+		return
+	}
 
-type anthropicMessagesRequest struct {
-	Model         string          `json:"model"`
-	MaxTokens     int             `json:"max_tokens"`
-	Messages      json.RawMessage `json:"messages"`
-	System        json.RawMessage `json:"system,omitempty"`
-	Stream        bool            `json:"stream"`
-	Temperature   *float64        `json:"temperature,omitempty"`
-	TopP          *float64        `json:"top_p,omitempty"`
-	TopK          *int            `json:"top_k,omitempty"`
-	StopSequences []string        `json:"stop_sequences,omitempty"`
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
+	stream := false
+	if s, ok := raw["stream"].(bool); ok {
+		stream = s
+	}
+
+	db := config.GetDB()
+	provider, modelName := services.ResolveOpenAICompatModel(db, modelVal)
+	if provider == "" || modelName == "" {
+		respondAnthropicInvalidRequest(c, "Could not resolve provider from model")
+		return
+	}
+
+	rawBody := json.RawMessage(append(json.RawMessage(nil), bodyBytes...))
+	req := APIProxyRequest{
+		Provider:                 provider,
+		Model:                    modelName,
+		Messages:                 nil,
+		Stream:                   stream,
+		Options:                  nil,
+		RawAnthropicMessagesBody: rawBody,
+	}
+
+	userID, exists := c.Get("user_id")
+	if !exists {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+	userIDInt, ok := userID.(int)
+	if !ok {
+		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
+		return
+	}
+
+	c.Set(ctxKeyAnthropicCompat, anthropicCompatCtx{ClientModel: modelVal})
+	startTime := time.Now()
+	requestID := uuid.New().String()
+	proxyAPIRequestCore(c, userIDInt, requestID, startTime, req, c.Request.URL.Path)
 }
 
 func respondAnthropicInvalidRequest(c *gin.Context, msg string) {
@@ -111,83 +176,23 @@ func AnthropicListModels(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": items, "has_more": false})
 }
 
-// AnthropicMessages 将 Anthropic Messages 请求转为内部 OpenAI 兼容代理链路（含流式 SSE 的协议转换）。
-// Base URL：{API_ORIGIN}/api/v1/anthropic/v1；鉴权：Authorization: Bearer ptd_* 或 x-api-key: ptd_*。
-func AnthropicMessages(c *gin.Context) {
-	bodyBytes, readErr := io.ReadAll(c.Request.Body)
-	if readErr != nil {
-		respondAnthropicInvalidRequest(c, "Failed to read request body")
-		return
+func anthropicJSONNumberToInt(v interface{}) (int, bool) {
+	switch x := v.(type) {
+	case float64:
+		return int(x), true
+	case int:
+		return x, true
+	case int64:
+		return int(x), true
+	case json.Number:
+		n, err := x.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int(n), true
+	default:
+		return 0, false
 	}
-	var in anthropicMessagesRequest
-	if err := json.Unmarshal(bodyBytes, &in); err != nil {
-		respondAnthropicInvalidRequest(c, "Invalid JSON body")
-		return
-	}
-	modelVal := strings.TrimSpace(in.Model)
-	if modelVal == "" {
-		respondAnthropicInvalidRequest(c, "model is required")
-		return
-	}
-	if in.MaxTokens <= 0 {
-		respondAnthropicInvalidRequest(c, "max_tokens is required and must be positive")
-		return
-	}
-	msgs, err := anthropicToChatMessages(in.System, in.Messages)
-	if err != nil {
-		respondAnthropicInvalidRequest(c, err.Error())
-		return
-	}
-	if len(msgs) == 0 {
-		respondAnthropicInvalidRequest(c, "messages must be a non-empty array")
-		return
-	}
-
-	db := config.GetDB()
-	provider, modelName := services.ResolveOpenAICompatModel(db, modelVal)
-	if provider == "" || modelName == "" {
-		respondAnthropicInvalidRequest(c, "Could not resolve provider from model")
-		return
-	}
-
-	opts := map[string]interface{}{"max_tokens": in.MaxTokens}
-	if in.Temperature != nil {
-		opts["temperature"] = *in.Temperature
-	}
-	if in.TopP != nil {
-		opts["top_p"] = *in.TopP
-	}
-	if in.TopK != nil {
-		opts["top_k"] = *in.TopK
-	}
-	if len(in.StopSequences) > 0 {
-		opts["stop"] = in.StopSequences
-	}
-	optBytes, _ := json.Marshal(opts)
-
-	req := APIProxyRequest{
-		Provider: provider,
-		Model:    modelName,
-		Messages: msgs,
-		Stream:   in.Stream,
-		Options:  optBytes,
-	}
-
-	userID, exists := c.Get("user_id")
-	if !exists {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-	userIDInt, ok := userID.(int)
-	if !ok {
-		middleware.RespondWithError(c, apperrors.ErrInvalidToken)
-		return
-	}
-
-	c.Set(ctxKeyAnthropicCompat, anthropicCompatCtx{ClientModel: modelVal})
-	startTime := time.Now()
-	requestID := uuid.New().String()
-	proxyAPIRequestCore(c, userIDInt, requestID, startTime, req, c.Request.URL.Path)
 }
 
 func anthropicToChatMessages(system json.RawMessage, messagesJSON json.RawMessage) ([]ChatMessage, error) {
