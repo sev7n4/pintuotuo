@@ -45,7 +45,7 @@ docker exec pintuotuo-backend /app/capability-probe -out /tmp/capability-probe-l
 
 **GitHub Actions**：默认 **不再** 在 `deploy-tencent.yml` 末尾跑重 probe（避免阻塞部署）。需要全量/重探测时，在 Actions 中手动运行 **Capability probe (Tencent production)**（`.github/workflows/capability-probe-tencent.yml`，`workflow_dispatch`，可选 `-limit` / `-skip-embeddings`），或在部署机 `docker exec`（见上文示例）。
 
-**Admin（单 Key）**：行为与可选范围见 [endpoint-coverage-matrix.md](./endpoint-coverage-matrix.md)。接口：`POST /api/v1/admin/byok-routing/:id/capability-probe`（可选 `skip_embeddings`、`probes`、各模型字段等），`GET /api/v1/admin/byok-routing/:id/probe-models`；响应顶层 **`rows`** 与 CSV 列一致。用于上架前矩阵证据，勿对外泄露 `note` 中的 URL 片段。
+**Admin（单 Key）**：行为与可选范围见 [endpoint-coverage-matrix.md](./endpoint-coverage-matrix.md)。接口：`POST /api/v1/admin/byok-routing/:id/capability-probe`（可选 `skip_embeddings`、`probes`、各模型字段、**`billable`** 等），`GET /api/v1/admin/byok-routing/:id/probe-models`；响应顶层 **`rows`** 与 CSV 列一致。用于上架前矩阵证据，勿对外泄露 `note` 中的 URL 片段。
 
 探测输出勿提交仓库；`.gitignore`：`documentation/capability/capability-probe-output*.csv`。
 

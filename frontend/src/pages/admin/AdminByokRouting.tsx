@@ -55,10 +55,10 @@ const { Title, Text } = Typography;
 /** 部署机 docker 内跑 capability-probe 的示例命令（与 documentation/capability/README.md 一致）。 */
 function buildCapabilityProbeCLI(keyID: number): string {
   return [
-    '# 默认非计费（与 Admin 弹窗矩阵接近）；在部署机 backend 容器内执行：',
+    '# 默认非计费（与 Admin 弹窗「仅非 chat 三项」接近）；在部署机 backend 容器内执行：',
     `docker exec pintuotuo-backend /app/capability-probe -out /tmp/cap-key-${keyID}.csv -api-key-id ${keyID} -limit 1`,
     '',
-    '# 计费类全矩阵（慎用，见 documentation/capability/phase0-scope.md）：',
+    '# 计费类（等同 Admin 弹窗打开「计费类探测」或手动执行）：',
     `# docker exec pintuotuo-backend /app/capability-probe -out /tmp/cap-billable-${keyID}.csv -api-key-id ${keyID} -billable -limit 1`,
   ].join('\n');
 }
@@ -221,6 +221,7 @@ const AdminByokRouting = () => {
   const [capabilityRows, setCapabilityRows] = useState<CapabilityProbeRow[]>([]);
   const [capabilityLoading, setCapabilityLoading] = useState(false);
   const [capabilitySkipEmbeddings, setCapabilitySkipEmbeddings] = useState(false);
+  const [capabilityBillable, setCapabilityBillable] = useState(false);
   const [capabilityEndpointPickMode, setCapabilityEndpointPickMode] = useState<
     'single' | 'multiple'
   >('multiple');
@@ -509,11 +510,12 @@ const AdminByokRouting = () => {
     setCapabilityModerationModel(undefined);
     setCapabilityResponsesModel(undefined);
     setCapabilityFetchedModels([]);
+    setCapabilityBillable(false);
     setCapabilityRows([]);
     setCapabilityModalVisible(true);
   };
 
-  const runCapabilityFromModal = async () => {
+  const runCapabilityFromModal = () => {
     if (!capabilityTarget) return;
     const probesForRequest =
       capabilityEndpointPickMode === 'single' ? [capabilitySingleProbeId] : capabilityProbeIds;
@@ -529,22 +531,41 @@ const AdminByokRouting = () => {
       message.warning('已开启「跳过 embeddings」，请改选 moderations 或 responses');
       return;
     }
-    setCapabilityLoading(true);
-    try {
-      const body: CapabilityProbeRequest = {
-        skip_embeddings: capabilitySkipEmbeddings,
-        probes: probesForRequest,
-      };
-      if (capabilityEmbeddingModel) body.embedding_model = capabilityEmbeddingModel;
-      if (capabilityModerationModel) body.moderation_model = capabilityModerationModel;
-      if (capabilityResponsesModel) body.responses_model = capabilityResponsesModel;
-      const res = await adminByokRoutingService.runCapabilityProbe(capabilityTarget.id, body);
-      setCapabilityRows(res.data.rows || []);
-      message.success('能力探测完成（非 chat 矩阵）');
-    } catch {
-      message.error('能力探测失败或超时，请稍后重试');
-    } finally {
-      setCapabilityLoading(false);
+
+    const execute = async () => {
+      setCapabilityLoading(true);
+      try {
+        const body: CapabilityProbeRequest = {
+          skip_embeddings: capabilitySkipEmbeddings,
+          probes: probesForRequest,
+        };
+        if (capabilityBillable) body.billable = true;
+        if (capabilityEmbeddingModel) body.embedding_model = capabilityEmbeddingModel;
+        if (capabilityModerationModel) body.moderation_model = capabilityModerationModel;
+        if (capabilityResponsesModel) body.responses_model = capabilityResponsesModel;
+        const res = await adminByokRoutingService.runCapabilityProbe(capabilityTarget.id, body);
+        setCapabilityRows(res.data.rows || []);
+        message.success(
+          capabilityBillable ? '能力探测完成（含计费类极小请求）' : '能力探测完成（非 chat 矩阵）'
+        );
+      } catch {
+        message.error('能力探测失败或超时，请稍后重试');
+      } finally {
+        setCapabilityLoading(false);
+      }
+    };
+
+    if (capabilityBillable) {
+      Modal.confirm({
+        title: '确认计费类探测',
+        content:
+          '将额外发起 chat completions、图生、语音/转写等极小 POST（与 CLI -billable 同一路径），可能产生上游费用；与深度验证类似，请仅在环境可接受时执行。',
+        okText: '确认执行',
+        cancelText: '取消',
+        onOk: () => execute(),
+      });
+    } else {
+      void execute();
     }
   };
 
@@ -781,7 +802,7 @@ const AdminByokRouting = () => {
           {renderOperationButton(record, 'probe')}
           {renderOperationButton(record, 'verify')}
           {renderOperationButton(record, 'deep-verify')}
-          <Tooltip title="Phase0 能力探测（非 chat：models / embeddings / moderations / responses 等）">
+          <Tooltip title="Phase0 能力探测：models + 可选非 chat 三项；可选计费类（chat/图/音，与 CLI -billable 同路径）">
             <Button
               size="small"
               icon={<ApiOutlined />}
@@ -838,7 +859,7 @@ const AdminByokRouting = () => {
         {renderOperationButton(record, 'probe')}
         {renderOperationButton(record, 'verify')}
         {renderOperationButton(record, 'deep-verify')}
-        <Tooltip title="Phase0 能力探测（非 chat）">
+        <Tooltip title="Phase0 能力探测（可选计费类）">
           <Button size="small" icon={<ApiOutlined />} onClick={() => openCapabilityModal(record)} />
         </Tooltip>
       </div>
@@ -1080,7 +1101,7 @@ const AdminByokRouting = () => {
       </Modal>
 
       <Modal
-        title="Phase0 能力探测（非 chat）"
+        title="Phase0 能力探测"
         open={capabilityModalVisible}
         onCancel={() => {
           setCapabilityModalVisible(false);
@@ -1105,10 +1126,9 @@ const AdminByokRouting = () => {
               type="secondary"
               style={{ display: 'block', marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}
             >
-              严格来说「非
-              chat」还包含图生（images_*）、语音（audio_*）等；本后台探测固定为不计费模式，只会对下面三项发起真实
-              POST。图/音在结果表里会始终为 skipped（billable_disabled）。完整含计费矩阵请用仓库内
-              capability-probe CLI 的 -billable。每次探测仍会先跑 get_models（列表里第一行）。
+              默认仅对下方勾选的 embeddings / moderations / responses 发起非计费 POST。打开「计费类探测」并确认后，会额外发起与
+              CLI -billable 同路径的极小请求（chat completions、图生、语音/转写等），可能产生上游费用，行为与深度验证类似。每次仍会先跑
+              get_models（结果表第一行）。
             </Text>
             <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
               完整对照表（Admin / CLI / 图音等）：{' '}
@@ -1200,6 +1220,16 @@ const AdminByokRouting = () => {
                 }}
                 disabled={capabilityLoading}
               />
+              <Tooltip title="开启后请求 billable=true：额外发起 chat / 图 / 音等极小计费类 POST（与 CLI -billable 同路径）；开始探测前会二次确认。">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span>计费类探测</span>
+                  <Switch
+                    checked={capabilityBillable}
+                    onChange={setCapabilityBillable}
+                    disabled={capabilityLoading}
+                  />
+                </span>
+              </Tooltip>
               <Button
                 type="default"
                 onClick={() => {

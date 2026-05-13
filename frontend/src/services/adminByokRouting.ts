@@ -154,6 +154,7 @@ const getProbeModels = async (id: number) => {
 
 export interface CapabilityProbeRequest {
   skip_embeddings?: boolean;
+  billable?: boolean;
   probes?: string[];
   embedding_model?: string;
   moderation_model?: string;
@@ -162,10 +163,11 @@ export interface CapabilityProbeRequest {
 }
 
 const runCapabilityProbe = async (id: number, body?: CapabilityProbeRequest) => {
+  const timeout = body?.billable ? 300000 : 180000;
   return api.post<{ rows: CapabilityProbeRow[] }>(
     `/admin/byok-routing/${id}/capability-probe`,
     body ?? {},
-    { timeout: 180000 }
+    { timeout }
   );
 };
 
