@@ -81,9 +81,10 @@ func ProbeScannedKey(
 	return out
 }
 
-// AdminRunOptions configures admin single-key capability probe (non-billable; shorter defaults than CLI).
+// AdminRunOptions configures admin single-key capability probe (default non-billable; optional billable like CLI -billable).
 type AdminRunOptions struct {
 	SkipEmbeddings bool
+	Billable       bool // when true, runs chat / images / audio probes with minimal payloads (may incur upstream charges)
 	HTTPTimeout    time.Duration
 	LongTimeout    time.Duration
 	// NonChatProbeIDs limits non-billable POST probes (embeddings / moderations / responses). Nil = all three (embeddings still obeys SkipEmbeddings).
@@ -171,6 +172,14 @@ func RunForAdminAPIKeyID(ctx context.Context, db *sql.DB, keyID int, opts AdminR
 	if opts.LongTimeout <= 0 {
 		opts.LongTimeout = 90 * time.Second
 	}
+	if opts.Billable {
+		if opts.HTTPTimeout < 60*time.Second {
+			opts.HTTPTimeout = 60 * time.Second
+		}
+		if opts.LongTimeout < 120*time.Second {
+			opts.LongTimeout = 120 * time.Second
+		}
+	}
 
 	row, err := LoadAdminProbeKeyRow(ctx, db, keyID)
 	if err != nil {
@@ -198,7 +207,7 @@ func RunForAdminAPIKeyID(ctx context.Context, db *sql.DB, keyID int, opts AdminR
 
 	pf := ProbeFlags{
 		SkipEmbeddings:     opts.SkipEmbeddings,
-		Billable:           false,
+		Billable:           opts.Billable,
 		NonChatProbeIDs:    opts.NonChatProbeIDs,
 		EmbeddingModel:     emb,
 		ModerationModel:    mod,

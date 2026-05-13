@@ -624,7 +624,7 @@ func GetAdminBYOKProbeModels(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// RunBYOKCapabilityProbe runs Phase0-style non-chat upstream probes for one key (sync; may take up to ~2–3 minutes).
+// RunBYOKCapabilityProbe runs Phase0-style upstream probes for one key (sync; longer when billable=true).
 func RunBYOKCapabilityProbe(c *gin.Context) {
 	userRole, exists := c.Get("user_role")
 	if !exists || userRole != roleAdmin {
@@ -652,6 +652,7 @@ func RunBYOKCapabilityProbe(c *gin.Context) {
 
 	var body struct {
 		SkipEmbeddings  bool      `json:"skip_embeddings"`
+		Billable        bool      `json:"billable"`
 		Probes          *[]string `json:"probes"`
 		EmbeddingModel  string    `json:"embedding_model"`
 		ModerationModel string    `json:"moderation_model"`
@@ -660,6 +661,11 @@ func RunBYOKCapabilityProbe(c *gin.Context) {
 	}
 	_ = c.ShouldBindJSON(&body)
 
+	if body.Billable {
+		logger.LogInfo(c.Request.Context(), "admin_byok_routing", "BYOK capability probe with billable=true (admin)", map[string]interface{}{
+			"merchant_api_key_id": keyID,
+		})
+	}
 	var nonChatIDs []string
 	if body.Probes != nil {
 		if len(*body.Probes) == 0 {
@@ -686,6 +692,7 @@ func RunBYOKCapabilityProbe(c *gin.Context) {
 
 	rows, err := capabilityprobe.RunForAdminAPIKeyID(c.Request.Context(), db, keyID, capabilityprobe.AdminRunOptions{
 		SkipEmbeddings:  body.SkipEmbeddings,
+		Billable:        body.Billable,
 		NonChatProbeIDs: nonChatIDs,
 		EmbeddingModel:  body.EmbeddingModel,
 		ModerationModel: body.ModerationModel,

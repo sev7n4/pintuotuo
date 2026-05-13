@@ -55,7 +55,7 @@
 
 - **`.github/workflows/deploy-tencent.yml`**：默认部署**不再**自动跑重 `capability-probe`（避免长时间阻塞合并部署）。
 - **`.github/workflows/capability-probe-tencent.yml`**：`workflow_dispatch`，与原先 deploy 内逻辑等价（SSH 到腾讯云、`docker exec`、日志中 `tail` CSV 片段）；用于发版后或巡检时按需触发。
-- **Admin API**：`POST /api/v1/admin/byok-routing/:id/capability-probe` 对单条活跃 Key 同步返回顶层 **`rows`**（与 `capability-probe` CSV 列一致；不要求 `verified_at`，便于上架前自检）。**Admin 与 CLI 在各 `probe` 上是否真实请求上游** 的对照见 [endpoint-coverage-matrix.md](./endpoint-coverage-matrix.md)。
+- **Admin API**：`POST /api/v1/admin/byok-routing/:id/capability-probe` 对单条活跃 Key 同步返回顶层 **`rows`**（与 `capability-probe` CSV 列一致；不要求 `verified_at`，便于上架前自检）。请求体可选 **`billable: true`** 以启用与 CLI `-billable` 同路径的**轻量**计费类 POST（管理员 + 前端二次确认；服务端记日志）。**Admin 与 CLI 在各 `probe` 上是否真实请求上游** 的对照见 [endpoint-coverage-matrix.md](./endpoint-coverage-matrix.md)。
 - **全量计费探测**不在 CI 中默认开启；由运维在服务器上手工执行并保存 CSV。
 
 ## 5. Phase 0 完成判据（DoD 补充）
