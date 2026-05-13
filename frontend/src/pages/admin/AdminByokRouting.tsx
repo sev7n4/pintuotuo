@@ -214,7 +214,8 @@ const AdminByokRouting = () => {
   const [probeModelModalVisible, setProbeModelModalVisible] = useState(false);
   const [probeModelTarget, setProbeModelTarget] = useState<BYOKRoutingItem | null>(null);
   const [selectedProbeModel, setSelectedProbeModel] = useState<string | undefined>(undefined);
-  const [cachedModels, setCachedModels] = useState<Map<number, string[]>>(new Map());
+  const [probeModalModels, setProbeModalModels] = useState<string[]>([]);
+  const [probeModalModelsLoading, setProbeModalModelsLoading] = useState(false);
 
   const [capabilityModalVisible, setCapabilityModalVisible] = useState(false);
   const [capabilityTarget, setCapabilityTarget] = useState<BYOKRoutingItem | null>(null);
@@ -271,13 +272,14 @@ const AdminByokRouting = () => {
     fetchData();
   }, [fetchData]);
 
+  /** 与后端 GET .../probe-models（同轻量验证模型目录请求）一致，不合并列表缓存或 models_supported */
   const capabilityModelOptions = useMemo(() => {
     if (!capabilityTarget) return [];
-    const fromCache = cachedModels.get(capabilityTarget.id) || [];
-    const fromRow = capabilityTarget.models_supported || [];
-    const merged = [...new Set([...capabilityFetchedModels, ...fromCache, ...fromRow])];
-    return merged.map((m) => ({ label: m, value: m }));
-  }, [capabilityFetchedModels, capabilityTarget, cachedModels]);
+    const uniq = [...new Set(capabilityFetchedModels.filter((m) => Boolean(m && String(m).trim())))].sort(
+      (a, b) => a.localeCompare(b)
+    );
+    return uniq.map((m) => ({ label: m, value: m }));
+  }, [capabilityFetchedModels, capabilityTarget]);
 
   useEffect(() => {
     if (!capabilityModalVisible || !capabilityTarget) {
@@ -480,11 +482,31 @@ const AdminByokRouting = () => {
     }
   };
 
+  const fetchProbeModelsForModal = async (record: BYOKRoutingItem) => {
+    setProbeModalModelsLoading(true);
+    try {
+      const res = await adminByokRoutingService.getProbeModels(record.id);
+      const list = res.data.models || [];
+      setProbeModalModels(list);
+      setSelectedProbeModel(list.length > 0 ? list[0] : undefined);
+      if (!res.data.success && (res.data.hint || res.data.error_message)) {
+        message.warning((res.data.hint || res.data.error_message) as string);
+      }
+    } catch {
+      message.error('拉取模型列表失败');
+      setProbeModalModels([]);
+      setSelectedProbeModel(undefined);
+    } finally {
+      setProbeModalModelsLoading(false);
+    }
+  };
+
   const openProbeModelSelector = (record: BYOKRoutingItem) => {
     setProbeModelTarget(record);
-    const existing = cachedModels.get(record.id) || record.models_supported || [];
-    setSelectedProbeModel(existing.length > 0 ? existing[0] : undefined);
+    setProbeModalModels([]);
+    setSelectedProbeModel(undefined);
     setProbeModelModalVisible(true);
+    void fetchProbeModelsForModal(record);
   };
 
   const confirmProbeModel = () => {
@@ -585,14 +607,6 @@ const AdminByokRouting = () => {
 
         if (latest) {
           setVerificationResult(latest);
-
-          if (latest.models_found && latest.models_found.length > 0) {
-            setCachedModels((prev) => {
-              const next = new Map(prev);
-              next.set(id, latest.models_found!);
-              return next;
-            });
-          }
 
           if (latest.status === 'pending' || latest.status === 'in_progress') {
             attempts++;
@@ -1285,7 +1299,7 @@ const AdminByokRouting = () => {
               )}
             </Space>
             <Divider orientation="left" plain style={{ margin: '8px 0 12px' }}>
-              各端点模型（可选；选项来自 /v1/models 与已缓存列表）
+              各端点模型（仅来自下方「刷新 /v1/models」；与轻量验证同源，不合并 models_supported）
             </Divider>
             <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }} size="middle">
               <div>
@@ -1302,7 +1316,7 @@ const AdminByokRouting = () => {
                   options={capabilityModelOptions}
                   disabled={capabilityLoading}
                   notFoundContent={
-                    capabilityProbeModelsLoading ? '加载中…' : '暂无列表，可完成深度验证后重试'
+                    capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
                   }
                 />
               </div>
@@ -1319,7 +1333,9 @@ const AdminByokRouting = () => {
                   onChange={(v) => setCapabilityModerationModel(v)}
                   options={capabilityModelOptions}
                   disabled={capabilityLoading}
-                  notFoundContent={capabilityProbeModelsLoading ? '加载中…' : '暂无列表'}
+                  notFoundContent={
+                    capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
+                  }
                 />
               </div>
               <div>
@@ -1335,7 +1351,9 @@ const AdminByokRouting = () => {
                   onChange={(v) => setCapabilityResponsesModel(v)}
                   options={capabilityModelOptions}
                   disabled={capabilityLoading}
-                  notFoundContent={capabilityProbeModelsLoading ? '加载中…' : '暂无列表'}
+                  notFoundContent={
+                    capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
+                  }
                 />
               </div>
               {capabilityBillable && (
@@ -1352,7 +1370,9 @@ const AdminByokRouting = () => {
                     onChange={(v) => setCapabilityChatModel(v)}
                     options={capabilityModelOptions}
                     disabled={capabilityLoading}
-                    notFoundContent={capabilityProbeModelsLoading ? '加载中…' : '暂无列表'}
+                    notFoundContent={
+                      capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
+                    }
                   />
                 </div>
               )}
@@ -1385,7 +1405,12 @@ const AdminByokRouting = () => {
       <Modal
         title="深度验证 - 探测模型选择"
         open={probeModelModalVisible}
-        onCancel={() => setProbeModelModalVisible(false)}
+        onCancel={() => {
+          setProbeModelModalVisible(false);
+          setProbeModelTarget(null);
+          setProbeModalModels([]);
+          setSelectedProbeModel(undefined);
+        }}
         onOk={confirmProbeModel}
         width={480}
         okText="开始深度验证"
@@ -1400,25 +1425,37 @@ const AdminByokRouting = () => {
       >
         <div style={{ marginBottom: 16 }}>
           <p style={{ marginBottom: 8, color: 'rgba(0,0,0,0.65)' }}>
-            选择用于配额探测的模型，不选择将使用默认模型。
+            列表与能力探测、轻量验证同源（GET <code style={{ fontSize: 12 }}>/admin/byok-routing/:id/probe-models</code>
+            ）。不合并列表缓存或 models_supported。
           </p>
-          <Select
-            style={{ width: '100%' }}
-            placeholder="选择探测模型（可选）"
-            allowClear
-            showSearch
-            value={selectedProbeModel}
-            onChange={(val) => setSelectedProbeModel(val)}
-            options={(
-              cachedModels.get(probeModelTarget?.id || 0) ||
-              probeModelTarget?.models_supported ||
-              []
-            ).map((m) => ({
-              label: m,
-              value: m,
-            }))}
-            notFoundContent="暂无模型列表，将使用默认模型"
-          />
+          <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
+            <Select
+              style={{ width: '100%' }}
+              placeholder={probeModalModelsLoading ? '正在拉取模型列表…' : '选择探测模型（可选）'}
+              allowClear
+              showSearch
+              loading={probeModalModelsLoading}
+              value={selectedProbeModel}
+              onChange={(val) => setSelectedProbeModel(val)}
+              options={probeModalModels.map((m) => ({ label: m, value: m }))}
+              notFoundContent={
+                probeModalModelsLoading ? '加载中…' : '暂无，可点击右侧刷新或检查上游'
+              }
+            />
+            <Button
+              type="default"
+              icon={<SyncOutlined spin={probeModalModelsLoading} />}
+              disabled={!probeModelTarget || probeModalModelsLoading}
+              onClick={() => {
+                if (probeModelTarget) void fetchProbeModelsForModal(probeModelTarget);
+              }}
+            >
+              刷新
+            </Button>
+          </Space.Compact>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            不选择将使用默认模型发起深度验证。
+          </Text>
         </div>
       </Modal>
 
