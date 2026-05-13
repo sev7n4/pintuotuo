@@ -143,6 +143,9 @@ func LoadAdminProbeKeyRow(ctx context.Context, db *sql.DB, keyID int) (*AdminPro
 		&mpCode, &apiFormat, &mpAPIBase, &mpProviderRegion,
 		&mpEndpoints, &mpRouteStrategy,
 	)
+	if err == sql.ErrNoRows {
+		return nil, sql.ErrNoRows
+	}
 	if err != nil {
 		return nil, err
 	}
