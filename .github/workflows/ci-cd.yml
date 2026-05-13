@@ -8,6 +8,9 @@ on:
       - 'docs/**'
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  # 在 PR 未自动出现 Checks 时，可在 Actions 里手动运行（选分支 ref）；合并到 main 后也可从默认分支触发。
+  workflow_dispatch:
 
 permissions:
   contents: read
