@@ -37,14 +37,42 @@ func authTokenForProbe(cfg *services.ExecutionProviderConfig, decrypted string) 
 
 // ProbeFlags mirrors cmd/capability-probe probe flags (default billable=false for non-chat Phase0).
 type ProbeFlags struct {
-	SkipEmbeddings     bool
-	Billable           bool
-	EmbeddingModel     string
-	ModerationModel    string
+	SkipEmbeddings  bool
+	Billable        bool
+	EmbeddingModel  string
+	ModerationModel string
+	// ChatModel is used for billable chat completions and (if ResponsesModel empty) for /v1/responses probe.
 	ChatModel          string
+	ResponsesModel     string
 	ImageModel         string
 	SpeechModel        string
 	TranscriptionModel string
+	// NonChatProbeIDs limits which non-billable POST probes run: embeddings, moderations, responses (see services.EndpointType*).
+	// Empty means all three (embeddings still obeys SkipEmbeddings).
+	NonChatProbeIDs []string
+}
+
+func (p ProbeFlags) shouldRunNonChatPost(probeID string) bool {
+	pid := strings.ToLower(strings.TrimSpace(probeID))
+	if pid == services.EndpointTypeEmbeddings && p.SkipEmbeddings {
+		return false
+	}
+	if len(p.NonChatProbeIDs) == 0 {
+		return true
+	}
+	for _, id := range p.NonChatProbeIDs {
+		if strings.ToLower(strings.TrimSpace(id)) == pid {
+			return true
+		}
+	}
+	return false
+}
+
+func responsesProbeModel(p ProbeFlags) string {
+	if s := strings.TrimSpace(p.ResponsesModel); s != "" {
+		return s
+	}
+	return strings.TrimSpace(p.ChatModel)
 }
 
 func postJSONProbe(ctx context.Context, client *http.Client, url, bearer, body string) (code int, ok bool, note string) {
@@ -145,6 +173,8 @@ func runOpenAIFormatProbes(
 
 	if p.SkipEmbeddings {
 		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeEmbeddings, "0", "skipped", "skip_embeddings_flag")
+	} else if !p.shouldRunNonChatPost(services.EndpointTypeEmbeddings) {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeEmbeddings, "0", "skipped", "probe_not_selected")
 	} else {
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeEmbeddings)
 		body := fmt.Sprintf(`{"model":%q,"input":"probe"}`, p.EmbeddingModel)
@@ -152,7 +182,9 @@ func runOpenAIFormatProbes(
 		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeEmbeddings, itoa(code), boolStr(ok), note)
 	}
 
-	{
+	if !p.shouldRunNonChatPost(services.EndpointTypeModerations) {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeModerations, "0", "skipped", "probe_not_selected")
+	} else {
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeModerations)
 		body := fmt.Sprintf(`{"model":%q,"input":"probe"}`, p.ModerationModel)
 		code, ok, note := postJSONProbe(ctx, client, u, tok, body)
@@ -257,11 +289,13 @@ func runOpenAIFormatProbes(
 		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeAudioSpeech, itoa(code), boolStr(ok), note)
 	}
 
-	{
+	if !p.shouldRunNonChatPost(services.EndpointTypeResponses) {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeResponses, "0", "skipped", "probe_not_selected")
+	} else {
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeResponses)
 		maxOut := 1
 		bodyStruct := map[string]interface{}{
-			"model":             p.ChatModel,
+			"model":             responsesProbeModel(p),
 			"input":             "ping",
 			"max_output_tokens": maxOut,
 		}
