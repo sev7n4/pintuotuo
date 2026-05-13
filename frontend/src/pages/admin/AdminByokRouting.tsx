@@ -31,6 +31,7 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   SyncOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import {
   adminByokRoutingService,
@@ -46,9 +47,21 @@ import {
   getErrorCategoryLabel,
   getErrorCategoryColor,
 } from '@/utils/byokRouteMode';
+import { copyToClipboard } from '@/utils/clipboard';
 import styles from './AdminByokRouting.module.css';
 
 const { Title, Text } = Typography;
+
+/** 部署机 docker 内跑 capability-probe 的示例命令（与 documentation/capability/README.md 一致）。 */
+function buildCapabilityProbeCLI(keyID: number): string {
+  return [
+    '# 默认非计费（与 Admin 弹窗矩阵接近）；在部署机 backend 容器内执行：',
+    `docker exec pintuotuo-backend /app/capability-probe -out /tmp/cap-key-${keyID}.csv -api-key-id ${keyID} -limit 1`,
+    '',
+    '# 计费类全矩阵（慎用，见 documentation/capability/phase0-scope.md）：',
+    `# docker exec pintuotuo-backend /app/capability-probe -out /tmp/cap-billable-${keyID}.csv -api-key-id ${keyID} -billable -limit 1`,
+  ].join('\n');
+}
 
 const byokTypeTag = (byokType: string) => {
   const colorMap: Record<string, string> = {
@@ -1210,6 +1223,20 @@ const AdminByokRouting = () => {
               >
                 刷新 /v1/models
               </Button>
+              <Tooltip title="复制可在部署机执行的 docker exec 命令（含单 Key -api-key-id；计费行为见注释）">
+                <Button
+                  type="default"
+                  icon={<CopyOutlined />}
+                  disabled={capabilityLoading || !capabilityTarget}
+                  onClick={async () => {
+                    if (!capabilityTarget) return;
+                    const ok = await copyToClipboard(buildCapabilityProbeCLI(capabilityTarget.id));
+                    message[ok ? 'success' : 'error'](ok ? '已复制 CLI 命令' : '复制失败');
+                  }}
+                >
+                  复制 CLI 命令
+                </Button>
+              </Tooltip>
               <Button type="primary" onClick={runCapabilityFromModal} loading={capabilityLoading}>
                 开始探测
               </Button>

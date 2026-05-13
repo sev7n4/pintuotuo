@@ -40,7 +40,7 @@
 | 阶段 | 建议动作 |
 |------|----------|
 | **Phase B** | 产品/风控确认：是否允许在 Admin 内显式开启「计费类」探测；若否，CLI / 手工工作流保持为全矩阵主入口。 |
-| **Phase C（轻量）** | Admin 或 Runbook 提供「一键复制 `docker exec … capability-probe …`」片段，降低运维门槛。 |
+| **Phase C（轻量）** | Admin「Phase0 能力探测」弹窗已提供 **复制 CLI 命令**（`docker exec … capability-probe -api-key-id …`）；Runbook 仍可补充环境差异说明。 |
 | **Phase C（重量）** | 若批准：Admin 增加 `billable` + 图/音勾选、异步任务、审计日志；与本表同步更新「Admin 是否真实请求」列。 |
 
 ---
