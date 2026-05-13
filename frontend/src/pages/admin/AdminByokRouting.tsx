@@ -234,6 +234,7 @@ const AdminByokRouting = () => {
   const [capabilityEmbeddingModel, setCapabilityEmbeddingModel] = useState<string | undefined>();
   const [capabilityModerationModel, setCapabilityModerationModel] = useState<string | undefined>();
   const [capabilityResponsesModel, setCapabilityResponsesModel] = useState<string | undefined>();
+  const [capabilityChatModel, setCapabilityChatModel] = useState<string | undefined>();
   const [capabilityFetchedModels, setCapabilityFetchedModels] = useState<string[]>([]);
   const [capabilityProbeModelsLoading, setCapabilityProbeModelsLoading] = useState(false);
 
@@ -509,6 +510,7 @@ const AdminByokRouting = () => {
     setCapabilityEmbeddingModel(undefined);
     setCapabilityModerationModel(undefined);
     setCapabilityResponsesModel(undefined);
+    setCapabilityChatModel(undefined);
     setCapabilityFetchedModels([]);
     setCapabilityBillable(false);
     setCapabilityRows([]);
@@ -543,6 +545,7 @@ const AdminByokRouting = () => {
         if (capabilityEmbeddingModel) body.embedding_model = capabilityEmbeddingModel;
         if (capabilityModerationModel) body.moderation_model = capabilityModerationModel;
         if (capabilityResponsesModel) body.responses_model = capabilityResponsesModel;
+        if (capabilityChatModel) body.chat_model = capabilityChatModel;
         const res = await adminByokRoutingService.runCapabilityProbe(capabilityTarget.id, body);
         setCapabilityRows(res.data.rows || []);
         message.success(
@@ -559,7 +562,7 @@ const AdminByokRouting = () => {
       Modal.confirm({
         title: '确认计费类探测',
         content:
-          '将额外发起 chat completions、图生、语音/转写等极小 POST（与 CLI -billable 同一路径），可能产生上游费用；与深度验证类似，请仅在环境可接受时执行。',
+          '将额外发起 chat completions、图生、语音/转写等极小 POST（与 CLI -billable 同一路径），可能产生上游费用；与深度验证类似，请仅在环境可接受时执行。可在下方「Chat completions」下拉中指定 chat 模型（可选，不选则默认 gpt-4o-mini）。',
         okText: '确认执行',
         cancelText: '取消',
         onOk: () => execute(),
@@ -1282,7 +1285,7 @@ const AdminByokRouting = () => {
               )}
             </Space>
             <Divider orientation="left" plain style={{ margin: '8px 0 12px' }}>
-              各端点模型（可选，不选则使用服务端默认；选项来自 /v1/models 与已缓存列表）
+              各端点模型（可选；选项来自 /v1/models 与已缓存列表）
             </Divider>
             <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }} size="middle">
               <div>
@@ -1325,7 +1328,7 @@ const AdminByokRouting = () => {
                 </div>
                 <Select
                   style={{ width: '100%', maxWidth: 480 }}
-                  placeholder="默认与 chat 探测一致（gpt-4o-mini）"
+                  placeholder="未填时与 Chat 模型或默认 gpt-4o-mini 一致"
                   allowClear
                   showSearch
                   value={capabilityResponsesModel}
@@ -1335,6 +1338,24 @@ const AdminByokRouting = () => {
                   notFoundContent={capabilityProbeModelsLoading ? '加载中…' : '暂无列表'}
                 />
               </div>
+              {capabilityBillable && (
+                <div>
+                  <div style={{ marginBottom: 4, fontSize: 12, color: 'rgba(0,0,0,0.55)' }}>
+                    Chat completions（计费类）
+                  </div>
+                  <Select
+                    style={{ width: '100%', maxWidth: 480 }}
+                    placeholder="默认 gpt-4o-mini；与深度验证探测模型用法相同"
+                    allowClear
+                    showSearch
+                    value={capabilityChatModel}
+                    onChange={(v) => setCapabilityChatModel(v)}
+                    options={capabilityModelOptions}
+                    disabled={capabilityLoading}
+                    notFoundContent={capabilityProbeModelsLoading ? '加载中…' : '暂无列表'}
+                  />
+                </div>
+              )}
             </Space>
             {capabilityLoading && (
               <div style={{ textAlign: 'center', padding: 24 }}>
