@@ -233,14 +233,19 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 		}, nil
 	}
 
-	modelsEndpoint := OpenAICompatModelsProbeURL(endpoint)
 	resolvedMode := s.resolvedRouteMode(ctx, apiKey)
-	authToken := s.getDecryptedAPIKey(apiKey)
+	modelsBase := endpoint
 	if resolvedMode == GatewayModeLitellm {
-		if masterKey := os.Getenv("LITELLM_MASTER_KEY"); masterKey != "" {
-			authToken = strings.TrimSpace(masterKey)
+		// Match APIKeyValidator.performVerificationWithRouteMode: for litellm traffic, list models from the
+		// configured direct upstream base when present, using the merchant key — not the LiteLLM gateway
+		// /v1/models catalog with LITELLM_MASTER_KEY (which caused Admin probe-models vs 轻量验证 列表不一致).
+		if upstream, upErr := s.resolveDirectEndpoint(ctx, apiKey); upErr == nil && strings.TrimSpace(upstream) != "" {
+			modelsBase = upstream
 		}
 	}
+	authToken := s.getDecryptedAPIKey(apiKey)
+
+	modelsEndpoint := OpenAICompatModelsProbeURL(modelsBase)
 	client := s.routeAwareHTTPClient(resolvedMode)
 	probe, err := ProbeProviderModels(ctx, client, modelsEndpoint, authToken, apiKey.Provider)
 	if err != nil {
