@@ -1,11 +1,10 @@
-package main
+package capabilityprobe
 
 import (
 	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,38 +35,16 @@ func authTokenForProbe(cfg *services.ExecutionProviderConfig, decrypted string) 
 	return decrypted
 }
 
-func writeProbeRow(w *csv.Writer, ts string, key *models.MerchantAPIKey, apiFormat, routeMode, probe, httpCode, ok, note string) {
-	_ = w.Write([]string{
-		ts, itoa(key.ID), itoa(key.MerchantID), key.Provider, apiFormat, routeMode,
-		probe, httpCode, ok, truncate(note, 600),
-	})
-	w.Flush()
-}
-
-// pcmWavProbeMono16LE 生成极短静音 WAV（固定 16kHz / 200ms），供音频类 POST 探测；避免可变整型转换以通过 gosec G115。
-func pcmWavProbeMono16LE() []byte {
-	const sampleRate = 16000
-	const durationMs = 200
-	numSamples := sampleRate * durationMs / 1000
-	if numSamples < 1 {
-		numSamples = 1
-	}
-	dataSize := numSamples * 2
-	buf := make([]byte, 44+dataSize)
-	copy(buf[0:4], []byte("RIFF"))
-	binary.LittleEndian.PutUint32(buf[4:8], uint32(36+dataSize))
-	copy(buf[8:12], []byte("WAVEfmt "))
-	binary.LittleEndian.PutUint32(buf[12:16], 16)
-	binary.LittleEndian.PutUint16(buf[16:18], 1)
-	binary.LittleEndian.PutUint16(buf[18:20], 1)
-	binary.LittleEndian.PutUint32(buf[20:24], sampleRate)
-	binary.LittleEndian.PutUint32(buf[24:28], sampleRate*2)
-	binary.LittleEndian.PutUint16(buf[28:30], 2)
-	binary.LittleEndian.PutUint16(buf[30:32], 16)
-	copy(buf[32:36], []byte("data"))
-	binary.LittleEndian.PutUint32(buf[36:40], uint32(dataSize))
-	// PCM silence already zero
-	return buf
+// ProbeFlags mirrors cmd/capability-probe probe flags (default billable=false for non-chat Phase0).
+type ProbeFlags struct {
+	SkipEmbeddings     bool
+	Billable           bool
+	EmbeddingModel     string
+	ModerationModel    string
+	ChatModel          string
+	ImageModel         string
+	SpeechModel        string
+	TranscriptionModel string
 }
 
 func postJSONProbe(ctx context.Context, client *http.Client, url, bearer, body string) (code int, ok bool, note string) {
@@ -110,10 +87,34 @@ func postMultipartProbe(ctx context.Context, client *http.Client, url, bearer st
 	return resp.StatusCode, resp.StatusCode >= 200 && resp.StatusCode < 300, resp.Status
 }
 
-// runOpenAIFormatProbes emits one CSV row per OpenAI-shaped endpoint (与 services.EndpointType* 对齐)。
+// pcmWavProbeMono16LE 生成极短静音 WAV（固定 16kHz / 200ms），供音频类 POST 探测；避免可变整型转换以通过 gosec G115。
+func pcmWavProbeMono16LE() []byte {
+	const sampleRate = 16000
+	const durationMs = 200
+	numSamples := sampleRate * durationMs / 1000
+	if numSamples < 1 {
+		numSamples = 1
+	}
+	dataSize := numSamples * 2
+	buf := make([]byte, 44+dataSize)
+	copy(buf[0:4], []byte("RIFF"))
+	binary.LittleEndian.PutUint32(buf[4:8], uint32(36+dataSize))
+	copy(buf[8:12], []byte("WAVEfmt "))
+	binary.LittleEndian.PutUint32(buf[12:16], 16)
+	binary.LittleEndian.PutUint16(buf[16:18], 1)
+	binary.LittleEndian.PutUint16(buf[18:20], 1)
+	binary.LittleEndian.PutUint32(buf[20:24], sampleRate)
+	binary.LittleEndian.PutUint32(buf[24:28], sampleRate*2)
+	binary.LittleEndian.PutUint16(buf[28:30], 2)
+	binary.LittleEndian.PutUint16(buf[30:32], 16)
+	copy(buf[32:36], []byte("data"))
+	binary.LittleEndian.PutUint32(buf[36:40], uint32(dataSize))
+	return buf
+}
+
 func runOpenAIFormatProbes(
 	ctx context.Context,
-	w *csv.Writer,
+	out *[]Row,
 	ts string,
 	client *http.Client,
 	longClient *http.Client,
@@ -121,67 +122,62 @@ func runOpenAIFormatProbes(
 	apiFormat, routeMode string,
 	mpCode, mpAPIBase, mpProviderRegion string,
 	mpEndpoints, mpRouteStrategy []byte,
-	p probeFlags,
+	p ProbeFlags,
 ) {
-	cfg, err := buildExecCfg(mpCode, mpAPIBase, apiFormat, mpProviderRegion, mpRouteStrategy, mpEndpoints, key)
+	cfg, err := BuildExecutionConfig(mpCode, mpAPIBase, apiFormat, mpProviderRegion, mpRouteStrategy, mpEndpoints, key)
 	if err != nil {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "openai_probe_init", "0", "false", "build_cfg:"+err.Error())
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "openai_probe_init", "0", "false", "build_cfg:"+err.Error())
 		return
 	}
 	decrypted, derr := utils.Decrypt(key.APIKeyEncrypted)
 	if derr != nil || decrypted == "" {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "openai_probe_init", "0", "false", "decrypt_failed")
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "openai_probe_init", "0", "false", "decrypt_failed")
 		return
 	}
 	tok := authTokenForProbe(cfg, decrypted)
 
 	baseURL, _, err := services.ResolveMerchantAPIKeyUpstreamBase(ctx, key)
 	if err != nil {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "resolve_base", "0", "false", err.Error())
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "resolve_base", "0", "false", err.Error())
 		return
 	}
 	chatURL := services.OpenAICompatChatCompletionsURL(baseURL)
 
-	// --- embeddings ---
-	if p.skipEmbeddings {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeEmbeddings, "0", "skipped", "skip_embeddings_flag")
+	if p.SkipEmbeddings {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeEmbeddings, "0", "skipped", "skip_embeddings_flag")
 	} else {
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeEmbeddings)
-		body := fmt.Sprintf(`{"model":%q,"input":"probe"}`, p.embeddingModel)
+		body := fmt.Sprintf(`{"model":%q,"input":"probe"}`, p.EmbeddingModel)
 		code, ok, note := postJSONProbe(ctx, client, u, tok, body)
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeEmbeddings, itoa(code), boolStr(ok), note)
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeEmbeddings, itoa(code), boolStr(ok), note)
 	}
 
-	// --- moderations（通常低成本）---
 	{
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeModerations)
-		body := fmt.Sprintf(`{"model":%q,"input":"probe"}`, p.moderationModel)
+		body := fmt.Sprintf(`{"model":%q,"input":"probe"}`, p.ModerationModel)
 		code, ok, note := postJSONProbe(ctx, client, u, tok, body)
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeModerations, itoa(code), boolStr(ok), note)
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeModerations, itoa(code), boolStr(ok), note)
 	}
 
-	// --- chat completions ---
-	if !p.billable {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeChatCompletions, "0", "skipped", "set_-billable_to_enable_token_charging_probes")
+	if !p.Billable {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeChatCompletions, "0", "skipped", "set_-billable_to_enable_token_charging_probes")
 	} else {
-		body := fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"p"}],"max_tokens":1}`, p.chatModel)
+		body := fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"p"}],"max_tokens":1}`, p.ChatModel)
 		code, ok, note := postJSONProbe(ctx, longClient, chatURL, tok, body)
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeChatCompletions, itoa(code), boolStr(ok), note)
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeChatCompletions, itoa(code), boolStr(ok), note)
 	}
 
-	// --- images generations ---
-	if !p.billable {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeImagesGenerations, "0", "skipped", "billable_disabled")
+	if !p.Billable {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeImagesGenerations, "0", "skipped", "billable_disabled")
 	} else {
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeImagesGenerations)
-		body := fmt.Sprintf(`{"model":%q,"prompt":"solid gray","n":1,"size":"256x256"}`, p.imageModel)
+		body := fmt.Sprintf(`{"model":%q,"prompt":"solid gray","n":1,"size":"256x256"}`, p.ImageModel)
 		code, ok, note := postJSONProbe(ctx, longClient, u, tok, body)
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeImagesGenerations, itoa(code), boolStr(ok), note)
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeImagesGenerations, itoa(code), boolStr(ok), note)
 	}
 
-	// --- images variations (multipart) ---
-	if !p.billable {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeImagesVariations, "0", "skipped", "billable_disabled")
+	if !p.Billable {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeImagesVariations, "0", "skipped", "billable_disabled")
 	} else {
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeImagesVariations)
 		code, ok, note := postMultipartProbe(ctx, longClient, u, tok, func(mw *multipart.Writer) error {
@@ -195,12 +191,11 @@ func runOpenAIFormatProbes(
 			_, err = fw.Write(probePNG1x1)
 			return err
 		})
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeImagesVariations, itoa(code), boolStr(ok), note)
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeImagesVariations, itoa(code), boolStr(ok), note)
 	}
 
-	// --- images edits ---
-	if !p.billable {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeImagesEdits, "0", "skipped", "billable_disabled")
+	if !p.Billable {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeImagesEdits, "0", "skipped", "billable_disabled")
 	} else {
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeImagesEdits)
 		code, ok, note := postMultipartProbe(ctx, longClient, u, tok, func(mw *multipart.Writer) error {
@@ -215,18 +210,17 @@ func runOpenAIFormatProbes(
 			_, err = fw.Write(probePNG1x1)
 			return err
 		})
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeImagesEdits, itoa(code), boolStr(ok), note)
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeImagesEdits, itoa(code), boolStr(ok), note)
 	}
 
 	wav := pcmWavProbeMono16LE()
 
-	// --- audio transcriptions ---
-	if !p.billable {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeAudioTranscriptions, "0", "skipped", "billable_disabled")
+	if !p.Billable {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeAudioTranscriptions, "0", "skipped", "billable_disabled")
 	} else {
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeAudioTranscriptions)
 		code, ok, note := postMultipartProbe(ctx, longClient, u, tok, func(mw *multipart.Writer) error {
-			_ = mw.WriteField("model", p.transcriptionModel)
+			_ = mw.WriteField("model", p.TranscriptionModel)
 			fw, err := mw.CreateFormFile("file", "probe.wav")
 			if err != nil {
 				return err
@@ -234,16 +228,15 @@ func runOpenAIFormatProbes(
 			_, err = fw.Write(wav)
 			return err
 		})
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeAudioTranscriptions, itoa(code), boolStr(ok), note)
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeAudioTranscriptions, itoa(code), boolStr(ok), note)
 	}
 
-	// --- audio translations ---
-	if !p.billable {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeAudioTranslations, "0", "skipped", "billable_disabled")
+	if !p.Billable {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeAudioTranslations, "0", "skipped", "billable_disabled")
 	} else {
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeAudioTranslations)
 		code, ok, note := postMultipartProbe(ctx, longClient, u, tok, func(mw *multipart.Writer) error {
-			_ = mw.WriteField("model", p.transcriptionModel)
+			_ = mw.WriteField("model", p.TranscriptionModel)
 			_ = mw.WriteField("prompt", "translate to English")
 			fw, err := mw.CreateFormFile("file", "probe.wav")
 			if err != nil {
@@ -252,48 +245,28 @@ func runOpenAIFormatProbes(
 			_, err = fw.Write(wav)
 			return err
 		})
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeAudioTranslations, itoa(code), boolStr(ok), note)
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeAudioTranslations, itoa(code), boolStr(ok), note)
 	}
 
-	// --- audio speech ---
-	if !p.billable {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeAudioSpeech, "0", "skipped", "billable_disabled")
+	if !p.Billable {
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeAudioSpeech, "0", "skipped", "billable_disabled")
 	} else {
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeAudioSpeech)
-		body := fmt.Sprintf(`{"model":%q,"input":"hi","voice":"alloy"}`, p.speechModel)
+		body := fmt.Sprintf(`{"model":%q,"input":"hi","voice":"alloy"}`, p.SpeechModel)
 		code, ok, note := postJSONProbe(ctx, longClient, u, tok, body)
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeAudioSpeech, itoa(code), boolStr(ok), note)
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeAudioSpeech, itoa(code), boolStr(ok), note)
 	}
 
-	// --- responses ---
 	{
 		u := services.ResolveEndpointByType(cfg, services.EndpointTypeResponses)
 		maxOut := 1
 		bodyStruct := map[string]interface{}{
-			"model":             p.chatModel,
+			"model":             p.ChatModel,
 			"input":             "ping",
 			"max_output_tokens": maxOut,
 		}
 		b, _ := json.Marshal(bodyStruct)
 		code, ok, note := postJSONProbe(ctx, longClient, u, tok, string(b))
-		writeProbeRow(w, ts, key, apiFormat, routeMode, "post_"+services.EndpointTypeResponses, itoa(code), boolStr(ok), note)
+		appendRow(out, ts, key.ID, key.MerchantID, key.Provider, apiFormat, routeMode, "post_"+services.EndpointTypeResponses, itoa(code), boolStr(ok), note)
 	}
-}
-
-type probeFlags struct {
-	skipEmbeddings     bool
-	billable           bool
-	embeddingModel     string
-	moderationModel    string
-	chatModel          string
-	imageModel         string
-	speechModel        string
-	transcriptionModel string
-}
-
-func boolStr(v bool) string {
-	if v {
-		return "true"
-	}
-	return "false"
 }

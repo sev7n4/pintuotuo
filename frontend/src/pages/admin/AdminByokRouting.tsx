@@ -13,6 +13,7 @@ import {
   Input,
   Tooltip,
   Spin,
+  Switch,
   Descriptions,
   Result,
   Divider,
@@ -23,6 +24,7 @@ import {
   SettingOutlined,
   ThunderboltOutlined,
   SafetyCertificateOutlined,
+  ApiOutlined,
   SearchOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
@@ -33,6 +35,7 @@ import {
   BYOKRoutingItem,
   UpdateRouteConfigRequest,
   VerificationResult,
+  CapabilityProbeRow,
 } from '@/services/adminByokRouting';
 import {
   getRouteModeLabel,
@@ -196,6 +199,12 @@ const AdminByokRouting = () => {
   const [probeModelTarget, setProbeModelTarget] = useState<BYOKRoutingItem | null>(null);
   const [selectedProbeModel, setSelectedProbeModel] = useState<string | undefined>(undefined);
   const [cachedModels, setCachedModels] = useState<Map<number, string[]>>(new Map());
+
+  const [capabilityModalVisible, setCapabilityModalVisible] = useState(false);
+  const [capabilityTarget, setCapabilityTarget] = useState<BYOKRoutingItem | null>(null);
+  const [capabilityRows, setCapabilityRows] = useState<CapabilityProbeRow[]>([]);
+  const [capabilityLoading, setCapabilityLoading] = useState(false);
+  const [capabilitySkipEmbeddings, setCapabilitySkipEmbeddings] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -422,6 +431,29 @@ const AdminByokRouting = () => {
     }
   };
 
+  const openCapabilityModal = (record: BYOKRoutingItem) => {
+    setCapabilityTarget(record);
+    setCapabilitySkipEmbeddings(false);
+    setCapabilityRows([]);
+    setCapabilityModalVisible(true);
+  };
+
+  const runCapabilityFromModal = async () => {
+    if (!capabilityTarget) return;
+    setCapabilityLoading(true);
+    try {
+      const res = await adminByokRoutingService.runCapabilityProbe(capabilityTarget.id, {
+        skip_embeddings: capabilitySkipEmbeddings,
+      });
+      setCapabilityRows(res.data.rows || []);
+      message.success('能力探测完成（非 chat 矩阵）');
+    } catch {
+      message.error('能力探测失败或超时，请稍后重试');
+    } finally {
+      setCapabilityLoading(false);
+    }
+  };
+
   const pollVerificationResult = async (id: number) => {
     const maxAttempts = 30;
     const interval = 2000;
@@ -641,7 +673,7 @@ const AdminByokRouting = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 220,
+      width: 280,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small" wrap>
@@ -655,6 +687,13 @@ const AdminByokRouting = () => {
           {renderOperationButton(record, 'probe')}
           {renderOperationButton(record, 'verify')}
           {renderOperationButton(record, 'deep-verify')}
+          <Tooltip title="Phase0 能力探测（非 chat：models / embeddings / moderations / responses 等）">
+            <Button
+              size="small"
+              icon={<ApiOutlined />}
+              onClick={() => openCapabilityModal(record)}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -705,6 +744,9 @@ const AdminByokRouting = () => {
         {renderOperationButton(record, 'probe')}
         {renderOperationButton(record, 'verify')}
         {renderOperationButton(record, 'deep-verify')}
+        <Tooltip title="Phase0 能力探测（非 chat）">
+          <Button size="small" icon={<ApiOutlined />} onClick={() => openCapabilityModal(record)} />
+        </Tooltip>
       </div>
     </div>
   );
@@ -939,6 +981,74 @@ const AdminByokRouting = () => {
                 </Descriptions.Item>
               )}
             </Descriptions>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        title="Phase0 能力探测（非 chat）"
+        open={capabilityModalVisible}
+        onCancel={() => {
+          setCapabilityModalVisible(false);
+          setCapabilityTarget(null);
+          setCapabilityRows([]);
+        }}
+        footer={null}
+        width={920}
+        destroyOnClose
+      >
+        {capabilityTarget && (
+          <div>
+            <p style={{ marginBottom: 12, color: 'rgba(0,0,0,0.65)' }}>
+              商户：{capabilityTarget.company_name} · Key：{capabilityTarget.name}（
+              {capabilityTarget.provider.toUpperCase()}）
+            </p>
+            <Space wrap style={{ marginBottom: 16 }}>
+              <span>跳过 embeddings POST</span>
+              <Switch
+                checked={capabilitySkipEmbeddings}
+                onChange={setCapabilitySkipEmbeddings}
+                disabled={capabilityLoading}
+              />
+              <Button
+                type="primary"
+                onClick={runCapabilityFromModal}
+                loading={capabilityLoading}
+              >
+                开始探测
+              </Button>
+              {capabilityRows.length > 0 && (
+                <Button
+                  onClick={() => {
+                    setCapabilityRows([]);
+                  }}
+                  disabled={capabilityLoading}
+                >
+                  清空结果
+                </Button>
+              )}
+            </Space>
+            {capabilityLoading && (
+              <div style={{ textAlign: 'center', padding: 24 }}>
+                <Spin size="large" />
+                <p style={{ marginTop: 12 }}>正在请求上游（可能需 1–3 分钟）…</p>
+              </div>
+            )}
+            {capabilityRows.length > 0 && (
+              <Table
+                size="small"
+                pagination={false}
+                dataSource={capabilityRows.map((r, i) => ({ ...r, key: i }))}
+                columns={[
+                  { title: 'probe', dataIndex: 'probe', key: 'probe', width: 220 },
+                  { title: 'HTTP', dataIndex: 'http_code', key: 'http_code', width: 72 },
+                  { title: 'ok', dataIndex: 'ok', key: 'ok', width: 56 },
+                  { title: 'api_format', dataIndex: 'api_format', key: 'api_format', width: 96 },
+                  { title: 'route_mode', dataIndex: 'route_mode', key: 'route_mode', width: 100 },
+                  { title: 'note', dataIndex: 'note', key: 'note', ellipsis: true },
+                ]}
+              />
+            )}
           </div>
         )}
       </Modal>

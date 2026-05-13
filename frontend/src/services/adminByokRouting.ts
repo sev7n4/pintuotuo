@@ -124,6 +124,27 @@ const getVerificationDetails = async (
   return api.get(`/admin/byok-routing/${id}/verification`);
 };
 
+export interface CapabilityProbeRow {
+  ts: string;
+  merchant_api_key_id: number;
+  merchant_id: number;
+  provider: string;
+  api_format: string;
+  route_mode: string;
+  probe: string;
+  http_code: string;
+  ok: string;
+  note: string;
+}
+
+const runCapabilityProbe = async (id: number, body?: { skip_embeddings?: boolean }) => {
+  return api.post<{ rows: CapabilityProbeRow[] }>(
+    `/admin/byok-routing/${id}/capability-probe`,
+    body ?? {},
+    { timeout: 180000 }
+  );
+};
+
 export const adminByokRoutingService = {
   getByokRoutingList,
   updateRouteConfig,
@@ -131,4 +152,5 @@ export const adminByokRoutingService = {
   triggerLightVerify,
   triggerDeepVerify,
   getVerificationDetails,
+  runCapabilityProbe,
 };

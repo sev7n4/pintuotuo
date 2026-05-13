@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pintuotuo/backend/capabilityprobe"
 	"github.com/pintuotuo/backend/config"
 	"github.com/pintuotuo/backend/models"
 	"github.com/pintuotuo/backend/services"
@@ -82,15 +83,15 @@ func main() {
 	client := &http.Client{Timeout: *httpTimeout}
 	longClient := &http.Client{Timeout: *longTimeout}
 
-	pf := probeFlags{
-		skipEmbeddings:     *skipEmbeddings,
-		billable:           *billable,
-		embeddingModel:     strings.TrimSpace(*embeddingModel),
-		moderationModel:    strings.TrimSpace(*moderationModel),
-		chatModel:          strings.TrimSpace(*chatModel),
-		imageModel:         strings.TrimSpace(*imageModel),
-		speechModel:        strings.TrimSpace(*speechModel),
-		transcriptionModel: strings.TrimSpace(*transcriptionModel),
+	pf := capabilityprobe.ProbeFlags{
+		SkipEmbeddings:     *skipEmbeddings,
+		Billable:           *billable,
+		EmbeddingModel:     strings.TrimSpace(*embeddingModel),
+		ModerationModel:    strings.TrimSpace(*moderationModel),
+		ChatModel:          strings.TrimSpace(*chatModel),
+		ImageModel:         strings.TrimSpace(*imageModel),
+		SpeechModel:        strings.TrimSpace(*speechModel),
+		TranscriptionModel: strings.TrimSpace(*transcriptionModel),
 	}
 
 	args := []interface{}{}
@@ -164,99 +165,13 @@ LIMIT %d
 			_ = json.Unmarshal(routeConfigBytes, &key.RouteConfig)
 		}
 
-		routeMode := ""
-		if _, rm, e2 := services.ResolveMerchantAPIKeyUpstreamBase(ctx, &key); e2 == nil {
-			routeMode = rm
+		for _, r := range capabilityprobe.ProbeScannedKey(ctx, hc, client, longClient, ts, &key, apiFormat, mpCode, mpAPIBase, mpProviderRegion, mpEndpoints, mpRouteStrategy, pf) {
+			_ = w.Write(r.CSVRecord())
 		}
-
-		full, err := hc.FullVerification(ctx, &key)
-		note := ""
-		httpCode := 0
-		ok := "false"
-		if err != nil {
-			note = "health_error:" + err.Error()
-		} else if full != nil {
-			httpCode = full.StatusCode
-			if full.Success {
-				ok = "true"
-				if httpCode == 0 {
-					httpCode = 200
-				}
-			}
-			note = strings.TrimSpace(full.ErrorMessage)
-			if note == "" && len(full.ModelsFound) > 0 {
-				note = fmt.Sprintf("models_count=%d", len(full.ModelsFound))
-			}
-		}
-		writeProbeRow(w, ts, &key, apiFormat, routeMode, "get_models", itoa(httpCode), ok, truncate(note, 500))
-
-		if strings.ToLower(strings.TrimSpace(apiFormat)) != "openai" {
-			writeNonOpenAISkips(w, ts, &key, apiFormat, routeMode)
-			continue
-		}
-
-		runOpenAIFormatProbes(ctx, w, ts, client, longClient, &key, apiFormat, routeMode, mpCode, mpAPIBase, mpProviderRegion, mpEndpoints, mpRouteStrategy, pf)
+		w.Flush()
 	}
 	if err := rows.Err(); err != nil {
 		log.Fatalf("rows: %v", err)
 	}
 	w.Flush()
-}
-
-func writeNonOpenAISkips(w *csv.Writer, ts string, key *models.MerchantAPIKey, apiFormat, routeMode string) {
-	for _, probe := range []string{
-		"post_" + services.EndpointTypeChatCompletions,
-		"post_" + services.EndpointTypeEmbeddings,
-		"post_" + services.EndpointTypeImagesGenerations,
-		"post_" + services.EndpointTypeImagesVariations,
-		"post_" + services.EndpointTypeImagesEdits,
-		"post_" + services.EndpointTypeAudioTranscriptions,
-		"post_" + services.EndpointTypeAudioTranslations,
-		"post_" + services.EndpointTypeAudioSpeech,
-		"post_" + services.EndpointTypeModerations,
-		"post_" + services.EndpointTypeResponses,
-	} {
-		writeProbeRow(w, ts, key, apiFormat, routeMode, probe, "0", "skipped", "api_format_not_openai_use_anthropic_native_or_other_adapter")
-	}
-}
-
-func itoa(v int) string {
-	return fmt.Sprintf("%d", v)
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "…"
-}
-
-func buildExecCfg(
-	mpCode, mpAPIBase, apiFormat, mpProviderRegion string,
-	mpRouteStrategy, mpEndpoints []byte,
-	key *models.MerchantAPIKey,
-) (*services.ExecutionProviderConfig, error) {
-	var rs, ep map[string]interface{}
-	if err := json.Unmarshal(mpRouteStrategy, &rs); err != nil {
-		rs = map[string]interface{}{}
-	}
-	if err := json.Unmarshal(mpEndpoints, &ep); err != nil {
-		ep = map[string]interface{}{}
-	}
-	cfg := &services.ExecutionProviderConfig{
-		Code:            mpCode,
-		Name:            mpCode,
-		APIBaseURL:      mpAPIBase,
-		APIFormat:       apiFormat,
-		ProviderRegion:  mpProviderRegion,
-		RouteStrategy:   rs,
-		Endpoints:       ep,
-		BYOKEndpointURL: strings.TrimSpace(key.EndpointURL),
-		BYOKRouteMode:   key.RouteMode,
-		BYOKRouteConfig: key.RouteConfig,
-		BYOKFallbackURL: strings.TrimSpace(key.FallbackEndpointURL),
-		BYOKRegion:      strings.TrimSpace(key.Region),
-	}
-	services.ConfigureGatewayMode(cfg)
-	return cfg, nil
 }
