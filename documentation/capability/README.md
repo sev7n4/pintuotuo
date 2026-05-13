@@ -18,7 +18,7 @@
 
 ## 上游探测命令（Go，从数据库读取 BYOK）
 
-实现路径：[backend/cmd/capability-probe/](../../backend/cmd/capability-probe/)（`main.go` + `probes.go`）
+实现路径：共享包 [`backend/capabilityprobe/`](../../backend/capabilityprobe/)（与 `cmd/capability-probe`、Admin API 共用探测逻辑）；CLI 入口为 [`backend/cmd/capability-probe/`](../../backend/cmd/capability-probe/)（`main.go`）。
 
 - **生产镜像**：与 `server` 一并构建，路径 **`/app/capability-probe`**（见 [backend/Dockerfile](../../backend/Dockerfile)）。
 - **厂商 API Key** 仅从 **`merchant_api_keys.api_key_encrypted`** 解密；**不**使用操作员本机的 `OPENAI_API_KEY` 等。
@@ -39,6 +39,8 @@ docker exec pintuotuo-backend /app/capability-probe -out /tmp/capability-probe-l
 本地：`make capability-probe`（`CAPABILITY_PROBE_FLAGS='-out /tmp/c.csv -provider openai -limit 5'`）。
 
 **GitHub Actions**：默认 **不再** 在 `deploy-tencent.yml` 末尾跑重 probe（避免阻塞部署）。需要全量/重探测时，在 Actions 中手动运行 **Capability probe (Tencent production)**（`.github/workflows/capability-probe-tencent.yml`，`workflow_dispatch`，可选 `-limit` / `-skip-embeddings`），或在部署机 `docker exec`（见上文示例）。
+
+**Admin（单 Key）**：`POST /api/v1/admin/byok-routing/:id/capability-probe`（管理员登录）请求体可选 `{ "skip_embeddings": true }`，响应顶层 **`rows`** 与 CSV 列一致；用于上架前矩阵证据，勿对外泄露 `note` 中的 URL 片段。
 
 探测输出勿提交仓库；`.gitignore`：`documentation/capability/capability-probe-output*.csv`。
 

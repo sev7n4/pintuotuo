@@ -4,12 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pintuotuo/backend/cache"
+	"github.com/pintuotuo/backend/capabilityprobe"
 	"github.com/pintuotuo/backend/config"
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/logger"
@@ -542,6 +544,59 @@ func DeepVerifyBYOK(c *gin.Context) {
 		"message":           "Deep verification started",
 		"api_key_id":        apiKey.ID,
 		"verification_type": "admin_deep",
+	})
+}
+
+// RunBYOKCapabilityProbe runs Phase0-style non-chat upstream probes for one key (sync; may take up to ~2–3 minutes).
+func RunBYOKCapabilityProbe(c *gin.Context) {
+	userRole, exists := c.Get("user_role")
+	if !exists || userRole != roleAdmin {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"FORBIDDEN",
+			"Admin access required",
+			http.StatusForbidden,
+			nil,
+		))
+		return
+	}
+
+	keyIDStr := c.Param("id")
+	keyID, err := strconv.Atoi(keyIDStr)
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
+		return
+	}
+
+	db := config.GetDB()
+	if db == nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	var body struct {
+		SkipEmbeddings bool `json:"skip_embeddings"`
+	}
+	_ = c.ShouldBindJSON(&body)
+
+	rows, err := capabilityprobe.RunForAdminAPIKeyID(c.Request.Context(), db, keyID, capabilityprobe.AdminRunOptions{
+		SkipEmbeddings: body.SkipEmbeddings,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		middleware.RespondWithError(c, apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"API key not found or not eligible for capability probe",
+			http.StatusNotFound,
+			err,
+		))
+		return
+	}
+	if err != nil {
+		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"rows": rows,
 	})
 }
 
