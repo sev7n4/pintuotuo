@@ -222,8 +222,31 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 	}, nil
 }
 
+// ResolveOpenAICompatModelsListProbe returns the GET URL and bearer token for OpenAI-compatible model listing
+// for this merchant key. Single source of truth for FullVerification, Admin probe-models, and
+// APIKeyValidator light/deep connection test — same path across direct / auto / proxy / litellm.
+func (s *HealthChecker) ResolveOpenAICompatModelsListProbe(ctx context.Context, apiKey *models.MerchantAPIKey) (modelsListURL string, authToken string, resolvedRouteMode string, err error) {
+	trafficEp, resolveErr := s.resolveEndpoint(ctx, apiKey)
+	if resolveErr != nil {
+		return "", "", "", resolveErr
+	}
+	resolvedRouteMode = s.resolvedRouteMode(ctx, apiKey)
+	modelsBase := trafficEp
+	if resolvedRouteMode == GatewayModeLitellm {
+		if upstream, upErr := s.resolveDirectEndpoint(ctx, apiKey); upErr == nil && strings.TrimSpace(upstream) != "" {
+			modelsBase = upstream
+		}
+	}
+	authToken = s.getDecryptedAPIKey(apiKey)
+	if strings.TrimSpace(authToken) == "" && strings.TrimSpace(apiKey.APIKeyEncrypted) != "" {
+		return "", "", resolvedRouteMode, fmt.Errorf("failed to decrypt API key")
+	}
+	modelsListURL = OpenAICompatModelsProbeURL(modelsBase)
+	return modelsListURL, authToken, resolvedRouteMode, nil
+}
+
 func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.MerchantAPIKey) (*HealthCheckResult, error) {
-	endpoint, resolveErr := s.resolveEndpoint(ctx, apiKey)
+	modelsEndpoint, authToken, resolvedMode, resolveErr := s.ResolveOpenAICompatModelsListProbe(ctx, apiKey)
 	if resolveErr != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -233,20 +256,7 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 		}, nil
 	}
 
-	resolvedMode := s.resolvedRouteMode(ctx, apiKey)
-	modelsBase := endpoint
-	if resolvedMode == GatewayModeLitellm {
-		// Match APIKeyValidator.performVerificationWithRouteMode: for litellm traffic, list models from the
-		// configured direct upstream base when present, using the merchant key — not the LiteLLM gateway
-		// /v1/models catalog with LITELLM_MASTER_KEY (which caused Admin probe-models vs 轻量验证 列表不一致).
-		if upstream, upErr := s.resolveDirectEndpoint(ctx, apiKey); upErr == nil && strings.TrimSpace(upstream) != "" {
-			modelsBase = upstream
-		}
-	}
-	authToken := s.getDecryptedAPIKey(apiKey)
-
-	modelsEndpoint := OpenAICompatModelsProbeURL(modelsBase)
-	client := s.routeAwareHTTPClient(resolvedMode)
+	client := newProxyAwareHTTPClient(10*time.Second, resolvedMode)
 	probe, err := ProbeProviderModels(ctx, client, modelsEndpoint, authToken, apiKey.Provider)
 	if err != nil {
 		return &HealthCheckResult{
