@@ -804,14 +804,14 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		).Scan(&endpointURLCol, &fallbackEndpointURLCol)
 	}
 	synthKey := &models.MerchantAPIKey{
-		ID:                    apiKeyID,
-		Provider:              provider,
-		APIKeyEncrypted:       encryptedKey,
-		RouteMode:             routeMode,
-		RouteConfig:           routeConfig,
-		Region:                region,
-		EndpointURL:           endpointURLCol,
-		FallbackEndpointURL:   fallbackEndpointURLCol,
+		ID:                  apiKeyID,
+		Provider:            provider,
+		APIKeyEncrypted:     encryptedKey,
+		RouteMode:           routeMode,
+		RouteConfig:         routeConfig,
+		Region:              region,
+		EndpointURL:         endpointURLCol,
+		FallbackEndpointURL: fallbackEndpointURLCol,
 	}
 	hc := NewHealthChecker()
 	modelsURL, modelsAuthToken, probeRouteMode, modelsResolveErr := hc.ResolveOpenAICompatModelsListProbe(ctx, synthKey)
