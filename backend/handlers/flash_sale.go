@@ -19,15 +19,58 @@ import (
 	"github.com/pintuotuo/backend/services"
 )
 
+// flashSaleSelectColumns must stay aligned with scanFlashSaleRow scan order.
+const flashSaleSelectColumns = `id, name, description, start_time, end_time, status, created_at, updated_at,
+	is_featured, badge_text, badge_text_secondary, marketing_line, promo_label, promo_ends_at`
+
+type sqlScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+func scanFlashSaleRow(sc sqlScanner) (FlashSale, error) {
+	var s FlashSale
+	var promoEnds sql.NullTime
+	err := sc.Scan(
+		&s.ID,
+		&s.Name,
+		&s.Description,
+		&s.StartTime,
+		&s.EndTime,
+		&s.Status,
+		&s.CreatedAt,
+		&s.UpdatedAt,
+		&s.IsFeatured,
+		&s.BadgeText,
+		&s.BadgeTextSecondary,
+		&s.MarketingLine,
+		&s.PromoLabel,
+		&promoEnds,
+	)
+	if err != nil {
+		return s, err
+	}
+	if promoEnds.Valid {
+		t := promoEnds.Time
+		s.PromoEndsAt = &t
+	}
+	return s, nil
+}
+
 type FlashSale struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	StartTime   time.Time `json:"start_time"`
-	EndTime     time.Time `json:"end_time"`
-	Status      string    `json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                 int        `json:"id"`
+	Name               string     `json:"name"`
+	Description        string     `json:"description"`
+	StartTime          time.Time  `json:"start_time"`
+	EndTime            time.Time  `json:"end_time"`
+	Status             string     `json:"status"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	IsFeatured         bool       `json:"is_featured"`
+	BadgeText          string     `json:"badge_text,omitempty"`
+	BadgeTextSecondary string     `json:"badge_text_secondary,omitempty"`
+	MarketingLine      string     `json:"marketing_line,omitempty"`
+	PromoLabel         string     `json:"promo_label,omitempty"`
+	PromoEndsAt        *time.Time `json:"promo_ends_at,omitempty"`
 }
 
 type FlashSaleProduct struct {
@@ -78,7 +121,7 @@ func GetActiveFlashSales(c *gin.Context) {
 	}
 
 	rows, err := db.Query(`
-		SELECT id, name, description, start_time, end_time, status, created_at, updated_at 
+		SELECT `+flashSaleSelectColumns+`
 		FROM flash_sales 
 		WHERE status = 'active' AND start_time <= $1 AND end_time > $1
 		ORDER BY start_time ASC`,
@@ -92,8 +135,8 @@ func GetActiveFlashSales(c *gin.Context) {
 
 	var sales []FlashSale
 	for rows.Next() {
-		var s FlashSale
-		if err := rows.Scan(&s.ID, &s.Name, &s.Description, &s.StartTime, &s.EndTime, &s.Status, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		s, scanErr := scanFlashSaleRow(rows)
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
@@ -146,7 +189,7 @@ func GetUpcomingFlashSales(c *gin.Context) {
 	}
 
 	rows, err := db.Query(`
-		SELECT id, name, description, start_time, end_time, status, created_at, updated_at
+		SELECT `+flashSaleSelectColumns+`
 		FROM flash_sales
 		WHERE status = 'upcoming' AND start_time > $1 AND end_time > $1
 		ORDER BY start_time ASC`,
@@ -160,8 +203,8 @@ func GetUpcomingFlashSales(c *gin.Context) {
 
 	var sales []FlashSale
 	for rows.Next() {
-		var s FlashSale
-		if err := rows.Scan(&s.ID, &s.Name, &s.Description, &s.StartTime, &s.EndTime, &s.Status, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		s, scanErr := scanFlashSaleRow(rows)
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
@@ -306,7 +349,7 @@ func AdminListFlashSales(c *gin.Context) {
 	}
 
 	rows, err := db.Query(`
-		SELECT id, name, description, start_time, end_time, status, created_at, updated_at
+		SELECT ` + flashSaleSelectColumns + `
 		FROM flash_sales
 		ORDER BY id DESC
 		LIMIT 500`)
@@ -318,8 +361,8 @@ func AdminListFlashSales(c *gin.Context) {
 
 	var list []FlashSale
 	for rows.Next() {
-		var s FlashSale
-		if err := rows.Scan(&s.ID, &s.Name, &s.Description, &s.StartTime, &s.EndTime, &s.Status, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		s, scanErr := scanFlashSaleRow(rows)
+		if scanErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
 		}
@@ -354,12 +397,11 @@ func AdminGetFlashSaleDetail(c *gin.Context) {
 		return
 	}
 
-	var sale FlashSale
-	err = db.QueryRow(`
-		SELECT id, name, description, start_time, end_time, status, created_at, updated_at
+	sale, err := scanFlashSaleRow(db.QueryRow(`
+		SELECT `+flashSaleSelectColumns+`
 		FROM flash_sales WHERE id = $1`,
 		saleIDInt,
-	).Scan(&sale.ID, &sale.Name, &sale.Description, &sale.StartTime, &sale.EndTime, &sale.Status, &sale.CreatedAt, &sale.UpdatedAt)
+	))
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FLASH_SALE_NOT_FOUND",
@@ -399,10 +441,16 @@ func AdminPatchFlashSale(c *gin.Context) {
 	}
 
 	var body struct {
-		Name        *string    `json:"name"`
-		Description *string    `json:"description"`
-		StartTime   *time.Time `json:"start_time"`
-		EndTime     *time.Time `json:"end_time"`
+		Name               *string    `json:"name"`
+		Description        *string    `json:"description"`
+		StartTime          *time.Time `json:"start_time"`
+		EndTime            *time.Time `json:"end_time"`
+		IsFeatured         *bool      `json:"is_featured"`
+		BadgeText          *string    `json:"badge_text"`
+		BadgeTextSecondary *string    `json:"badge_text_secondary"`
+		MarketingLine      *string    `json:"marketing_line"`
+		PromoLabel         *string    `json:"promo_label"`
+		PromoEndsAt        *string    `json:"promo_ends_at"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
@@ -418,12 +466,11 @@ func AdminPatchFlashSale(c *gin.Context) {
 		return
 	}
 
-	var cur FlashSale
-	err := db.QueryRow(`
-		SELECT id, name, description, start_time, end_time, status, created_at, updated_at
+	cur, err := scanFlashSaleRow(db.QueryRow(`
+		SELECT `+flashSaleSelectColumns+`
 		FROM flash_sales WHERE id = $1`,
 		saleIDInt,
-	).Scan(&cur.ID, &cur.Name, &cur.Description, &cur.StartTime, &cur.EndTime, &cur.Status, &cur.CreatedAt, &cur.UpdatedAt)
+	))
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FLASH_SALE_NOT_FOUND",
@@ -440,14 +487,16 @@ func AdminPatchFlashSale(c *gin.Context) {
 	if cur.Status != "upcoming" {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FLASH_SALE_NOT_EDITABLE",
-			"仅「待开始」场次可修改基本信息与时间",
+			"仅「待开始」场次可修改基本信息、展示与活动及时间段",
 			http.StatusBadRequest,
 			nil,
 		))
 		return
 	}
 
-	if body.Name == nil && body.Description == nil && body.StartTime == nil && body.EndTime == nil {
+	if body.Name == nil && body.Description == nil && body.StartTime == nil && body.EndTime == nil &&
+		body.IsFeatured == nil && body.BadgeText == nil && body.BadgeTextSecondary == nil &&
+		body.MarketingLine == nil && body.PromoLabel == nil && body.PromoEndsAt == nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"NO_FIELDS",
 			"请至少提交一个要修改的字段",
@@ -472,6 +521,53 @@ func AdminPatchFlashSale(c *gin.Context) {
 	en := cur.EndTime
 	if body.EndTime != nil {
 		en = *body.EndTime
+	}
+	isFeatured := cur.IsFeatured
+	if body.IsFeatured != nil {
+		isFeatured = *body.IsFeatured
+	}
+	badgeText := cur.BadgeText
+	if body.BadgeText != nil {
+		badgeText = strings.TrimSpace(*body.BadgeText)
+	}
+	badgeSecondary := cur.BadgeTextSecondary
+	if body.BadgeTextSecondary != nil {
+		badgeSecondary = strings.TrimSpace(*body.BadgeTextSecondary)
+	}
+	marketingLine := cur.MarketingLine
+	if body.MarketingLine != nil {
+		marketingLine = strings.TrimSpace(*body.MarketingLine)
+	}
+	promoLabel := cur.PromoLabel
+	if body.PromoLabel != nil {
+		promoLabel = strings.TrimSpace(*body.PromoLabel)
+	}
+
+	var promoEnds interface{}
+	if body.PromoEndsAt != nil {
+		ps := strings.TrimSpace(*body.PromoEndsAt)
+		if ps == "" {
+			promoEnds = nil
+		} else {
+			t, perr := time.Parse(time.RFC3339Nano, ps)
+			if perr != nil {
+				t, perr = time.Parse(time.RFC3339, ps)
+			}
+			if perr != nil {
+				middleware.RespondWithError(c, apperrors.NewAppError(
+					"INVALID_PROMO_ENDS_AT",
+					"活动结束时间（展示）格式无效，请使用 ISO 时间",
+					http.StatusBadRequest,
+					nil,
+				))
+				return
+			}
+			promoEnds = t
+		}
+	} else if cur.PromoEndsAt != nil {
+		promoEnds = *cur.PromoEndsAt
+	} else {
+		promoEnds = nil
 	}
 	if !en.After(st) {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -538,14 +634,16 @@ func AdminPatchFlashSale(c *gin.Context) {
 		}
 	}
 
-	var sale FlashSale
-	err = tx.QueryRow(`
+	sale, err := scanFlashSaleRow(tx.QueryRow(`
 		UPDATE flash_sales
-		   SET name = $1, description = $2, start_time = $3, end_time = $4, updated_at = CURRENT_TIMESTAMP
-		 WHERE id = $5 AND status = 'upcoming'
-		 RETURNING id, name, description, start_time, end_time, status, created_at, updated_at`,
-		name, desc, st, en, saleIDInt,
-	).Scan(&sale.ID, &sale.Name, &sale.Description, &sale.StartTime, &sale.EndTime, &sale.Status, &sale.CreatedAt, &sale.UpdatedAt)
+		   SET name = $1, description = $2, start_time = $3, end_time = $4,
+		       is_featured = $5, badge_text = $6, badge_text_secondary = $7,
+		       marketing_line = $8, promo_label = $9, promo_ends_at = $10,
+		       updated_at = CURRENT_TIMESTAMP
+		 WHERE id = $11 AND status = 'upcoming'
+		 RETURNING `+flashSaleSelectColumns,
+		name, desc, st, en, isFeatured, badgeText, badgeSecondary, marketingLine, promoLabel, promoEnds, saleIDInt,
+	))
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FLASH_SALE_NOT_EDITABLE",
@@ -589,11 +687,17 @@ func CreateFlashSale(c *gin.Context) {
 	}
 
 	var req struct {
-		Name        string    `json:"name" binding:"required"`
-		Description string    `json:"description"`
-		StartTime   time.Time `json:"start_time" binding:"required"`
-		EndTime     time.Time `json:"end_time" binding:"required"`
-		Skus        []struct {
+		Name               string     `json:"name" binding:"required"`
+		Description        string     `json:"description"`
+		StartTime          time.Time  `json:"start_time" binding:"required"`
+		EndTime            time.Time  `json:"end_time" binding:"required"`
+		IsFeatured         *bool      `json:"is_featured"`
+		BadgeText          *string    `json:"badge_text"`
+		BadgeTextSecondary *string    `json:"badge_text_secondary"`
+		MarketingLine      *string    `json:"marketing_line"`
+		PromoLabel         *string    `json:"promo_label"`
+		PromoEndsAt        *time.Time `json:"promo_ends_at"`
+		Skus               []struct {
 			SKUID        int     `json:"sku_id" binding:"required"`
 			FlashPrice   float64 `json:"flash_price" binding:"required"`
 			StockLimit   int     `json:"stock_limit" binding:"required"`
@@ -650,13 +754,40 @@ func CreateFlashSale(c *gin.Context) {
 		saleStatus = productStatusActive
 	}
 
-	var sale FlashSale
-	err = tx.QueryRow(`
-		INSERT INTO flash_sales (name, description, start_time, end_time, status)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, name, description, start_time, end_time, status, created_at, updated_at`,
+	isFeatured := false
+	if req.IsFeatured != nil {
+		isFeatured = *req.IsFeatured
+	}
+	badgeText := ""
+	if req.BadgeText != nil {
+		badgeText = strings.TrimSpace(*req.BadgeText)
+	}
+	badgeSecondary := ""
+	if req.BadgeTextSecondary != nil {
+		badgeSecondary = strings.TrimSpace(*req.BadgeTextSecondary)
+	}
+	marketingLine := ""
+	if req.MarketingLine != nil {
+		marketingLine = strings.TrimSpace(*req.MarketingLine)
+	}
+	promoLabel := ""
+	if req.PromoLabel != nil {
+		promoLabel = strings.TrimSpace(*req.PromoLabel)
+	}
+	var promoEnds interface{}
+	if req.PromoEndsAt != nil {
+		promoEnds = *req.PromoEndsAt
+	} else {
+		promoEnds = nil
+	}
+
+	sale, err := scanFlashSaleRow(tx.QueryRow(`
+		INSERT INTO flash_sales (name, description, start_time, end_time, status, is_featured, badge_text, badge_text_secondary, marketing_line, promo_label, promo_ends_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		RETURNING `+flashSaleSelectColumns,
 		req.Name, req.Description, req.StartTime, req.EndTime, saleStatus,
-	).Scan(&sale.ID, &sale.Name, &sale.Description, &sale.StartTime, &sale.EndTime, &sale.Status, &sale.CreatedAt, &sale.UpdatedAt)
+		isFeatured, badgeText, badgeSecondary, marketingLine, promoLabel, promoEnds,
+	))
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"FLASH_SALE_CREATE_FAILED",
@@ -814,13 +945,12 @@ func UpdateFlashSaleStatus(c *gin.Context) {
 		return
 	}
 
-	var sale FlashSale
-	err := db.QueryRow(`
+	sale, err := scanFlashSaleRow(db.QueryRow(`
 		UPDATE flash_sales SET status = $1, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $2
-		RETURNING id, name, description, start_time, end_time, status, created_at, updated_at`,
+		RETURNING `+flashSaleSelectColumns,
 		req.Status, saleIDInt,
-	).Scan(&sale.ID, &sale.Name, &sale.Description, &sale.StartTime, &sale.EndTime, &sale.Status, &sale.CreatedAt, &sale.UpdatedAt)
+	))
 
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(

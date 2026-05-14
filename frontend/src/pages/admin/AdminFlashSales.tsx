@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Card,
   Typography,
@@ -10,20 +10,24 @@ import {
   message,
   Alert,
   Table,
-  Drawer,
-  Tag,
   Modal,
   Popconfirm,
+  Select,
+  Tag,
+  Row,
+  Col,
+  DatePicker,
+  Spin,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { MinusCircleOutlined, PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from '@/services/api';
 import { skuService } from '@/services/sku';
 import type { SKUWithSPU } from '@/types/sku';
 import type { APIResponse } from '@/types';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 type SkuLine = {
   sku_id?: number;
@@ -41,6 +45,12 @@ type FlashSaleRow = {
   status: string;
   created_at: string;
   updated_at: string;
+  is_featured?: boolean;
+  badge_text?: string;
+  badge_text_secondary?: string;
+  marketing_line?: string;
+  promo_label?: string;
+  promo_ends_at?: string | null;
 };
 
 type FlashSaleProductRow = {
@@ -56,78 +66,90 @@ type FlashSaleProductRow = {
   discount: number;
 };
 
-/** 与套餐包一致：仅接受可上架 SKU（active + SPU active），通过 ID 查询校验，不提供全量下拉。 */
-function FlashSkuIdField({
-  value,
-  onChange,
-}: {
-  value?: number;
-  onChange?: (v: number | undefined) => void;
-}) {
-  const [checking, setChecking] = useState(false);
-  const [resolved, setResolved] = useState<SKUWithSPU | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
+type CreateFormValues = {
+  name: string;
+  description?: string;
+  start_time?: dayjs.Dayjs;
+  end_time?: dayjs.Dayjs;
+  is_featured?: boolean;
+  badge_text?: string;
+  badge_text_secondary?: string;
+  marketing_line?: string;
+  promo_label?: string;
+  promo_ends_at?: dayjs.Dayjs;
+  skus: SkuLine[];
+};
 
-  const runCheck = async () => {
-    const id = Number(value);
-    if (!(id > 0)) {
-      message.warning('请先输入有效的 SKU ID');
-      return;
-    }
-    setChecking(true);
-    setHint(null);
-    setResolved(null);
-    try {
-      const res = await skuService.getSKU(id);
-      const sku = res.data.data as SKUWithSPU;
-      if (sku.status !== 'active') {
-        setHint('该 SKU 未上架（status 非 active），不可用于秒杀');
-        return;
-      }
-      if (sku.spu_status != null && sku.spu_status !== '' && sku.spu_status !== 'active') {
-        setHint('关联 SPU 未上架，不可用于秒杀');
-        return;
-      }
-      setResolved(sku);
-    } catch {
-      setHint('未找到该 SKU 或无权查看，请确认 ID');
-    } finally {
-      setChecking(false);
-    }
+type PreviewContext = {
+  isDraft: boolean;
+  warnings: string[];
+};
+
+function collectFlashPreviewWarnings(sale: FlashSaleRow, skus: FlashSaleProductRow[]): string[] {
+  const w: string[] = [];
+  if (sale.status === 'upcoming') {
+    w.push('当前为「待开始」，用户端「限时秒杀」卖场仅展示进行中场次；待开始仅出现在「即将开始」区块。');
+  }
+  if (sale.status === 'ended' || sale.status === 'canceled') {
+    w.push('该场次已结束或已取消，用户端不再展示。');
+  }
+  const now = dayjs();
+  if (sale.start_time && dayjs(sale.start_time).isAfter(now) && sale.status === 'active') {
+    w.push('开始时间晚于当前（状态异常），请核对后台调度。');
+  }
+  if (sale.promo_ends_at && !dayjs(sale.promo_ends_at).isAfter(now)) {
+    w.push('活动结束时间（展示）已过期，角标/倒计时类展示可能不再符合运营预期。');
+  }
+  const live = skus.filter((p) => p.stock_limit > p.stock_sold);
+  if (live.length === 0 && skus.length > 0) {
+    w.push('全部 SKU 已售罄，用户端进行中列表将隐藏该场次。');
+  }
+  return w;
+}
+
+function buildDraftFlashSalePreview(v: CreateFormValues, skuById: Map<number, SKUWithSPU>): {
+  sale: FlashSaleRow;
+  skus: FlashSaleProductRow[];
+} {
+  const startISO = v.start_time?.toISOString() || new Date().toISOString();
+  const endISO = v.end_time?.toISOString() || new Date().toISOString();
+  const sale: FlashSaleRow = {
+    id: 0,
+    name: (v.name || '').trim() || '（未命名）',
+    description: (v.description || '').trim(),
+    start_time: startISO,
+    end_time: endISO,
+    status: 'upcoming',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_featured: !!v.is_featured,
+    badge_text: (v.badge_text || '').trim(),
+    badge_text_secondary: (v.badge_text_secondary || '').trim(),
+    marketing_line: (v.marketing_line || '').trim(),
+    promo_label: (v.promo_label || '').trim(),
+    promo_ends_at: v.promo_ends_at ? v.promo_ends_at.toISOString() : undefined,
   };
-
-  return (
-    <div>
-      <Space wrap>
-        <InputNumber
-          min={1}
-          precision={0}
-          placeholder="SKU ID"
-          value={value}
-          onChange={(v) => {
-            onChange?.(v ?? undefined);
-            setResolved(null);
-            setHint(null);
-          }}
-          style={{ width: 140 }}
-        />
-        <Button type="default" onClick={() => void runCheck()} loading={checking}>
-          校验可售
-        </Button>
-      </Space>
-      {resolved && (
-        <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>
-          {resolved.spu_name || '—'} · {resolved.sku_code} · 零售价 ¥{Number(resolved.retail_price).toFixed(2)}{' '}
-          · 库存 {resolved.stock ?? '—'}
-        </Text>
-      )}
-      {hint && (
-        <Text type="danger" style={{ display: 'block', marginTop: 4 }}>
-          {hint}
-        </Text>
-      )}
-    </div>
-  );
+  const skus: FlashSaleProductRow[] = (v.skus || []).map((line, idx) => {
+    const sid = Number(line.sku_id);
+    const s = skuById.get(sid);
+    const name = s ? `${s.spu_name} · ${s.sku_code}` : `SKU #${sid}`;
+    const orig = s ? Number(s.retail_price) : 0;
+    const fp = Number(line.flash_price ?? 0);
+    const disc = orig > 0 ? Math.round((1 - fp / orig) * 100) : 0;
+    return {
+      id: -(idx + 1),
+      flash_sale_id: 0,
+      sku_id: sid,
+      product_name: name,
+      flash_price: fp,
+      original_price: orig,
+      stock_limit: Number(line.stock_limit ?? 0),
+      stock_sold: 0,
+      per_user_limit: line.per_user_limit != null ? Number(line.per_user_limit) : 1,
+      discount: disc,
+    };
+  });
+  return { sale, skus };
 }
 
 function statusTag(status: string) {
@@ -143,18 +165,62 @@ function statusTag(status: string) {
 const AdminFlashSales = () => {
   const [loading, setLoading] = useState(false);
   const [listLoading, setListLoading] = useState(false);
-  const [form] = Form.useForm();
-  const [editForm] = Form.useForm();
+  const [form] = Form.useForm<CreateFormValues>();
+  const [editForm] = Form.useForm<CreateFormValues>();
   const [rows, setRows] = useState<FlashSaleRow[]>([]);
+  const [sellableSkus, setSellableSkus] = useState<SKUWithSPU[]>([]);
+  const [skuPoolLoading, setSkuPoolLoading] = useState(false);
+  const skuSearchTimer = useRef<number>();
+
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<{
     sale: FlashSaleRow;
     skus: FlashSaleProductRow[];
   } | null>(null);
+  const [previewCtx, setPreviewCtx] = useState<PreviewContext>({ isDraft: false, warnings: [] });
+
   const [editOpen, setEditOpen] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editingRow, setEditingRow] = useState<FlashSaleRow | null>(null);
+
+  const loadSellableSkus = useCallback(async (q?: string) => {
+    setSkuPoolLoading(true);
+    try {
+      const res = await skuService.getSKUs({
+        scope: 'sellable',
+        per_page: 100,
+        q: q?.trim() || undefined,
+      });
+      setSellableSkus(res.data.data || []);
+    } catch {
+      message.error('加载可售 SKU 失败');
+      setSellableSkus([]);
+    } finally {
+      setSkuPoolLoading(false);
+    }
+  }, []);
+
+  const scheduleSkuSearch = (q: string) => {
+    window.clearTimeout(skuSearchTimer.current);
+    skuSearchTimer.current = window.setTimeout(() => {
+      void loadSellableSkus(q);
+    }, 320);
+  };
+
+  useEffect(() => {
+    void loadSellableSkus('');
+    return () => window.clearTimeout(skuSearchTimer.current);
+  }, [loadSellableSkus]);
+
+  const skuOptions = useMemo(
+    () =>
+      sellableSkus.map((s) => ({
+        value: s.id,
+        label: `${s.sku_code} / ${s.spu_name} (¥${Number(s.retail_price).toFixed(2)})`,
+      })),
+    [sellableSkus]
+  );
 
   const loadList = useCallback(async () => {
     setListLoading(true);
@@ -180,10 +246,11 @@ const AdminFlashSales = () => {
     return Boolean(String(providerModelID || '').trim() || String(modelName || '').trim());
   };
 
-  const openPreview = async (id: number) => {
+  const openSavedPreview = async (id: number) => {
     setPreviewOpen(true);
     setPreviewLoading(true);
     setPreview(null);
+    setPreviewCtx({ isDraft: false, warnings: [] });
     try {
       type Detail = FlashSaleRow & { skus: FlashSaleProductRow[] };
       const res = await api.get<APIResponse<Detail>>(`/admin/flash-sales/${id}`);
@@ -194,12 +261,44 @@ const AdminFlashSales = () => {
         return;
       }
       const { skus, ...sale } = d;
-      setPreview({ sale: sale as FlashSaleRow, skus: skus || [] });
+      const sk = skus || [];
+      setPreview({ sale: sale as FlashSaleRow, skus: sk });
+      setPreviewCtx({ isDraft: false, warnings: collectFlashPreviewWarnings(sale as FlashSaleRow, sk) });
     } catch {
       message.error('加载详情失败');
       setPreviewOpen(false);
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  const openDraftPreview = async () => {
+    try {
+      const v = await form.validateFields();
+      const lineRows = v.skus || [];
+      for (const row of lineRows) {
+        if (!row.sku_id || row.sku_id <= 0) {
+          message.error('请为每一行选择 SKU（可售池）');
+          return;
+        }
+      }
+      if (!v.start_time || !v.end_time || !v.end_time.isAfter(v.start_time)) {
+        message.error('请填写有效的开始与结束时间，且结束须晚于开始');
+        return;
+      }
+      const byId = new Map(sellableSkus.map((s) => [s.id, s]));
+      const missing = lineRows.some((r) => !byId.has(Number(r.sku_id)));
+      const { sale, skus } = buildDraftFlashSalePreview(v, byId);
+      const extra: string[] = [];
+      if (missing) extra.push('部分 SKU 不在当前搜索结果中，保存前请用搜索重新选中或刷新可售列表。');
+      setPreview({ sale, skus });
+      setPreviewCtx({
+        isDraft: true,
+        warnings: [...collectFlashPreviewWarnings(sale, skus), ...extra],
+      });
+      setPreviewOpen(true);
+    } catch {
+      message.info('请先完善表单必填项后再预览');
     }
   };
 
@@ -219,8 +318,14 @@ const AdminFlashSales = () => {
     editForm.setFieldsValue({
       name: row.name,
       description: row.description || '',
-      start_time: dayjs(row.start_time).format('YYYY-MM-DDTHH:mm'),
-      end_time: dayjs(row.end_time).format('YYYY-MM-DDTHH:mm'),
+      start_time: dayjs(row.start_time),
+      end_time: dayjs(row.end_time),
+      is_featured: !!row.is_featured,
+      badge_text: row.badge_text || '',
+      badge_text_secondary: row.badge_text_secondary || '',
+      marketing_line: row.marketing_line || '',
+      promo_label: row.promo_label || '',
+      promo_ends_at: row.promo_ends_at ? dayjs(row.promo_ends_at) : undefined,
     });
     setEditOpen(true);
   };
@@ -233,8 +338,14 @@ const AdminFlashSales = () => {
       await api.put(`/admin/flash-sales/${editingRow.id}`, {
         name: v.name,
         description: v.description || '',
-        start_time: new Date(v.start_time).toISOString(),
-        end_time: new Date(v.end_time).toISOString(),
+        start_time: v.start_time?.toISOString(),
+        end_time: v.end_time?.toISOString(),
+        is_featured: !!v.is_featured,
+        badge_text: (v.badge_text || '').trim(),
+        badge_text_secondary: (v.badge_text_secondary || '').trim(),
+        marketing_line: (v.marketing_line || '').trim(),
+        promo_label: (v.promo_label || '').trim(),
+        promo_ends_at: v.promo_ends_at ? v.promo_ends_at.toISOString() : '',
       });
       message.success('已保存');
       setEditOpen(false);
@@ -270,12 +381,24 @@ const AdminFlashSales = () => {
       render: (t: string) => dayjs(t).format('YYYY-MM-DD HH:mm'),
     },
     {
+      title: '运营',
+      key: 'ops',
+      width: 200,
+      render: (_, r) => (
+        <Space wrap size={0}>
+          {r.is_featured ? <Tag color="gold">推荐</Tag> : null}
+          {r.badge_text ? <Tag color="purple">{r.badge_text}</Tag> : null}
+          {r.promo_label ? <Tag color="blue">{r.promo_label}</Tag> : null}
+        </Space>
+      ),
+    },
+    {
       title: '操作',
       key: 'op',
       width: 280,
       render: (_, r) => (
         <Space wrap size={0}>
-          <Button type="link" size="small" onClick={() => void openPreview(r.id)}>
+          <Button type="link" size="small" onClick={() => void openSavedPreview(r.id)}>
             预览
           </Button>
           {r.status === 'upcoming' && (
@@ -314,16 +437,10 @@ const AdminFlashSales = () => {
     },
   ];
 
-  const onFinish = async (values: {
-    name: string;
-    description?: string;
-    start_time: string;
-    end_time: string;
-    skus: SkuLine[];
-  }) => {
-    const startMs = new Date(values.start_time).getTime();
-    const endMs = new Date(values.end_time).getTime();
-    if (!(startMs > 0) || !(endMs > 0) || endMs <= startMs) {
+  const onFinish = async (values: CreateFormValues) => {
+    const st = values.start_time;
+    const en = values.end_time;
+    if (!st || !en || !en.isAfter(st)) {
       message.warning('请填写有效的开始与结束时间，且结束须晚于开始');
       return;
     }
@@ -376,12 +493,22 @@ const AdminFlashSales = () => {
       await api.post('/flash-sales', {
         name: values.name,
         description: values.description || '',
-        start_time: new Date(values.start_time).toISOString(),
-        end_time: new Date(values.end_time).toISOString(),
+        start_time: st.toISOString(),
+        end_time: en.toISOString(),
+        is_featured: !!values.is_featured,
+        badge_text: (values.badge_text || '').trim(),
+        badge_text_secondary: (values.badge_text_secondary || '').trim(),
+        marketing_line: (values.marketing_line || '').trim(),
+        promo_label: (values.promo_label || '').trim(),
+        promo_ends_at: values.promo_ends_at ? values.promo_ends_at.toISOString() : undefined,
         skus,
       });
       message.success('秒杀活动已创建');
       form.resetFields();
+      form.setFieldsValue({
+        skus: [{}],
+        is_featured: false,
+      });
       void loadList();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
@@ -441,79 +568,163 @@ const AdminFlashSales = () => {
       </Card>
 
       <Card title="新建秒杀活动">
-        <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ skus: [{}] }}>
-          <Form.Item
-            name="name"
-            label="活动名称"
-            rules={[{ required: true, message: '请输入名称' }]}
-          >
-            <Input placeholder="例如：春季限时秒杀" />
-          </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={2} placeholder="可选" />
-          </Form.Item>
-          <Form.Item
-            name="start_time"
-            label="开始时间"
-            rules={[{ required: true, message: '请选择开始时间' }]}
-          >
-            <Input type="datetime-local" />
-          </Form.Item>
-          <Form.Item
-            name="end_time"
-            label="结束时间"
-            rules={[{ required: true, message: '请选择结束时间' }]}
-          >
-            <Input type="datetime-local" />
-          </Form.Item>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={onFinish}
+          initialValues={{ skus: [{}], is_featured: false }}
+        >
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message="SKU 选择"
+            description="与「套餐包」SKU 明细一致：候选池为「可售」SKU（SKU 与所属 SPU 均在售）。支持输入编码或名称远程搜索。"
+          />
 
-          <Form.List name="skus">
-            {(fields, { add, remove }) => (
-              <>
-                {fields.map((field) => (
-                  <Space key={field.key} align="start" wrap style={{ marginBottom: 8 }}>
-                    <Form.Item
-                      name={[field.name, 'sku_id']}
-                      label="SKU ID"
-                      rules={[{ required: true, message: '请输入 SKU ID' }]}
-                    >
-                      <FlashSkuIdField />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'flash_price']}
-                      label="秒杀价"
-                      rules={[{ required: true, message: '必填' }]}
-                    >
-                      <InputNumber min={0} step={0.01} placeholder="元" style={{ width: 120 }} />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'stock_limit']}
-                      label="秒杀库存"
-                      rules={[{ required: true, message: '必填' }]}
-                    >
-                      <InputNumber min={1} placeholder="件" style={{ width: 100 }} />
-                    </Form.Item>
-                    <Form.Item name={[field.name, 'per_user_limit']} label="每人限购">
-                      <InputNumber min={1} placeholder="默认 1" style={{ width: 100 }} />
-                    </Form.Item>
-                    <MinusCircleOutlined
-                      style={{ marginTop: 30, color: '#999' }}
-                      onClick={() => remove(field.name)}
-                    />
-                  </Space>
-                ))}
-                <Form.Item>
-                  <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                    添加 SKU
-                  </Button>
+          <Card size="small" title="基础信息" style={{ marginBottom: 12 }}>
+            <Row gutter={[16, 8]}>
+              <Col xs={24} md={12}>
+                <Form.Item name="name" label="活动名称" rules={[{ required: true, message: '请输入名称' }]}>
+                  <Input placeholder="例如：春季限时秒杀" />
                 </Form.Item>
-              </>
-            )}
-          </Form.List>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="is_featured" label="推荐位">
+                  <Select
+                    options={[
+                      { label: '否', value: false },
+                      { label: '是', value: true },
+                    ]}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="description" label="描述">
+                  <Input.TextArea rows={2} placeholder="可选" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="marketing_line" label="一句话卖点（前台）">
+                  <Input placeholder="可选，展示在卖场活动标题旁" allowClear />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
 
-          <Button type="primary" htmlType="submit" loading={loading}>
-            创建秒杀活动
-          </Button>
+          <Card size="small" title="展示与活动" style={{ marginBottom: 12 }}>
+            <Row gutter={[16, 8]}>
+              <Col xs={24} md={8}>
+                <Form.Item name="badge_text" label="主角标">
+                  <Input placeholder="如 限时特惠" allowClear />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="badge_text_secondary" label="次角标">
+                  <Input placeholder="如 赠算力" allowClear />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="promo_label" label="活动标签（轻量）">
+                  <Input placeholder="如 限时立减（展示用）" allowClear />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="promo_ends_at" label="活动结束时间（展示）">
+                  <DatePicker showTime style={{ width: '100%' }} allowClear />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card size="small" title="场次时间（定时开抢 / 结束）" style={{ marginBottom: 12 }}>
+            <Row gutter={[16, 8]}>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="start_time"
+                  label="开始时间"
+                  rules={[{ required: true, message: '请选择开始时间' }]}
+                >
+                  <DatePicker showTime style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="end_time"
+                  label="结束时间"
+                  rules={[{ required: true, message: '请选择结束时间' }]}
+                >
+                  <DatePicker showTime style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card size="small" title="SKU 明细（可售池）" style={{ marginBottom: 12 }}>
+            <Form.List name="skus">
+              {(fields, { add, remove }) => (
+                <>
+                  {fields.map((field) => (
+                    <Space key={field.key} align="start" wrap style={{ marginBottom: 8 }}>
+                      <Form.Item
+                        name={[field.name, 'sku_id']}
+                        label="SKU"
+                        rules={[{ required: true, message: '请选择 SKU' }]}
+                      >
+                        <Select
+                          showSearch
+                          filterOption={false}
+                          placeholder="搜索 SKU 编码 / SPU 名称"
+                          options={skuOptions}
+                          loading={skuPoolLoading}
+                          style={{ minWidth: 280 }}
+                          onSearch={(q) => scheduleSkuSearch(q)}
+                          onDropdownVisibleChange={(open) => {
+                            if (open && sellableSkus.length === 0) void loadSellableSkus('');
+                          }}
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        name={[field.name, 'flash_price']}
+                        label="秒杀价"
+                        rules={[{ required: true, message: '必填' }]}
+                      >
+                        <InputNumber min={0} step={0.01} placeholder="元" style={{ width: 120 }} />
+                      </Form.Item>
+                      <Form.Item
+                        name={[field.name, 'stock_limit']}
+                        label="秒杀库存"
+                        rules={[{ required: true, message: '必填' }]}
+                      >
+                        <InputNumber min={1} placeholder="件" style={{ width: 100 }} />
+                      </Form.Item>
+                      <Form.Item name={[field.name, 'per_user_limit']} label="每人限购">
+                        <InputNumber min={1} placeholder="默认 1" style={{ width: 100 }} />
+                      </Form.Item>
+                      <MinusCircleOutlined
+                        style={{ marginTop: 30, color: '#999' }}
+                        onClick={() => remove(field.name)}
+                      />
+                    </Space>
+                  ))}
+                  <Form.Item>
+                    <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                      添加 SKU
+                    </Button>
+                  </Form.Item>
+                </>
+              )}
+            </Form.List>
+          </Card>
+
+          <Space wrap>
+            <Button type="primary" htmlType="submit" loading={loading}>
+              创建秒杀活动
+            </Button>
+            <Button icon={<EyeOutlined />} onClick={() => void openDraftPreview()}>
+              预览用户端
+            </Button>
+          </Space>
         </Form>
       </Card>
 
@@ -527,58 +738,157 @@ const AdminFlashSales = () => {
         onOk={() => void submitEdit()}
         confirmLoading={editSaving}
         destroyOnClose
-        width={520}
+        width={720}
       >
         <Form form={editForm} layout="vertical">
-          <Form.Item name="name" label="活动名称" rules={[{ required: true, message: '必填' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item name="start_time" label="开始时间" rules={[{ required: true, message: '必填' }]}>
-            <Input type="datetime-local" />
-          </Form.Item>
-          <Form.Item name="end_time" label="结束时间" rules={[{ required: true, message: '必填' }]}>
-            <Input type="datetime-local" />
-          </Form.Item>
+          <Card size="small" title="基础信息" style={{ marginBottom: 12 }}>
+            <Form.Item name="name" label="活动名称" rules={[{ required: true, message: '必填' }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="description" label="描述">
+              <Input.TextArea rows={2} />
+            </Form.Item>
+            <Form.Item name="is_featured" label="推荐位">
+              <Select
+                options={[
+                  { label: '否', value: false },
+                  { label: '是', value: true },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item name="marketing_line" label="一句话卖点（前台）">
+              <Input allowClear />
+            </Form.Item>
+          </Card>
+          <Card size="small" title="展示与活动" style={{ marginBottom: 12 }}>
+            <Row gutter={[12, 8]}>
+              <Col xs={24} md={8}>
+                <Form.Item name="badge_text" label="主角标">
+                  <Input allowClear />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="badge_text_secondary" label="次角标">
+                  <Input allowClear />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item name="promo_label" label="活动标签">
+                  <Input allowClear />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item name="promo_ends_at" label="活动结束时间（展示）">
+                  <DatePicker showTime style={{ width: '100%' }} allowClear />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+          <Card size="small" title="场次时间">
+            <Row gutter={[12, 8]}>
+              <Col xs={24} md={12}>
+                <Form.Item name="start_time" label="开始时间" rules={[{ required: true, message: '必填' }]}>
+                  <DatePicker showTime style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item name="end_time" label="结束时间" rules={[{ required: true, message: '必填' }]}>
+                  <DatePicker showTime style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
         </Form>
       </Modal>
 
-      <Drawer
-        title={preview ? `预览 · ${preview.sale.name}` : '预览'}
-        width={720}
+      <Modal
+        title="用户端预览（限时秒杀卖场）"
         open={previewOpen}
-        onClose={() => {
+        onCancel={() => {
           setPreviewOpen(false);
           setPreview(null);
         }}
+        footer={null}
+        width={640}
         destroyOnClose
       >
         {previewLoading ? (
-          <Text type="secondary">加载中…</Text>
+          <Spin />
         ) : preview ? (
-          <>
-            <Space direction="vertical" size={8} style={{ marginBottom: 16 }}>
-              <div>
-                状态 {statusTag(preview.sale.status)} · ID {preview.sale.id}
-              </div>
-              <Text type="secondary">
-                {dayjs(preview.sale.start_time).format('YYYY-MM-DD HH:mm')} —{' '}
-                {dayjs(preview.sale.end_time).format('YYYY-MM-DD HH:mm')}
-              </Text>
-              {preview.sale.description ? <div>{preview.sale.description}</div> : null}
-            </Space>
-            <Table<FlashSaleProductRow>
-              rowKey="id"
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            {previewCtx.isDraft ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="草稿预览"
+                description="展示为当前表单未保存状态；保存并上架后，用户端以接口数据为准。"
+              />
+            ) : null}
+            {previewCtx.warnings.length > 0 ? (
+              <Alert
+                type="info"
+                showIcon
+                message="用户端可见性提示"
+                description={
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {previewCtx.warnings.map((t) => (
+                      <li key={t}>{t}</li>
+                    ))}
+                  </ul>
+                }
+              />
+            ) : null}
+            <Card
               size="small"
-              columns={previewSkuCols}
-              dataSource={preview.skus}
-              pagination={false}
-            />
-          </>
+              style={{ borderRadius: 12 }}
+              title={
+                <Space wrap>
+                  <span>{preview.sale.name}</span>
+                  {preview.sale.is_featured ? <Tag color="gold">推荐</Tag> : null}
+                  {preview.sale.badge_text ? <Tag color="purple">{preview.sale.badge_text}</Tag> : null}
+                  {preview.sale.badge_text_secondary ? (
+                    <Tag color="cyan">{preview.sale.badge_text_secondary}</Tag>
+                  ) : null}
+                  {preview.sale.promo_label ? <Tag color="blue">{preview.sale.promo_label}</Tag> : null}
+                </Space>
+              }
+            >
+              {preview.sale.marketing_line ? (
+                <Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                  {preview.sale.marketing_line}
+                </Paragraph>
+              ) : null}
+              {preview.sale.description ? (
+                <Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                  {preview.sale.description}
+                </Paragraph>
+              ) : null}
+              <Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                场次：{dayjs(preview.sale.start_time).format('YYYY-MM-DD HH:mm')} —{' '}
+                {dayjs(preview.sale.end_time).format('YYYY-MM-DD HH:mm')}
+              </Paragraph>
+              {preview.sale.promo_ends_at ? (
+                <Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                  活动展示结束：{dayjs(preview.sale.promo_ends_at).format('YYYY-MM-DD HH:mm')}
+                </Paragraph>
+              ) : null}
+              <Paragraph type="secondary" style={{ marginBottom: 4 }}>
+                秒杀 SKU（与卖场卡片字段一致）
+              </Paragraph>
+              <Table<FlashSaleProductRow>
+                rowKey="id"
+                size="small"
+                columns={previewSkuCols}
+                dataSource={preview.skus}
+                pagination={false}
+              />
+            </Card>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              前台路径：/catalog?flash=true · 接口：GET /flash-sales/active、/upcoming
+            </Text>
+          </Space>
         ) : null}
-      </Drawer>
+      </Modal>
     </div>
   );
 };

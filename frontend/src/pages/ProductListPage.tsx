@@ -83,6 +83,12 @@ interface FlashSale {
   end_time: string;
   status: string;
   skus: FlashSaleProduct[];
+  is_featured?: boolean;
+  badge_text?: string;
+  badge_text_secondary?: string;
+  marketing_line?: string;
+  promo_label?: string;
+  promo_ends_at?: string | null;
 }
 
 const sortTypeMap: Record<string, { title: string; icon: React.ReactNode }> = {
@@ -744,8 +750,19 @@ export const ProductListPage: React.FC = () => {
           <Card size="small" title="即将开始" style={{ marginBottom: 16 }}>
             {upcomingFlashSales.map((sale) => (
               <div key={sale.id} style={{ marginBottom: 12 }}>
-                <Text strong>{sale.name}</Text>
-                <Text type="secondary" style={{ marginLeft: 8 }}>
+                <Space wrap align="center">
+                  <Text strong>{sale.name}</Text>
+                  {sale.is_featured ? <Tag color="gold">推荐</Tag> : null}
+                  {sale.badge_text ? <Tag color="purple">{sale.badge_text}</Tag> : null}
+                  {sale.badge_text_secondary ? <Tag color="cyan">{sale.badge_text_secondary}</Tag> : null}
+                  {sale.promo_label ? <Tag color="blue">{sale.promo_label}</Tag> : null}
+                </Space>
+                {sale.marketing_line ? (
+                  <div style={{ marginTop: 4 }}>
+                    <Text type="secondary">{sale.marketing_line}</Text>
+                  </div>
+                ) : null}
+                <Text type="secondary" style={{ marginLeft: 0, display: 'block', marginTop: 4 }}>
                   {dayjs(sale.start_time).format('MM-DD HH:mm')} 开抢 —{' '}
                   {dayjs(sale.end_time).format('MM-DD HH:mm')} 结束
                 </Text>
@@ -785,14 +802,27 @@ export const ProductListPage: React.FC = () => {
               <div key={sale.id} style={{ marginBottom: 24 }}>
                 <Card
                   title={
-                    <Space>
+                    <Space wrap align="center">
                       <ThunderboltOutlined style={{ color: '#faad14' }} />
                       <span>{sale.name}</span>
-                      {sale.description && <Text type="secondary">({sale.description})</Text>}
+                      {sale.is_featured ? <Tag color="gold">推荐</Tag> : null}
+                      {sale.badge_text ? <Tag color="purple">{sale.badge_text}</Tag> : null}
+                      {sale.badge_text_secondary ? <Tag color="cyan">{sale.badge_text_secondary}</Tag> : null}
+                      {sale.promo_label ? <Tag color="blue">{sale.promo_label}</Tag> : null}
                     </Space>
                   }
                   style={{ marginBottom: 16 }}
                 >
+                  {sale.marketing_line ? (
+                    <div style={{ marginBottom: 12 }}>
+                      <Text type="secondary">{sale.marketing_line}</Text>
+                    </div>
+                  ) : null}
+                  {sale.description ? (
+                    <div style={{ marginBottom: 12 }}>
+                      <Text type="secondary">({sale.description})</Text>
+                    </div>
+                  ) : null}
                   <Row gutter={[16, 16]}>
                     {sale.skus.map((product) => {
                       const stockPercent =
