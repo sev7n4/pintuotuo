@@ -91,7 +91,7 @@ func validateAnthropicCompanionForSKU(db *sql.DB, merchantID, skuID int, anthrop
 			err,
 		)
 	}
-	if strings.ToLower(strings.TrimSpace(prov)) != strings.ToLower(strings.TrimSpace(expected)) {
+	if !strings.EqualFold(strings.TrimSpace(prov), strings.TrimSpace(expected)) {
 		return apperrors.NewAppError(
 			"MERCHANT_SKU_ANTHROPIC_PROVIDER_MISMATCH",
 			"Anthropic 出站密钥的 provider 须为 "+expected,
