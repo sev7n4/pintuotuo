@@ -57,20 +57,20 @@ func scanFlashSaleRow(sc sqlScanner) (FlashSale, error) {
 }
 
 type FlashSale struct {
-	ID                   int        `json:"id"`
-	Name                 string     `json:"name"`
-	Description          string     `json:"description"`
-	StartTime            time.Time  `json:"start_time"`
-	EndTime              time.Time  `json:"end_time"`
-	Status               string     `json:"status"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
-	IsFeatured           bool       `json:"is_featured"`
-	BadgeText            string     `json:"badge_text,omitempty"`
-	BadgeTextSecondary   string     `json:"badge_text_secondary,omitempty"`
-	MarketingLine        string     `json:"marketing_line,omitempty"`
-	PromoLabel           string     `json:"promo_label,omitempty"`
-	PromoEndsAt          *time.Time `json:"promo_ends_at,omitempty"`
+	ID                 int        `json:"id"`
+	Name               string     `json:"name"`
+	Description        string     `json:"description"`
+	StartTime          time.Time  `json:"start_time"`
+	EndTime            time.Time  `json:"end_time"`
+	Status             string     `json:"status"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	IsFeatured         bool       `json:"is_featured"`
+	BadgeText          string     `json:"badge_text,omitempty"`
+	BadgeTextSecondary string     `json:"badge_text_secondary,omitempty"`
+	MarketingLine      string     `json:"marketing_line,omitempty"`
+	PromoLabel         string     `json:"promo_label,omitempty"`
+	PromoEndsAt        *time.Time `json:"promo_ends_at,omitempty"`
 }
 
 type FlashSaleProduct struct {
@@ -441,16 +441,16 @@ func AdminPatchFlashSale(c *gin.Context) {
 	}
 
 	var body struct {
-		Name                 *string    `json:"name"`
-		Description          *string    `json:"description"`
-		StartTime            *time.Time `json:"start_time"`
-		EndTime              *time.Time `json:"end_time"`
-		IsFeatured           *bool      `json:"is_featured"`
-		BadgeText            *string    `json:"badge_text"`
-		BadgeTextSecondary   *string    `json:"badge_text_secondary"`
-		MarketingLine        *string    `json:"marketing_line"`
-		PromoLabel           *string    `json:"promo_label"`
-		PromoEndsAt          *string    `json:"promo_ends_at"`
+		Name               *string    `json:"name"`
+		Description        *string    `json:"description"`
+		StartTime          *time.Time `json:"start_time"`
+		EndTime            *time.Time `json:"end_time"`
+		IsFeatured         *bool      `json:"is_featured"`
+		BadgeText          *string    `json:"badge_text"`
+		BadgeTextSecondary *string    `json:"badge_text_secondary"`
+		MarketingLine      *string    `json:"marketing_line"`
+		PromoLabel         *string    `json:"promo_label"`
+		PromoEndsAt        *string    `json:"promo_ends_at"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		middleware.RespondWithError(c, apperrors.ErrInvalidRequest)
