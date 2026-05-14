@@ -40,6 +40,7 @@ func anthropicCompatFromContext(c *gin.Context) (anthropicCompatCtx, bool) {
 // AnthropicMessages 接受 Anthropic Messages API 原始 JSON，在 api_format=anthropic 的上游原样转发（仅改写 model；LiteLLM 注入 user_config）。
 // 若上游为 OpenAI 兼容而客户端走本路由，请改用 POST …/openai/v1/chat/completions。
 // Base URL：{API_ORIGIN}/api/v1/anthropic/v1；鉴权：Authorization: Bearer ptd_* 或 x-api-key: ptd_*。
+// 出站头：Anthropic-Beta、Anthropic-Version（及 Openai-* 等）默认白名单透传至上游，见 applyProxyOutboundAuthHeaders；可设 API_PROXY_FORWARD_EXTRA_HEADERS 追加、API_PROXY_FORWARD_CLIENT_HEADERS=false 全关。
 func AnthropicMessages(c *gin.Context) {
 	bodyBytes, readErr := io.ReadAll(c.Request.Body)
 	if readErr != nil {

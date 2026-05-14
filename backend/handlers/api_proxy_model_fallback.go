@@ -16,10 +16,9 @@ import (
 	"github.com/pintuotuo/backend/utils"
 )
 
-// apiProxyModelFallbackEnabled 默认开启；设置 API_PROXY_MODEL_FALLBACK=0|false|off 可关闭运行时模型链 fallback。
+// apiProxyModelFallbackEnabled 默认开启；设置 API_PROXY_MODEL_FALLBACK=0|false|off|no 可关闭运行时模型链 fallback。
 func apiProxyModelFallbackEnabled() bool {
-	v := strings.TrimSpace(strings.ToLower(os.Getenv("API_PROXY_MODEL_FALLBACK")))
-	return v != "0" && v != "false" && v != "off"
+	return !envLooksExplicitlyDisabled(os.Getenv("API_PROXY_MODEL_FALLBACK"))
 }
 
 type proxyCatalogAttempt struct {

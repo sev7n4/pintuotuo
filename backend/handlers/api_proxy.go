@@ -669,16 +669,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			hreq.GetBody = func() (io.ReadCloser, error) {
 				return io.NopCloser(bytes.NewReader(jb)), nil
 			}
-			hreq.Header.Set("Content-Type", "application/json")
-			if anthropicRaw && isAnthClient {
-				hreq.Header.Set("x-api-key", dk)
-				hreq.Header.Set("anthropic-version", "2023-06-01")
-			} else {
-				authToken := resolveAuthTokenFromRouteMode(resolveRouteMode(&pk), dk)
-				hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
-			}
-			hreq.Header.Set("Accept", "text/event-stream")
-			applyProxyUpstreamHeaders(c, hreq, requestID)
+			useAnthropicKeyAuth := anthropicRaw && isAnthClient
+			applyProxyOutboundAuthHeaders(c, hreq, requestID, useAnthropicKeyAuth, dk, &pk, true)
 
 			r, rc, execErr := executeProviderRequestWithRetry(streamClient, hreq, retryPolicyStream)
 			retryCountStream += rc
@@ -880,16 +872,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		hreq.GetBody = func() (io.ReadCloser, error) {
 			return io.NopCloser(bytes.NewReader(jb)), nil
 		}
-		hreq.Header.Set("Content-Type", "application/json")
-		switch pcfg.APIFormat {
-		case providerAnthropic:
-			hreq.Header.Set("x-api-key", dk)
-			hreq.Header.Set("anthropic-version", "2023-06-01")
-		default:
-			authToken := resolveAuthTokenFromRouteMode(resolveRouteMode(&pk), dk)
-			hreq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", authToken))
-		}
-		applyProxyUpstreamHeaders(c, hreq, requestID)
+		applyProxyOutboundAuthHeaders(c, hreq, requestID, pcfg.APIFormat == providerAnthropic, dk, &pk, false)
 
 		r, rc, execErr := executeProviderRequestWithRetry(client, hreq, retryPolicy)
 		retryCountTotal += rc
@@ -1792,8 +1775,7 @@ func routingStrategyWithSource() (code string, source string) {
 }
 
 func shouldUseSmartRouting(userID int, requestID string) bool {
-	enabled := strings.TrimSpace(strings.ToLower(os.Getenv("SMART_ROUTING_ENABLE")))
-	if enabled == "false" || enabled == "0" || enabled == "off" {
+	if envLooksExplicitlyDisabled(os.Getenv("SMART_ROUTING_ENABLE")) {
 		return false
 	}
 	percent := 100
