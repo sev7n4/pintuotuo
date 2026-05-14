@@ -31,6 +31,7 @@ func respondOpenAIError(c *gin.Context, status int, message string) {
 // Supports stream:true (SSE) for OpenAI-compatible providers; see deploy/litellm/README.md.
 // Clients should set base URL to {API_ORIGIN}/api/v1/openai/v1 (OpenAI SDK: baseURL + "/chat/completions").
 // Authentication: Bearer platform API key (ptd_* / ptt_*) or JWT（与 /openai/v1 其它路由一致）。
+// 出站头：Openai-Beta、Openai-Organization 等默认白名单透传至上游（与 api_proxy 一致）；见 proxy_upstream_headers.go 环境变量说明。
 func OpenAIChatCompletions(c *gin.Context) {
 	bodyBytes, readErr := io.ReadAll(c.Request.Body)
 	if readErr != nil {
