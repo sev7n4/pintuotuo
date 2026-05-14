@@ -100,6 +100,11 @@ func AnthropicMessages(c *gin.Context) {
 		Options:                  nil,
 		RawAnthropicMessagesBody: rawBody,
 	}
+	if sibling := services.AnthropicSiblingProviderCode(provider); sibling != "" && services.ModelProviderCodeExistsActive(db, sibling) {
+		req.CatalogProvider = provider
+		req.Provider = sibling
+		req.MergeAnthropicCompanionKeySlots = true
+	}
 
 	userID, exists := c.Get("user_id")
 	if !exists {

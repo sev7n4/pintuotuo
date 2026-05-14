@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Card,
   Table,
@@ -25,6 +25,7 @@ import type {
   MerchantSKUDetail,
   AvailableSKU,
   MerchantSKUCreateRequest,
+  MerchantSKUUpdateRequest,
 } from '@/types/merchantSku';
 import type { MerchantAPIKey } from '@/types';
 import { merchantService } from '@/services/merchant';
@@ -33,6 +34,12 @@ import styles from './MerchantProducts.module.css';
 
 const { Text } = Typography;
 const { useBreakpoint } = Grid;
+
+/** 与后端约定一致：目录主厂商 + `_anthropic` 为 Claude/Anthropic 出站用 merchant_api_keys.provider */
+function anthropicSiblingProviderCode(modelProvider: string): string {
+  const p = (modelProvider || '').trim().toLowerCase();
+  return p ? `${p}_anthropic` : '';
+}
 
 const MerchantSKUs = () => {
   const screens = useBreakpoint();
@@ -46,6 +53,7 @@ const MerchantSKUs = () => {
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [selectedSKUs, setSelectedSKUs] = useState<number[]>([]);
   const [selectedAPIKey, setSelectedAPIKey] = useState<number | undefined>();
+  const [selectedAnthropicAPIKey, setSelectedAnthropicAPIKey] = useState<number | undefined>();
   const [costGuideMode, setCostGuideMode] = useState<'official' | 'self_hosted'>('official');
   const [customPricingEnabled, setCustomPricingEnabled] = useState(false);
   const [customInputRate, setCustomInputRate] = useState<number | undefined>();
@@ -130,6 +138,7 @@ const MerchantSKUs = () => {
   const handleSelectSKU = () => {
     setSelectedSKUs([]);
     setSelectedAPIKey(undefined);
+    setSelectedAnthropicAPIKey(undefined);
     setCostGuideMode('official');
     setCustomPricingEnabled(false);
     setCustomInputRate(undefined);
@@ -155,6 +164,7 @@ const MerchantSKUs = () => {
         const data: MerchantSKUCreateRequest = {
           sku_id: skuId,
           api_key_id: selectedAPIKey,
+          anthropic_api_key_id: selectedAnthropicAPIKey,
           custom_pricing_enabled: customPricingEnabled,
           cost_input_rate: customPricingEnabled ? customInputRate : undefined,
           cost_output_rate: customPricingEnabled ? customOutputRate : undefined,
@@ -178,6 +188,12 @@ const MerchantSKUs = () => {
             window.location.href = '/merchant/settings';
           },
         });
+      } else if (axiosError.response?.data?.code === 'MERCHANT_SKU_ANTHROPIC_PROVIDER_MISMATCH') {
+        message.error(
+          axiosError.response?.data?.message || 'Anthropic 出站密钥的 provider 与 SPU 主厂商不匹配'
+        );
+      } else if (axiosError.response?.data?.code === 'MERCHANT_SKU_ANTHROPIC_INVALID') {
+        message.error(axiosError.response?.data?.message || 'Anthropic 出站密钥无效');
       } else if (axiosError.response?.data?.code === 'MERCHANT_SKU_KEY_CONFLICT') {
         message.error(
           axiosError.response?.data?.message ||
@@ -237,6 +253,38 @@ const MerchantSKUs = () => {
       }
     }
   };
+
+  const handleUpdateAnthropicKey = async (id: number, anthropicKeyId: number | undefined) => {
+    try {
+      const payload: MerchantSKUUpdateRequest = {
+        anthropic_api_key_id: anthropicKeyId === undefined ? 0 : anthropicKeyId,
+      };
+      await merchantSkuService.updateMerchantSKU(id, payload);
+      message.success('Anthropic 出站密钥已更新');
+      fetchMerchantSKUs();
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { message?: string; code?: string } } };
+      const code = axiosError.response?.data?.code;
+      if (code === 'MERCHANT_SKU_KEY_CONFLICT') {
+        message.error(
+          axiosError.response?.data?.message ||
+            '该密钥已绑定其他在售商品，请更换或先下架占用该密钥的商品'
+        );
+      } else if (
+        code === 'MERCHANT_SKU_ANTHROPIC_PROVIDER_MISMATCH' ||
+        code === 'MERCHANT_SKU_ANTHROPIC_INVALID'
+      ) {
+        message.error(axiosError.response?.data?.message || 'Anthropic 出站密钥无效');
+      } else {
+        message.error('更新失败');
+      }
+    }
+  };
+
+  const anthropicLikeKeys = useMemo(
+    () => apiKeys.filter((k) => (k.provider || '').trim().toLowerCase().endsWith('_anthropic')),
+    [apiKeys]
+  );
 
   const formatPrice = (price: number) => `¥${price.toFixed(2)}`;
 
@@ -352,6 +400,37 @@ const MerchantSKUs = () => {
             ))}
         </Select>
       ),
+    },
+    {
+      title: 'Anthropic 出站 Key',
+      key: 'anthropic_api_key',
+      width: screens.xs ? 110 : 160,
+      render: (_: unknown, record: MerchantSKUDetail) => {
+        const sibling = anthropicSiblingProviderCode(record.model_provider);
+        const options = apiKeys.filter(
+          (key) => (key.provider || '').trim().toLowerCase() === sibling.toLowerCase()
+        );
+        return (
+          <Tooltip
+            title={`可选；须为 provider=${sibling} 的商户密钥，用于 Claude/Anthropic 入口出站`}
+          >
+            <Select
+              style={{ width: '100%' }}
+              placeholder={options.length ? '可选' : '无匹配密钥'}
+              value={record.anthropic_api_key_id}
+              onChange={(value) => handleUpdateAnthropicKey(record.id, value)}
+              allowClear
+              size="small"
+            >
+              {options.map((key) => (
+                <Select.Option key={key.id} value={key.id}>
+                  {key.name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Tooltip>
+        );
+      },
     },
     {
       title: '销量',
@@ -501,7 +580,7 @@ const MerchantSKUs = () => {
             dataSource={merchantSKUs}
             rowKey="id"
             loading={loading}
-            scroll={{ x: 900 }}
+            scroll={{ x: 1080 }}
             pagination={{
               pageSize: 10,
               showSizeChanger: true,
@@ -618,6 +697,28 @@ const MerchantSKUs = () => {
                 </Select.Option>
               ))}
             </Select>
+
+            <label style={{ display: 'block', marginTop: 12, marginBottom: 8 }}>
+              Anthropic 出站 Key（可选）
+            </label>
+            <Tooltip title="须与所选 SKU 的 SPU 主厂商一致：密钥 provider 为「主厂商_anthropic」（如 alibaba_anthropic）。未配置时可留空。">
+              <Select
+                style={{ width: '100%' }}
+                placeholder="可选；用于 Claude / Anthropic Messages 出站"
+                value={selectedAnthropicAPIKey}
+                onChange={setSelectedAnthropicAPIKey}
+                allowClear
+              >
+                {anthropicLikeKeys.map((key) => (
+                  <Select.Option key={key.id} value={key.id}>
+                    <Space>
+                      <ApiOutlined />
+                      {key.name} ({key.provider})
+                    </Space>
+                  </Select.Option>
+                ))}
+              </Select>
+            </Tooltip>
 
             {customPricingEnabled && (
               <Row gutter={12} style={{ marginTop: 12 }}>

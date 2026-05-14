@@ -88,6 +88,10 @@ func legacyProviderList() []map[string]interface{} {
 type APIProxyRequest struct {
 	Provider string `json:"provider" binding:"required"`
 	Model    string `json:"model" binding:"required"`
+	// CatalogProvider 目录计价与 strict 权益主厂商（如 alibaba）；空表示与 Provider 相同。
+	CatalogProvider string `json:"-"`
+	// MergeAnthropicCompanionKeySlots 为真时，strict 白名单合并 merchant_skus.anthropic_api_key_id 对应 Key。
+	MergeAnthropicCompanionKeySlots bool `json:"-"`
 	// Messages 与 Options 供 Anthropic 兼容入口等内部结构化调用；OpenAI 兼容 chat 使用 RawOpenAIChatBody 时可为空。
 	Messages      []ChatMessage   `json:"messages"`
 	Stream        bool            `json:"stream"`
@@ -295,9 +299,14 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	traceSpan := services.StartLLMTrace(requestID, userIDInt)
 	defer traceSpan.Finish(c.Request.Context())
 
+	catalogProv := strings.TrimSpace(req.CatalogProvider)
+	if catalogProv == "" {
+		catalogProv = strings.TrimSpace(req.Provider)
+	}
+
 	var strictPricingVID *int
 	if services.EntitlementEnforcementStrict() {
-		vid, _, ok, entErr := services.ResolveChosenPricingVersion(db, userIDInt, req.Provider, req.Model)
+		vid, _, ok, entErr := services.ResolveChosenPricingVersion(db, userIDInt, catalogProv, req.Model)
 		if entErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -373,7 +382,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	var entCtx *services.EntitlementRoutingContext
 	if services.EntitlementEnforcementStrict() {
 		var entErr error
-		entCtx, entErr = services.ResolveEntitlementRoutingContext(db, userIDInt, req.Provider, req.Model)
+		entOpts := services.EntitlementRoutingOptions{MergeAnthropicCompanionKeySlots: req.MergeAnthropicCompanionKeySlots}
+		entCtx, entErr = services.ResolveEntitlementRoutingContextWithOptions(db, userIDInt, catalogProv, req.Model, entOpts)
 		if entErr != nil {
 			billingEngine.CancelPreDeduct(userIDInt, requestID)
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -1542,7 +1552,8 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 						 COALESCE(mak.route_mode, 'auto') as route_mode,
 						 COALESCE(mak.route_config, '{}'::jsonb) as route_config
 						 FROM merchant_skus ms
-						 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
+						 JOIN merchant_api_keys mak ON mak.provider = $2
+						   AND (mak.id = ms.api_key_id OR mak.id = ms.anthropic_api_key_id)
 						 JOIN merchants m ON m.id = ms.merchant_id
 						 WHERE ms.id = $1 AND ms.status = 'active'
 						   AND mak.provider = $2 AND mak.status = 'active'
@@ -1572,7 +1583,8 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 				 COALESCE(mak.route_mode, 'auto') as route_mode,
 				 COALESCE(mak.route_config, '{}'::jsonb) as route_config
 				 FROM merchant_skus ms
-				 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
+				 JOIN merchant_api_keys mak ON mak.provider = $4
+				   AND (mak.id = ms.api_key_id OR mak.id = ms.anthropic_api_key_id)
 				 JOIN merchants m ON m.id = ms.merchant_id
 				 WHERE ms.id = $1 AND ms.status = 'active'
 				   AND ms.merchant_id = $2
@@ -1645,14 +1657,14 @@ func resolveMerchantSKUProcurementForLog(db *sql.DB, req APIProxyRequest, apiKey
 		err = db.QueryRow(
 			`SELECT ms.id, ms.cost_input_rate, ms.cost_output_rate
 			 FROM merchant_skus ms
-			 WHERE ms.id = $1 AND ms.api_key_id = $2 AND ms.merchant_id = $3 AND ms.status = 'active'`,
+			 WHERE ms.id = $1 AND (ms.api_key_id = $2 OR ms.anthropic_api_key_id = $2) AND ms.merchant_id = $3 AND ms.status = 'active'`,
 			*req.MerchantSKUID, apiKeyID, merchantID,
 		).Scan(&msID, &inRate, &outRate)
 	} else {
 		err = db.QueryRow(
 			`SELECT ms.id, ms.cost_input_rate, ms.cost_output_rate
 			 FROM merchant_skus ms
-			 WHERE ms.api_key_id = $1 AND ms.status = 'active'
+			 WHERE (ms.api_key_id = $1 OR ms.anthropic_api_key_id = $1) AND ms.status = 'active'
 			 LIMIT 1`,
 			apiKeyID,
 		).Scan(&msID, &inRate, &outRate)
