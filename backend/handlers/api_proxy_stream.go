@@ -32,6 +32,7 @@ func executeProxyChatCompletionStreamFromUpstream(
 	requestID string,
 	userIDInt int,
 	req APIProxyRequest,
+	catalogProv string,
 	billProv string,
 	billModel string,
 	requestPath string,
@@ -120,7 +121,7 @@ func executeProxyChatCompletionStreamFromUpstream(
 	}
 
 	tokenUsage := billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
-	cost, cerr := calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
+	cost, cerr := calculateTokenCost(db, userIDInt, pricingLookupProvider(catalogProv, billProv), billModel, inputTokens, outputTokens, strictPricingVID)
 	if cerr != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		logger.LogError(context.Background(), "api_proxy", "stream token cost resolution failed", cerr, map[string]interface{}{
@@ -214,6 +215,7 @@ func executeAnthropicNativeStreamPassthrough(
 	requestID string,
 	userIDInt int,
 	req APIProxyRequest,
+	catalogProv string,
 	billProv string,
 	billModel string,
 	requestPath string,
@@ -299,7 +301,7 @@ func executeAnthropicNativeStreamPassthrough(
 	}
 
 	tokenUsage := billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
-	cost, cerr := calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
+	cost, cerr := calculateTokenCost(db, userIDInt, pricingLookupProvider(catalogProv, billProv), billModel, inputTokens, outputTokens, strictPricingVID)
 	if cerr != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		logger.LogError(context.Background(), "api_proxy", "anthropic native stream token cost resolution failed", cerr, map[string]interface{}{
@@ -367,6 +369,7 @@ func executeProxyAnthropicStreamFromUpstream(
 	requestID string,
 	userIDInt int,
 	req APIProxyRequest,
+	catalogProv string,
 	billProv string,
 	billModel string,
 	clientModel string,
@@ -554,7 +557,7 @@ func executeProxyAnthropicStreamFromUpstream(
 	}
 
 	tokenUsage := billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
-	cost, cerr := calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
+	cost, cerr := calculateTokenCost(db, userIDInt, pricingLookupProvider(catalogProv, billProv), billModel, inputTokens, outputTokens, strictPricingVID)
 	if cerr != nil {
 		billingEngine.CancelPreDeduct(userIDInt, requestID)
 		logger.LogError(context.Background(), "api_proxy", "anthropic stream token cost resolution failed", cerr, map[string]interface{}{
