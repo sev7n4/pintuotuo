@@ -589,12 +589,12 @@ func GetAdminBYOKProbeModels(c *gin.Context) {
 	}
 
 	af := strings.ToLower(strings.TrimSpace(row.APIFormat))
-	if af != "openai" {
+	if af != "openai" && !services.ProviderUsesAnthropicHTTP(row.Key.Provider, row.APIFormat) {
 		c.JSON(http.StatusOK, gin.H{
 			"models":     []string{},
 			"api_format": row.APIFormat,
 			"success":    false,
-			"hint":       "当前提供商的 api_format 非 openai，不进行 /v1/models 拉取；模型下拉可使用列表中的 models_supported 或手动输入。",
+			"hint":       "当前提供商的 api_format 非 openai/anthropic，不进行上游模型列表拉取；模型下拉可使用列表中的 models_supported 或手动输入。",
 		})
 		return
 	}

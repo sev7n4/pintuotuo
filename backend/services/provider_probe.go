@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -26,14 +27,140 @@ type ProbeModelsResult struct {
 
 // ProbeProviderModels performs one GET <modelsURL> probe and parses OpenAI-style model list payload.
 func SetProviderAuthHeaders(req *http.Request, provider, apiKey string) {
-	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case modelProviderAnthropic:
+	if ProviderUsesAnthropicHTTP(provider, "") {
 		req.Header.Set("x-api-key", apiKey)
 		req.Header.Set("anthropic-version", "2023-06-01")
-	default:
+	} else {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 	}
 	req.Header.Set("Content-Type", "application/json")
+}
+
+// AnthropicMessagesProbeURL returns POST URL for Anthropic Messages API given a provider base URL.
+func AnthropicMessagesProbeURL(endpoint string) string {
+	b := normalizeOpenAICompatBase(endpoint)
+	if hasOpenAICompatVersionedRootSuffix(b) {
+		return b + "/messages"
+	}
+	return b + "/v1/messages"
+}
+
+// ProbeProviderConnectivity probes upstream reachability: OpenAI GET /models or Anthropic POST /messages.
+func ProbeProviderConnectivity(ctx context.Context, client *http.Client, baseURL, apiKey, provider, apiFormat string) (*ProbeModelsResult, error) {
+	baseURL = normalizeOpenAICompatBase(baseURL)
+	if baseURL == "" {
+		return &ProbeModelsResult{
+			Success:   false,
+			ErrorMsg:  "endpoint is empty",
+			ErrorCode: "PROBE_CONFIG_ERROR",
+		}, nil
+	}
+	if ProviderUsesAnthropicHTTP(provider, apiFormat) {
+		model := selectProbeModel(provider, nil, "")
+		return ProbeProviderAnthropicMessages(ctx, client, baseURL, apiKey, provider, model)
+	}
+	return ProbeProviderModels(ctx, client, OpenAICompatModelsProbeURL(baseURL), apiKey, provider)
+}
+
+// ProbeProviderAnthropicMessages sends a minimal Messages request (same auth path as proxy anthropic upstream).
+func ProbeProviderAnthropicMessages(ctx context.Context, client *http.Client, baseURL, apiKey, provider, model string) (*ProbeModelsResult, error) {
+	if model == "" {
+		model = selectProbeModel(provider, nil, "")
+	}
+	if model == "" {
+		return &ProbeModelsResult{
+			Success:   false,
+			ErrorCode: "PROBE_MODEL_MISSING",
+			ErrorMsg:  "no model available for anthropic messages probe",
+		}, nil
+	}
+
+	body := map[string]interface{}{
+		"model":      model,
+		"max_tokens": 1,
+		"messages": []map[string]string{
+			{"role": "user", "content": "ping"},
+		},
+	}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+
+	messagesURL := AnthropicMessagesProbeURL(baseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, messagesURL, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, err
+	}
+	SetProviderAuthHeaders(req, provider, apiKey)
+
+	start := time.Now()
+	resp, err := client.Do(req)
+	latencyMs := int(time.Since(start).Milliseconds())
+	if err != nil {
+		errInfo := MapProviderError(0, "", fmt.Sprintf("connection failed: %v", err), nil, err, "")
+		return &ProbeModelsResult{
+			Success:       false,
+			LatencyMs:     latencyMs,
+			ErrorMsg:      errInfo.ProviderMessage,
+			ErrorCategory: errInfo.Category,
+		}, err
+	}
+	defer resp.Body.Close()
+
+	rawBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	result := &ProbeModelsResult{
+		StatusCode: resp.StatusCode,
+		LatencyMs:  latencyMs,
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		code, msg := ExtractProviderError(rawBody)
+		if code == "" {
+			code = fmt.Sprintf("HTTP_%d", resp.StatusCode)
+		}
+		if msg == "" {
+			msg = strings.TrimSpace(string(rawBody))
+		}
+		errInfo := MapProviderError(resp.StatusCode, code, msg, resp.Header, nil, string(rawBody))
+		result.ErrorCode = code
+		result.ErrorMsg = msg
+		result.ErrorCategory = errInfo.Category
+		result.ProviderRequestID = errInfo.ProviderRequestID
+		result.RawErrorExcerpt = errInfo.RawErrorExcerpt
+		return result, nil
+	}
+
+	result.Success = true
+	models := GetPredefinedModels(provider)
+	if len(models) == 0 {
+		models = []string{model}
+	}
+	sort.Strings(models)
+	result.Models = models
+	return result, nil
+}
+
+// ProbeAnthropicMessagesQuota checks billable access via a minimal POST /messages (deep verification).
+func ProbeAnthropicMessagesQuota(ctx context.Context, client *http.Client, baseURL, apiKey, provider, model string) (bool, string, string) {
+	probe, err := ProbeProviderAnthropicMessages(ctx, client, baseURL, apiKey, provider, model)
+	if err != nil {
+		return false, ErrCodeQuotaProbeNetworkError, err.Error()
+	}
+	if probe != nil && probe.Success {
+		return true, "", ""
+	}
+	code := "ANTHROPIC_PROBE_FAILED"
+	msg := "anthropic messages probe failed"
+	if probe != nil {
+		if strings.TrimSpace(probe.ErrorCode) != "" {
+			code = probe.ErrorCode
+		}
+		if strings.TrimSpace(probe.ErrorMsg) != "" {
+			msg = probe.ErrorMsg
+		}
+	}
+	return false, code, msg
 }
 
 func ProbeProviderModels(ctx context.Context, client *http.Client, modelsURL string, apiKey string, provider string) (*ProbeModelsResult, error) {
@@ -184,21 +311,28 @@ func ProbeEndpointURL(ctx context.Context, url string, apiKey string, timeoutMs 
 }
 
 var predefinedModels = map[string][]string{
-	"openai":    {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"},
-	"anthropic": {"claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-haiku-20240307"},
-	"stepfun":   {"stepfun-step-1-8k", "stepfun-step-1-32k", "stepfun-step-2-16k"},
-	"deepseek":  {"deepseek-chat", "deepseek-coder"},
-	"moonshot":  {"moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"},
-	"zhipu":     {"glm-4", "glm-4-flash", "glm-3-turbo"},
-	"alibaba":   {"qwen-turbo", "qwen-plus", "qwen-max"},
-	"qwen":      {"qwen-turbo", "qwen-plus", "qwen-max"},
-	"google":    {"gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"},
+	"openai":            {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"},
+	"anthropic":         {"claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-haiku-20240307"},
+	"stepfun":           {"stepfun-step-1-8k", "stepfun-step-1-32k", "stepfun-step-2-16k"},
+	"deepseek":          {"deepseek-chat", "deepseek-coder"},
+	"moonshot":          {"moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"},
+	"zhipu":             {"glm-4", "glm-4-flash", "glm-3-turbo"},
+	"alibaba":           {"qwen-turbo", "qwen-plus", "qwen-max"},
+	"alibaba_anthropic": {"qwen-plus", "qwen-turbo", "glm-4"},
+	"qwen":              {"qwen-turbo", "qwen-plus", "qwen-max"},
+	"google":            {"gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"},
 }
 
 func GetPredefinedModels(provider string) []string {
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	if models, ok := predefinedModels[provider]; ok {
 		return models
+	}
+	if strings.HasSuffix(provider, AnthropicSiblingProviderSuffix) {
+		primary := strings.TrimSuffix(provider, AnthropicSiblingProviderSuffix)
+		if models, ok := predefinedModels[primary]; ok {
+			return models
+		}
 	}
 	return []string{}
 }

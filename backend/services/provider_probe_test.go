@@ -99,6 +99,17 @@ func TestSetProviderAuthHeaders(t *testing.T) {
 		}
 	})
 
+	t.Run("alibaba_anthropic uses x-api-key header", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/messages", nil)
+		SetProviderAuthHeaders(req, "alibaba_anthropic", "sk-dashscope")
+		if got := req.Header.Get("x-api-key"); got != "sk-dashscope" {
+			t.Fatalf("x-api-key=%s want=sk-dashscope", got)
+		}
+		if got := req.Header.Get("Authorization"); got != "" {
+			t.Fatalf("Authorization should be empty, got=%s", got)
+		}
+	})
+
 	t.Run("anthropic case insensitive", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/models", nil)
 		SetProviderAuthHeaders(req, "Anthropic", "sk-ant-test")
@@ -153,5 +164,40 @@ func TestProbeProviderModels_AnthropicAuthHeaders(t *testing.T) {
 	}
 	if receivedVersion != "2023-06-01" {
 		t.Fatalf("anthropic-version=%s want=2023-06-01", receivedVersion)
+	}
+}
+
+func TestAnthropicMessagesProbeURL(t *testing.T) {
+	if got := AnthropicMessagesProbeURL("https://dashscope.aliyuncs.com/compatible-model/v1"); got != "https://dashscope.aliyuncs.com/compatible-model/v1/messages" {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestProbeProviderConnectivity_AnthropicMessages(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" && r.URL.Path != "/messages" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("method=%s want POST", r.Method)
+		}
+		if r.Header.Get("x-api-key") != "test-key" {
+			t.Fatalf("x-api-key=%s", r.Header.Get("x-api-key"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"type":"message","id":"msg_1","role":"assistant","content":[{"type":"text","text":"pong"}]}`))
+	}))
+	defer srv.Close()
+
+	res, err := ProbeProviderConnectivity(context.Background(), &http.Client{Timeout: 2 * time.Second}, srv.URL, "test-key", "alibaba_anthropic", "anthropic")
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if res == nil || !res.Success {
+		t.Fatalf("probe=%+v", res)
+	}
+	if len(res.Models) == 0 {
+		t.Fatal("expected fallback models")
 	}
 }
