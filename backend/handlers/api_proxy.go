@@ -729,15 +729,15 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			}
 
 			if anthropicRaw && isAnthClient {
-				executeAnthropicNativeStreamPassthrough(c, r, requestID, userIDInt, req, att.provider, att.model, requestPath, startTime, db,
+				executeAnthropicNativeStreamPassthrough(c, r, requestID, userIDInt, req, catalogProv, att.provider, att.model, requestPath, startTime, db,
 					billingEngine, pk, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
 					decisionStart, traceSpan, strategySnapshot, retryCountStream)
 			} else if isAnthClient {
-				executeProxyAnthropicStreamFromUpstream(c, r, requestID, userIDInt, req, att.provider, att.model, ac.ClientModel, requestPath, startTime, db,
+				executeProxyAnthropicStreamFromUpstream(c, r, requestID, userIDInt, req, catalogProv, att.provider, att.model, ac.ClientModel, requestPath, startTime, db,
 					billingEngine, pk, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
 					decisionStart, traceSpan, strategySnapshot, retryCountStream)
 			} else {
-				executeProxyChatCompletionStreamFromUpstream(c, r, requestID, userIDInt, req, att.provider, att.model, requestPath, startTime, db,
+				executeProxyChatCompletionStreamFromUpstream(c, r, requestID, userIDInt, req, catalogProv, att.provider, att.model, requestPath, startTime, db,
 					billingEngine, pk, merchantID, strictPricingVID, selectedStrategy, smartCandidatesJSON, effectivePolicySource,
 					decisionStart, traceSpan, strategySnapshot, retryCountStream)
 			}
@@ -981,7 +981,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			inputTokens, outputTokens = in, out
 			tokenUsage = billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
 			var cerr error
-			cost, cerr = calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
+			cost, cerr = calculateTokenCost(db, userIDInt, pricingLookupProvider(catalogProv, billProv), billModel, inputTokens, outputTokens, strictPricingVID)
 			if cerr != nil {
 				billingEngine.CancelPreDeduct(userIDInt, requestID)
 				logger.LogError(context.Background(), "api_proxy", "Anthropic native token cost resolution failed", cerr, map[string]interface{}{
@@ -998,7 +998,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			}
 			tokenUsage = billingEngine.CalculateTokenUsage(inputTokens, outputTokens)
 			var cerr error
-			cost, cerr = calculateTokenCost(db, userIDInt, billProv, billModel, inputTokens, outputTokens, strictPricingVID)
+			cost, cerr = calculateTokenCost(db, userIDInt, pricingLookupProvider(catalogProv, billProv), billModel, inputTokens, outputTokens, strictPricingVID)
 			if cerr != nil {
 				billingEngine.CancelPreDeduct(userIDInt, requestID)
 				middleware.RespondWithError(c, apperrors.ErrPricingSnapshotMiss)
@@ -1378,6 +1378,15 @@ func mapLLMProxyHTTPStatusForClient(upstream int, routeMode string) int {
 	default:
 		return upstream
 	}
+}
+
+// pricingLookupProvider 用于 pricing_version_spu_rates + spus 按 model_provider 关联：
+// Anthropic 兄弟出站时 billProv 为 XX_anthropic，快照与权益仍挂在目录主厂商 XX 下（与 ResolveChosenPricingVersion 一致）。
+func pricingLookupProvider(catalogProv, billProv string) string {
+	if cp := strings.TrimSpace(catalogProv); cp != "" {
+		return cp
+	}
+	return billProv
 }
 
 func calculateTokenCost(db *sql.DB, userID int, provider, model string, inputTokens, outputTokens int, strictPricingVID *int) (float64, error) {
