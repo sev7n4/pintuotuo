@@ -46,8 +46,9 @@ func (s *ProviderModelSyncService) SyncProviderModels(ctx context.Context, provi
 	}
 
 	client := newProxyAwareHTTPClient(15*time.Second, resolveProviderRouteMode(providerCode))
+	siblingOpenAIBase := SiblingOpenAIBaseFromDB(db, providerCode)
 
-	probe, err := ProbeProviderConnectivity(ctx, client, apiBaseURL, apiKey, providerCode, apiFormat)
+	probe, err := ProbeProviderConnectivity(ctx, client, apiBaseURL, apiKey, providerCode, apiFormat, siblingOpenAIBase)
 	if err != nil {
 		return 0, fmt.Errorf("failed to probe models for provider %s: %w", providerCode, err)
 	}

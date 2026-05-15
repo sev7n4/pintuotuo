@@ -157,11 +157,12 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 
 	baseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
 	apiFmt := strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
+	siblingOpenAIBase := v.siblingOpenAIBaseForProvider(provider)
 	probeClient := newProxyAwareHTTPClient(10*time.Second, routeMode)
 	var probe *ProbeModelsResult
 	var probeErr error
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = ProbeProviderConnectivity(ctx, probeClient, baseURL, decryptedKey, provider, apiFmt)
+		probe, probeErr = ProbeProviderConnectivity(ctx, probeClient, baseURL, decryptedKey, provider, apiFmt, siblingOpenAIBase)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break
@@ -509,6 +510,10 @@ func (v *APIKeyValidator) getProviderConfig(provider string) (map[string]string,
 	}, nil
 }
 
+func (v *APIKeyValidator) siblingOpenAIBaseForProvider(provider string) string {
+	return SiblingOpenAIBaseFromDB(v.ensureDB(), provider)
+}
+
 func (v *APIKeyValidator) getAPIKeyRouteConfig(apiKeyID int, provider string) (string, map[string]interface{}, string) {
 	db := v.ensureDB()
 	if db == nil {
@@ -834,13 +839,14 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		apiFmt = strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
 	}
 
+	siblingOpenAIBase := v.siblingOpenAIBaseForProvider(provider)
 	probeClient := newProxyAwareHTTPClient(10*time.Second, probeRouteMode)
 
 	var probe *ProbeModelsResult
 	var probeErr error
 	var connectionFailed bool
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = ProbeProviderConnectivity(ctx, probeClient, connectivityBase, modelsAuthToken, provider, apiFmt)
+		probe, probeErr = ProbeProviderConnectivity(ctx, probeClient, connectivityBase, modelsAuthToken, provider, apiFmt, siblingOpenAIBase)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break

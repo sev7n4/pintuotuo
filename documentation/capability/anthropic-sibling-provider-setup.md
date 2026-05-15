@@ -25,7 +25,7 @@
 ## 2. 接入前条件（必须满足）
 
 - [ ] 上游已提供 **Anthropic Messages API 兼容** 端点（能 `POST {base}/messages`，接受 `x-api-key` + `anthropic-version`）。
-- [ ] 已知兼容根 URL（通常以 `/v1` 结尾，如 `https://example.com/compatible-model/v1`）。
+- [ ] 已知兼容根 URL（按各云文档：**阿里云百炼 Anthropic 兼容**见下文 §3.3，勿与 OpenAI 的 `compatible-mode` 混用）。
 - [ ] 已知至少一个可用于**深度验证探测**的模型 ID（该账号下真实可调用）。
 - [ ] 平台已部署迁移 **099**（`merchant_skus.anthropic_api_key_id` 列存在）。
 - [ ] 目录侧已有 SPU/SKU，`spus.model_provider = XX`（**不要**把 SPU 主厂商设为 `XX_anthropic`）。
@@ -52,15 +52,25 @@
 | `code` | **`XX_anthropic`** | 必须等于 `{主厂商}_anthropic`，与代码 `AnthropicSiblingProviderCode(XX)` 一致 |
 | `name` | 可读名称 | 如「XX（Anthropic 出站）」 |
 | `api_format` | **`anthropic`** | 触发 Messages 探测与 x-api-key 鉴权 |
-| `api_base_url` | 上游 Anthropic 兼容**版本化根路径** | 示例：`https://dashscope.aliyuncs.com/compatible-model/v1`；**不要**多写 `/messages`（系统会拼 `/messages`） |
+| `api_base_url` | 上游 Anthropic 兼容根路径（**按各厂商文档**） | **不要**手工拼 `/messages`（系统按 base 是否以 `/v1` 结尾拼接 `…/v1/messages 或 …/messages`）。阿里云见 §3.3。 |
 | `status` | **`active`** | 非 active 时代理不会改写出站 |
-| `litellm_model_template` 等 | 若 Key 走 LiteLLM | 按该上游在 LiteLLM 中的命名填写（见 §7） |
+| `litellm_model_template` 等 | 若 Key 走 LiteLLM | 按该 upstream 在 LiteLLM 中的命名填写（见 §7） |
+
+### 3.3 阿里云百炼（`alibaba_anthropic`）基址
+
+与 **OpenAI 兼容** `…/compatible-mode/v1` **不是同一路径**。Anthropic Messages 兼容基址应为：
+
+`https://dashscope.aliyuncs.com/apps/anthropic`
+
+（国际站等见阿里云「Anthropic API 兼容」文档中的区域域名。）
+
+**严禁**使用 **`compatible-model`**（如 `…/compatible-model/v1`）：该路径对上游**无效**，会得到 **HTTP 404**，轻量/深度验证与立即探测均失败；界面可能将 **404** 归入「模型不存在」类提示。
 
 **常见错误**
 
 - `code` 写成 `anthropic_XX` 或 `XX-anthropic` → SKU 校验与代理改写会失败。
 - `api_format` 仍为 `openai` → 验证会走 `GET /models`，极易失败。
-- `api_base_url` 缺少 `/v1` 段 → 探测 URL 可能拼错。
+- 阿里云误填 **`compatible-model`**，或与主线路混用 **`compatible-mode` 去拼 Messages** → **404**；应使用 **`/apps/anthropic`**。
 
 ---
 
@@ -97,9 +107,18 @@
 
 ### 6.1 推荐顺序（副 Key `XX_anthropic`）
 
+**与主 Key（`XX`）的差异（重要）**
+
+| 项 | `alibaba`（OpenAI 兼容） | `alibaba_anthropic`（Anthropic Messages） |
+|----|--------------------------|----------------------------------------|
+| 基址 | `…/compatible-mode/v1` | `…/apps/anthropic`（**不是** compatible-mode） |
+| 拉模型列表 | 上游 `GET …/models`，可返回上百个 id | 上游**无** `GET /models`（会 404） |
+| 平台探测 | 直接解析上游列表 | 先 `POST …/messages` 验连通；模型列表在部署 **PR #514+ 增强** 后，会再用**同一密钥**对主线路 `GET …/compatible-mode/v1/models` 填充下拉（与 pkey 列表一致） |
+| 深度验证探测模型 | 任选帐号内 chat 模型 | 须为 **Anthropic 线路文档支持的 model**（如 `qwen-plus`）；目录里的 `glm-5.1` 等未必能在 Messages 线路上调用 |
+
 1. **深度验证**（必选，若需 `verified` + strict 放行）  
-   - 在 UI 选择或填写 **探测模型**（`probe_model`）：须为上游真实可调用的模型 ID。  
-   - 新厂商若未在代码里配置默认探测模型，**务必手动指定**。
+   - 在 UI 选择或填写 **探测模型**（`probe_model`）：须为 **Anthropic 兼容线路上真实可调用的** model id（阿里云见官方「支持的模型」表，常为 qwen 系列）。  
+   - 勿默认选仅在 OpenAI `compatible-mode` 列表里出现、但 Anthropic 线不支持的 id。
 2. **立即探测**（可选，刷新 `health_status`）  
    - 走 `LightweightPing` 或 `FullVerification`（由 Key 的 `health_check_level` 决定）。
 3. 确认库表状态（见 §8 SQL）。
@@ -232,7 +251,7 @@ WHERE ms.merchant_id = :merchant_id AND ms.status = 'active';
 | 项 | 值 |
 |----|-----|
 | 主厂商 | `alibaba`，OpenAI 兼容 base（如 DashScope compatible-mode） |
-| 影子厂商 | `alibaba_anthropic`，`api_format=anthropic`，base 如 `https://dashscope.aliyuncs.com/compatible-model/v1` |
+| 影子厂商 | `alibaba_anthropic`，`api_format=anthropic`，base `https://dashscope.aliyuncs.com/apps/anthropic`（勿用 `compatible-model`） |
 | 探测模型 | 深度验证可填账号内可用模型（如 `qwen-plus` 或实际 glm 型号） |
 | 商户 | 5 条主 Key + 5 条 `alibaba_anthropic` 副 Key，各 SKU 各绑一对 |
 

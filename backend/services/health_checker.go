@@ -171,7 +171,8 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 
 	apiFmt := s.providerAPIFormat(apiKey.Provider)
 	client := newProxyAwareHTTPClient(10*time.Second, resolvedMode)
-	probe, err := ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt)
+	siblingOpenAIBase := s.siblingOpenAIBaseForProvider(apiKey.Provider)
+	probe, err := ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt, siblingOpenAIBase)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -256,6 +257,13 @@ func (s *HealthChecker) providerAPIFormat(provider string) string {
 	return strings.ToLower(strings.TrimSpace(apiFormat))
 }
 
+func (s *HealthChecker) siblingOpenAIBaseForProvider(provider string) string {
+	if s.db == nil {
+		s.db = config.GetDB()
+	}
+	return SiblingOpenAIBaseFromDB(s.db, provider)
+}
+
 func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.MerchantAPIKey) (*HealthCheckResult, error) {
 	baseURL, authToken, resolvedMode, resolveErr := s.ResolveProviderConnectivityBase(ctx, apiKey)
 	if resolveErr != nil {
@@ -274,7 +282,8 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 	}
 
 	client := newProxyAwareHTTPClient(10*time.Second, resolvedMode)
-	probe, err := ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt)
+	siblingOpenAIBase := s.siblingOpenAIBaseForProvider(apiKey.Provider)
+	probe, err := ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt, siblingOpenAIBase)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
