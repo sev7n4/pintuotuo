@@ -172,6 +172,10 @@ func TestAnthropicMessagesProbeURL(t *testing.T) {
 	if got := AnthropicMessagesProbeURL("https://dashscope.aliyuncs.com/apps/anthropic/v1"); got != "https://dashscope.aliyuncs.com/apps/anthropic/v1/messages" {
 		t.Fatalf("got %s", got)
 	}
+	// Admin 常见写法：base 不带版本段时需 /v1/messages（api_proxy 出站须与健康探测一致）
+	if got := AnthropicMessagesProbeURL("https://dashscope.aliyuncs.com/apps/anthropic"); got != "https://dashscope.aliyuncs.com/apps/anthropic/v1/messages" {
+		t.Fatalf("got %s", got)
+	}
 }
 
 func TestProbeProviderConnectivity_AnthropicMessages(t *testing.T) {

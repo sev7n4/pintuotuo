@@ -618,7 +618,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 			var jb []byte
 			var mErr error
 			if anthropicRaw && isAnthClient {
-				ep = fmt.Sprintf("%s/messages", base)
+				ep = services.AnthropicMessagesProbeURL(base)
 				streamTrue := true
 				var uc map[string]interface{}
 				if resolveRouteMode(&pk) == routeModeLitellm {
@@ -819,9 +819,9 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 
 		ep := fmt.Sprintf("%s/chat/completions", base)
 		if anthropicProxyUsesRawBody(req) {
-			ep = fmt.Sprintf("%s/messages", base)
+			ep = services.AnthropicMessagesProbeURL(base)
 		} else if pcfg.APIFormat == providerAnthropic {
-			ep = fmt.Sprintf("%s/messages", base)
+			ep = services.AnthropicMessagesProbeURL(base)
 		}
 
 		var jb []byte
