@@ -15,6 +15,16 @@ func TestAnthropicSiblingProviderCode(t *testing.T) {
 	}
 }
 
+func TestPrimaryProviderFromAnthropicSibling(t *testing.T) {
+	t.Parallel()
+	if got := PrimaryProviderFromAnthropicSibling("alibaba_anthropic"); got != "alibaba" {
+		t.Fatalf("got %q", got)
+	}
+	if PrimaryProviderFromAnthropicSibling("alibaba") != "" {
+		t.Fatal("expected empty for non-sibling")
+	}
+}
+
 func TestProviderUsesAnthropicHTTP(t *testing.T) {
 	t.Parallel()
 	if !ProviderUsesAnthropicHTTP("alibaba_anthropic", "") {

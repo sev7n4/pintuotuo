@@ -168,7 +168,8 @@ func TestProbeProviderModels_AnthropicAuthHeaders(t *testing.T) {
 }
 
 func TestAnthropicMessagesProbeURL(t *testing.T) {
-	if got := AnthropicMessagesProbeURL("https://dashscope.aliyuncs.com/compatible-model/v1"); got != "https://dashscope.aliyuncs.com/compatible-model/v1/messages" {
+	// 阿里云百炼 Anthropic 兼容：base 以 /v1 结尾时只追加 /messages
+	if got := AnthropicMessagesProbeURL("https://dashscope.aliyuncs.com/apps/anthropic/v1"); got != "https://dashscope.aliyuncs.com/apps/anthropic/v1/messages" {
 		t.Fatalf("got %s", got)
 	}
 }
@@ -190,7 +191,7 @@ func TestProbeProviderConnectivity_AnthropicMessages(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	res, err := ProbeProviderConnectivity(context.Background(), &http.Client{Timeout: 2 * time.Second}, srv.URL, "test-key", "alibaba_anthropic", "anthropic")
+	res, err := ProbeProviderConnectivity(context.Background(), &http.Client{Timeout: 2 * time.Second}, srv.URL, "test-key", "alibaba_anthropic", "anthropic", "")
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}

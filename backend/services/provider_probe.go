@@ -46,7 +46,8 @@ func AnthropicMessagesProbeURL(endpoint string) string {
 }
 
 // ProbeProviderConnectivity probes upstream reachability: OpenAI GET /models or Anthropic POST /messages.
-func ProbeProviderConnectivity(ctx context.Context, client *http.Client, baseURL, apiKey, provider, apiFormat string) (*ProbeModelsResult, error) {
+// openAISiblingBase：影子厂商（如 alibaba_anthropic）探测成功后，可用同一密钥对主厂商 OpenAI 兼容基址 GET /models 拉取模型列表（阿里云等无 Anthropic /models 接口）。
+func ProbeProviderConnectivity(ctx context.Context, client *http.Client, baseURL, apiKey, provider, apiFormat, openAISiblingBase string) (*ProbeModelsResult, error) {
 	baseURL = normalizeOpenAICompatBase(baseURL)
 	if baseURL == "" {
 		return &ProbeModelsResult{
@@ -57,9 +58,31 @@ func ProbeProviderConnectivity(ctx context.Context, client *http.Client, baseURL
 	}
 	if ProviderUsesAnthropicHTTP(provider, apiFormat) {
 		model := selectProbeModel(provider, nil, "")
-		return ProbeProviderAnthropicMessages(ctx, client, baseURL, apiKey, provider, model)
+		result, err := ProbeProviderAnthropicMessages(ctx, client, baseURL, apiKey, provider, model)
+		if result != nil && result.Success {
+			result.Models = anthropicProbeModelList(ctx, client, apiKey, provider, openAISiblingBase, model)
+		}
+		return result, err
 	}
 	return ProbeProviderModels(ctx, client, OpenAICompatModelsProbeURL(baseURL), apiKey, provider)
+}
+
+// anthropicProbeModelList 在 Messages 探测成功后填充模型列表：优先主线路 GET /models，否则预置列表。
+func anthropicProbeModelList(ctx context.Context, client *http.Client, apiKey, provider, openAISiblingBase, probeModel string) []string {
+	siblingBase := normalizeOpenAICompatBase(openAISiblingBase)
+	if siblingBase != "" {
+		primary := PrimaryProviderFromAnthropicSibling(provider)
+		if primary != "" {
+			if modelsProbe, err := ProbeProviderModels(ctx, client, OpenAICompatModelsProbeURL(siblingBase), apiKey, primary); err == nil && modelsProbe != nil && modelsProbe.Success && len(modelsProbe.Models) > 0 {
+				return modelsProbe.Models
+			}
+		}
+	}
+	models := GetPredefinedModels(provider)
+	if len(models) == 0 && strings.TrimSpace(probeModel) != "" {
+		return []string{probeModel}
+	}
+	return models
 }
 
 // ProbeProviderAnthropicMessages sends a minimal Messages request (same auth path as proxy anthropic upstream).
