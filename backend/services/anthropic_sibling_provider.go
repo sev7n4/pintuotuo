@@ -17,6 +17,19 @@ func AnthropicSiblingProviderCode(primaryProvider string) string {
 	return p + AnthropicSiblingProviderSuffix
 }
 
+// ProviderUsesAnthropicHTTP 判断出站 HTTP 应使用 Anthropic Messages 鉴权（x-api-key + anthropic-version）。
+// apiFormat 来自 model_providers.api_format；provider 为 merchant_api_keys.provider。
+func ProviderUsesAnthropicHTTP(provider, apiFormat string) bool {
+	if strings.EqualFold(strings.TrimSpace(apiFormat), modelProviderAnthropic) {
+		return true
+	}
+	p := strings.ToLower(strings.TrimSpace(provider))
+	if p == modelProviderAnthropic {
+		return true
+	}
+	return strings.HasSuffix(p, AnthropicSiblingProviderSuffix)
+}
+
 // ModelProviderCodeExistsActive 判断 model_providers 是否存在且 status=active。
 func ModelProviderCodeExistsActive(db *sql.DB, code string) bool {
 	if db == nil {

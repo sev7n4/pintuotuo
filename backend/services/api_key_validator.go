@@ -156,12 +156,12 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 	}
 
 	baseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
-	modelsURL := baseURL + "/models"
+	apiFmt := strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
 	probeClient := newProxyAwareHTTPClient(10*time.Second, routeMode)
 	var probe *ProbeModelsResult
 	var probeErr error
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = ProbeProviderModels(ctx, probeClient, modelsURL, decryptedKey, provider)
+		probe, probeErr = ProbeProviderConnectivity(ctx, probeClient, baseURL, decryptedKey, provider, apiFmt)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break
@@ -192,11 +192,17 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 	metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(probe.Models)))
 
 	if isDeepVerification(verificationType) {
-		apiFmt := strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
-		probeSupported := apiFmt == modelProviderOpenAI
+		probeSupported := apiFmt == modelProviderOpenAI || ProviderUsesAnthropicHTTP(provider, apiFmt)
 		result.PricingVerified = probeSupported
 		if probeSupported {
-			quotaOK, quotaCode, quotaMsg := v.probeQuota(providerConfig, provider, decryptedKey, result.ModelsFound)
+			var quotaOK bool
+			var quotaCode, quotaMsg string
+			if ProviderUsesAnthropicHTTP(provider, apiFmt) {
+				model := selectProbeModel(provider, result.ModelsFound, "")
+				quotaOK, quotaCode, quotaMsg = ProbeAnthropicMessagesQuota(ctx, probeClient, baseURL, decryptedKey, provider, model)
+			} else {
+				quotaOK, quotaCode, quotaMsg = v.probeQuota(providerConfig, provider, decryptedKey, result.ModelsFound)
+			}
 			if !quotaOK {
 				v.handleVerificationError(ctx, verificationID, apiKeyID, quotaCode, quotaMsg, startTime)
 				return
@@ -706,6 +712,8 @@ func selectProbeModel(provider string, models []string, userSelected string) str
 		return "deepseek-chat"
 	case modelProviderAlibaba:
 		return "qwen-turbo"
+	case "alibaba_anthropic":
+		return "qwen-plus"
 	case modelProviderGoogle:
 		return "gemini-2.0-flash"
 	default:
@@ -814,10 +822,16 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		FallbackEndpointURL: fallbackEndpointURLCol,
 	}
 	hc := NewHealthChecker()
-	modelsURL, modelsAuthToken, probeRouteMode, modelsResolveErr := hc.ResolveOpenAICompatModelsListProbe(ctx, synthKey)
+	connectivityBase, modelsAuthToken, probeRouteMode, modelsResolveErr := hc.ResolveProviderConnectivityBase(ctx, synthKey)
 	if modelsResolveErr != nil {
 		v.handleVerificationError(ctx, verificationID, apiKeyID, "ENDPOINT_RESOLVE_FAILED", modelsResolveErr.Error(), startTime)
 		return
+	}
+
+	providerConfig, providerCfgErr := v.getProviderConfig(provider)
+	apiFmt := modelProviderOpenAI
+	if providerCfgErr == nil {
+		apiFmt = strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
 	}
 
 	probeClient := newProxyAwareHTTPClient(10*time.Second, probeRouteMode)
@@ -826,7 +840,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 	var probeErr error
 	var connectionFailed bool
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = ProbeProviderModels(ctx, probeClient, modelsURL, modelsAuthToken, provider)
+		probe, probeErr = ProbeProviderConnectivity(ctx, probeClient, connectivityBase, modelsAuthToken, provider, apiFmt)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break
@@ -912,13 +926,18 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 	}
 
 	if isDeepVerification(verificationType) {
-		providerConfig, providerErr := v.getProviderConfig(provider)
-		if providerErr == nil {
-			apiFmt := strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
-			probeSupported := apiFmt == modelProviderOpenAI
+		if providerCfgErr == nil {
+			probeSupported := apiFmt == modelProviderOpenAI || ProviderUsesAnthropicHTTP(provider, apiFmt)
 			result.PricingVerified = probeSupported
 			if probeSupported {
-				quotaOK, quotaCode, quotaMsg := v.probeQuotaWithEndpoint(endpoint, provider, authToken, result.ModelsFound, routeMode, decryptedKey, probeModel)
+				var quotaOK bool
+				var quotaCode, quotaMsg string
+				if ProviderUsesAnthropicHTTP(provider, apiFmt) {
+					model := selectProbeModel(provider, result.ModelsFound, probeModel)
+					quotaOK, quotaCode, quotaMsg = ProbeAnthropicMessagesQuota(ctx, probeClient, connectivityBase, modelsAuthToken, provider, model)
+				} else {
+					quotaOK, quotaCode, quotaMsg = v.probeQuotaWithEndpoint(endpoint, provider, authToken, result.ModelsFound, routeMode, decryptedKey, probeModel)
+				}
 				if !quotaOK {
 					v.handleVerificationError(ctx, verificationID, apiKeyID, quotaCode, quotaMsg, startTime)
 					return
@@ -1177,7 +1196,7 @@ func litellmProviderPrefix(provider string) string {
 		return modelProviderAnthropic
 	case modelProviderDeepseek:
 		return modelProviderDeepseek
-	case modelProviderAlibaba:
+	case modelProviderAlibaba, "alibaba_anthropic":
 		return "dashscope"
 	case modelProviderZhipu:
 		return "zai"

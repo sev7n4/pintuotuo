@@ -159,7 +159,7 @@ func (s *HealthChecker) GetHealthCheckInterval(level string) int {
 }
 
 func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.MerchantAPIKey) (*HealthCheckResult, error) {
-	endpoint, resolveErr := s.resolveEndpoint(ctx, apiKey)
+	baseURL, authToken, resolvedMode, resolveErr := s.ResolveProviderConnectivityBase(ctx, apiKey)
 	if resolveErr != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -169,63 +169,46 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 		}, nil
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	apiFmt := s.providerAPIFormat(apiKey.Provider)
+	client := newProxyAwareHTTPClient(10*time.Second, resolvedMode)
+	probe, err := ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
 			Status:       HealthStatusUnhealthy,
-			ErrorMessage: fmt.Sprintf("failed to create request: %v", err),
-			CheckType:    "lightweight",
-		}, nil
-	}
-
-	resolvedMode := s.resolvedRouteMode(ctx, apiKey)
-	authToken := s.getDecryptedAPIKey(apiKey)
-	if resolvedMode == GatewayModeLitellm {
-		if masterKey := os.Getenv("LITELLM_MASTER_KEY"); masterKey != "" {
-			authToken = strings.TrimSpace(masterKey)
-		}
-	}
-	SetProviderAuthHeaders(req, apiKey.Provider, authToken)
-
-	client := s.routeAwareHTTPClient(resolvedMode)
-	start := time.Now()
-	resp, err := client.Do(req)
-	latencyMs := int(time.Since(start).Milliseconds())
-
-	if err != nil {
-		return &HealthCheckResult{
-			Success:      false,
-			Status:       HealthStatusUnhealthy,
-			LatencyMs:    latencyMs,
+			LatencyMs:    probeLatency(probe),
 			ErrorMessage: fmt.Sprintf("connection failed: %v", err),
 			CheckType:    "lightweight",
 		}, nil
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+	if probe != nil && probe.Success {
 		return &HealthCheckResult{
 			Success:   true,
 			Status:    HealthStatusHealthy,
-			LatencyMs: latencyMs,
+			LatencyMs: probe.LatencyMs,
 			CheckType: "lightweight",
 		}, nil
 	}
 
+	errMsg := "connectivity probe failed"
+	if probe != nil && strings.TrimSpace(probe.ErrorMsg) != "" {
+		errMsg = probe.ErrorMsg
+	}
+	status := HealthStatusDegraded
+	if probe != nil && probe.StatusCode == http.StatusUnauthorized {
+		status = HealthStatusUnhealthy
+	}
 	return &HealthCheckResult{
 		Success:      false,
-		Status:       HealthStatusDegraded,
-		LatencyMs:    latencyMs,
-		ErrorMessage: fmt.Sprintf("unexpected status code: %d", resp.StatusCode),
+		Status:       status,
+		LatencyMs:    probeLatency(probe),
+		ErrorMessage: errMsg,
 		CheckType:    "lightweight",
 	}, nil
 }
 
-// ResolveOpenAICompatModelsListProbe returns the GET URL and bearer token for OpenAI-compatible model listing
-// for this merchant key. Single source of truth for FullVerification, Admin probe-models, and
-// APIKeyValidator light/deep connection test — same path across direct / auto / proxy / litellm.
-func (s *HealthChecker) ResolveOpenAICompatModelsListProbe(ctx context.Context, apiKey *models.MerchantAPIKey) (modelsListURL string, authToken string, resolvedRouteMode string, err error) {
+// ResolveProviderConnectivityBase returns the upstream base URL and auth token for connectivity probes.
+func (s *HealthChecker) ResolveProviderConnectivityBase(ctx context.Context, apiKey *models.MerchantAPIKey) (baseURL string, authToken string, resolvedRouteMode string, err error) {
 	trafficEp, resolveErr := s.resolveEndpoint(ctx, apiKey)
 	if resolveErr != nil {
 		return "", "", "", resolveErr
@@ -241,12 +224,40 @@ func (s *HealthChecker) ResolveOpenAICompatModelsListProbe(ctx context.Context, 
 	if strings.TrimSpace(authToken) == "" && strings.TrimSpace(apiKey.APIKeyEncrypted) != "" {
 		return "", "", resolvedRouteMode, fmt.Errorf("failed to decrypt API key")
 	}
-	modelsListURL = OpenAICompatModelsProbeURL(modelsBase)
-	return modelsListURL, authToken, resolvedRouteMode, nil
+	return normalizeOpenAICompatBase(modelsBase), authToken, resolvedRouteMode, nil
+}
+
+// ResolveOpenAICompatModelsListProbe returns the GET URL and bearer token for OpenAI-compatible model listing
+// for this merchant key. Single source of truth for FullVerification, Admin probe-models, and
+// APIKeyValidator light/deep connection test — same path across direct / auto / proxy / litellm.
+func (s *HealthChecker) ResolveOpenAICompatModelsListProbe(ctx context.Context, apiKey *models.MerchantAPIKey) (modelsListURL string, authToken string, resolvedRouteMode string, err error) {
+	connectivityBase, token, routeMode, resolveErr := s.ResolveProviderConnectivityBase(ctx, apiKey)
+	if resolveErr != nil {
+		return "", "", "", resolveErr
+	}
+	return OpenAICompatModelsProbeURL(connectivityBase), token, routeMode, nil
+}
+
+func (s *HealthChecker) providerAPIFormat(provider string) string {
+	if s.db == nil {
+		s.db = config.GetDB()
+	}
+	if s.db == nil {
+		return modelProviderOpenAI
+	}
+	var apiFormat string
+	err := s.db.QueryRow(
+		`SELECT COALESCE(NULLIF(TRIM(api_format), ''), $1) FROM model_providers WHERE lower(trim(code)) = lower(trim($2))`,
+		modelProviderOpenAI, provider,
+	).Scan(&apiFormat)
+	if err != nil {
+		return modelProviderOpenAI
+	}
+	return strings.ToLower(strings.TrimSpace(apiFormat))
 }
 
 func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.MerchantAPIKey) (*HealthCheckResult, error) {
-	modelsEndpoint, authToken, resolvedMode, resolveErr := s.ResolveOpenAICompatModelsListProbe(ctx, apiKey)
+	baseURL, authToken, resolvedMode, resolveErr := s.ResolveProviderConnectivityBase(ctx, apiKey)
 	if resolveErr != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -256,8 +267,14 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 		}, nil
 	}
 
+	apiFmt := s.providerAPIFormat(apiKey.Provider)
+	endpointUsed := OpenAICompatModelsProbeURL(baseURL)
+	if ProviderUsesAnthropicHTTP(apiKey.Provider, apiFmt) {
+		endpointUsed = AnthropicMessagesProbeURL(baseURL)
+	}
+
 	client := newProxyAwareHTTPClient(10*time.Second, resolvedMode)
-	probe, err := ProbeProviderModels(ctx, client, modelsEndpoint, authToken, apiKey.Provider)
+	probe, err := ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -274,7 +291,7 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 			LatencyMs:    probe.LatencyMs,
 			ModelsFound:  probe.Models,
 			PricingInfo:  s.extractPricingInfo(apiKey.Provider),
-			EndpointUsed: modelsEndpoint,
+			EndpointUsed: endpointUsed,
 			CheckType:    "full",
 		}, nil
 	}
@@ -293,7 +310,7 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 		ProviderRequestID: safeProbeValue(probe, func(p *ProbeModelsResult) string { return p.ProviderRequestID }),
 		StatusCode:        safeProbeInt(probe, func(p *ProbeModelsResult) int { return p.StatusCode }),
 		RawErrorExcerpt:   safeProbeValue(probe, func(p *ProbeModelsResult) string { return p.RawErrorExcerpt }),
-		EndpointUsed:      modelsEndpoint,
+		EndpointUsed:      endpointUsed,
 		CheckType:         "full",
 	}, nil
 }

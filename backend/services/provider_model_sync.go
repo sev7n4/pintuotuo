@@ -25,12 +25,13 @@ func (s *ProviderModelSyncService) SyncProviderModels(ctx context.Context, provi
 		return 0, fmt.Errorf("database not initialized")
 	}
 
-	var apiBaseURL string
+	var apiBaseURL, apiFormat string
 	err := db.QueryRowContext(ctx,
-		`SELECT COALESCE(NULLIF(TRIM(api_base_url), ''), '')
+		`SELECT COALESCE(NULLIF(TRIM(api_base_url), ''), ''),
+		        COALESCE(NULLIF(TRIM(api_format), ''), 'openai')
 		 FROM model_providers WHERE code = $1 AND status = 'active'`,
 		providerCode,
-	).Scan(&apiBaseURL)
+	).Scan(&apiBaseURL, &apiFormat)
 	if err != nil {
 		return 0, fmt.Errorf("provider %s not found or inactive: %w", providerCode, err)
 	}
@@ -44,11 +45,9 @@ func (s *ProviderModelSyncService) SyncProviderModels(ctx context.Context, provi
 		return 0, fmt.Errorf("failed to get API key for provider %s: %w", providerCode, err)
 	}
 
-	modelsURL := buildModelsURL(apiBaseURL)
-
 	client := newProxyAwareHTTPClient(15*time.Second, resolveProviderRouteMode(providerCode))
 
-	probe, err := ProbeProviderModels(ctx, client, modelsURL, apiKey, providerCode)
+	probe, err := ProbeProviderConnectivity(ctx, client, apiBaseURL, apiKey, providerCode, apiFormat)
 	if err != nil {
 		return 0, fmt.Errorf("failed to probe models for provider %s: %w", providerCode, err)
 	}
