@@ -10,7 +10,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_merchant_skus_one_active_per_anthropic_api_
   ON merchant_skus (anthropic_api_key_id)
   WHERE status = 'active' AND anthropic_api_key_id IS NOT NULL;
 
-CREATE OR REPLACE VIEW merchant_sku_details AS
+-- PostgreSQL 不允许 CREATE OR REPLACE VIEW 在中间插入列（会报 cannot change name of view column）。
+DROP VIEW IF EXISTS merchant_sku_details;
+
+CREATE VIEW merchant_sku_details AS
 SELECT
   ms.id,
   ms.merchant_id,
