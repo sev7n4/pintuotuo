@@ -186,14 +186,6 @@ func (s *ProviderModelSyncService) ListProviderModels(ctx context.Context, provi
 	return result, nil
 }
 
-func buildModelsURL(apiBaseURL string) string {
-	b := strings.TrimRight(apiBaseURL, "/")
-	if hasOpenAICompatVersionedRootSuffix(b) {
-		return b + "/models"
-	}
-	return b + "/v1/models"
-}
-
 func resolveProviderRouteMode(providerCode string) string {
 	region := getProviderRegionStatic(providerCode)
 	if region == "" || region == regionDomestic {
