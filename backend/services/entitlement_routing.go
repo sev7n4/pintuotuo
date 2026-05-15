@@ -46,14 +46,25 @@ func (e *EntitlementRoutingContext) MerchantSKUForAPIKey(apiKeyID int) (int, boo
 	return v, ok
 }
 
+// EntitlementRoutingOptions 控制权益白名单边是否合并 Anthropic 出站专用密钥槽位。
+type EntitlementRoutingOptions struct {
+	MergeAnthropicCompanionKeySlots bool
+}
+
 // ResolveEntitlementRoutingContext walks entitled SKUs for (provider, model), ordered by quota score (desc),
 // and returns the first SKU that has at least one operational merchant_sku → api_key edge.
 // If no SKU yields keys, AllowedAPIKeyIDs is empty (caller should fail closed).
 func ResolveEntitlementRoutingContext(db *sql.DB, userID int, provider, model string) (*EntitlementRoutingContext, error) {
+	return ResolveEntitlementRoutingContextWithOptions(db, userID, provider, model, EntitlementRoutingOptions{})
+}
+
+// ResolveEntitlementRoutingContextWithOptions 与 ResolveEntitlementRoutingContext 相同，但可按目录主厂商合并
+// merchant_skus.anthropic_api_key_id（须为 {catalogProvider}_anthropic 的 Key）进入白名单。
+func ResolveEntitlementRoutingContextWithOptions(db *sql.DB, userID int, catalogProvider, model string, opts EntitlementRoutingOptions) (*EntitlementRoutingContext, error) {
 	if db == nil {
 		return nil, fmt.Errorf("database not available")
 	}
-	pv := normalizeProvider(provider)
+	pv := normalizeProvider(catalogProvider)
 	mv := strings.TrimSpace(model)
 	if pv == "" || mv == "" {
 		return &EntitlementRoutingContext{
@@ -76,7 +87,7 @@ func ResolveEntitlementRoutingContext(db *sql.DB, userID int, provider, model st
 	}
 
 	for _, row := range skus {
-		edges, qerr := buildAllowlistEdgesForSKU(db, row.SkuID, pv)
+		edges, qerr := buildAllowlistEdgesForSKU(db, row.SkuID, pv, opts.MergeAnthropicCompanionKeySlots)
 		if qerr != nil {
 			return nil, qerr
 		}
@@ -175,8 +186,7 @@ ORDER BY quota_score DESC, sku_id ASC`
 	return out, rows.Err()
 }
 
-func buildAllowlistEdgesForSKU(db *sql.DB, skuID int, providerNorm string) ([]entitlementKeyEdge, error) {
-	const q = `
+const entitlementEdgesMainOnly = `
 SELECT ms.id, ms.merchant_id, mak.id
 FROM merchant_skus ms
 INNER JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
@@ -190,10 +200,36 @@ WHERE ms.sku_id = $1
   AND mak.status = 'active'
   AND mak.verification_result = 'verified'
   AND mak.health_status IN ('healthy', 'degraded')
-  AND (mak.quota_limit IS NULL OR mak.quota_used < mak.quota_limit)
-ORDER BY ms.id ASC`
+  AND (mak.quota_limit IS NULL OR mak.quota_used < mak.quota_limit)`
 
-	rows, err := db.Query(q, skuID, providerNorm)
+const entitlementEdgesAnthropicUnion = `
+UNION ALL
+SELECT ms.id, ms.merchant_id, mak2.id
+FROM merchant_skus ms
+INNER JOIN merchant_api_keys mak2 ON mak2.id = ms.anthropic_api_key_id
+INNER JOIN merchants m ON m.id = ms.merchant_id
+  AND m.status IN ('active', 'approved')
+  AND m.lifecycle_status <> 'suspended'
+WHERE ms.sku_id = $1
+  AND ms.status = 'active'
+  AND ms.anthropic_api_key_id IS NOT NULL
+  AND lower(trim(mak2.provider)) = lower(trim($3::text))
+  AND mak2.status = 'active'
+  AND mak2.verification_result = 'verified'
+  AND mak2.health_status IN ('healthy', 'degraded')
+  AND (mak2.quota_limit IS NULL OR mak2.quota_used < mak2.quota_limit)`
+
+func buildAllowlistEdgesForSKU(db *sql.DB, skuID int, catalogProviderNorm string, mergeAnthropicCompanion bool) ([]entitlementKeyEdge, error) {
+	sibling := AnthropicSiblingProviderCode(catalogProviderNorm)
+	q := entitlementEdgesMainOnly
+	args := []interface{}{skuID, catalogProviderNorm}
+	if mergeAnthropicCompanion && sibling != "" {
+		q += entitlementEdgesAnthropicUnion
+		args = append(args, sibling)
+	}
+	q += ` ORDER BY 1 ASC, 3 ASC`
+
+	rows, err := db.Query(q, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -16,6 +16,7 @@ import (
 	apperrors "github.com/pintuotuo/backend/errors"
 	"github.com/pintuotuo/backend/middleware"
 	"github.com/pintuotuo/backend/models"
+	"github.com/pintuotuo/backend/services"
 )
 
 const merchantSKUStatusInactive = "inactive"
@@ -30,16 +31,82 @@ func merchantSKUKeyConflictAppErr(cause error) *apperrors.AppError {
 	)
 }
 
-// hasOtherActiveMerchantSKUForAPIKey 在「将存在一条 active 且绑定该 Key 的 merchant_sku」为真时返回 true。excludeMerchantSKUID=0 表示不排除（用于新建）。
+// hasOtherActiveMerchantSKUForAPIKey 在「将存在一条 active 且主键或 Anthropic 槽绑定该 Key 的 merchant_sku」为真时返回 true。excludeMerchantSKUID=0 表示不排除（用于新建）。
 func hasOtherActiveMerchantSKUForAPIKey(db *sql.DB, apiKeyID int, excludeMerchantSKUID int) (bool, error) {
 	var exists bool
 	err := db.QueryRow(`
 		SELECT EXISTS(
 			SELECT 1 FROM merchant_skus
-			WHERE api_key_id = $1 AND status = 'active'
+			WHERE status = 'active'
 			  AND ($2 = 0 OR id <> $2)
+			  AND (api_key_id = $1 OR anthropic_api_key_id = $1)
 		)`, apiKeyID, excludeMerchantSKUID).Scan(&exists)
 	return exists, err
+}
+
+func validateAnthropicCompanionForSKU(db *sql.DB, merchantID, skuID int, anthropicKeyID, primaryKeyID *int, excludeMerchantSKUID int) *apperrors.AppError {
+	if anthropicKeyID == nil || *anthropicKeyID <= 0 {
+		return nil
+	}
+	if primaryKeyID != nil && *primaryKeyID > 0 && *anthropicKeyID == *primaryKeyID {
+		return apperrors.NewAppError(
+			"MERCHANT_SKU_ANTHROPIC_INVALID",
+			"Anthropic 出站密钥不能与主密钥相同",
+			http.StatusBadRequest,
+			nil,
+		)
+	}
+	var mp string
+	err := db.QueryRow(
+		`SELECT lower(trim(sp.model_provider)) FROM skus s INNER JOIN spus sp ON sp.id = s.spu_id WHERE s.id = $1`,
+		skuID,
+	).Scan(&mp)
+	if err != nil || strings.TrimSpace(mp) == "" {
+		return apperrors.NewAppError(
+			"SKU_NOT_FOUND",
+			"SKU不存在或已下架",
+			http.StatusBadRequest,
+			err,
+		)
+	}
+	expected := services.AnthropicSiblingProviderCode(mp)
+	if expected == "" {
+		return apperrors.NewAppError(
+			"MERCHANT_SKU_ANTHROPIC_INVALID",
+			"无法解析 SPU 主厂商",
+			http.StatusBadRequest,
+			nil,
+		)
+	}
+	var prov string
+	err = db.QueryRow(
+		`SELECT trim(provider) FROM merchant_api_keys WHERE id = $1 AND merchant_id = $2 AND status = 'active'`,
+		*anthropicKeyID, merchantID,
+	).Scan(&prov)
+	if err != nil {
+		return apperrors.NewAppError(
+			"API_KEY_NOT_FOUND",
+			"Anthropic 出站密钥不存在或不属于当前商户",
+			http.StatusBadRequest,
+			err,
+		)
+	}
+	if !strings.EqualFold(strings.TrimSpace(prov), strings.TrimSpace(expected)) {
+		return apperrors.NewAppError(
+			"MERCHANT_SKU_ANTHROPIC_PROVIDER_MISMATCH",
+			"Anthropic 出站密钥的 provider 须为 "+expected,
+			http.StatusBadRequest,
+			nil,
+		)
+	}
+	dup, err := hasOtherActiveMerchantSKUForAPIKey(db, *anthropicKeyID, excludeMerchantSKUID)
+	if err != nil {
+		return apperrors.ErrDatabaseError
+	}
+	if dup {
+		return merchantSKUKeyConflictAppErr(nil)
+	}
+	return nil
 }
 
 func resolveSKUDefaultCostBySKUID(db *sql.DB, skuID int) (float64, float64, error) {
@@ -104,23 +171,32 @@ func normalizeMerchantSKUCostUpdate(req models.MerchantSKUUpdateRequest, current
 }
 
 func syncMerchantAPIKeyCostByID(db *sql.DB, merchantSKUID int) error {
-	var apiKeyID sql.NullInt64
+	var apiKeyID, anthropicKeyID sql.NullInt64
 	var inputRate, outputRate, profit float64
 	err := db.QueryRow(
-		`SELECT api_key_id, COALESCE(cost_input_rate, 0), COALESCE(cost_output_rate, 0), COALESCE(profit_margin, 20)
+		`SELECT api_key_id, anthropic_api_key_id, COALESCE(cost_input_rate, 0), COALESCE(cost_output_rate, 0), COALESCE(profit_margin, 20)
 		 FROM merchant_skus WHERE id = $1`,
 		merchantSKUID,
-	).Scan(&apiKeyID, &inputRate, &outputRate, &profit)
-	if err != nil || !apiKeyID.Valid || apiKeyID.Int64 <= 0 {
+	).Scan(&apiKeyID, &anthropicKeyID, &inputRate, &outputRate, &profit)
+	if err != nil {
 		return err
 	}
-	_, err = db.Exec(
-		`UPDATE merchant_api_keys
-		 SET cost_input_rate = $1, cost_output_rate = $2, profit_margin = $3, updated_at = CURRENT_TIMESTAMP
-		 WHERE id = $4`,
-		inputRate, outputRate, profit, apiKeyID.Int64,
-	)
-	return err
+	syncOne := func(keyID sql.NullInt64) error {
+		if !keyID.Valid || keyID.Int64 <= 0 {
+			return nil
+		}
+		_, err := db.Exec(
+			`UPDATE merchant_api_keys
+			 SET cost_input_rate = $1, cost_output_rate = $2, profit_margin = $3, updated_at = CURRENT_TIMESTAMP
+			 WHERE id = $4`,
+			inputRate, outputRate, profit, keyID.Int64,
+		)
+		return err
+	}
+	if err := syncOne(apiKeyID); err != nil {
+		return err
+	}
+	return syncOne(anthropicKeyID)
 }
 
 func invalidateMerchantSKUCache(ctx context.Context, merchantID int) {
@@ -177,9 +253,10 @@ func ListMerchantSKUs(c *gin.Context) {
 		}
 	}
 
-	query := `SELECT id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at,
+	query := `SELECT id, merchant_id, sku_id, api_key_id, anthropic_api_key_id, status, sales_count, total_sales_amount, created_at, updated_at,
 		sku_code, sku_type, token_amount, compute_points, retail_price, original_price, valid_days, 
 		group_enabled, group_discount_rate, spu_name, model_provider, model_name, model_tier, api_key_name, api_key_provider,
+		anthropic_api_key_name, anthropic_api_key_provider,
 		COALESCE(cost_input_rate, 0), COALESCE(cost_output_rate, 0), COALESCE(profit_margin, 20), COALESCE(custom_pricing_enabled, false),
 		COALESCE(spu_input_rate, 0), COALESCE(spu_output_rate, 0)
 		FROM merchant_sku_details WHERE merchant_id = $1`
@@ -203,13 +280,16 @@ func ListMerchantSKUs(c *gin.Context) {
 	for rows.Next() {
 		var s models.MerchantSKUDetail
 		var apiKeyID sql.NullInt64
+		var anthropicKeyID sql.NullInt64
 		var apiKeyName, apiKeyProvider sql.NullString
+		var anthropicKeyName, anthropicKeyProvider sql.NullString
 		var tokenAmount sql.NullInt64
 		var computePoints, originalPrice, groupDiscountRate sql.NullFloat64
 
-		err := rows.Scan(&s.ID, &s.MerchantID, &s.SKUID, &apiKeyID, &s.Status, &s.SalesCount, &s.TotalSalesAmount, &s.CreatedAt, &s.UpdatedAt,
+		err := rows.Scan(&s.ID, &s.MerchantID, &s.SKUID, &apiKeyID, &anthropicKeyID, &s.Status, &s.SalesCount, &s.TotalSalesAmount, &s.CreatedAt, &s.UpdatedAt,
 			&s.SKUCode, &s.SKUType, &tokenAmount, &computePoints, &s.RetailPrice, &originalPrice, &s.ValidDays,
 			&s.GroupEnabled, &groupDiscountRate, &s.SPUName, &s.ModelProvider, &s.ModelName, &s.ModelTier, &apiKeyName, &apiKeyProvider,
+			&anthropicKeyName, &anthropicKeyProvider,
 			&s.CostInputRate, &s.CostOutputRate, &s.ProfitMargin, &s.CustomPricing, &s.SPUInputRate, &s.SPUOutputRate)
 		if err != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -220,11 +300,21 @@ func ListMerchantSKUs(c *gin.Context) {
 			mid := int(apiKeyID.Int64)
 			s.APIKeyID = &mid
 		}
+		if anthropicKeyID.Valid {
+			aid := int(anthropicKeyID.Int64)
+			s.AnthropicAPIKeyID = &aid
+		}
 		if apiKeyName.Valid {
 			s.APIKeyName = apiKeyName.String
 		}
 		if apiKeyProvider.Valid {
 			s.APIKeyProvider = apiKeyProvider.String
+		}
+		if anthropicKeyName.Valid {
+			s.AnthropicAPIKeyName = anthropicKeyName.String
+		}
+		if anthropicKeyProvider.Valid {
+			s.AnthropicAPIKeyProvider = anthropicKeyProvider.String
 		}
 		if tokenAmount.Valid {
 			s.TokenAmount = tokenAmount.Int64
@@ -440,14 +530,25 @@ func CreateMerchantSKU(c *gin.Context) {
 				return
 			}
 		}
+		if appErr := validateAnthropicCompanionForSKU(db, merchantID, req.SKUID, req.AnthropicAPIKeyID, req.APIKeyID, existingID); appErr != nil {
+			middleware.RespondWithError(c, appErr)
+			return
+		}
+		var anthArg interface{}
+		if req.AnthropicAPIKeyID != nil && *req.AnthropicAPIKeyID > 0 {
+			anthArg = *req.AnthropicAPIKeyID
+		} else {
+			anthArg = nil
+		}
 		var reactivated models.MerchantSKUDetail
+		var retMainKey, retAnthKey sql.NullInt64
 		err = db.QueryRow(
-			`UPDATE merchant_skus SET status = $1, api_key_id = $2, cost_input_rate = $3, cost_output_rate = $4,
-			 profit_margin = $5, custom_pricing_enabled = $6, updated_at = CURRENT_TIMESTAMP
-			 WHERE id = $7
-			 RETURNING id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
-			merchantStatusActive, req.APIKeyID, costInputRate, costOutputRate, profitMargin, customPricing, existingID,
-		).Scan(&reactivated.ID, &reactivated.MerchantID, &reactivated.SKUID, &reactivated.APIKeyID, &reactivated.Status,
+			`UPDATE merchant_skus SET status = $1, api_key_id = $2, anthropic_api_key_id = $3, cost_input_rate = $4, cost_output_rate = $5,
+			 profit_margin = $6, custom_pricing_enabled = $7, updated_at = CURRENT_TIMESTAMP
+			 WHERE id = $8
+			 RETURNING id, merchant_id, sku_id, api_key_id, anthropic_api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
+			merchantStatusActive, req.APIKeyID, anthArg, costInputRate, costOutputRate, profitMargin, customPricing, existingID,
+		).Scan(&reactivated.ID, &reactivated.MerchantID, &reactivated.SKUID, &retMainKey, &retAnthKey, &reactivated.Status,
 			&reactivated.SalesCount, &reactivated.TotalSalesAmount, &reactivated.CreatedAt, &reactivated.UpdatedAt)
 		if err != nil {
 			var pqErr *pq.Error
@@ -457,6 +558,14 @@ func CreateMerchantSKU(c *gin.Context) {
 			}
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
+		}
+		if retMainKey.Valid {
+			v := int(retMainKey.Int64)
+			reactivated.APIKeyID = &v
+		}
+		if retAnthKey.Valid {
+			v := int(retAnthKey.Int64)
+			reactivated.AnthropicAPIKeyID = &v
 		}
 		err = db.QueryRow(
 			`SELECT s.sku_code, s.sku_type, s.retail_price, s.valid_days, s.group_enabled, sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier
@@ -470,6 +579,9 @@ func CreateMerchantSKU(c *gin.Context) {
 		}
 		if reactivated.APIKeyID != nil && *reactivated.APIKeyID > 0 {
 			_ = db.QueryRow("SELECT name, provider FROM merchant_api_keys WHERE id = $1", *reactivated.APIKeyID).Scan(&reactivated.APIKeyName, &reactivated.APIKeyProvider)
+		}
+		if reactivated.AnthropicAPIKeyID != nil && *reactivated.AnthropicAPIKeyID > 0 {
+			_ = db.QueryRow("SELECT name, provider FROM merchant_api_keys WHERE id = $1", *reactivated.AnthropicAPIKeyID).Scan(&reactivated.AnthropicAPIKeyName, &reactivated.AnthropicAPIKeyProvider)
 		}
 		reactivated.CostInputRate = costInputRate
 		reactivated.CostOutputRate = costOutputRate
@@ -508,6 +620,11 @@ func CreateMerchantSKU(c *gin.Context) {
 		}
 	}
 
+	if appErr := validateAnthropicCompanionForSKU(db, merchantID, req.SKUID, req.AnthropicAPIKeyID, req.APIKeyID, 0); appErr != nil {
+		middleware.RespondWithError(c, appErr)
+		return
+	}
+
 	spuInputRate, spuOutputRate, err := resolveSKUDefaultCostBySKUID(db, req.SKUID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -519,13 +636,21 @@ func CreateMerchantSKU(c *gin.Context) {
 		return
 	}
 
+	var anthArg interface{}
+	if req.AnthropicAPIKeyID != nil && *req.AnthropicAPIKeyID > 0 {
+		anthArg = *req.AnthropicAPIKeyID
+	} else {
+		anthArg = nil
+	}
+
 	var merchantSKU models.MerchantSKUDetail
+	var insMainKey, insAnthKey sql.NullInt64
 	err = db.QueryRow(
-		`INSERT INTO merchant_skus (merchant_id, sku_id, api_key_id, status, cost_input_rate, cost_output_rate, profit_margin, custom_pricing_enabled) 
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-		 RETURNING id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
-		merchantID, req.SKUID, req.APIKeyID, merchantStatusActive, costInputRate, costOutputRate, profitMargin, customPricing,
-	).Scan(&merchantSKU.ID, &merchantSKU.MerchantID, &merchantSKU.SKUID, &merchantSKU.APIKeyID, &merchantSKU.Status, &merchantSKU.SalesCount, &merchantSKU.TotalSalesAmount, &merchantSKU.CreatedAt, &merchantSKU.UpdatedAt)
+		`INSERT INTO merchant_skus (merchant_id, sku_id, api_key_id, anthropic_api_key_id, status, cost_input_rate, cost_output_rate, profit_margin, custom_pricing_enabled) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+		 RETURNING id, merchant_id, sku_id, api_key_id, anthropic_api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
+		merchantID, req.SKUID, req.APIKeyID, anthArg, merchantStatusActive, costInputRate, costOutputRate, profitMargin, customPricing,
+	).Scan(&merchantSKU.ID, &merchantSKU.MerchantID, &merchantSKU.SKUID, &insMainKey, &insAnthKey, &merchantSKU.Status, &merchantSKU.SalesCount, &merchantSKU.TotalSalesAmount, &merchantSKU.CreatedAt, &merchantSKU.UpdatedAt)
 
 	if err != nil {
 		var pqErr *pq.Error
@@ -540,6 +665,14 @@ func CreateMerchantSKU(c *gin.Context) {
 			err,
 		))
 		return
+	}
+	if insMainKey.Valid {
+		v := int(insMainKey.Int64)
+		merchantSKU.APIKeyID = &v
+	}
+	if insAnthKey.Valid {
+		v := int(insAnthKey.Int64)
+		merchantSKU.AnthropicAPIKeyID = &v
 	}
 
 	err = db.QueryRow(
@@ -558,6 +691,13 @@ func CreateMerchantSKU(c *gin.Context) {
 		if err != nil {
 			merchantSKU.APIKeyName = ""
 			merchantSKU.APIKeyProvider = ""
+		}
+	}
+	if merchantSKU.AnthropicAPIKeyID != nil && *merchantSKU.AnthropicAPIKeyID > 0 {
+		err = db.QueryRow("SELECT name, provider FROM merchant_api_keys WHERE id = $1", *merchantSKU.AnthropicAPIKeyID).Scan(&merchantSKU.AnthropicAPIKeyName, &merchantSKU.AnthropicAPIKeyProvider)
+		if err != nil {
+			merchantSKU.AnthropicAPIKeyName = ""
+			merchantSKU.AnthropicAPIKeyProvider = ""
 		}
 	}
 	merchantSKU.CostInputRate = costInputRate
@@ -611,13 +751,13 @@ func UpdateMerchantSKU(c *gin.Context) {
 		return
 	}
 
-	if req.APIKeyID != nil && *req.APIKeyID > 0 {
+	if req.AnthropicAPIKeyID != nil && *req.AnthropicAPIKeyID > 0 {
 		var apiKeyExists bool
-		err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM merchant_api_keys WHERE id = $1 AND merchant_id = $2 AND status = 'active')", *req.APIKeyID, merchantID).Scan(&apiKeyExists)
+		err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM merchant_api_keys WHERE id = $1 AND merchant_id = $2 AND status = 'active')", *req.AnthropicAPIKeyID, merchantID).Scan(&apiKeyExists)
 		if err != nil || !apiKeyExists {
 			middleware.RespondWithError(c, apperrors.NewAppError(
 				"API_KEY_NOT_FOUND",
-				"API Key不存在或不属于当前商户",
+				"Anthropic 出站密钥不存在或不属于当前商户",
 				http.StatusBadRequest,
 				err,
 			))
@@ -627,14 +767,15 @@ func UpdateMerchantSKU(c *gin.Context) {
 
 	var currentInput, currentOutput, currentProfit float64
 	var currentCustom bool
-	var curKey sql.NullInt64
+	var curKey, curAnth sql.NullInt64
 	var curStatus string
+	var skuID int
 	err = db.QueryRow(
 		`SELECT COALESCE(cost_input_rate, 0), COALESCE(cost_output_rate, 0), COALESCE(profit_margin, 20), COALESCE(custom_pricing_enabled, false),
-			api_key_id, status
+			api_key_id, anthropic_api_key_id, status, sku_id
 		 FROM merchant_skus WHERE id = $1 AND merchant_id = $2`,
 		id, merchantID,
-	).Scan(&currentInput, &currentOutput, &currentProfit, &currentCustom, &curKey, &curStatus)
+	).Scan(&currentInput, &currentOutput, &currentProfit, &currentCustom, &curKey, &curAnth, &curStatus, &skuID)
 	if err != nil {
 		middleware.RespondWithError(c, apperrors.NewAppError(
 			"MERCHANT_SKU_NOT_FOUND",
@@ -650,6 +791,14 @@ func UpdateMerchantSKU(c *gin.Context) {
 			effKey = sql.NullInt64{}
 		} else {
 			effKey = sql.NullInt64{Int64: int64(*req.APIKeyID), Valid: true}
+		}
+	}
+	effAnth := curAnth
+	if req.AnthropicAPIKeyID != nil {
+		if *req.AnthropicAPIKeyID <= 0 {
+			effAnth = sql.NullInt64{}
+		} else {
+			effAnth = sql.NullInt64{Int64: int64(*req.AnthropicAPIKeyID), Valid: true}
 		}
 	}
 	effStatus := curStatus
@@ -668,21 +817,60 @@ func UpdateMerchantSKU(c *gin.Context) {
 			return
 		}
 	}
+	if effAnth.Valid && effAnth.Int64 > 0 && effStatus == merchantStatusActive {
+		var dup bool
+		dup, err = hasOtherActiveMerchantSKUForAPIKey(db, int(effAnth.Int64), id)
+		if err != nil {
+			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
+			return
+		}
+		if dup {
+			middleware.RespondWithError(c, merchantSKUKeyConflictAppErr(nil))
+			return
+		}
+	}
 	newInput, newOutput, newProfit, newCustom, appErr := normalizeMerchantSKUCostUpdate(req, currentInput, currentOutput, currentProfit, currentCustom)
 	if appErr != nil {
 		middleware.RespondWithError(c, appErr)
 		return
 	}
 
+	if effAnth.Valid && effAnth.Int64 > 0 {
+		anthID := int(effAnth.Int64)
+		var primPtr *int
+		if effKey.Valid && effKey.Int64 > 0 {
+			v := int(effKey.Int64)
+			primPtr = &v
+		}
+		if appErr := validateAnthropicCompanionForSKU(db, merchantID, skuID, &anthID, primPtr, id); appErr != nil {
+			middleware.RespondWithError(c, appErr)
+			return
+		}
+	}
+
+	var apiKeyArg interface{}
+	if effKey.Valid {
+		apiKeyArg = effKey.Int64
+	} else {
+		apiKeyArg = nil
+	}
+	var anthropicArg interface{}
+	if effAnth.Valid {
+		anthropicArg = effAnth.Int64
+	} else {
+		anthropicArg = nil
+	}
+
 	var merchantSKU models.MerchantSKUDetail
+	var updMainKey, updAnthKey sql.NullInt64
 	err = db.QueryRow(
-		`UPDATE merchant_skus SET api_key_id = $1, status = COALESCE($2, status),
-		 cost_input_rate = $3, cost_output_rate = $4, profit_margin = $5, custom_pricing_enabled = $6,
+		`UPDATE merchant_skus SET api_key_id = $1, anthropic_api_key_id = $2, status = $3,
+		 cost_input_rate = $4, cost_output_rate = $5, profit_margin = $6, custom_pricing_enabled = $7,
 		 updated_at = CURRENT_TIMESTAMP 
-		 WHERE id = $7 AND merchant_id = $8
-		 RETURNING id, merchant_id, sku_id, api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
-		req.APIKeyID, req.Status, newInput, newOutput, newProfit, newCustom, id, merchantID,
-	).Scan(&merchantSKU.ID, &merchantSKU.MerchantID, &merchantSKU.SKUID, &merchantSKU.APIKeyID, &merchantSKU.Status, &merchantSKU.SalesCount, &merchantSKU.TotalSalesAmount, &merchantSKU.CreatedAt, &merchantSKU.UpdatedAt)
+		 WHERE id = $8 AND merchant_id = $9
+		 RETURNING id, merchant_id, sku_id, api_key_id, anthropic_api_key_id, status, sales_count, total_sales_amount, created_at, updated_at`,
+		apiKeyArg, anthropicArg, effStatus, newInput, newOutput, newProfit, newCustom, id, merchantID,
+	).Scan(&merchantSKU.ID, &merchantSKU.MerchantID, &merchantSKU.SKUID, &updMainKey, &updAnthKey, &merchantSKU.Status, &merchantSKU.SalesCount, &merchantSKU.TotalSalesAmount, &merchantSKU.CreatedAt, &merchantSKU.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		middleware.RespondWithError(c, apperrors.NewAppError(
@@ -702,6 +890,15 @@ func UpdateMerchantSKU(c *gin.Context) {
 		return
 	}
 
+	if updMainKey.Valid {
+		v := int(updMainKey.Int64)
+		merchantSKU.APIKeyID = &v
+	}
+	if updAnthKey.Valid {
+		v := int(updAnthKey.Int64)
+		merchantSKU.AnthropicAPIKeyID = &v
+	}
+
 	err = db.QueryRow(
 		`SELECT s.sku_code, s.sku_type, s.retail_price, s.valid_days, s.group_enabled, sp.name as spu_name, sp.model_provider, sp.model_name, sp.model_tier
 		 FROM skus s JOIN spus sp ON s.spu_id = sp.id WHERE s.id = $1`,
@@ -718,6 +915,13 @@ func UpdateMerchantSKU(c *gin.Context) {
 		if err != nil {
 			merchantSKU.APIKeyName = ""
 			merchantSKU.APIKeyProvider = ""
+		}
+	}
+	if merchantSKU.AnthropicAPIKeyID != nil && *merchantSKU.AnthropicAPIKeyID > 0 {
+		err = db.QueryRow("SELECT name, provider FROM merchant_api_keys WHERE id = $1", *merchantSKU.AnthropicAPIKeyID).Scan(&merchantSKU.AnthropicAPIKeyName, &merchantSKU.AnthropicAPIKeyProvider)
+		if err != nil {
+			merchantSKU.AnthropicAPIKeyName = ""
+			merchantSKU.AnthropicAPIKeyProvider = ""
 		}
 	}
 	merchantSKU.CostInputRate = newInput

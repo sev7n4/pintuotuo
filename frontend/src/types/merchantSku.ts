@@ -3,6 +3,7 @@ export interface MerchantSKU {
   merchant_id: number;
   sku_id: number;
   api_key_id?: number;
+  anthropic_api_key_id?: number;
   status: 'active' | 'inactive';
   sales_count: number;
   total_sales_amount: number;
@@ -26,6 +27,8 @@ export interface MerchantSKUDetail extends MerchantSKU {
   model_tier: string;
   api_key_name?: string;
   api_key_provider?: string;
+  anthropic_api_key_name?: string;
+  anthropic_api_key_provider?: string;
   cost_input_rate: number;
   cost_output_rate: number;
   profit_margin: number;
@@ -58,6 +61,7 @@ export interface AvailableSKU {
 export interface MerchantSKUCreateRequest {
   sku_id: number;
   api_key_id?: number;
+  anthropic_api_key_id?: number;
   custom_pricing_enabled?: boolean;
   cost_input_rate?: number;
   cost_output_rate?: number;
@@ -66,6 +70,7 @@ export interface MerchantSKUCreateRequest {
 
 export interface MerchantSKUUpdateRequest {
   api_key_id?: number;
+  anthropic_api_key_id?: number;
   status?: string;
   custom_pricing_enabled?: boolean;
   cost_input_rate?: number;

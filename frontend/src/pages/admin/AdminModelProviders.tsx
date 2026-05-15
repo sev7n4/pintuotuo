@@ -404,6 +404,26 @@ const AdminModelProviders = () => {
       <Form.Item name="api_format" label="API 格式" rules={[{ required: true }]}>
         <Select options={apiFormatOptions} placeholder="选择格式" disabled={isFallbackEditing} />
       </Form.Item>
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message="商户 SKU 与 Anthropic（Claude）出站"
+        description={
+          <div>
+            <p>
+              若同一订阅既要 OpenAI 兼容又要走 Anthropic Messages 出站，除目录
+              <strong>主厂商</strong>（如 <code>alibaba</code>）外，请再建一条厂商代码为「主厂商小写
+              + <code>_anthropic</code>」的记录（例如 <code>alibaba_anthropic</code>），且 API
+              格式选 <strong>anthropic</strong>。
+            </p>
+            <p style={{ marginTop: 8 }}>
+              商户上架 SKU 时可在「Anthropic 出站 Key」绑定 <code>provider</code> 为该代码的 API
+              Key；strict 权益白名单会合并该槽位。
+            </p>
+          </div>
+        }
+      />
       <Form.Item
         name="compat_prefixes"
         label="OpenAI 兼容前缀（无前缀 model 名匹配）"

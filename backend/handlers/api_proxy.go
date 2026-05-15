@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 	"github.com/pintuotuo/backend/billing"
 	"github.com/pintuotuo/backend/cache"
 	"github.com/pintuotuo/backend/config"
@@ -88,6 +89,10 @@ func legacyProviderList() []map[string]interface{} {
 type APIProxyRequest struct {
 	Provider string `json:"provider" binding:"required"`
 	Model    string `json:"model" binding:"required"`
+	// CatalogProvider 目录计价与 strict 权益主厂商（如 alibaba）；空表示与 Provider 相同。
+	CatalogProvider string `json:"-"`
+	// MergeAnthropicCompanionKeySlots 为真时，strict 白名单合并 merchant_skus.anthropic_api_key_id 对应 Key。
+	MergeAnthropicCompanionKeySlots bool `json:"-"`
 	// Messages 与 Options 供 Anthropic 兼容入口等内部结构化调用；OpenAI 兼容 chat 使用 RawOpenAIChatBody 时可为空。
 	Messages      []ChatMessage   `json:"messages"`
 	Stream        bool            `json:"stream"`
@@ -295,9 +300,14 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	traceSpan := services.StartLLMTrace(requestID, userIDInt)
 	defer traceSpan.Finish(c.Request.Context())
 
+	catalogProv := strings.TrimSpace(req.CatalogProvider)
+	if catalogProv == "" {
+		catalogProv = strings.TrimSpace(req.Provider)
+	}
+
 	var strictPricingVID *int
 	if services.EntitlementEnforcementStrict() {
-		vid, _, ok, entErr := services.ResolveChosenPricingVersion(db, userIDInt, req.Provider, req.Model)
+		vid, _, ok, entErr := services.ResolveChosenPricingVersion(db, userIDInt, catalogProv, req.Model)
 		if entErr != nil {
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
 			return
@@ -373,7 +383,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 	var entCtx *services.EntitlementRoutingContext
 	if services.EntitlementEnforcementStrict() {
 		var entErr error
-		entCtx, entErr = services.ResolveEntitlementRoutingContext(db, userIDInt, req.Provider, req.Model)
+		entOpts := services.EntitlementRoutingOptions{MergeAnthropicCompanionKeySlots: req.MergeAnthropicCompanionKeySlots}
+		entCtx, entErr = services.ResolveEntitlementRoutingContextWithOptions(db, userIDInt, catalogProv, req.Model, entOpts)
 		if entErr != nil {
 			billingEngine.CancelPreDeduct(userIDInt, requestID)
 			middleware.RespondWithError(c, apperrors.ErrDatabaseError)
@@ -401,7 +412,8 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		}
 	}
 
-	keyFilter := entitlementKeyFilterForRouter(services.EntitlementEnforcementStrict(), entCtx)
+	outboundProv := strings.TrimSpace(req.Provider)
+	keyFilter := entitlementKeyFilterForRouter(services.EntitlementEnforcementStrict(), entCtx, db, outboundProv)
 
 	selectedStrategy := "legacy_fallback"
 	effectivePolicySource := ""
@@ -424,7 +436,7 @@ func proxyAPIRequestCore(c *gin.Context, userIDInt int, requestID string, startT
 		}
 	}
 	if req.APIKeyID == nil && req.MerchantSKUID == nil && services.EntitlementEnforcementStrict() && entCtx != nil && len(entCtx.AllowedAPIKeyIDs) > 0 {
-		if pick, msid := pickDeterministicEntitledKey(entCtx); pick > 0 {
+		if pick, msid := pickDeterministicEntitledKey(db, entCtx, outboundProv); pick > 0 {
 			p := pick
 			req.APIKeyID = &p
 			if req.MerchantSKUID == nil && msid > 0 {
@@ -1435,12 +1447,17 @@ func getProviderRuntimeConfig(db *sql.DB, providerCode string) (providerRuntimeC
 }
 
 // entitlementKeyFilterForRouter: nil = no filter (legacy); strict with no keys = empty slice (no SmartRouter pool).
-func entitlementKeyFilterForRouter(strict bool, ent *services.EntitlementRoutingContext) []int {
+// outboundProvider 非空时仅保留 merchant_api_keys.provider 与出站厂商一致的 Key（如 alibaba_anthropic）。
+func entitlementKeyFilterForRouter(strict bool, ent *services.EntitlementRoutingContext, db *sql.DB, outboundProvider string) []int {
 	if !strict {
 		return nil
 	}
+	return filterEntitledAPIKeyIDsByOutboundProvider(db, ent, outboundProvider)
+}
+
+func entitledAPIKeyIDsSorted(ent *services.EntitlementRoutingContext) []int {
 	if ent == nil || len(ent.AllowedAPIKeyIDs) == 0 {
-		return []int{}
+		return nil
 	}
 	out := make([]int, 0, len(ent.AllowedAPIKeyIDs))
 	for id := range ent.AllowedAPIKeyIDs {
@@ -1450,18 +1467,48 @@ func entitlementKeyFilterForRouter(strict bool, ent *services.EntitlementRouting
 	return out
 }
 
-func pickDeterministicEntitledKey(ent *services.EntitlementRoutingContext) (apiKeyID int, merchantSKUID int) {
-	if ent == nil || len(ent.AllowedAPIKeyIDs) == 0 {
-		return 0, 0
+// filterEntitledAPIKeyIDsByOutboundProvider 在 strict 白名单内按出站 provider 过滤；outbound 为空或 db 为 nil 时返回全部 allowlist（升序）。
+func filterEntitledAPIKeyIDsByOutboundProvider(db *sql.DB, ent *services.EntitlementRoutingContext, outboundProvider string) []int {
+	all := entitledAPIKeyIDsSorted(ent)
+	if len(all) == 0 {
+		return []int{}
 	}
-	minK := 0
-	for k := range ent.AllowedAPIKeyIDs {
-		if minK == 0 || k < minK {
-			minK = k
+	outboundProvider = strings.TrimSpace(outboundProvider)
+	if outboundProvider == "" || db == nil {
+		return all
+	}
+	rows, err := db.Query(
+		`SELECT mak.id
+		 FROM merchant_api_keys mak
+		 WHERE mak.id = ANY($1)
+		   AND lower(trim(mak.provider)) = lower(trim($2))
+		   AND mak.status = 'active'
+		 ORDER BY mak.id ASC`,
+		pq.Array(all), outboundProvider,
+	)
+	if err != nil {
+		return []int{}
+	}
+	defer rows.Close()
+	var matched []int
+	for rows.Next() {
+		var id int
+		if scanErr := rows.Scan(&id); scanErr == nil {
+			matched = append(matched, id)
 		}
 	}
-	msid, _ := ent.MerchantSKUForAPIKey(minK)
-	return minK, msid
+	return matched
+}
+
+// pickDeterministicEntitledKey 在权益白名单内按 outboundProvider 取最小 api_key_id，保证与 selectAPIKeyForRequest 的 mak.provider 校验一致。
+func pickDeterministicEntitledKey(db *sql.DB, ent *services.EntitlementRoutingContext, outboundProvider string) (apiKeyID int, merchantSKUID int) {
+	filtered := filterEntitledAPIKeyIDsByOutboundProvider(db, ent, outboundProvider)
+	if len(filtered) == 0 {
+		return 0, 0
+	}
+	pick := filtered[0]
+	msid, _ := ent.MerchantSKUForAPIKey(pick)
+	return pick, msid
 }
 
 func scanMerchantAPIKeyQuotaRow(row *sql.Row, apiKey *models.MerchantAPIKey) error {
@@ -1542,7 +1589,8 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 						 COALESCE(mak.route_mode, 'auto') as route_mode,
 						 COALESCE(mak.route_config, '{}'::jsonb) as route_config
 						 FROM merchant_skus ms
-						 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
+						 JOIN merchant_api_keys mak ON mak.provider = $2
+						   AND (mak.id = ms.api_key_id OR mak.id = ms.anthropic_api_key_id)
 						 JOIN merchants m ON m.id = ms.merchant_id
 						 WHERE ms.id = $1 AND ms.status = 'active'
 						   AND mak.provider = $2 AND mak.status = 'active'
@@ -1572,7 +1620,8 @@ func selectAPIKeyForRequest(db *sql.DB, userID, merchantID int, req APIProxyRequ
 				 COALESCE(mak.route_mode, 'auto') as route_mode,
 				 COALESCE(mak.route_config, '{}'::jsonb) as route_config
 				 FROM merchant_skus ms
-				 JOIN merchant_api_keys mak ON mak.id = ms.api_key_id
+				 JOIN merchant_api_keys mak ON mak.provider = $4
+				   AND (mak.id = ms.api_key_id OR mak.id = ms.anthropic_api_key_id)
 				 JOIN merchants m ON m.id = ms.merchant_id
 				 WHERE ms.id = $1 AND ms.status = 'active'
 				   AND ms.merchant_id = $2
@@ -1645,14 +1694,14 @@ func resolveMerchantSKUProcurementForLog(db *sql.DB, req APIProxyRequest, apiKey
 		err = db.QueryRow(
 			`SELECT ms.id, ms.cost_input_rate, ms.cost_output_rate
 			 FROM merchant_skus ms
-			 WHERE ms.id = $1 AND ms.api_key_id = $2 AND ms.merchant_id = $3 AND ms.status = 'active'`,
+			 WHERE ms.id = $1 AND (ms.api_key_id = $2 OR ms.anthropic_api_key_id = $2) AND ms.merchant_id = $3 AND ms.status = 'active'`,
 			*req.MerchantSKUID, apiKeyID, merchantID,
 		).Scan(&msID, &inRate, &outRate)
 	} else {
 		err = db.QueryRow(
 			`SELECT ms.id, ms.cost_input_rate, ms.cost_output_rate
 			 FROM merchant_skus ms
-			 WHERE ms.api_key_id = $1 AND ms.status = 'active'
+			 WHERE (ms.api_key_id = $1 OR ms.anthropic_api_key_id = $1) AND ms.status = 'active'
 			 LIMIT 1`,
 			apiKeyID,
 		).Scan(&msID, &inRate, &outRate)
