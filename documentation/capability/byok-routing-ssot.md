@@ -60,3 +60,4 @@
 | 网关模式 | `ConfigureGatewayMode`、`determineGatewayMode` |
 | 代理 HTTP | `handlers.resolveEndpointURL`、`applyAPIKeyRouteConfig` |
 | 健康 / 探测基址 | `HealthChecker.resolveEndpointWithRouteMode`、`ResolveMerchantAPIKeyUpstreamBase` |
+| Anthropic 影子厂商 `XX_anthropic` | [anthropic-sibling-provider-setup.md](./anthropic-sibling-provider-setup.md)（厂商表 + 副 Key + SKU 副槽；验证见同文档） |

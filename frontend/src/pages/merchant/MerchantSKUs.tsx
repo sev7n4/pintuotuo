@@ -32,8 +32,11 @@ import { merchantService } from '@/services/merchant';
 import MerchantGuard from '@/components/MerchantGuard';
 import styles from './MerchantProducts.module.css';
 
-const { Text } = Typography;
+const { Text, Link } = Typography;
 const { useBreakpoint } = Grid;
+
+const ANTHROPIC_SIBLING_SETUP_DOC =
+  'https://github.com/sev7n4/pintuotuo/blob/main/documentation/capability/anthropic-sibling-provider-setup.md';
 
 /** 与后端约定一致：目录主厂商 + `_anthropic` 为 Claude/Anthropic 出站用 merchant_api_keys.provider */
 function anthropicSiblingProviderCode(modelProvider: string): string {
@@ -412,7 +415,14 @@ const MerchantSKUs = () => {
         );
         return (
           <Tooltip
-            title={`可选；须为 provider=${sibling} 的商户密钥，用于 Claude/Anthropic 入口出站`}
+            title={
+              <span>
+                可选；须为 provider={sibling} 的商户密钥，用于 Claude/Anthropic 入口出站。配置说明见{' '}
+                <a href={ANTHROPIC_SIBLING_SETUP_DOC} target="_blank" rel="noopener noreferrer">
+                  接入文档
+                </a>
+              </span>
+            }
           >
             <Select
               style={{ width: '100%' }}
@@ -698,9 +708,15 @@ const MerchantSKUs = () => {
               ))}
             </Select>
 
-            <label style={{ display: 'block', marginTop: 12, marginBottom: 8 }}>
+            <label style={{ display: 'block', marginTop: 12, marginBottom: 4 }}>
               Anthropic 出站 Key（可选）
             </label>
+            <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 8 }}>
+              须为「主厂商_anthropic」密钥；未配置可留空。{' '}
+              <Link href={ANTHROPIC_SIBLING_SETUP_DOC} target="_blank">
+                配置检查清单
+              </Link>
+            </Text>
             <Tooltip title="须与所选 SKU 的 SPU 主厂商一致：密钥 provider 为「主厂商_anthropic」（如 alibaba_anthropic）。未配置时可留空。">
               <Select
                 style={{ width: '100%' }}

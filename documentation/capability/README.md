@@ -19,6 +19,7 @@
 | [phase0-scope.md](./phase0-scope.md) | 0.x | **用量与范围**：默认/计费探测次数、部署流水线行为 |
 | [endpoint-coverage-matrix.md](./endpoint-coverage-matrix.md) | 0.x | **端点覆盖矩阵**：Admin vs CLI、是否真实 POST、与「全量非 chat」的关系 |
 | [byok-routing-ssot.md](./byok-routing-ssot.md) | — | **BYOK 路由 SSOT**：`merchant_api_keys` 与 `model_providers` 回退、api_proxy 与 ExecutionLayer |
+| [anthropic-sibling-provider-setup.md](./anthropic-sibling-provider-setup.md) | — | **`XX_anthropic` 双厂商出站**：Admin 厂商配置、商户副 Key、验证/健康探测、SKU 绑定与检查清单 |
 | [risk-register-template.md](./risk-register-template.md) | 0.6 | 风险登记占位（复制到 Wiki/Jira 亦可） |
 
 ## 上游探测命令（Go，从数据库读取 BYOK）
@@ -49,10 +50,14 @@ docker exec pintuotuo-backend /app/capability-probe -out /tmp/capability-probe-l
 
 探测输出勿提交仓库；`.gitignore`：`documentation/capability/capability-probe-output*.csv`。
 
+## Anthropic 双厂商出站（`XX` + `XX_anthropic`）
+
+运营接入新厂商的 Anthropic Messages 兼容线路时，请使用 **[anthropic-sibling-provider-setup.md](./anthropic-sibling-provider-setup.md)**（最小检查清单 + 配置步骤）。与 PR #513（SKU 副 Key / strict 合并）及 PR #514（`api_format=anthropic` 验证与健康探测）配套。
+
 ## 与代码的对照
 
 - 端点路径常量：[`backend/services/execution_layer.go`](../../backend/services/execution_layer.go) 中 `endpointPathSuffixes`。
-- 模型列表探测（仅 GET models）：[`backend/services/provider_probe.go`](../../backend/services/provider_probe.go)。
+- 连通性探测（OpenAI `GET /models` 或 Anthropic `POST /messages`）：[`backend/services/provider_probe.go`](../../backend/services/provider_probe.go) 中 `ProbeProviderConnectivity`。
 
 ## 下一步（需人工）
 

@@ -63,9 +63,12 @@ function buildCapabilityProbeCLI(keyID: number): string {
   ].join('\n');
 }
 
+const ANTHROPIC_SIBLING_SETUP_DOC =
+  'https://github.com/sev7n4/pintuotuo/blob/main/documentation/capability/anthropic-sibling-provider-setup.md';
+
 /** Admin 各处理模型列表时的统一说明（与后端 probe-models / FullVerification 一致） */
 const BYOK_PROBE_MODELS_DESCRIPTION =
-  '与轻量验证、能力探测、深度验证模型选择同源：GET /admin/byok-routing/:id/probe-models（OpenAI 兼容模型目录），不合并 models_supported 或验证记录内快照。';
+  '与轻量验证、能力探测、深度验证模型选择同源：GET /admin/byok-routing/:id/probe-models。OpenAI 格式拉取 /models；api_format=anthropic 或 provider 以 _anthropic 结尾时走 Messages 探测（与商户端验证相同）。';
 
 /** 验证结果里「使用端点」与模型目录 probe 路径的区别说明 */
 const BYOK_ENDPOINT_USED_NOTE =
@@ -221,9 +224,9 @@ const AdminByokRouting = () => {
   const [verificationContextKeyId, setVerificationContextKeyId] = useState<number | null>(null);
   const [verificationProbeModels, setVerificationProbeModels] = useState<string[] | null>(null);
   const [verificationProbeModelsLoading, setVerificationProbeModelsLoading] = useState(false);
-  const [verificationProbeModelsError, setVerificationProbeModelsError] = useState<string | undefined>(
-    undefined
-  );
+  const [verificationProbeModelsError, setVerificationProbeModelsError] = useState<
+    string | undefined
+  >(undefined);
 
   const [probeModelModalVisible, setProbeModelModalVisible] = useState(false);
   const [probeModelTarget, setProbeModelTarget] = useState<BYOKRoutingItem | null>(null);
@@ -289,9 +292,9 @@ const AdminByokRouting = () => {
   /** 与后端 GET .../probe-models（同轻量验证模型目录请求）一致，不合并列表缓存或 models_supported */
   const capabilityModelOptions = useMemo(() => {
     if (!capabilityTarget) return [];
-    const uniq = [...new Set(capabilityFetchedModels.filter((m) => Boolean(m && String(m).trim())))].sort(
-      (a, b) => a.localeCompare(b)
-    );
+    const uniq = [
+      ...new Set(capabilityFetchedModels.filter((m) => Boolean(m && String(m).trim()))),
+    ].sort((a, b) => a.localeCompare(b));
     return uniq.map((m) => ({ label: m, value: m }));
   }, [capabilityFetchedModels, capabilityTarget]);
 
@@ -1206,8 +1209,9 @@ const AdminByokRouting = () => {
               type="secondary"
               style={{ display: 'block', marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}
             >
-              默认仅对下方勾选的 embeddings / moderations / responses 发起非计费 POST。打开「计费类探测」并确认后，会额外发起与
-              CLI -billable 同路径的极小请求（chat completions、图生、语音/转写等），可能产生上游费用，行为与深度验证类似。每次仍会先跑
+              默认仅对下方勾选的 embeddings / moderations / responses 发起非计费
+              POST。打开「计费类探测」并确认后，会额外发起与 CLI -billable 同路径的极小请求（chat
+              completions、图生、语音/转写等），可能产生上游费用，行为与深度验证类似。每次仍会先跑
               get_models（结果表第一行）。
             </Text>
             <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
@@ -1385,7 +1389,9 @@ const AdminByokRouting = () => {
                   options={capabilityModelOptions}
                   disabled={capabilityLoading}
                   notFoundContent={
-                    capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
+                    capabilityProbeModelsLoading
+                      ? '加载中…'
+                      : '暂无，请先点「刷新 /v1/models」或检查上游'
                   }
                 />
               </div>
@@ -1403,7 +1409,9 @@ const AdminByokRouting = () => {
                   options={capabilityModelOptions}
                   disabled={capabilityLoading}
                   notFoundContent={
-                    capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
+                    capabilityProbeModelsLoading
+                      ? '加载中…'
+                      : '暂无，请先点「刷新 /v1/models」或检查上游'
                   }
                 />
               </div>
@@ -1421,7 +1429,9 @@ const AdminByokRouting = () => {
                   options={capabilityModelOptions}
                   disabled={capabilityLoading}
                   notFoundContent={
-                    capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
+                    capabilityProbeModelsLoading
+                      ? '加载中…'
+                      : '暂无，请先点「刷新 /v1/models」或检查上游'
                   }
                 />
               </div>
@@ -1440,7 +1450,9 @@ const AdminByokRouting = () => {
                     options={capabilityModelOptions}
                     disabled={capabilityLoading}
                     notFoundContent={
-                      capabilityProbeModelsLoading ? '加载中…' : '暂无，请先点「刷新 /v1/models」或检查上游'
+                      capabilityProbeModelsLoading
+                        ? '加载中…'
+                        : '暂无，请先点「刷新 /v1/models」或检查上游'
                     }
                   />
                 </div>
@@ -1493,8 +1505,14 @@ const AdminByokRouting = () => {
         ]}
       >
         <div style={{ marginBottom: 16 }}>
-          <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12, lineHeight: 1.6 }}>
-            {BYOK_PROBE_MODELS_DESCRIPTION}
+          <Text
+            type="secondary"
+            style={{ display: 'block', marginBottom: 12, fontSize: 12, lineHeight: 1.6 }}
+          >
+            {BYOK_PROBE_MODELS_DESCRIPTION}{' '}
+            <a href={ANTHROPIC_SIBLING_SETUP_DOC} target="_blank" rel="noopener noreferrer">
+              XX_anthropic 接入文档
+            </a>
           </Text>
           <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
             <Select
@@ -1584,7 +1602,10 @@ const AdminByokRouting = () => {
 
             {verificationResult.endpoint_used && (
               <Descriptions.Item label="使用端点">
-                <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}>
+                <Text
+                  type="secondary"
+                  style={{ display: 'block', marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}
+                >
                   {BYOK_ENDPOINT_USED_NOTE}
                 </Text>
                 <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>
@@ -1594,9 +1615,13 @@ const AdminByokRouting = () => {
             )}
 
             <Descriptions.Item label="发现的模型">
-              <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}>
+              <Text
+                type="secondary"
+                style={{ display: 'block', marginBottom: 8, fontSize: 12, lineHeight: 1.6 }}
+              >
                 {BYOK_PROBE_MODELS_DESCRIPTION}
-                {verificationResult.status === 'pending' || verificationResult.status === 'in_progress'
+                {verificationResult.status === 'pending' ||
+                verificationResult.status === 'in_progress'
                   ? ' 验证结束后将自动拉取并展示。'
                   : ''}
               </Text>
@@ -1622,7 +1647,9 @@ const AdminByokRouting = () => {
                         ))}
                       </Space>
                     ) : (
-                      <Text type="secondary">未从上游返回模型 ID（可关闭后使用能力探测「刷新 /v1/models」重试）</Text>
+                      <Text type="secondary">
+                        未从上游返回模型 ID（可关闭后使用能力探测「刷新 /v1/models」重试）
+                      </Text>
                     )}
                   </>
                 )}

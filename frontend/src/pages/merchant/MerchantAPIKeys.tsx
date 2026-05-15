@@ -879,6 +879,18 @@ const MerchantAPIKeys = () => {
               「Strict 权益」列为「可路由」时，表示与后端白名单条件一致；仍需 SKU
               承接等数据完整，最终以接口与日志为准。
             </li>
+            <li>
+              <code>provider</code> 以 <code>_anthropic</code> 结尾的密钥（Claude 出站副 Key）须完成
+              <strong>深度验证</strong>并指定有效探测模型；配置步骤见{' '}
+              <a
+                href="https://github.com/sev7n4/pintuotuo/blob/main/documentation/capability/anthropic-sibling-provider-setup.md"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                anthropic-sibling-provider-setup.md
+              </a>
+              。
+            </li>
           </ol>
         }
       />

@@ -421,6 +421,16 @@ const AdminModelProviders = () => {
               商户上架 SKU 时可在「Anthropic 出站 Key」绑定 <code>provider</code> 为该代码的 API
               Key；strict 权益白名单会合并该槽位。
             </p>
+            <p style={{ marginTop: 8, marginBottom: 0 }}>
+              完整检查清单与配置步骤：{' '}
+              <a
+                href="https://github.com/sev7n4/pintuotuo/blob/main/documentation/capability/anthropic-sibling-provider-setup.md"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                anthropic-sibling-provider-setup.md
+              </a>
+            </p>
           </div>
         }
       />
