@@ -41,6 +41,22 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch || github.ref }}
 
+      - name: Validate production environment secrets
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -z "${{ secrets.TENCENT_CLOUD_OVERSEAS_SSH_KEY }}" ] && missing+=(TENCENT_CLOUD_OVERSEAS_SSH_KEY)
+          [ -z "${{ secrets.TENCENT_CLOUD_OVERSEAS_USER }}" ] && missing+=(TENCENT_CLOUD_OVERSEAS_USER)
+          [ -z "${{ secrets.TENCENT_CLOUD_OVERSEAS_IP }}" ] && missing+=(TENCENT_CLOUD_OVERSEAS_IP)
+          [ -z "${{ secrets.TENCENT_CLOUD_OVERSEAS_LITELLM_DIR }}" ] && missing+=(TENCENT_CLOUD_OVERSEAS_LITELLM_DIR)
+          [ -z "${{ secrets.LITELLM_MASTER_KEY }}" ] && missing+=(LITELLM_MASTER_KEY)
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing production environment secrets: ${missing[*]}"
+            echo "Configure them under Settings → Environments → production → Environment secrets."
+            echo "See documentation/ops/litellm-overseas-github-secrets.md"
+            exit 1
+          fi
+
       - name: Deploy LiteLLM to overseas host
         env:
           OVERSEAS_DIR: ${{ secrets.TENCENT_CLOUD_OVERSEAS_LITELLM_DIR }}

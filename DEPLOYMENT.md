@@ -115,8 +115,11 @@ BYOK (Bring Your Own Key) 路由模式需要以下环境变量配置：
 
 | 变量 | 环境 | 说明 | 示例 |
 |------|------|------|------|
-| `LLM_GATEWAY_LITELLM_URL` | 生产 | LiteLLM网关地址 | http://litellm:4000 |
-| `LITELLM_MASTER_KEY` | 生产 | LiteLLM认证密钥 | sk-litellm-master-key |
+| `LLM_GATEWAY_LITELLM_URL` | 生产 | 国内 LiteLLM 网关地址 | http://litellm:4000 |
+| `LLM_GATEWAY_LITELLM_URL_OVERSEAS` | 生产 | 海外 LiteLLM 网关（新加坡等） | http://43.160.204.9:4000 |
+| `LITELLM_MASTER_KEY` | 生产 | LiteLLM 认证密钥（国内/海外共用） | sk-litellm-master-key |
+
+**海外 LiteLLM 节点 CI 部署**：Workflow [`.github/workflows/deploy-litellm-overseas.yml`](.github/workflows/deploy-litellm-overseas.yml)。GitHub **production** 环境需单独配置 `TENCENT_CLOUD_OVERSEAS_*` 等 Secrets，完整步骤见 [`documentation/ops/litellm-overseas-github-secrets.md`](documentation/ops/litellm-overseas-github-secrets.md)。
 
 **配置示例**：
 ```bash
