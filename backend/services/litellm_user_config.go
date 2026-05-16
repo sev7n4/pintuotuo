@@ -13,9 +13,12 @@ func BuildLitellmUserConfig(provider, catalogModel, decryptedKey, upstreamBaseUR
 	if err != nil || litellmModel == "" {
 		if strings.EqualFold(provider, modelProviderOpenRouter) {
 			litellmModel = formatLitellmModelForOpenRouter(catalogModel)
-		} else if resolved, resolveErr := resolveLitellmModelName(provider, catalogModel); resolveErr == nil {
-			litellmModel = resolved
-		} else {
+		} else if canResolveLitellmModelWithoutCache(provider) {
+			if resolved, resolveErr := resolveLitellmModelName(provider, catalogModel); resolveErr == nil {
+				litellmModel = resolved
+			}
+		}
+		if litellmModel == "" {
 			modelName := catalogModel
 			if idx := strings.LastIndex(catalogModel, "/"); idx >= 0 {
 				modelName = catalogModel[idx+1:]
@@ -41,5 +44,17 @@ func BuildLitellmUserConfig(provider, catalogModel, decryptedKey, upstreamBaseUR
 				"litellm_params": params,
 			},
 		},
+	}
+}
+
+func canResolveLitellmModelWithoutCache(provider string) bool {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case modelProviderOpenAI, modelProviderAnthropic, modelProviderDeepseek,
+		modelProviderAlibaba, modelProviderAlibabaAnthropic,
+		modelProviderZhipu, modelProviderMoonshot, modelProviderMinimax,
+		modelProviderGoogle, modelProviderStepfun:
+		return true
+	default:
+		return false
 	}
 }
