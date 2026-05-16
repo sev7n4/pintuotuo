@@ -13,6 +13,8 @@ func BuildLitellmUserConfig(provider, catalogModel, decryptedKey, upstreamBaseUR
 	if err != nil || litellmModel == "" {
 		if strings.EqualFold(provider, modelProviderOpenRouter) {
 			litellmModel = formatLitellmModelForOpenRouter(catalogModel)
+		} else if resolved, resolveErr := resolveLitellmModelName(provider, catalogModel); resolveErr == nil {
+			litellmModel = resolved
 		} else {
 			modelName := catalogModel
 			if idx := strings.LastIndex(catalogModel, "/"); idx >= 0 {
