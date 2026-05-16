@@ -169,10 +169,7 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 		}, nil
 	}
 
-	apiFmt := s.providerAPIFormat(apiKey.Provider)
-	client := newProxyAwareHTTPClient(10*time.Second, resolvedMode)
-	siblingOpenAIBase := s.siblingOpenAIBaseForProvider(apiKey.Provider)
-	probe, err := ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt, siblingOpenAIBase)
+	probe, err := s.probeMerchantKeyConnectivity(ctx, apiKey, baseURL, authToken, resolvedMode)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -208,7 +205,8 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 	}, nil
 }
 
-// ResolveProviderConnectivityBase returns the upstream base URL and auth token for connectivity probes.
+// ResolveProviderConnectivityBase returns the probe base URL and bearer token for connectivity checks.
+// For litellm route mode the base is the LiteLLM gateway (/v1) and auth is LITELLM_MASTER_KEY — not the vendor direct URL or BYOK sk.
 func (s *HealthChecker) ResolveProviderConnectivityBase(ctx context.Context, apiKey *models.MerchantAPIKey) (baseURL string, authToken string, resolvedRouteMode string, err error) {
 	trafficEp, resolveErr := s.resolveEndpoint(ctx, apiKey)
 	if resolveErr != nil {
@@ -216,16 +214,36 @@ func (s *HealthChecker) ResolveProviderConnectivityBase(ctx context.Context, api
 	}
 	resolvedRouteMode = s.resolvedRouteMode(ctx, apiKey)
 	modelsBase := trafficEp
+
 	if resolvedRouteMode == GatewayModeLitellm {
-		if upstream, upErr := s.resolveDirectEndpoint(ctx, apiKey); upErr == nil && strings.TrimSpace(upstream) != "" {
-			modelsBase = upstream
+		masterKey := strings.TrimSpace(os.Getenv("LITELLM_MASTER_KEY"))
+		if masterKey == "" {
+			return "", "", resolvedRouteMode, fmt.Errorf("LITELLM_MASTER_KEY not configured")
 		}
+		return normalizeOpenAICompatBase(modelsBase), masterKey, resolvedRouteMode, nil
 	}
+
 	authToken = s.getDecryptedAPIKey(apiKey)
 	if strings.TrimSpace(authToken) == "" && strings.TrimSpace(apiKey.APIKeyEncrypted) != "" {
 		return "", "", resolvedRouteMode, fmt.Errorf("failed to decrypt API key")
 	}
 	return normalizeOpenAICompatBase(modelsBase), authToken, resolvedRouteMode, nil
+}
+
+// probeMerchantKeyConnectivity runs provider connectivity probes. LiteLLM gateways are OpenAI-compatible
+// (GET /v1/models + master key); Anthropic-native POST /messages is not used on the gateway host.
+func (s *HealthChecker) probeMerchantKeyConnectivity(
+	ctx context.Context,
+	apiKey *models.MerchantAPIKey,
+	baseURL, authToken, resolvedMode string,
+) (*ProbeModelsResult, error) {
+	client := newProxyAwareHTTPClient(10*time.Second, resolvedMode)
+	if resolvedMode == GatewayModeLitellm {
+		return ProbeProviderModels(ctx, client, OpenAICompatModelsProbeURL(baseURL), authToken, apiKey.Provider)
+	}
+	apiFmt := s.providerAPIFormat(apiKey.Provider)
+	siblingOpenAIBase := s.siblingOpenAIBaseForProvider(apiKey.Provider)
+	return ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt, siblingOpenAIBase)
 }
 
 // ResolveOpenAICompatModelsListProbe returns the GET URL and bearer token for OpenAI-compatible model listing
@@ -275,15 +293,15 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 		}, nil
 	}
 
-	apiFmt := s.providerAPIFormat(apiKey.Provider)
 	endpointUsed := OpenAICompatModelsProbeURL(baseURL)
-	if ProviderUsesAnthropicHTTP(apiKey.Provider, apiFmt) {
-		endpointUsed = AnthropicMessagesProbeURL(baseURL)
+	if resolvedMode != GatewayModeLitellm {
+		apiFmt := s.providerAPIFormat(apiKey.Provider)
+		if ProviderUsesAnthropicHTTP(apiKey.Provider, apiFmt) {
+			endpointUsed = AnthropicMessagesProbeURL(baseURL)
+		}
 	}
 
-	client := newProxyAwareHTTPClient(10*time.Second, resolvedMode)
-	siblingOpenAIBase := s.siblingOpenAIBaseForProvider(apiKey.Provider)
-	probe, err := ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt, siblingOpenAIBase)
+	probe, err := s.probeMerchantKeyConnectivity(ctx, apiKey, baseURL, authToken, resolvedMode)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -637,9 +655,18 @@ func (s *HealthChecker) resolveLitellmEndpoint(ctx context.Context, apiKey *mode
 		}
 	}
 
-	litellmURL := os.Getenv("LLM_GATEWAY_LITELLM_URL")
+	region := apiKey.Region
+	if region == "" {
+		region = regionDomestic
+	}
+	litellmURL := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL"))
+	if region == regionOverseas {
+		if overseas := strings.TrimSpace(os.Getenv("LLM_GATEWAY_LITELLM_URL_OVERSEAS")); overseas != "" {
+			litellmURL = overseas
+		}
+	}
 	if litellmURL != "" {
-		return litellmURL + "/v1", nil
+		return strings.TrimRight(litellmURL, "/") + "/v1", nil
 	}
 
 	return "", fmt.Errorf("LiteLLM endpoint not configured")
