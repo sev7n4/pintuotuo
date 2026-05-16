@@ -97,12 +97,24 @@ jobs:
             docker ps -a
             exit 1
           fi
-          sleep 8
-          HEALTH_CODE=\$(curl -s -o /dev/null -w '%{http_code}' \
-            -H "Authorization: Bearer ${{ secrets.LITELLM_MASTER_KEY }}" \
-            http://127.0.0.1:4000/health || echo "000")
-          echo "LiteLLM /health HTTP status: \${HEALTH_CODE}"
+          set -a
+          # shellcheck disable=SC1091
+          source .env
+          set +a
+          HEALTH_CODE=""
+          for attempt in \$(seq 1 30); do
+            HEALTH_CODE=\$(curl -s -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer \${LITELLM_MASTER_KEY}" \
+              http://127.0.0.1:4000/health 2>/dev/null || true)
+            if [ "\${HEALTH_CODE}" = "200" ]; then
+              echo "LiteLLM /health HTTP status: 200 (attempt \${attempt})"
+              break
+            fi
+            echo "attempt \${attempt}: /health status=\${HEALTH_CODE:-curl_failed}, retry in 2s..."
+            sleep 2
+          done
           if [ "\${HEALTH_CODE}" != "200" ]; then
+            echo "ERROR: LiteLLM /health did not return 200 after 60s"
             docker logs --tail 80 pintuotuo-litellm-overseas || true
             exit 1
           fi
