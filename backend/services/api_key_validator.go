@@ -703,8 +703,8 @@ func selectProbeModel(provider string, models []string, userSelected string) str
 	if userSelected != "" {
 		return userSelected
 	}
-	if len(models) > 0 {
-		return models[0]
+	if picked := pickProbeModelFromCatalog(provider, models); picked != "" {
+		return picked
 	}
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case modelProviderZhipu:
@@ -721,6 +721,8 @@ func selectProbeModel(provider string, models []string, userSelected string) str
 		return "qwen-plus"
 	case modelProviderGoogle:
 		return "gemini-2.0-flash"
+	case "openrouter":
+		return "openrouter/google/gemini-2.0-flash-001"
 	default:
 		return ""
 	}
@@ -1242,6 +1244,9 @@ func (v *APIKeyValidator) resolveLitellmModelNameFromDB(provider, model string) 
 	}
 
 	template = strings.TrimSpace(template)
+	if template == "" && strings.EqualFold(strings.TrimSpace(provider), "openrouter") {
+		template = "openrouter/{model_id}"
+	}
 	if template == "" {
 		return "", fmt.Errorf("provider %s has no litellm_model_template configured", provider)
 	}
@@ -1282,18 +1287,25 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 		return false, "QUOTA_PROBE_UPSTREAM_URL_MISSING", "upstream base URL not configured"
 	}
 
-	litellmModel, err := v.resolveLitellmModelNameFromDB(provider, model)
-	if err != nil {
-		litellmModel, err = resolveLitellmModelName(provider, model)
+	catalogModel := strings.TrimSpace(model)
+	var litellmModel string
+	if strings.EqualFold(strings.TrimSpace(provider), "openrouter") {
+		litellmModel = formatLitellmModelForOpenRouter(catalogModel)
+	} else {
+		var err error
+		litellmModel, err = v.resolveLitellmModelNameFromDB(provider, catalogModel)
 		if err != nil {
-			return false, "LITELLM_UNSUPPORTED_PROVIDER", err.Error()
+			litellmModel, err = resolveLitellmModelName(provider, catalogModel)
+			if err != nil {
+				return false, "LITELLM_UNSUPPORTED_PROVIDER", err.Error()
+			}
 		}
 	}
 
 	userConfig := map[string]interface{}{
 		"model_list": []map[string]interface{}{
 			{
-				"model_name": "probe-model",
+				"model_name": catalogModel,
 				"litellm_params": map[string]interface{}{
 					"model":    litellmModel,
 					"api_key":  originalAPIKey,
@@ -1304,7 +1316,7 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 	}
 
 	body := map[string]interface{}{
-		"model":       "probe-model",
+		"model":       catalogModel,
 		"messages":    []map[string]string{{"role": "user", "content": "ping"}},
 		"max_tokens":  1,
 		"user_config": userConfig,

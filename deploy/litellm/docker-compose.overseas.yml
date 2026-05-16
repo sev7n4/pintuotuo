@@ -1,0 +1,24 @@
+# 海外 LiteLLM 单节点（与 docker-compose.prod.yml 中 litellm 服务对齐）
+# 用法：在服务器 /opt/pintuotuo-litellm 目录放置本文件、.env、litellm_proxy_config.yaml 后执行：
+#   docker compose -f docker-compose.overseas.yml up -d
+
+services:
+  litellm:
+    image: litellm/litellm:v1.83.3-stable
+    container_name: pintuotuo-litellm-overseas
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - OTEL_SERVICE_NAME=litellm-proxy-overseas
+    volumes:
+      - ./litellm_proxy_config.yaml:/app/litellm_proxy_config.yaml:ro
+    command:
+      - --config
+      - /app/litellm_proxy_config.yaml
+      - --host
+      - 0.0.0.0
+      - --port
+      - "4000"
+    ports:
+      - "4000:4000"
