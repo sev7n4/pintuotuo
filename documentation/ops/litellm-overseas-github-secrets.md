@@ -96,11 +96,18 @@ sudo mkdir -p /opt/pintuotuo-litellm
 sudo chown "$USER:$USER" /opt/pintuotuo-litellm
 cd /opt/pintuotuo-litellm
 
-# 创建 .env（值与大陆生产 LITELLM_MASTER_KEY 一致）
-cat > .env <<'EOF'
-LITELLM_MASTER_KEY=<与大陆 backend 相同的 master key>
-EOF
+# 方式 A：从仓库示例复制后编辑（占位符须替换）
+# 见 deploy/litellm/.env.example
+cp /path/to/repo/deploy/litellm/.env.example .env
 chmod 600 .env
+vi .env
+
+# 方式 B：从大陆生产同步（推荐，与本机 scripts/bootstrap-overseas-litellm-env.sh 一致）
+# 在大陆机已生成：/root/pintuotuo-overseas-bootstrap/.env
+# 本机执行（会提示输入海外机密码）：
+#   scp -i ~/.ssh/tencent_cloud_deploy root@119.29.173.89:/root/pintuotuo-overseas-bootstrap/.env /tmp/pintuotuo-litellm.env
+#   scp /tmp/pintuotuo-litellm.env ubuntu@43.160.204.9:/tmp/
+#   ssh ubuntu@43.160.204.9 'sudo mkdir -p /opt/pintuotuo-litellm && sudo chown $USER:$USER /opt/pintuotuo-litellm && install -m 600 /tmp/pintuotuo-litellm.env /opt/pintuotuo-litellm/.env'
 ```
 
 ### 4.3 在 GitHub 写入 Environment secrets
