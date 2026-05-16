@@ -4,7 +4,7 @@
 
 services:
   litellm:
-    image: litellm/litellm:v1.83.3-stable
+    image: litellm/litellm:${LITELLM_IMAGE_TAG:-v1.83.3-stable}
     container_name: pintuotuo-litellm-overseas
     restart: unless-stopped
     env_file:

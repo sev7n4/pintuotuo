@@ -1146,7 +1146,7 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	if baseURL == "" {
 		return false, "QUOTA_PROBE_CONFIG_ERROR", "endpoint is empty"
 	}
-	model := selectProbeModel(provider, models, probeModel)
+	model := selectQuotaProbeModel(provider, models, probeModel, routeMode)
 	if model == "" {
 		return false, "QUOTA_PROBE_MODEL_MISSING", "no model available for quota probe"
 	}
@@ -1223,46 +1223,6 @@ func litellmProviderPrefix(provider string) string {
 	}
 }
 
-func (v *APIKeyValidator) resolveLitellmModelNameFromDB(provider, model string) (string, error) {
-	cached, err := ResolveLitellmModelFromCache(provider, model)
-	if err == nil {
-		return cached, nil
-	}
-
-	db := v.ensureDB()
-	if db == nil {
-		return "", fmt.Errorf("database not available")
-	}
-
-	var template string
-	err = db.QueryRow(
-		"SELECT COALESCE(litellm_model_template, '') FROM model_providers WHERE code = $1 AND status = 'active'",
-		strings.TrimSpace(provider),
-	).Scan(&template)
-	if err != nil {
-		return "", fmt.Errorf("provider %s not found: %w", provider, err)
-	}
-
-	template = strings.TrimSpace(template)
-	if template == "" && strings.EqualFold(strings.TrimSpace(provider), modelProviderOpenRouter) {
-		template = "openrouter/{model_id}"
-	}
-	if template == "" {
-		return "", fmt.Errorf("provider %s has no litellm_model_template configured", provider)
-	}
-
-	modelName := model
-	if idx := strings.LastIndex(model, "/"); idx >= 0 {
-		modelName = model[idx+1:]
-	}
-
-	if strings.Contains(template, "{model_id}") {
-		return strings.ReplaceAll(template, "{model_id}", modelName), nil
-	}
-
-	return template + "/" + modelName, nil
-}
-
 func resolveLitellmModelName(provider, model string) (string, error) {
 	prefix := litellmProviderPrefix(provider)
 	if prefix == "" {
@@ -1276,44 +1236,21 @@ func resolveLitellmModelName(provider, model string) (string, error) {
 	return prefix + "/" + modelName, nil
 }
 
-func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider, model, originalAPIKey, litellmMasterKey string) (bool, string, string) {
-	providerConfig, err := v.getProviderConfig(provider)
-	if err != nil {
-		return false, "QUOTA_PROBE_PROVIDER_CONFIG_ERROR", fmt.Sprintf("failed to get provider config: %v", err)
+func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider, catalogModel, originalAPIKey, litellmMasterKey string) (bool, string, string) {
+	upstreamBaseURL := ResolveLitellmUpstreamBaseURL(provider)
+	if upstreamBaseURL == "" {
+		providerConfig, err := v.getProviderConfig(provider)
+		if err != nil {
+			return false, "QUOTA_PROBE_PROVIDER_CONFIG_ERROR", fmt.Sprintf("failed to get provider config: %v", err)
+		}
+		upstreamBaseURL = strings.TrimRight(providerConfig["api_base_url"], "/")
 	}
-
-	upstreamBaseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
 	if upstreamBaseURL == "" {
 		return false, "QUOTA_PROBE_UPSTREAM_URL_MISSING", "upstream base URL not configured"
 	}
 
-	catalogModel := strings.TrimSpace(model)
-	var litellmModel string
-	if strings.EqualFold(strings.TrimSpace(provider), modelProviderOpenRouter) {
-		litellmModel = formatLitellmModelForOpenRouter(catalogModel)
-	} else {
-		var resolveErr error
-		litellmModel, resolveErr = v.resolveLitellmModelNameFromDB(provider, catalogModel)
-		if resolveErr != nil {
-			litellmModel, resolveErr = resolveLitellmModelName(provider, catalogModel)
-			if resolveErr != nil {
-				return false, "LITELLM_UNSUPPORTED_PROVIDER", resolveErr.Error()
-			}
-		}
-	}
-
-	userConfig := map[string]interface{}{
-		"model_list": []map[string]interface{}{
-			{
-				"model_name": catalogModel,
-				"litellm_params": map[string]interface{}{
-					"model":    litellmModel,
-					"api_key":  originalAPIKey,
-					"api_base": upstreamBaseURL,
-				},
-			},
-		},
-	}
+	catalogModel = strings.TrimSpace(catalogModel)
+	userConfig := BuildLitellmUserConfig(provider, catalogModel, originalAPIKey, upstreamBaseURL)
 
 	body := map[string]interface{}{
 		"model":       catalogModel,

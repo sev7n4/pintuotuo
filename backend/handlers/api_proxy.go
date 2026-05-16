@@ -1338,33 +1338,7 @@ func resolveAuthTokenFromRouteMode(routeMode string, fallbackToken string) strin
 }
 
 func buildLitellmUserConfig(provider, model, decryptedKey, upstreamBaseURL string) map[string]interface{} {
-	litellmModel, err := services.ResolveLitellmModelFromCache(provider, model)
-	if err != nil || litellmModel == "" {
-		modelName := model
-		if idx := strings.LastIndex(model, "/"); idx >= 0 {
-			modelName = model[idx+1:]
-		}
-		litellmModel = modelName
-	}
-
-	params := map[string]interface{}{
-		"model": litellmModel,
-	}
-	if decryptedKey != "" {
-		params["api_key"] = decryptedKey
-	}
-	if upstreamBaseURL != "" {
-		params["api_base"] = upstreamBaseURL
-	}
-
-	return map[string]interface{}{
-		"model_list": []map[string]interface{}{
-			{
-				"model_name":     model,
-				"litellm_params": params,
-			},
-		},
-	}
+	return services.BuildLitellmUserConfig(provider, model, decryptedKey, upstreamBaseURL)
 }
 
 // mapLLMProxyHTTPStatusForClient 将 LiteLLM/上游鉴权类错误映射为 502，避免前端误当作平台 JWT 失效（与 api.ts 对 /openai/、/proxy/ 豁免互补）。

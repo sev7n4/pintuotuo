@@ -1,0 +1,109 @@
+# 新加坡海外 LiteLLM 节点（与大陆 deploy-litellm / docker-compose.prod 解耦）
+# 服务器需预先存在：项目目录、.env（含 LITELLM_MASTER_KEY，勿提交仓库）
+#
+# GitHub Secrets（production environment）:
+#   TENCENT_CLOUD_OVERSEAS_SSH_KEY   — SSH 私钥
+#   TENCENT_CLOUD_OVERSEAS_USER      — 如 ubuntu
+#   TENCENT_CLOUD_OVERSEAS_IP        — 如 43.160.204.9
+#   TENCENT_CLOUD_OVERSEAS_LITELLM_DIR — 如 /opt/pintuotuo-litellm
+#   LITELLM_MASTER_KEY               — 健康检查 Bearer（与 backend LLM_GATEWAY 一致）
+
+name: Deploy LiteLLM Overseas
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy (config files from repo)'
+        required: true
+        default: 'main'
+      litellm_image_tag:
+        description: 'LiteLLM Docker image tag'
+        required: true
+        default: 'v1.83.3-stable'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/litellm/**'
+      - '.github/workflows/deploy-litellm-overseas.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-litellm-overseas:
+    name: Deploy LiteLLM (Overseas)
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+
+      - name: Deploy LiteLLM to overseas host
+        env:
+          OVERSEAS_DIR: ${{ secrets.TENCENT_CLOUD_OVERSEAS_LITELLM_DIR }}
+          IMAGE_TAG: ${{ github.event.inputs.litellm_image_tag || 'v1.83.3-stable' }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "${{ secrets.TENCENT_CLOUD_OVERSEAS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          HOST="${{ secrets.TENCENT_CLOUD_OVERSEAS_USER }}@${{ secrets.TENCENT_CLOUD_OVERSEAS_IP }}"
+
+          echo "Syncing LiteLLM SSOT config to ${OVERSEAS_DIR} ..."
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$HOST" "mkdir -p '${OVERSEAS_DIR}'"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key \
+            deploy/litellm/litellm_proxy_config.yaml \
+            deploy/litellm/provider_gateway_map.json \
+            deploy/litellm/docker-compose.overseas.yml \
+            "$HOST:${OVERSEAS_DIR}/"
+
+          ssh -o StrictHostKeyChecking=no \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=60 \
+            -i ~/.ssh/deploy_key "$HOST" << EOF
+          set -euo pipefail
+          cd '${OVERSEAS_DIR}'
+          if [ ! -f .env ]; then
+            echo "ERROR: ${OVERSEAS_DIR}/.env missing on server (create with LITELLM_MASTER_KEY before first deploy)"
+            exit 1
+          fi
+          export LITELLM_IMAGE_TAG='${IMAGE_TAG}'
+          echo "Pulling litellm/litellm:\${LITELLM_IMAGE_TAG} ..."
+          docker pull "litellm/litellm:\${LITELLM_IMAGE_TAG}"
+          docker compose -f docker-compose.overseas.yml pull || true
+          docker compose -f docker-compose.overseas.yml up -d
+          echo "Verifying container pintuotuo-litellm-overseas ..."
+          if ! docker ps --format '{{.Names}}' | grep -q '^pintuotuo-litellm-overseas$'; then
+            echo "ERROR: pintuotuo-litellm-overseas not running"
+            docker ps -a
+            exit 1
+          fi
+          sleep 8
+          HEALTH_CODE=\$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${{ secrets.LITELLM_MASTER_KEY }}" \
+            http://127.0.0.1:4000/health || echo "000")
+          echo "LiteLLM /health HTTP status: \${HEALTH_CODE}"
+          if [ "\${HEALTH_CODE}" != "200" ]; then
+            docker logs --tail 80 pintuotuo-litellm-overseas || true
+            exit 1
+          fi
+          echo 'Overseas LiteLLM deployment completed successfully'
+          EOF
+
+          rm -f ~/.ssh/deploy_key
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "## LiteLLM Overseas Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Host | ${{ secrets.TENCENT_CLOUD_OVERSEAS_IP }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Directory | ${{ secrets.TENCENT_CLOUD_OVERSEAS_LITELLM_DIR }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image tag | ${{ github.event.inputs.litellm_image_tag || 'v1.83.3-stable' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Trigger | ${{ github.event_name }} |" >> "$GITHUB_STEP_SUMMARY"
