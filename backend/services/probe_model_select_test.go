@@ -27,6 +27,33 @@ func TestSelectProbeModel_IgnoresForeignCatalogEntry(t *testing.T) {
 	}
 }
 
+func TestSelectQuotaProbeModel_LitellmIgnoresGatewayCatalog(t *testing.T) {
+	gatewayModels := []string{"*", "openai/*", "anthropic/claude-3-7-sonnet-20250219", "openai/dall-e-2"}
+	got := selectQuotaProbeModel("openai", gatewayModels, "", GatewayModeLitellm)
+	if got != "gpt-4o" {
+		t.Fatalf("openai litellm quota probe: got %q want gpt-4o from predefined SSOT", got)
+	}
+	got = selectQuotaProbeModel("google", gatewayModels, "", GatewayModeLitellm)
+	if got != "gemini-2.0-flash" {
+		t.Fatalf("google litellm quota probe: got %q", got)
+	}
+}
+
+func TestBuildLitellmUserConfig_MatchesTemplateSSOT(t *testing.T) {
+	SetLitellmCacheForTest(map[string]LitellmTemplateEntry{
+		"google": {Template: "gemini/{model_id}", ProviderAPIBaseURL: "https://generativelanguage.googleapis.com/v1beta/openai/v1"},
+	})
+	uc := BuildLitellmUserConfig("google", "gemini-2.0-flash", "sk-byok", "https://generativelanguage.googleapis.com/v1beta/openai/v1")
+	ml := uc["model_list"].([]map[string]interface{})[0]
+	if ml["model_name"] != "gemini-2.0-flash" {
+		t.Fatalf("model_name %v", ml["model_name"])
+	}
+	params := ml["litellm_params"].(map[string]interface{})
+	if params["model"] != "gemini/gemini-2.0-flash" {
+		t.Fatalf("litellm model %v", params["model"])
+	}
+}
+
 func TestFormatLitellmModelForOpenRouter(t *testing.T) {
 	if got := formatLitellmModelForOpenRouter("anthropic/claude-3.5-sonnet"); got != "openrouter/anthropic/claude-3.5-sonnet" {
 		t.Fatalf("got %q", got)

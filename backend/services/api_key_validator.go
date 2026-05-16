@@ -1146,7 +1146,7 @@ func (v *APIKeyValidator) probeQuotaWithEndpoint(endpoint, provider, apiKey stri
 	if baseURL == "" {
 		return false, "QUOTA_PROBE_CONFIG_ERROR", "endpoint is empty"
 	}
-	model := selectProbeModel(provider, models, probeModel)
+	model := selectQuotaProbeModel(provider, models, probeModel, routeMode)
 	if model == "" {
 		return false, "QUOTA_PROBE_MODEL_MISSING", "no model available for quota probe"
 	}
@@ -1276,44 +1276,21 @@ func resolveLitellmModelName(provider, model string) (string, error) {
 	return prefix + "/" + modelName, nil
 }
 
-func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider, model, originalAPIKey, litellmMasterKey string) (bool, string, string) {
-	providerConfig, err := v.getProviderConfig(provider)
-	if err != nil {
-		return false, "QUOTA_PROBE_PROVIDER_CONFIG_ERROR", fmt.Sprintf("failed to get provider config: %v", err)
+func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider, catalogModel, originalAPIKey, litellmMasterKey string) (bool, string, string) {
+	upstreamBaseURL := ResolveLitellmUpstreamBaseURL(provider)
+	if upstreamBaseURL == "" {
+		providerConfig, err := v.getProviderConfig(provider)
+		if err != nil {
+			return false, "QUOTA_PROBE_PROVIDER_CONFIG_ERROR", fmt.Sprintf("failed to get provider config: %v", err)
+		}
+		upstreamBaseURL = strings.TrimRight(providerConfig["api_base_url"], "/")
 	}
-
-	upstreamBaseURL := strings.TrimRight(providerConfig["api_base_url"], "/")
 	if upstreamBaseURL == "" {
 		return false, "QUOTA_PROBE_UPSTREAM_URL_MISSING", "upstream base URL not configured"
 	}
 
-	catalogModel := strings.TrimSpace(model)
-	var litellmModel string
-	if strings.EqualFold(strings.TrimSpace(provider), modelProviderOpenRouter) {
-		litellmModel = formatLitellmModelForOpenRouter(catalogModel)
-	} else {
-		var resolveErr error
-		litellmModel, resolveErr = v.resolveLitellmModelNameFromDB(provider, catalogModel)
-		if resolveErr != nil {
-			litellmModel, resolveErr = resolveLitellmModelName(provider, catalogModel)
-			if resolveErr != nil {
-				return false, "LITELLM_UNSUPPORTED_PROVIDER", resolveErr.Error()
-			}
-		}
-	}
-
-	userConfig := map[string]interface{}{
-		"model_list": []map[string]interface{}{
-			{
-				"model_name": catalogModel,
-				"litellm_params": map[string]interface{}{
-					"model":    litellmModel,
-					"api_key":  originalAPIKey,
-					"api_base": upstreamBaseURL,
-				},
-			},
-		},
-	}
+	catalogModel = strings.TrimSpace(catalogModel)
+	userConfig := BuildLitellmUserConfig(provider, catalogModel, originalAPIKey, upstreamBaseURL)
 
 	body := map[string]interface{}{
 		"model":       catalogModel,
