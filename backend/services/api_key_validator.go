@@ -717,11 +717,11 @@ func selectProbeModel(provider string, models []string, userSelected string) str
 		return "deepseek-chat"
 	case modelProviderAlibaba:
 		return "qwen-turbo"
-	case "alibaba_anthropic":
+	case modelProviderAlibabaAnthropic:
 		return "qwen-plus"
 	case modelProviderGoogle:
 		return "gemini-2.0-flash"
-	case "openrouter":
+	case modelProviderOpenRouter:
 		return "openrouter/google/gemini-2.0-flash-001"
 	default:
 		return ""
@@ -1204,7 +1204,7 @@ func litellmProviderPrefix(provider string) string {
 		return modelProviderAnthropic
 	case modelProviderDeepseek:
 		return modelProviderDeepseek
-	case modelProviderAlibaba, "alibaba_anthropic":
+	case modelProviderAlibaba, modelProviderAlibabaAnthropic:
 		return "dashscope"
 	case modelProviderZhipu:
 		return "zai"
@@ -1244,7 +1244,7 @@ func (v *APIKeyValidator) resolveLitellmModelNameFromDB(provider, model string) 
 	}
 
 	template = strings.TrimSpace(template)
-	if template == "" && strings.EqualFold(strings.TrimSpace(provider), "openrouter") {
+	if template == "" && strings.EqualFold(strings.TrimSpace(provider), modelProviderOpenRouter) {
 		template = "openrouter/{model_id}"
 	}
 	if template == "" {
@@ -1289,15 +1289,15 @@ func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider,
 
 	catalogModel := strings.TrimSpace(model)
 	var litellmModel string
-	if strings.EqualFold(strings.TrimSpace(provider), "openrouter") {
+	if strings.EqualFold(strings.TrimSpace(provider), modelProviderOpenRouter) {
 		litellmModel = formatLitellmModelForOpenRouter(catalogModel)
 	} else {
-		var err error
-		litellmModel, err = v.resolveLitellmModelNameFromDB(provider, catalogModel)
-		if err != nil {
-			litellmModel, err = resolveLitellmModelName(provider, catalogModel)
-			if err != nil {
-				return false, "LITELLM_UNSUPPORTED_PROVIDER", err.Error()
+		var resolveErr error
+		litellmModel, resolveErr = v.resolveLitellmModelNameFromDB(provider, catalogModel)
+		if resolveErr != nil {
+			litellmModel, resolveErr = resolveLitellmModelName(provider, catalogModel)
+			if resolveErr != nil {
+				return false, "LITELLM_UNSUPPORTED_PROVIDER", resolveErr.Error()
 			}
 		}
 	}

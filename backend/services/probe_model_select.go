@@ -34,10 +34,10 @@ func modelMatchesProviderProbe(provider, modelLower string) bool {
 		return strings.HasPrefix(modelLower, "gemini") ||
 			strings.HasPrefix(modelLower, "gemini/") ||
 			strings.HasPrefix(modelLower, "google/")
-	case modelProviderAnthropic, "alibaba_anthropic":
+	case modelProviderAnthropic, modelProviderAlibabaAnthropic:
 		return strings.Contains(modelLower, "claude") ||
 			strings.HasPrefix(modelLower, "anthropic/")
-	case "openrouter":
+	case modelProviderOpenRouter:
 		if strings.HasPrefix(modelLower, "openrouter/") {
 			return true
 		}
