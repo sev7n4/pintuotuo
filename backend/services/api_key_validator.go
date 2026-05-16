@@ -839,14 +839,11 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		apiFmt = strings.ToLower(strings.TrimSpace(providerConfig["api_format"]))
 	}
 
-	siblingOpenAIBase := v.siblingOpenAIBaseForProvider(provider)
-	probeClient := newProxyAwareHTTPClient(10*time.Second, probeRouteMode)
-
 	var probe *ProbeModelsResult
 	var probeErr error
 	var connectionFailed bool
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = ProbeProviderConnectivity(ctx, probeClient, connectivityBase, modelsAuthToken, provider, apiFmt, siblingOpenAIBase)
+		probe, probeErr = hc.probeMerchantKeyConnectivity(ctx, synthKey, connectivityBase, modelsAuthToken, probeRouteMode)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break
@@ -938,7 +935,10 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 			if probeSupported {
 				var quotaOK bool
 				var quotaCode, quotaMsg string
-				if ProviderUsesAnthropicHTTP(provider, apiFmt) {
+				if routeMode == GatewayModeLitellm {
+					quotaOK, quotaCode, quotaMsg = v.probeQuotaWithEndpoint(endpoint, provider, authToken, result.ModelsFound, routeMode, decryptedKey, probeModel)
+				} else if ProviderUsesAnthropicHTTP(provider, apiFmt) {
+					probeClient := newProxyAwareHTTPClient(15*time.Second, probeRouteMode)
 					model := selectProbeModel(provider, result.ModelsFound, probeModel)
 					quotaOK, quotaCode, quotaMsg = ProbeAnthropicMessagesQuota(ctx, probeClient, connectivityBase, modelsAuthToken, provider, model)
 				} else {
