@@ -68,22 +68,24 @@ environment: production
 
 ### 4.1 海外机准备 SSH（一次性）
 
-在**能登录海外机的终端**执行（示例用户 `ubuntu`）：
+**推荐（本机 Mac，会弹出密码框一次）**：
 
 ```bash
-# 本机生成专用密钥（若无）
-ssh-keygen -t ed25519 -f ~/.ssh/pintuotuo_overseas_deploy -N "" -C "github-actions-litellm-overseas"
-
-# 将公钥写入海外机（按实际 IP/用户替换）
-ssh-copy-id -i ~/.ssh/pintuotuo_overseas_deploy.pub ubuntu@43.160.204.9
-
-# 验证免密登录
-ssh -i ~/.ssh/pintuotuo_overseas_deploy ubuntu@43.160.204.9 'whoami && docker --version'
+./scripts/install-overseas-deploy-pubkey.sh
 ```
 
-将 **`~/.ssh/pintuotuo_overseas_deploy` 私钥完整内容**（含首尾行）粘贴到 GitHub Secret `TENCENT_CLOUD_OVERSEAS_SSH_KEY`。
+脚本会生成（若不存在）`~/.ssh/pintuotuo_overseas_deploy`，把公钥写入 `ubuntu@43.160.204.9:~/.ssh/authorized_keys`，并验证免密登录。
 
-> 若海外机此前仅密码登录，必须先完成上述公钥部署，否则 CI 无法 SSH。
+**或手动**：
+
+```bash
+ssh-copy-id -i ~/.ssh/pintuotuo_overseas_deploy.pub ubuntu@43.160.204.9
+ssh -i ~/.ssh/pintuotuo_overseas_deploy ubuntu@43.160.204.9 'whoami'
+```
+
+将 **`~/.ssh/pintuotuo_overseas_deploy` 私钥完整内容**（含首尾行）粘贴到 GitHub Secret `TENCENT_CLOUD_OVERSEAS_SSH_KEY`（勿发到聊天/工单）。
+
+公钥指纹注释：`github-actions-litellm-overseas`
 
 ### 4.2 海外机准备部署目录与 `.env`（一次性）
 

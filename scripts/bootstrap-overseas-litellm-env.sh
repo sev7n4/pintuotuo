@@ -16,6 +16,7 @@ DOMESTIC_SSH="${DOMESTIC_SSH:-root@119.29.173.89}"
 DOMESTIC_KEY="${DOMESTIC_KEY:-$HOME/.ssh/tencent_cloud_deploy}"
 OVERSEAS_SSH="${OVERSEAS_SSH:-ubuntu@43.160.204.9}"
 OVERSEAS_DIR="${OVERSEAS_DIR:-/opt/pintuotuo-litellm}"
+OVERSEAS_KEY="${OVERSEAS_KEY:-$HOME/.ssh/pintuotuo_overseas_deploy}"
 BOOT_DIR="/root/pintuotuo-overseas-bootstrap"
 
 ssh_domestic() {
@@ -59,8 +60,8 @@ install_on_overseas() {
     "${DOMESTIC_SSH}:${BOOT_DIR}/.env" \
     "${DOMESTIC_SSH}:${BOOT_DIR}/install-on-overseas.sh" \
     "$tmp/"
-  scp -o StrictHostKeyChecking=no "$tmp/.env" "$tmp/install-on-overseas.sh" "${OVERSEAS_SSH}:/tmp/"
-  ssh -o StrictHostKeyChecking=no "$OVERSEAS_SSH" "cd /tmp && OVERSEAS_DIR=${OVERSEAS_DIR} bash ./install-on-overseas.sh"
+  scp -o StrictHostKeyChecking=no -i "$OVERSEAS_KEY" "$tmp/.env" "$tmp/install-on-overseas.sh" "${OVERSEAS_SSH}:/tmp/"
+  ssh -o StrictHostKeyChecking=no -i "$OVERSEAS_KEY" "$OVERSEAS_SSH" "cd /tmp && OVERSEAS_DIR=${OVERSEAS_DIR} bash ./install-on-overseas.sh"
 }
 
 case "${1:-}" in
@@ -74,7 +75,7 @@ case "${1:-}" in
     ;;
   *)
     prepare_on_domestic
-    if ssh -o StrictHostKeyChecking=no -o BatchMode=yes "$OVERSEAS_SSH" true 2>/dev/null; then
+    if ssh -o StrictHostKeyChecking=no -o BatchMode=yes -i "$OVERSEAS_KEY" "$OVERSEAS_SSH" true 2>/dev/null; then
       install_on_overseas
     else
       echo "Overseas SSH not available in BatchMode. Prepared on domestic: ${BOOT_DIR}"
