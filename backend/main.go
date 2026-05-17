@@ -97,6 +97,9 @@ func main() {
 	services.GetHealthScheduler().Start()
 	defer services.GetHealthScheduler().Stop()
 
+	services.GetProviderModelSyncScheduler().Start()
+	defer services.GetProviderModelSyncScheduler().Stop()
+
 	shutdownTracing, err := tracing.Init(context.Background())
 	if err != nil {
 		log.Fatalf("Failed to init tracing: %v", err)

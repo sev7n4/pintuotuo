@@ -26,6 +26,7 @@ import {
   GlobalOutlined,
   SyncOutlined,
   ApiOutlined,
+  DiffOutlined,
 } from '@ant-design/icons';
 import { skuService } from '@/services/sku';
 import { routeConfigService } from '@/services/routeConfig';
@@ -53,6 +54,16 @@ const AdminModelProviders = () => {
   const [apiKeyListLoading, setApiKeyListLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [selectedAPIKeyID, setSelectedAPIKeyID] = useState<number | undefined>(undefined);
+
+  const [gapModalVisible, setGapModalVisible] = useState(false);
+  const [gapProvider, setGapProvider] = useState<ModelProvider | null>(null);
+  const [gapLoading, setGapLoading] = useState(false);
+  const [gapData, setGapData] = useState<
+    Awaited<ReturnType<typeof skuService.getProviderCatalogGaps>>['data'] | null
+  >(null);
+  const [selectedPendingModels, setSelectedPendingModels] = useState<string[]>([]);
+  const [creatingDrafts, setCreatingDrafts] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const fetchList = async () => {
     setLoading(true);
@@ -216,11 +227,67 @@ const AdminModelProviders = () => {
       const response = await skuService.syncProviderModels(syncingProvider.code, selectedAPIKeyID);
       message.success(`同步成功，共同步 ${response.data.synced_count} 个模型`);
       setSyncModalVisible(false);
+      const provider = syncingProvider;
       setSyncingProvider(null);
+      if (provider) {
+        await handleOpenCatalogGapModal(provider);
+      }
     } catch (error) {
       message.error(error instanceof Error ? error.message : '同步失败');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleOpenCatalogGapModal = async (record: ModelProvider) => {
+    setGapProvider(record);
+    setGapModalVisible(true);
+    setGapLoading(true);
+    setSelectedPendingModels([]);
+    try {
+      const response = await skuService.getProviderCatalogGaps(record.code);
+      setGapData(response.data);
+      setSelectedPendingModels(
+        (response.data.pending_onboard || []).map((m) => m.model_id).slice(0, 20)
+      );
+    } catch {
+      message.error('获取目录差异失败');
+      setGapData(null);
+    } finally {
+      setGapLoading(false);
+    }
+  };
+
+  const handleCreateSPUDrafts = async () => {
+    if (!gapProvider || selectedPendingModels.length === 0) {
+      message.warning('请选择待上架模型');
+      return;
+    }
+    setCreatingDrafts(true);
+    try {
+      const res = await skuService.createProviderSPUDrafts(gapProvider.code, selectedPendingModels);
+      const created = (res.data.results || []).filter((r) => r.spu_id).length;
+      message.success(`已创建 ${created} 个 SPU 草稿（inactive）`);
+      await handleOpenCatalogGapModal(gapProvider);
+    } catch {
+      message.error('创建 SPU 草稿失败');
+    } finally {
+      setCreatingDrafts(false);
+    }
+  };
+
+  const handleSyncAllProviders = async () => {
+    setSyncingAll(true);
+    try {
+      const res = await skuService.syncAllProviderModels();
+      const results = res.data.results || {};
+      const ok = Object.values(results).filter((n) => n >= 0).length;
+      message.success(`全量同步完成：${ok} 个厂商成功`);
+      await fetchList();
+    } catch {
+      message.error('全量同步失败');
+    } finally {
+      setSyncingAll(false);
     }
   };
 
@@ -307,10 +374,10 @@ const AdminModelProviders = () => {
     {
       title: '操作',
       key: 'action',
-      width: 160,
+      width: 220,
       fixed: 'right' as const,
       render: (_: unknown, record: ModelProvider) => (
-        <Space size="small">
+        <Space size="small" wrap>
           <Button
             type="link"
             size="small"
@@ -320,14 +387,24 @@ const AdminModelProviders = () => {
             编辑
           </Button>
           {record.code !== fallbackCode && (
-            <Button
-              type="link"
-              size="small"
-              icon={<SyncOutlined />}
-              onClick={() => handleOpenSyncModal(record)}
-            >
-              同步模型
-            </Button>
+            <>
+              <Button
+                type="link"
+                size="small"
+                icon={<SyncOutlined />}
+                onClick={() => handleOpenSyncModal(record)}
+              >
+                同步模型
+              </Button>
+              <Button
+                type="link"
+                size="small"
+                icon={<DiffOutlined />}
+                onClick={() => handleOpenCatalogGapModal(record)}
+              >
+                目录差异
+              </Button>
+            </>
           )}
         </Space>
       ),
@@ -704,6 +781,9 @@ const AdminModelProviders = () => {
             <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
               新增厂商
             </Button>
+            <Button loading={syncingAll} icon={<SyncOutlined />} onClick={handleSyncAllProviders}>
+              全量同步模型
+            </Button>
             <Button onClick={() => fetchList()}>刷新</Button>
           </Space>
         }
@@ -713,7 +793,7 @@ const AdminModelProviders = () => {
           showIcon
           style={{ marginBottom: 12 }}
           message="统一厂商配置"
-          description="在此页面可配置厂商基础信息、路由策略和端点地址。系统会根据商户类型和区域自动选择最优路由模式（直连/LiteLLM/代理）。"
+          description="在此页面可配置厂商基础信息、路由策略和端点地址。同步模型后可用「目录差异」对比厂商列表与 SPU，一键生成 inactive 草稿 SPU。定时任务需设置环境变量 PROVIDER_MODEL_SYNC_ENABLED=true。"
         />
         <Table
           rowKey="id"
@@ -833,6 +913,85 @@ const AdminModelProviders = () => {
             </Form.Item>
           </Form>
         )}
+      </Modal>
+
+      <Modal
+        title={gapProvider ? `目录差异：${gapProvider.name}` : '目录差异'}
+        open={gapModalVisible}
+        onCancel={() => {
+          setGapModalVisible(false);
+          setGapProvider(null);
+          setGapData(null);
+        }}
+        width={720}
+        footer={[
+          <Button key="close" onClick={() => setGapModalVisible(false)}>
+            关闭
+          </Button>,
+          <Button
+            key="draft"
+            type="primary"
+            loading={creatingDrafts}
+            disabled={selectedPendingModels.length === 0}
+            onClick={handleCreateSPUDrafts}
+          >
+            生成 SPU 草稿
+          </Button>,
+        ]}
+      >
+        {gapLoading ? (
+          <div style={{ textAlign: 'center', padding: 24 }}>
+            <Spin />
+          </div>
+        ) : gapData ? (
+          <>
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={`厂商快照 ${gapData.provider_model_count} 个 · 目录 SPU ${gapData.spu_model_count} 个`}
+              description={
+                gapData.last_synced_at
+                  ? `最近同步：${new Date(gapData.last_synced_at).toLocaleString()}`
+                  : '尚未同步厂商模型，请先「同步模型」'
+              }
+            />
+            {(gapData.stale_spus?.length ?? 0) > 0 && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`${gapData.stale_spus.length} 个在售 SPU 已不在厂商最新列表中`}
+                description={
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {gapData.stale_spus.slice(0, 8).map((s) => (
+                      <li key={s.spu_id}>
+                        {s.spu_code} · {s.model_id}
+                        {s.active_sku_count > 0 ? `（${s.active_sku_count} 个在售 SKU）` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                }
+              />
+            )}
+            <div style={{ marginBottom: 8, fontWeight: 500 }}>待上架（厂商有、SPU 无）</div>
+            {(gapData.pending_onboard?.length ?? 0) === 0 ? (
+              <Alert type="success" message="无待上架模型" showIcon />
+            ) : (
+              <Select
+                mode="multiple"
+                style={{ width: '100%' }}
+                placeholder="选择要生成草稿的模型"
+                value={selectedPendingModels}
+                onChange={setSelectedPendingModels}
+                options={(gapData.pending_onboard || []).map((m) => ({
+                  value: m.model_id,
+                  label: m.display_name ? `${m.model_id} (${m.display_name})` : m.model_id,
+                }))}
+              />
+            )}
+          </>
+        ) : null}
       </Modal>
     </div>
   );

@@ -45,6 +45,10 @@ const AdminSPUs = () => {
     { value: string; label: string }[]
   >([]);
   const [syncingModels, setSyncingModels] = useState(false);
+  const [catalogGapHint, setCatalogGapHint] = useState<{
+    pending: number;
+    stale: number;
+  } | null>(null);
   const [listScope, setListScope] = useState<'active' | 'all'>('active');
   const [filters, setFilters] = useState({
     provider: '',
@@ -105,6 +109,7 @@ const AdminSPUs = () => {
   const fetchProviderModels = async (providerCode: string) => {
     if (!providerCode) {
       setProviderModelOptions([]);
+      setCatalogGapHint(null);
       return;
     }
     try {
@@ -113,6 +118,15 @@ const AdminSPUs = () => {
       setProviderModelOptions(models.map((m) => ({ value: m.model_id, label: m.model_id })));
     } catch {
       setProviderModelOptions([]);
+    }
+    try {
+      const gapRes = await skuService.getProviderCatalogGaps(providerCode);
+      setCatalogGapHint({
+        pending: gapRes.data.pending_onboard?.length ?? 0,
+        stale: gapRes.data.stale_spus?.length ?? 0,
+      });
+    } catch {
+      setCatalogGapHint(null);
     }
   };
 
@@ -155,6 +169,7 @@ const AdminSPUs = () => {
     setEditingSPU(null);
     form.resetFields();
     setProviderModelOptions([]);
+    setCatalogGapHint(null);
     const timestamp = Date.now().toString(36).toUpperCase().slice(-6);
     form.setFieldsValue({
       spu_code: `SPU-${timestamp}`,
@@ -546,6 +561,30 @@ const AdminSPUs = () => {
         width={700}
       >
         <Form form={form} layout="vertical">
+          {catalogGapHint && (catalogGapHint.pending > 0 || catalogGapHint.stale > 0) && (
+            <Alert
+              type={catalogGapHint.stale > 0 ? 'warning' : 'info'}
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="厂商目录差异"
+              description={
+                <>
+                  {catalogGapHint.pending > 0 && (
+                    <span>
+                      {catalogGapHint.pending} 个模型已在厂商同步列表中但尚无 SPU，可在 「厂商配置 →
+                      目录差异」一键生成草稿。
+                    </span>
+                  )}
+                  {catalogGapHint.stale > 0 && (
+                    <span>
+                      {catalogGapHint.pending > 0 ? ' ' : ''}
+                      {catalogGapHint.stale} 个在售 SPU 已不在厂商最新列表，请评估是否下架。
+                    </span>
+                  )}
+                </>
+              }
+            />
+          )}
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item

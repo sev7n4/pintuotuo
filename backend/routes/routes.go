@@ -354,6 +354,9 @@ func RegisterAdminRoutes(router *gin.RouterGroup) {
 
 		admin.GET("/provider-models", handlers.ListProviderModels)
 		admin.POST("/model-providers/:code/sync-models", handlers.SyncProviderModels)
+		admin.GET("/model-providers/:code/catalog-gaps", handlers.GetProviderCatalogGap)
+		admin.POST("/model-providers/:code/spu-drafts", handlers.CreateProviderSPUDrafts)
+		admin.POST("/model-providers/sync-all", handlers.SyncAllProviderModels)
 
 		admin.GET("/route-configs/providers", handlers.GetProviderRouteConfigs)
 		admin.GET("/route-configs/providers/:code", handlers.GetProviderRouteConfig)
