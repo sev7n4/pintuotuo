@@ -144,7 +144,7 @@ func normalizeFuelStationConfig(cfg FuelStationConfig) FuelStationConfig {
 	}
 	for i := range cfg.Sections {
 		if cfg.Sections[i].Status == "" {
-			cfg.Sections[i].Status = "active"
+			cfg.Sections[i].Status = routingStrategyStatusActive
 		}
 	}
 	return cfg
