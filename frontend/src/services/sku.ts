@@ -65,6 +65,39 @@ export const skuService = {
       apiKeyID ? { api_key_id: apiKeyID } : {}
     ),
 
+  getProviderCatalogGaps: (providerCode: string) =>
+    api.get<{
+      provider_code: string;
+      last_synced_at?: string;
+      provider_model_count: number;
+      spu_model_count: number;
+      pending_onboard: { model_id: string; display_name?: string }[];
+      stale_spus: {
+        spu_id: number;
+        spu_code: string;
+        name: string;
+        model_id: string;
+        active_sku_count: number;
+      }[];
+    }>(`/admin/model-providers/${providerCode}/catalog-gaps`),
+
+  createProviderSPUDrafts: (providerCode: string, modelIds: string[]) =>
+    api.post<{
+      provider_code: string;
+      results: {
+        model_id: string;
+        spu_id?: number;
+        spu_code?: string;
+        skipped?: boolean;
+        reason?: string;
+      }[];
+    }>(`/admin/model-providers/${providerCode}/spu-drafts`, { model_ids: modelIds }),
+
+  syncAllProviderModels: () =>
+    api.post<{ message: string; results: Record<string, number> }>(
+      '/admin/model-providers/sync-all'
+    ),
+
   getSKUs: (params?: {
     page?: number;
     per_page?: number;
