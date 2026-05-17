@@ -57,13 +57,6 @@ func normalizeCatalogModelID(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
 
-func spuCatalogModelID(providerModelID, modelName string) string {
-	if v := strings.TrimSpace(providerModelID); v != "" {
-		return v
-	}
-	return strings.TrimSpace(modelName)
-}
-
 // CompareProviderCatalog lists models in provider_models not covered by any SPU, and active SPUs missing from latest sync.
 func (s *ProviderCatalogGapService) CompareProviderCatalog(ctx context.Context, providerCode string) (*ProviderCatalogGap, error) {
 	return CompareProviderCatalogDB(ctx, config.GetDB(), providerCode)

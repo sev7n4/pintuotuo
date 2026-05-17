@@ -104,15 +104,6 @@ func TestNormalizeCatalogModelID(t *testing.T) {
 	}
 }
 
-func TestSpuCatalogModelID(t *testing.T) {
-	if spuCatalogModelID("claude-3", "") != "claude-3" {
-		t.Fatal()
-	}
-	if spuCatalogModelID("", "deepseek-chat") != "deepseek-chat" {
-		t.Fatal()
-	}
-}
-
 func TestUniqueDraftSPUCode_Sanitizes(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
