@@ -945,8 +945,8 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 	}
 
 	if !isDeepVerification(verificationType) && result.ConnectionTest {
-		if err := v.persistModelsSupported(apiKeyID, provider, result.ModelsFound); err != nil {
-			logger.LogError(ctx, "api_key_validator", "Failed to persist models_supported after light verification", err, map[string]interface{}{
+		if persistErr := v.persistModelsSupported(apiKeyID, provider, result.ModelsFound); persistErr != nil {
+			logger.LogError(ctx, "api_key_validator", "Failed to persist models_supported after light verification", persistErr, map[string]interface{}{
 				"api_key_id": apiKeyID,
 			})
 		}
