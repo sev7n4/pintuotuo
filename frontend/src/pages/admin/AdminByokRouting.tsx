@@ -68,11 +68,11 @@ const ANTHROPIC_SIBLING_SETUP_DOC =
 
 /** Admin 各处理模型列表时的统一说明（与后端 probe-models / FullVerification 一致） */
 const BYOK_PROBE_MODELS_DESCRIPTION =
-  '与轻量验证、能力探测、深度验证模型选择同源：GET /admin/byok-routing/:id/probe-models。OpenAI 格式拉取 /models；api_format=anthropic 或 provider 以 _anthropic 结尾时走 Messages 探测（与商户端验证相同）。';
+  '与轻量验证、能力探测、深度验证模型列表同源：GET /admin/byok-routing/:id/probe-models（FullVerification）。direct/proxy：BYOK 打厂商 /v1/models；litellm：网关 POST /v1/models + user_config（BYOK），按 provider 过滤，不用 Master Key 拉网关全局目录。Anthropic 格式走 Messages 探测。';
 
 /** 验证结果里「使用端点」与模型目录 probe 路径的区别说明 */
 const BYOK_ENDPOINT_USED_NOTE =
-  '为本次验证连接/配额阶段记录的实际请求端点；与上栏「发现的模型」所用 probe-models 解析路径可能不同（例如 LiteLLM 流量走网关、模型目录走已配置的直连 upstream）。';
+  '为本次深度验证 chat/配额阶段记录的 HTTP 端点。模型列表仍按 BYOK 经 litellm user_config 或厂商 upstream 解析，与上栏 probe-models 一致；深度选模使用平台 catalog，不用网关全局目录。';
 
 const byokTypeTag = (byokType: string) => {
   const colorMap: Record<string, string> = {

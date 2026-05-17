@@ -7,7 +7,8 @@
 ### 1. C 端 / 通用：`route_mode = litellm` + BYOK（`user_config`）
 
 - 业务后端在代理请求体中注入 `user_config` → `model_list` → `litellm_params`（`model`、`api_key`、`api_base`）。
-- 对齐代码：`backend/handlers/api_proxy.go`（`buildLitellmUserConfig`）、`backend/services/api_key_validator.go`（`probeQuotaViaLitellmUserConfig`）。
+- 对齐代码：`backend/handlers/api_proxy.go`（`buildLitellmUserConfig`）、`backend/services/byok_models_probe.go`（`ProbeLitellmBYOKModels` / `ProbeLitellmBYOKChatCompletion`）、`api_key_validator` 深度额度探测。
+- **验证探测**：轻量列表用 `POST /v1/models` + `user_config`（clientside_auth，与国内节点一致），不用 Master Key 拉网关全局 `GET /v1/models`。
 - 网关鉴权：请求 LiteLLM 时使用 `Authorization: Bearer $LITELLM_MASTER_KEY`（见 `resolveAuthTokenFromRouteMode`）。
 - 配置文件：`deploy/litellm/litellm_proxy_config.yaml` 中通配 `model_name` + `configurable_clientside_auth_params`。
 

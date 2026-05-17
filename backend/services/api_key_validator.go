@@ -188,9 +188,9 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 	result.ConnectionTest = true
 	result.ConnectionLatency = probe.LatencyMs
 	metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(probe.LatencyMs))
-	result.ModelsFound = probe.Models
-	result.ModelsCount = len(probe.Models)
-	metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(probe.Models)))
+	result.ModelsFound = FilterBYOKModelsForProvider(provider, probe.Models)
+	result.ModelsCount = len(result.ModelsFound)
+	metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(result.ModelsFound)))
 
 	if isDeepVerification(verificationType) {
 		probeSupported := apiFmt == modelProviderOpenAI || ProviderUsesAnthropicHTTP(provider, apiFmt)
@@ -227,7 +227,7 @@ func (v *APIKeyValidator) performVerificationWithRetry(apiKeyID int, provider, e
 	}
 
 	if isDeepVerification(verificationType) {
-		err = v.updateAPIKeyVerificationStatus(apiKeyID, result)
+		err = v.updateAPIKeyVerificationStatus(apiKeyID, provider, result)
 		if err != nil {
 			logger.LogError(ctx, "api_key_validator", "Failed to update API key verification status", err, map[string]interface{}{
 				"api_key_id": apiKeyID,
@@ -443,18 +443,32 @@ func nullStr(s string) interface{} {
 	return s
 }
 
-func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, result VerificationResult) error {
-	dbResult := normalizeVerificationDBStatus(result.Status)
-	return v.updateAPIKeyVerificationStatusWithStatus(apiKeyID, result, dbResult)
+func (v *APIKeyValidator) persistModelsSupported(apiKeyID int, provider string, models []string) error {
+	db := v.ensureDB()
+	if db == nil {
+		return fmt.Errorf("database not available")
+	}
+	filtered := FilterBYOKModelsForProvider(provider, models)
+	modelsJSON, _ := json.Marshal(filtered)
+	_, err := db.Exec(
+		`UPDATE merchant_api_keys SET models_supported = $1, updated_at = NOW() WHERE id = $2`,
+		modelsJSON, apiKeyID,
+	)
+	return err
 }
 
-func (v *APIKeyValidator) updateAPIKeyVerificationStatusWithStatus(apiKeyID int, result VerificationResult, dbResult string) error {
+func (v *APIKeyValidator) updateAPIKeyVerificationStatus(apiKeyID int, provider string, result VerificationResult) error {
+	dbResult := normalizeVerificationDBStatus(result.Status)
+	return v.updateAPIKeyVerificationStatusWithStatus(apiKeyID, provider, result, dbResult)
+}
+
+func (v *APIKeyValidator) updateAPIKeyVerificationStatusWithStatus(apiKeyID int, provider string, result VerificationResult, dbResult string) error {
 	db := v.ensureDB()
 	if db == nil {
 		return fmt.Errorf("database not available")
 	}
 
-	modelsJSON, _ := json.Marshal(result.ModelsFound)
+	modelsJSON, _ := json.Marshal(FilterBYOKModelsForProvider(provider, result.ModelsFound))
 	verifyMsg := result.ErrorMessage
 	if verifyMsg == "" && result.ErrorCode != "" {
 		verifyMsg = result.ErrorCode
@@ -588,7 +602,7 @@ func (v *APIKeyValidator) handleVerificationError(ctx context.Context, verificat
 
 	if apiKeyID > 0 {
 		newStatus := MapErrorCategoryToVerificationStatus(errInfo.Category, currentStatus)
-		if uerr := v.updateAPIKeyVerificationStatusWithStatus(apiKeyID, result, newStatus); uerr != nil {
+		if uerr := v.updateAPIKeyVerificationStatusWithStatus(apiKeyID, provider, result, newStatus); uerr != nil {
 			logger.LogError(ctx, "api_key_validator", "Failed to update merchant_api_keys after verification error", uerr, map[string]interface{}{
 				"api_key_id": apiKeyID,
 			})
@@ -845,7 +859,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 	var probeErr error
 	var connectionFailed bool
 	for attempt := retryCount; ; attempt++ {
-		probe, probeErr = hc.probeMerchantKeyConnectivity(ctx, synthKey, connectivityBase, modelsAuthToken, probeRouteMode)
+		probe, probeErr = hc.probeMerchantKeyConnectivity(ctx, synthKey, connectivityBase, modelsAuthToken, probeRouteMode, decryptedKey)
 		if probeErr == nil && probe != nil && probe.Success {
 			result.RetryCount = attempt
 			break
@@ -925,9 +939,17 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 		result.NetworkStatus = "ok"
 		result.ConnectionLatency = probe.LatencyMs
 		metrics.VerificationConnectionLatency.WithLabelValues(provider).Observe(float64(probe.LatencyMs))
-		result.ModelsFound = probe.Models
-		result.ModelsCount = len(probe.Models)
-		metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(probe.Models)))
+		result.ModelsFound = FilterBYOKModelsForProvider(provider, probe.Models)
+		result.ModelsCount = len(result.ModelsFound)
+		metrics.ModelsDiscovered.WithLabelValues(provider).Add(float64(len(result.ModelsFound)))
+	}
+
+	if !isDeepVerification(verificationType) && result.ConnectionTest {
+		if persistErr := v.persistModelsSupported(apiKeyID, provider, result.ModelsFound); persistErr != nil {
+			logger.LogError(ctx, "api_key_validator", "Failed to persist models_supported after light verification", persistErr, map[string]interface{}{
+				"api_key_id": apiKeyID,
+			})
+		}
 	}
 
 	if isDeepVerification(verificationType) {
@@ -937,8 +959,12 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 			if probeSupported {
 				var quotaOK bool
 				var quotaCode, quotaMsg string
+				modelsForQuota := result.ModelsFound
 				if routeMode == GatewayModeLitellm {
-					quotaOK, quotaCode, quotaMsg = v.probeQuotaWithEndpoint(endpoint, provider, authToken, result.ModelsFound, routeMode, decryptedKey, probeModel)
+					modelsForQuota = nil
+				}
+				if routeMode == GatewayModeLitellm {
+					quotaOK, quotaCode, quotaMsg = v.probeQuotaWithEndpoint(endpoint, provider, authToken, modelsForQuota, routeMode, decryptedKey, probeModel)
 				} else if ProviderUsesAnthropicHTTP(provider, apiFmt) {
 					probeClient := newProxyAwareHTTPClient(15*time.Second, probeRouteMode)
 					model := selectProbeModel(provider, result.ModelsFound, probeModel)
@@ -970,7 +996,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 	}
 
 	if isDeepVerification(verificationType) {
-		err = v.updateAPIKeyVerificationStatus(apiKeyID, result)
+		err = v.updateAPIKeyVerificationStatus(apiKeyID, provider, result)
 		if err != nil {
 			logger.LogError(ctx, "api_key_validator", "Failed to update API key verification status", err, map[string]interface{}{
 				"api_key_id": apiKeyID,
@@ -1237,56 +1263,10 @@ func resolveLitellmModelName(provider, model string) (string, error) {
 }
 
 func (v *APIKeyValidator) probeQuotaViaLitellmUserConfig(chatEndpoint, provider, catalogModel, originalAPIKey, litellmMasterKey string) (bool, string, string) {
-	upstreamBaseURL := ResolveLitellmUpstreamBaseURL(provider)
-	if upstreamBaseURL == "" {
-		providerConfig, err := v.getProviderConfig(provider)
-		if err != nil {
-			return false, "QUOTA_PROBE_PROVIDER_CONFIG_ERROR", fmt.Sprintf("failed to get provider config: %v", err)
-		}
-		upstreamBaseURL = strings.TrimRight(providerConfig["api_base_url"], "/")
-	}
-	if upstreamBaseURL == "" {
-		return false, "QUOTA_PROBE_UPSTREAM_URL_MISSING", "upstream base URL not configured"
-	}
-
-	catalogModel = strings.TrimSpace(catalogModel)
-	userConfig := BuildLitellmUserConfig(provider, catalogModel, originalAPIKey, upstreamBaseURL)
-
-	body := map[string]interface{}{
-		"model":       catalogModel,
-		"messages":    []map[string]string{{"role": "user", "content": "ping"}},
-		"max_tokens":  1,
-		"user_config": userConfig,
-	}
-
-	jsonBody, _ := json.Marshal(body)
-	req, err := http.NewRequest("POST", chatEndpoint, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return false, ErrCodeQuotaProbeRequestBuildFailed, err.Error()
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", litellmMasterKey))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := newProxyAwareHTTPClient(30*time.Second, GatewayModeLitellm).Do(req)
-	if err != nil {
-		return false, ErrCodeQuotaProbeNetworkError, err.Error()
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return true, "", ""
-	}
-
-	rawBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
-	code, msg := ExtractProviderError(rawBody)
-	if code == "" {
-		code = fmt.Sprintf("HTTP_%d", resp.StatusCode)
-	}
-	if msg == "" {
-		msg = strings.TrimSpace(string(rawBody))
-	}
-	if resp.StatusCode == http.StatusPaymentRequired || resp.StatusCode == http.StatusTooManyRequests {
-		code = errorCategoryQuotaInsufficient
-	}
-	return false, code, msg
+	ok, _, code, msg := ProbeLitellmBYOKChatCompletion(
+		context.Background(),
+		newProxyAwareHTTPClient(30*time.Second, GatewayModeLitellm),
+		chatEndpoint, provider, catalogModel, originalAPIKey, litellmMasterKey,
+	)
+	return ok, code, msg
 }

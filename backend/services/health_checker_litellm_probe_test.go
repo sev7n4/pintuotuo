@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,23 +15,33 @@ func TestResolveProviderConnectivityBase_LitellmUsesGatewayNotDirect(t *testing.
 	t.Setenv("LITELLM_MASTER_KEY", "sk-litellm-master-test")
 
 	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/models" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/models" {
+			body, _ := io.ReadAll(r.Body)
+			var payload map[string]interface{}
+			_ = json.Unmarshal(body, &payload)
+			if payload["user_config"] == nil {
+				t.Error("expected user_config in POST /v1/models")
+			}
+			if got := r.Header.Get("Authorization"); got != "Bearer sk-litellm-master-test" {
+				t.Errorf("Authorization = %q, want LiteLLM master key", got)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"id":"gemini-2.0-flash"}]}`))
+			return
 		}
-		if got := r.Header.Get("Authorization"); got != "Bearer sk-litellm-master-test" {
-			t.Errorf("Authorization = %q, want LiteLLM master key", got)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"id":"gemini/gemini-2.0-flash"}]}`))
+		t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
 	}))
 	defer gateway.Close()
 
 	t.Setenv("LLM_GATEWAY_LITELLM_URL_OVERSEAS", gateway.URL)
+	SetLitellmCacheForTest(map[string]LitellmTemplateEntry{
+		"google": {ProviderAPIBaseURL: "https://generativelanguage.googleapis.com/v1beta/openai"},
+	})
 
 	apiKey := &models.MerchantAPIKey{
-		ID:       1,
-		Provider: "google",
-		Region:   regionOverseas,
+		ID:        1,
+		Provider:  "google",
+		Region:    regionOverseas,
 		RouteMode: GatewayModeLitellm,
 		RouteConfig: map[string]interface{}{
 			"endpoints": map[string]interface{}{
@@ -56,12 +68,15 @@ func TestResolveProviderConnectivityBase_LitellmUsesGatewayNotDirect(t *testing.
 		t.Fatalf("base = %q, want %q", base, wantBase)
 	}
 
-	probe, err := hc.probeMerchantKeyConnectivity(context.Background(), apiKey, base, token, mode)
+	probe, err := hc.probeMerchantKeyConnectivity(context.Background(), apiKey, base, token, mode, "sk-byok-test")
 	if err != nil {
 		t.Fatalf("probeMerchantKeyConnectivity: %v", err)
 	}
 	if probe == nil || !probe.Success {
 		t.Fatalf("probe = %+v, want success", probe)
+	}
+	if len(probe.Models) != 1 || probe.Models[0] != "gemini-2.0-flash" {
+		t.Fatalf("models = %v, want BYOK-filtered gemini list", probe.Models)
 	}
 }
 
