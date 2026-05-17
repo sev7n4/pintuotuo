@@ -35,7 +35,7 @@
 
 | 步骤 | direct / proxy | litellm |
 |------|----------------|---------|
-| 轻量 / 立即 / FullVerification 列表 | BYOK → 厂商 `GET /v1/models`（或 Anthropic messages） | **P3**：`POST {gateway}/v1/models` + `user_config`（Master Key）；失败则 BYOK `GET` 上游；再失败则 BYOK chat + 预置列表 |
+| 轻量 / 立即 / FullVerification 列表 | BYOK → 厂商 `GET /v1/models`（或 Anthropic messages） | ① BYOK `GET` 上游（大陆可达时，如 OpenRouter）② 海外 LiteLLM + `user_config` **chat 探活** → **DB active SPU 目录**（`predefinedModels` 仅兜底） |
 | 列表写回 `models_supported` | 轻量成功即写（按 provider 过滤） | 同左；**禁止** Master Key `GET` 网关全局目录 |
 | 深度选模 | `probe.Models`（BYOK 上游） | **忽略** 网关目录；`selectQuotaProbeModel` 用平台 catalog / `models_supported` |
 | 深度 chat | BYOK 打厂商 | `POST {gateway}/v1/chat/completions` + Master Key + `user_config`（`ProbeLitellmBYOKChatCompletion`） |

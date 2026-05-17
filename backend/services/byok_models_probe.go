@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/pintuotuo/backend/config"
 )
 
 // FilterBYOKModelsForProvider keeps model ids that belong to the BYOK provider and drops gateway/noise entries.
@@ -38,22 +40,35 @@ func FilterBYOKModelsForProvider(provider string, models []string) []string {
 	return out
 }
 
-// ProbeLitellmBYOKChatCompletion sends a minimal chat via LiteLLM with user_config (BYOK path through gateway).
-func ProbeLitellmBYOKChatCompletion(
+// litellmBYOKPathReachable is true when the request reached the upstream via LiteLLM+BYOK (auth/quota errors count).
+func litellmBYOKPathReachable(statusCode int) bool {
+	if statusCode >= 200 && statusCode < 300 {
+		return true
+	}
+	switch statusCode {
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusPaymentRequired, http.StatusTooManyRequests:
+		return true
+	default:
+		return false
+	}
+}
+
+// probeLitellmBYOKChat probes chat via gateway user_config. billingOK is true only on 2xx; pathOK includes auth/quota responses.
+func probeLitellmBYOKChat(
 	ctx context.Context,
 	client *http.Client,
 	chatEndpoint, provider, catalogModel, decryptedBYOK, litellmMasterKey string,
-) (ok bool, statusCode int, errCode, errMsg string) {
+) (pathOK, billingOK bool, statusCode int, errCode, errMsg string) {
 	if client == nil {
 		client = newProxyAwareHTTPClient(30*time.Second, GatewayModeLitellm)
 	}
-	upstreamBaseURL := ResolveLitellmUpstreamBaseURL(provider)
+	upstreamBaseURL := ResolveProbeUpstreamBaseURL(provider)
 	if upstreamBaseURL == "" {
-		return false, 0, "QUOTA_PROBE_UPSTREAM_URL_MISSING", "upstream base URL not configured"
+		return false, false, 0, "QUOTA_PROBE_UPSTREAM_URL_MISSING", "upstream base URL not configured"
 	}
 	catalogModel = strings.TrimSpace(catalogModel)
 	if catalogModel == "" {
-		catalogModel = defaultCatalogProbeModel(provider)
+		catalogModel = defaultCatalogProbeModel(context.Background(), provider)
 	}
 	userConfig := BuildLitellmUserConfig(provider, catalogModel, decryptedBYOK, upstreamBaseURL)
 	body := map[string]interface{}{
@@ -65,18 +80,20 @@ func ProbeLitellmBYOKChatCompletion(
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, chatEndpoint, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return false, 0, ErrCodeQuotaProbeRequestBuildFailed, err.Error()
+		return false, false, 0, ErrCodeQuotaProbeRequestBuildFailed, err.Error()
 	}
 	req.Header.Set("Authorization", "Bearer "+litellmMasterKey)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return false, 0, ErrCodeQuotaProbeNetworkError, err.Error()
+		return false, false, 0, ErrCodeQuotaProbeNetworkError, err.Error()
 	}
 	defer resp.Body.Close()
 	statusCode = resp.StatusCode
-	if statusCode >= 200 && statusCode < 300 {
-		return true, statusCode, "", ""
+	pathOK = litellmBYOKPathReachable(statusCode)
+	billingOK = statusCode >= 200 && statusCode < 300
+	if billingOK {
+		return pathOK, billingOK, statusCode, "", ""
 	}
 	rawBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
 	errCode, errMsg = ExtractProviderError(rawBody)
@@ -89,10 +106,42 @@ func ProbeLitellmBYOKChatCompletion(
 	if statusCode == http.StatusPaymentRequired || statusCode == http.StatusTooManyRequests {
 		errCode = errorCategoryQuotaInsufficient
 	}
-	return false, statusCode, errCode, errMsg
+	return pathOK, billingOK, statusCode, errCode, errMsg
 }
 
-// ProbeLitellmBYOKModels lists models for a BYOK key via LiteLLM user_config, falling back to upstream GET with BYOK.
+// ProbeLitellmBYOKChatCompletion sends a minimal chat via LiteLLM with user_config (2xx only).
+func ProbeLitellmBYOKChatCompletion(
+	ctx context.Context,
+	client *http.Client,
+	chatEndpoint, provider, catalogModel, decryptedBYOK, litellmMasterKey string,
+) (ok bool, statusCode int, errCode, errMsg string) {
+	pathOK, billingOK, statusCode, errCode, errMsg := probeLitellmBYOKChat(ctx, client, chatEndpoint, provider, catalogModel, decryptedBYOK, litellmMasterKey)
+	if !pathOK {
+		return false, statusCode, errCode, errMsg
+	}
+	return billingOK, statusCode, errCode, errMsg
+}
+
+func probeLitellmBYOKChatWithCandidates(
+	ctx context.Context,
+	client *http.Client,
+	chatEndpoint, provider, decryptedBYOK, litellmMasterKey string,
+	candidates []string,
+) (pathOK, billingOK bool, statusCode int, errCode, errMsg, modelUsed string) {
+	for _, model := range candidates {
+		pathOK, billingOK, statusCode, errCode, errMsg = probeLitellmBYOKChat(ctx, client, chatEndpoint, provider, model, decryptedBYOK, litellmMasterKey)
+		if pathOK {
+			return pathOK, billingOK, statusCode, errCode, errMsg, model
+		}
+		if statusCode == http.StatusNotFound {
+			continue
+		}
+	}
+	return false, false, statusCode, errCode, errMsg, ""
+}
+
+// ProbeLitellmBYOKModels lists models for a BYOK key under route_mode=litellm.
+// Order: BYOK GET upstream (when reachable) → gateway chat path + platform catalog list → fail.
 func ProbeLitellmBYOKModels(
 	ctx context.Context,
 	client *http.Client,
@@ -103,41 +152,14 @@ func ProbeLitellmBYOKModels(
 		client = newProxyAwareHTTPClient(15*time.Second, GatewayModeLitellm)
 	}
 	gatewayV1Base = normalizeOpenAICompatBase(gatewayV1Base)
-	upstream := ResolveLitellmUpstreamBaseURL(provider)
+	upstream := ResolveProbeUpstreamBaseURL(provider)
+	chatURL := OpenAICompatChatCompletionsURL(gatewayV1Base)
+	candidates := CatalogProbeCandidates(ctx, provider)
 
 	if ProviderUsesAnthropicHTTP(provider, apiFormat) {
-		chatURL := OpenAICompatChatCompletionsURL(gatewayV1Base)
-		ok, statusCode, code, msg := ProbeLitellmBYOKChatCompletion(ctx, client, chatURL, provider, "", decryptedBYOK, masterKey)
-		models := anthropicProbeModelList(ctx, client, decryptedBYOK, provider, openAISiblingBase, defaultCatalogProbeModel(provider))
-		models = FilterBYOKModelsForProvider(provider, models)
-		result := &ProbeModelsResult{
-			Success:    ok,
-			StatusCode: statusCode,
-			ErrorCode:  code,
-			ErrorMsg:   msg,
-			Models:     models,
-		}
-		if !ok && msg != "" {
-			return result, nil
-		}
-		if len(models) > 0 {
-			result.Success = true
-		}
-		return result, nil
+		return probeLitellmAnthropicBYOKModels(ctx, client, chatURL, masterKey, provider, decryptedBYOK, openAISiblingBase, upstream, candidates)
 	}
 
-	catalogModel := defaultCatalogProbeModel(provider)
-	userConfig := BuildLitellmUserConfig(provider, catalogModel, decryptedBYOK, upstream)
-
-	// P3: LiteLLM clientside_auth — list models through gateway with user_config (same as domestic).
-	if probe, err := probeLitellmGatewayModelsWithUserConfig(ctx, client, gatewayV1Base, masterKey, userConfig, provider); err == nil && probe != nil && probe.Success && len(probe.Models) > 0 {
-		probe.Models = FilterBYOKModelsForProvider(provider, probe.Models)
-		if len(probe.Models) > 0 {
-			return probe, nil
-		}
-	}
-
-	// Fallback: BYOK GET upstream /v1/models (same api_base as user_config).
 	if upstream != "" {
 		probe, err := ProbeProviderModels(ctx, client, OpenAICompatModelsProbeURL(upstream), decryptedBYOK, provider)
 		if probe != nil {
@@ -148,72 +170,68 @@ func ProbeLitellmBYOKModels(
 		}
 	}
 
-	// Last resort: gateway BYOK chat path works → predefined catalog ids for this provider.
-	chatURL := OpenAICompatChatCompletionsURL(gatewayV1Base)
-	ok, statusCode, code, msg := ProbeLitellmBYOKChatCompletion(ctx, client, chatURL, provider, catalogModel, decryptedBYOK, masterKey)
-	if ok {
-		models := FilterBYOKModelsForProvider(provider, GetPredefinedModels(provider))
+	pathOK, _, statusCode, code, msg, _ := probeLitellmBYOKChatWithCandidates(ctx, client, chatURL, provider, decryptedBYOK, masterKey, candidates)
+	if pathOK {
+		models := FilterBYOKModelsForProvider(provider, ProbeCatalogModelsForProvider(ctx, provider))
 		return &ProbeModelsResult{Success: true, StatusCode: statusCode, Models: models}, nil
 	}
 	return &ProbeModelsResult{Success: false, StatusCode: statusCode, ErrorCode: code, ErrorMsg: msg}, nil
 }
 
-func probeLitellmGatewayModelsWithUserConfig(
+func probeLitellmAnthropicBYOKModels(
 	ctx context.Context,
 	client *http.Client,
-	gatewayV1Base, masterKey string,
-	userConfig map[string]interface{},
-	provider string,
+	chatURL, masterKey, provider, decryptedBYOK, openAISiblingBase, upstream string,
+	candidates []string,
 ) (*ProbeModelsResult, error) {
-	modelsURL := OpenAICompatModelsProbeURL(gatewayV1Base)
-	body, _ := json.Marshal(map[string]interface{}{"user_config": userConfig})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, modelsURL, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
+	pathOK, _, statusCode, code, msg, _ := probeLitellmBYOKChatWithCandidates(ctx, client, chatURL, provider, decryptedBYOK, masterKey, candidates)
+	if !pathOK {
+		return &ProbeModelsResult{Success: false, StatusCode: statusCode, ErrorCode: code, ErrorMsg: msg}, nil
 	}
-	req.Header.Set("Authorization", "Bearer "+masterKey)
-	req.Header.Set("Content-Type", "application/json")
-	return executeProbeModelsRequest(ctx, client, req, provider)
+
+	models := FilterBYOKModelsForProvider(provider, ProbeCatalogModelsForProvider(ctx, provider))
+	siblingBase := normalizeOpenAICompatBase(openAISiblingBase)
+	if siblingBase != "" && upstream != "" {
+		if modelsProbe, err := ProbeProviderModels(ctx, client, OpenAICompatModelsProbeURL(siblingBase), decryptedBYOK, provider); err == nil && modelsProbe != nil && modelsProbe.Success {
+			if merged := FilterBYOKModelsForProvider(provider, modelsProbe.Models); len(merged) > 0 {
+				models = merged
+			}
+		}
+	}
+	if len(models) == 0 {
+		return &ProbeModelsResult{Success: false, StatusCode: statusCode, ErrorCode: "PROBE_MODEL_LIST_EMPTY", ErrorMsg: "no catalog models for provider"}, nil
+	}
+	return &ProbeModelsResult{Success: true, StatusCode: statusCode, Models: models}, nil
 }
 
-func executeProbeModelsRequest(ctx context.Context, client *http.Client, req *http.Request, provider string) (*ProbeModelsResult, error) {
-	start := time.Now()
-	resp, err := client.Do(req)
-	latencyMs := int(time.Since(start).Milliseconds())
-	if err != nil {
-		errInfo := MapProviderError(0, "", "connection failed: "+err.Error(), nil, err, "")
-		return &ProbeModelsResult{
-			Success:       false,
-			LatencyMs:     latencyMs,
-			ErrorMsg:      errInfo.ProviderMessage,
-			ErrorCategory: errInfo.Category,
-		}, err
+// ResolveProbeUpstreamBaseURL returns vendor api_base for BYOK probes (litellm cache, then model_providers).
+func ResolveProbeUpstreamBaseURL(provider string) string {
+	if u := ResolveLitellmUpstreamBaseURL(provider); u != "" {
+		return u
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	result := &ProbeModelsResult{StatusCode: resp.StatusCode, LatencyMs: latencyMs}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		code, msg := ExtractProviderError(body)
-		if code == "" {
-			code = formatHTTPStatusCode(resp.StatusCode)
+	return providerAPIBaseURLFromDB(provider)
+}
+
+func providerAPIBaseURLFromDB(provider string) string {
+	db := config.GetDB()
+	if db == nil {
+		return ""
+	}
+	for _, pcode := range catalogProviderCodes(provider) {
+		var apiBase string
+		err := db.QueryRow(
+			`SELECT COALESCE(NULLIF(TRIM(api_base_url), ''), '')
+			 FROM model_providers WHERE lower(trim(code)) = lower(trim($1)) AND status = 'active'`,
+			pcode,
+		).Scan(&apiBase)
+		if err == nil {
+			apiBase = strings.TrimRight(strings.TrimSpace(apiBase), "/")
+			if apiBase != "" {
+				return apiBase
+			}
 		}
-		if msg == "" {
-			msg = strings.TrimSpace(string(body))
-		}
-		errInfo := MapProviderError(resp.StatusCode, code, msg, resp.Header, nil, string(body))
-		result.ErrorCode = code
-		result.ErrorMsg = msg
-		result.ErrorCategory = errInfo.Category
-		return result, nil
 	}
-	models, parseErr := parseOpenAIModels(body)
-	if parseErr != nil {
-		result.ErrorMsg = "failed to parse models: " + parseErr.Error()
-		return result, nil
-	}
-	result.Success = true
-	result.Models = models
-	return result, nil
+	return ""
 }
 
 func formatHTTPStatusCode(code int) string {
