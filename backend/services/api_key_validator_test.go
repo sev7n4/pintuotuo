@@ -300,6 +300,13 @@ func TestResolveLitellmModelName(t *testing.T) {
 			want:     "gemini/gemini-pro",
 			wantErr:  false,
 		},
+		{
+			name:     "openrouter catalog id",
+			provider: "openrouter",
+			model:    "anthropic/claude-3.5-sonnet",
+			want:     "openrouter/anthropic/claude-3.5-sonnet",
+			wantErr:  false,
+		},
 	}
 
 	for _, tt := range tests {
