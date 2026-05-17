@@ -169,7 +169,17 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 		}, nil
 	}
 
-	probe, err := s.probeMerchantKeyConnectivity(ctx, apiKey, baseURL, authToken, resolvedMode)
+	decryptedBYOK := s.getDecryptedAPIKey(apiKey)
+	if strings.TrimSpace(decryptedBYOK) == "" && strings.TrimSpace(apiKey.APIKeyEncrypted) != "" {
+		return &HealthCheckResult{
+			Success:      false,
+			Status:       HealthStatusUnhealthy,
+			ErrorMessage: "failed to decrypt API key",
+			CheckType:    "lightweight",
+		}, nil
+	}
+
+	probe, err := s.probeMerchantKeyConnectivity(ctx, apiKey, baseURL, authToken, resolvedMode, decryptedBYOK)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,
@@ -205,8 +215,8 @@ func (s *HealthChecker) LightweightPing(ctx context.Context, apiKey *models.Merc
 	}, nil
 }
 
-// ResolveProviderConnectivityBase returns the probe base URL and bearer token for connectivity checks.
-// For litellm route mode the base is the LiteLLM gateway (/v1) and auth is LITELLM_MASTER_KEY — not the vendor direct URL or BYOK sk.
+// ResolveProviderConnectivityBase returns the LiteLLM gateway base (/v1) + master key for litellm,
+// or vendor base + BYOK for direct/proxy. Model listing still uses BYOK via ProbeLitellmBYOKModels (user_config).
 func (s *HealthChecker) ResolveProviderConnectivityBase(ctx context.Context, apiKey *models.MerchantAPIKey) (baseURL string, authToken string, resolvedRouteMode string, err error) {
 	trafficEp, resolveErr := s.resolveEndpoint(ctx, apiKey)
 	if resolveErr != nil {
@@ -230,20 +240,26 @@ func (s *HealthChecker) ResolveProviderConnectivityBase(ctx context.Context, api
 	return normalizeOpenAICompatBase(modelsBase), authToken, resolvedRouteMode, nil
 }
 
-// probeMerchantKeyConnectivity runs provider connectivity probes. LiteLLM gateways are OpenAI-compatible
-// (GET /v1/models + master key); Anthropic-native POST /messages is not used on the gateway host.
+// probeMerchantKeyConnectivity lists models using merchant BYOK credentials.
+// litellm: user_config via gateway (P3) with upstream BYOK fallback; direct/proxy: vendor endpoint + BYOK.
 func (s *HealthChecker) probeMerchantKeyConnectivity(
 	ctx context.Context,
 	apiKey *models.MerchantAPIKey,
-	baseURL, authToken, resolvedMode string,
+	baseURL, authToken, resolvedMode, decryptedBYOK string,
 ) (*ProbeModelsResult, error) {
-	client := newProxyAwareHTTPClient(10*time.Second, resolvedMode)
+	client := newProxyAwareHTTPClient(15*time.Second, resolvedMode)
 	if resolvedMode == GatewayModeLitellm {
-		return ProbeProviderModels(ctx, client, OpenAICompatModelsProbeURL(baseURL), authToken, apiKey.Provider)
+		apiFmt := s.providerAPIFormat(apiKey.Provider)
+		siblingOpenAIBase := s.siblingOpenAIBaseForProvider(apiKey.Provider)
+		return ProbeLitellmBYOKModels(ctx, client, baseURL, authToken, apiKey.Provider, decryptedBYOK, apiFmt, siblingOpenAIBase)
 	}
 	apiFmt := s.providerAPIFormat(apiKey.Provider)
 	siblingOpenAIBase := s.siblingOpenAIBaseForProvider(apiKey.Provider)
-	return ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt, siblingOpenAIBase)
+	probe, err := ProbeProviderConnectivity(ctx, client, baseURL, authToken, apiKey.Provider, apiFmt, siblingOpenAIBase)
+	if probe != nil && probe.Success {
+		probe.Models = FilterBYOKModelsForProvider(apiKey.Provider, probe.Models)
+	}
+	return probe, err
 }
 
 // ResolveOpenAICompatModelsListProbe returns the GET URL and bearer token for OpenAI-compatible model listing
@@ -301,7 +317,17 @@ func (s *HealthChecker) FullVerification(ctx context.Context, apiKey *models.Mer
 		}
 	}
 
-	probe, err := s.probeMerchantKeyConnectivity(ctx, apiKey, baseURL, authToken, resolvedMode)
+	decryptedBYOK := s.getDecryptedAPIKey(apiKey)
+	if strings.TrimSpace(decryptedBYOK) == "" && strings.TrimSpace(apiKey.APIKeyEncrypted) != "" {
+		return &HealthCheckResult{
+			Success:      false,
+			Status:       HealthStatusUnhealthy,
+			ErrorMessage: "failed to decrypt API key",
+			CheckType:    "full",
+		}, nil
+	}
+
+	probe, err := s.probeMerchantKeyConnectivity(ctx, apiKey, baseURL, authToken, resolvedMode, decryptedBYOK)
 	if err != nil {
 		return &HealthCheckResult{
 			Success:      false,

@@ -31,6 +31,17 @@
 
 ## 3. 健康检查 / 额度探测
 
+`HealthChecker` / `APIKeyValidator` 对 **模型列表** 与 **深度 chat** 的 SSOT（与 `direct` / `proxy` 对齐，仅 HTTP 路径不同）：
+
+| 步骤 | direct / proxy | litellm |
+|------|----------------|---------|
+| 轻量 / 立即 / FullVerification 列表 | BYOK → 厂商 `GET /v1/models`（或 Anthropic messages） | **P3**：`POST {gateway}/v1/models` + `user_config`（Master Key）；失败则 BYOK `GET` 上游；再失败则 BYOK chat + 预置列表 |
+| 列表写回 `models_supported` | 轻量成功即写（按 provider 过滤） | 同左；**禁止** Master Key `GET` 网关全局目录 |
+| 深度选模 | `probe.Models`（BYOK 上游） | **忽略** 网关目录；`selectQuotaProbeModel` 用平台 catalog / `models_supported` |
+| 深度 chat | BYOK 打厂商 | `POST {gateway}/v1/chat/completions` + Master Key + `user_config`（`ProbeLitellmBYOKChatCompletion`） |
+
+实现入口：`ProbeLitellmBYOKModels`、`FilterBYOKModelsForProvider`、`probeMerchantKeyConnectivity`、`selectQuotaProbeModel`。管理端 `GET /admin/byok-routing/:id/probe-models` 与 `FullVerification` 同源。
+
 `HealthChecker` 使用同一商户行解析（`resolveLitellmEndpoint` 等），并对历史占位主机名做 **`NormalizeLegacyLitellmGatewayBaseURL`**：
 
 | URL 子串 | 映射到 |
