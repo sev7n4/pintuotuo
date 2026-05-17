@@ -93,6 +93,9 @@ func TestProbeLitellmBYOKModels_ChatPathUsesCatalogNotPOSTModels(t *testing.T) {
 			if body["user_config"] == nil {
 				t.Error("expected user_config on chat")
 			}
+			if body["model"] != "gemini/gemini-2.0-flash" {
+				t.Errorf("gateway model %v want gemini/gemini-2.0-flash", body["model"])
+			}
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"error":{"message":"invalid key"}}`))
 		default:

@@ -71,8 +71,12 @@ func probeLitellmBYOKChat(
 		catalogModel = defaultCatalogProbeModel(context.Background(), provider)
 	}
 	userConfig := BuildLitellmUserConfig(provider, catalogModel, decryptedBYOK, upstreamBaseURL)
+	gatewayModel := LitellmGatewayRequestModel(provider, catalogModel)
+	if gatewayModel == "" {
+		gatewayModel = catalogModel
+	}
 	body := map[string]interface{}{
-		"model":       catalogModel,
+		"model":       gatewayModel,
 		"messages":    []map[string]string{{"role": "user", "content": "ping"}},
 		"max_tokens":  1,
 		"user_config": userConfig,

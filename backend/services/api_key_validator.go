@@ -1241,6 +1241,8 @@ func litellmProviderPrefix(provider string) string {
 		return "gemini"
 	case modelProviderStepfun:
 		return modelProviderOpenAI
+	case modelProviderOpenRouter:
+		return modelProviderOpenRouter
 	case modelProviderBytedance:
 		return ""
 	default:
@@ -1249,6 +1251,9 @@ func litellmProviderPrefix(provider string) string {
 }
 
 func resolveLitellmModelName(provider, model string) (string, error) {
+	if strings.EqualFold(strings.TrimSpace(provider), modelProviderOpenRouter) {
+		return formatLitellmModelForOpenRouter(model), nil
+	}
 	prefix := litellmProviderPrefix(provider)
 	if prefix == "" {
 		return "", fmt.Errorf("provider %s is not supported by litellm (requires endpoint_id for bytedance)", provider)
