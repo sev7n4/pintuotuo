@@ -53,14 +53,16 @@ func LoadLitellmTemplateCache() {
 		}
 		code = strings.TrimSpace(code)
 		tpl = strings.TrimSpace(tpl)
-		if tpl == "" {
+		providerBase = strings.TrimSpace(providerBase)
+		gwBase = strings.TrimSpace(gwBase)
+		if tpl == "" && providerBase == "" && gwBase == "" {
 			continue
 		}
 		newCache[code] = LitellmTemplateEntry{
 			Template:           tpl,
 			APIKeyEnv:          strings.TrimSpace(keyEnv),
-			APIBase:            strings.TrimSpace(gwBase),
-			ProviderAPIBaseURL: strings.TrimSpace(providerBase),
+			APIBase:            gwBase,
+			ProviderAPIBaseURL: providerBase,
 		}
 	}
 
@@ -92,7 +94,7 @@ func ResolveLitellmModelFromCache(provider, model string) (string, error) {
 	}
 
 	entry, ok := litellmTemplateCache[strings.TrimSpace(provider)]
-	if !ok || entry.Template == "" {
+	if !ok || strings.TrimSpace(entry.Template) == "" {
 		return "", errProviderNotInCache
 	}
 

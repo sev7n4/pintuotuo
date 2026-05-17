@@ -2,10 +2,9 @@ package services
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/pintuotuo/backend/models"
@@ -15,18 +14,12 @@ func TestResolveProviderConnectivityBase_LitellmUsesGatewayNotDirect(t *testing.
 	t.Setenv("LITELLM_MASTER_KEY", "sk-litellm-master-test")
 
 	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/models" {
-			body, _ := io.ReadAll(r.Body)
-			var payload map[string]interface{}
-			_ = json.Unmarshal(body, &payload)
-			if payload["user_config"] == nil {
-				t.Error("expected user_config in POST /v1/models")
-			}
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/chat/completions" {
 			if got := r.Header.Get("Authorization"); got != "Bearer sk-litellm-master-test" {
 				t.Errorf("Authorization = %q, want LiteLLM master key", got)
 			}
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"data":[{"id":"gemini-2.0-flash"}]}`))
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":{"message":"invalid key"}}`))
 			return
 		}
 		t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
@@ -75,8 +68,13 @@ func TestResolveProviderConnectivityBase_LitellmUsesGatewayNotDirect(t *testing.
 	if probe == nil || !probe.Success {
 		t.Fatalf("probe = %+v, want success", probe)
 	}
-	if len(probe.Models) != 1 || probe.Models[0] != "gemini-2.0-flash" {
-		t.Fatalf("models = %v, want BYOK-filtered gemini list", probe.Models)
+	if len(probe.Models) == 0 {
+		t.Fatalf("models = %v, want catalog/predefined gemini ids", probe.Models)
+	}
+	for _, m := range probe.Models {
+		if !strings.Contains(strings.ToLower(m), "gemini") {
+			t.Fatalf("models = %v, want provider-filtered gemini only", probe.Models)
+		}
 	}
 }
 

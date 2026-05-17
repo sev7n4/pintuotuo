@@ -887,16 +887,15 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 
 		result.ConnectionTest = false
 		result.ConnectionError = msg
-		result.NetworkStatus = "network_error"
-		result.ModelsFound = GetPredefinedModels(provider)
-		result.ModelsCount = len(result.ModelsFound)
+		result.NetworkStatus = "fallback"
+		result.ModelsFound = nil
+		result.ModelsCount = 0
 
-		logger.LogWarn(ctx, "api_key_validator", "Light verification failed, using predefined models", map[string]interface{}{
-			"api_key_id":      apiKeyID,
-			"provider":        provider,
-			"error_code":      code,
-			"error_message":   msg,
-			"models_fallback": result.ModelsFound,
+		logger.LogWarn(ctx, "api_key_validator", "Light verification failed without BYOK path", map[string]interface{}{
+			"api_key_id":    apiKeyID,
+			"provider":      provider,
+			"error_code":    code,
+			"error_message": msg,
 		})
 
 		if !isDeepVerification(verificationType) {
@@ -921,7 +920,7 @@ func (v *APIKeyValidator) performVerificationWithRouteMode(
 				})
 			}
 
-			logger.LogInfo(ctx, "api_key_validator", "Light verification completed with fallback models", map[string]interface{}{
+			logger.LogInfo(ctx, "api_key_validator", "Light verification completed without connection (fallback status)", map[string]interface{}{
 				"api_key_id":      apiKeyID,
 				"verification_id": verificationID,
 				"status":          result.Status,

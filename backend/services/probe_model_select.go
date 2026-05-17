@@ -1,6 +1,9 @@
 package services
 
-import "strings"
+import (
+	"context"
+	"strings"
+)
 
 // pickProbeModelFromCatalog selects a model id from a LiteLLM /v1/models list for the given BYOK provider.
 // Gateway model lists are often cross-vendor; avoid using models[0] when it belongs to another provider.
@@ -76,7 +79,7 @@ func selectQuotaProbeModel(provider string, models []string, userSelected, route
 		if picked := pickCatalogProbeModel(provider, models); picked != "" {
 			return picked
 		}
-		return defaultCatalogProbeModel(provider)
+		return defaultCatalogProbeModel(context.Background(), provider)
 	}
 	return selectProbeModel(provider, models, "")
 }
@@ -114,9 +117,11 @@ func isGatewayCatalogNoise(model string) bool {
 	return false
 }
 
-func defaultCatalogProbeModel(provider string) string {
-	if models := GetPredefinedModels(provider); len(models) > 0 {
-		return models[0]
+func defaultCatalogProbeModel(ctx context.Context, provider string) string {
+	for _, m := range CatalogProbeCandidates(ctx, provider) {
+		if strings.TrimSpace(m) != "" {
+			return m
+		}
 	}
 	return selectProbeModel(provider, nil, "")
 }

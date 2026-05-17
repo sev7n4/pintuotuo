@@ -91,6 +91,16 @@ func TestResolveLitellmModelFromCache(t *testing.T) {
 			want:     "",
 			wantErr:  true,
 		},
+		{
+			name: "provider base only without template still resolves upstream",
+			cache: map[string]LitellmTemplateEntry{
+				"openrouter": {ProviderAPIBaseURL: "https://openrouter.ai/api/v1"},
+			},
+			provider: "openrouter",
+			model:    "gpt-4o",
+			want:     "",
+			wantErr:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -193,6 +203,16 @@ func TestResolveLitellmUpstreamBaseURL(t *testing.T) {
 		got := ResolveLitellmUpstreamBaseURL("unknown")
 		if got != "" {
 			t.Errorf("ResolveLitellmUpstreamBaseURL(\"unknown\") = %q, want empty", got)
+		}
+	})
+
+	t.Run("openrouter provider base without litellm template", func(t *testing.T) {
+		SetLitellmCacheForTest(map[string]LitellmTemplateEntry{
+			"openrouter": {ProviderAPIBaseURL: "https://openrouter.ai/api/v1"},
+		})
+		got := ResolveLitellmUpstreamBaseURL("openrouter")
+		if got != "https://openrouter.ai/api/v1" {
+			t.Errorf("got %q", got)
 		}
 	})
 
